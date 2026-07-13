@@ -15,6 +15,20 @@
       "when": 1783903464485,
       "tag": "0001_familiar_thunderball",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783932143061,
+      "tag": "0002_chilly_forge",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1783932776920,
+      "tag": "0003_known_puck",
+      "breakpoints": true
     }
   ]
 }

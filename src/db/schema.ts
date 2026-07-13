@@ -41,6 +41,29 @@ export const tags = sqliteTable(
   (table) => [uniqueIndex('tags_name_nocase_idx').on(sql`lower(${table.name})`)],
 )
 
+// A contact belongs to one company. Applications connect to contacts through
+// jobApplicationsToContacts below, allowing a recruiter or interviewer to be
+// associated with multiple applications at the same company.
+export const contacts = sqliteTable(
+  'contacts',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    companyId: integer('company_id')
+      .notNull()
+      .references(() => companies.id, { onDelete: 'restrict' }),
+    name: text('name').notNull(),
+    email: text('email'),
+    linkedinUrl: text('linkedin_url'),
+  },
+  (table) => [
+    index('contacts_company_idx').on(table.companyId),
+    uniqueIndex('contacts_company_email_nocase_idx').on(
+      table.companyId,
+      sql`lower(${table.email})`,
+    ),
+  ],
+)
+
 export const jobApplications = sqliteTable(
   'job_applications',
   {
@@ -58,7 +81,6 @@ export const jobApplications = sqliteTable(
     matchLevel: text('match_level', { enum: matchLevels }),
     applicationSource: text('application_source'),
     salary: text('salary'),
-    contact: text('contact'),
     notes: text('notes'),
     status: text('status', { enum: statuses }).notNull().default('Saved'),
     statusBeforeArchive: text('status_before_archive', { enum: statuses }),
@@ -99,6 +121,22 @@ export const jobApplicationsToTags = sqliteTable(
   (table) => [primaryKey({ columns: [table.jobApplicationId, table.tagId] })],
 )
 
+export const jobApplicationsToContacts = sqliteTable(
+  'job_applications_to_contacts',
+  {
+    jobApplicationId: integer('job_application_id')
+      .notNull()
+      .references(() => jobApplications.id, { onDelete: 'cascade' }),
+    contactId: integer('contact_id')
+      .notNull()
+      .references(() => contacts.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.jobApplicationId, table.contactId] }),
+    index('job_applications_to_contacts_contact_idx').on(table.contactId),
+  ],
+)
+
 export const followUps = sqliteTable(
   'follow_ups',
   {
@@ -128,3 +166,4 @@ export const interviews = sqliteTable(
 
 export type JobStatus = (typeof statuses)[number]
 export type JobApplication = typeof jobApplications.$inferSelect
+export type Contact = typeof contacts.$inferSelect
