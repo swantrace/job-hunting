@@ -62,6 +62,14 @@ export function Workspace({
       </div>
       <div id="workspace-application-panel" data-workspace-panel>
         <ApplicationForm job={job} filters={filters} companies={companies} tags={tags} />
+        {job.jobPosting && (
+          <details class="mt-6 rounded-box border border-base-300 p-4">
+            <summary class="cursor-pointer font-semibold">Saved job post</summary>
+            <pre class="mt-3 max-h-96 overflow-auto whitespace-pre-wrap text-sm">
+              {job.jobPosting.rawText}
+            </pre>
+          </details>
+        )}
       </div>
       <div id="workspace-contacts-panel" data-workspace-panel class="hidden">
         <ContactsSection job={job} filters={filters} />

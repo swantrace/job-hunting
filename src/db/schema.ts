@@ -108,6 +108,26 @@ export const jobApplications = sqliteTable(
   ],
 )
 
+export const jobPostings = sqliteTable(
+  'job_postings',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    jobApplicationId: integer('job_application_id')
+      .notNull()
+      .references(() => jobApplications.id, { onDelete: 'cascade' }),
+    rawText: text('raw_text').notNull(),
+    capturedAt: text('captured_at').notNull(),
+    contentHash: text('content_hash').notNull(),
+    parsedAt: text('parsed_at'),
+    parserModel: text('parser_model'),
+    parserPromptVersion: text('parser_prompt_version'),
+  },
+  (table) => [
+    uniqueIndex('job_postings_application_unique_idx').on(table.jobApplicationId),
+    index('job_postings_content_hash_idx').on(table.contentHash),
+  ],
+)
+
 export const jobApplicationsToTags = sqliteTable(
   'job_applications_to_tags',
   {
@@ -167,3 +187,4 @@ export const interviews = sqliteTable(
 export type JobStatus = (typeof statuses)[number]
 export type JobApplication = typeof jobApplications.$inferSelect
 export type Contact = typeof contacts.$inferSelect
+export type JobPosting = typeof jobPostings.$inferSelect

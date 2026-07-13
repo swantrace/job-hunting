@@ -113,21 +113,26 @@ export function QuickCollect({
   filters,
   errors,
   values = {},
+  formId = 'quick-form',
+  oob = false,
 }: {
   filters: Filters
   errors?: FieldErrors
   values?: Record<string, string>
+  formId?: string
+  oob?: boolean
 }) {
   const query = enc(filters)
   const { companies, tags } = listManagementData()
   return (
     <form
-      id="quick-form"
+      id={formId}
       class="card bg-base-100 shadow-sm"
       hx-post={`/applications?${query}`}
-      hx-target="#quick-form"
+      hx-target={`#${formId}`}
       hx-swap="outerHTML"
       novalidate
+      {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
     >
       <div class="card-body p-5">
         <h2 class="card-title">Quick collect</h2>
@@ -194,6 +199,11 @@ export function QuickCollect({
           <button class="btn btn-primary">Save opportunity</button>
         </div>
       </div>
+      {values.jobPostText && (
+        <textarea name="jobPostText" class="hidden">
+          {values.jobPostText}
+        </textarea>
+      )}
       <datalist id="company-options">
         {companies.map((company) => (
           <option value={company.name} />

@@ -1,6 +1,7 @@
 import { createRoute } from 'honox/factory'
 import { listApplications, metrics } from '../../src/db/queries'
 import { parseFilters } from '../../src/lib/request'
+import { AiParser } from '../components/AiParser'
 import { AppShell, Board, Filters, Metrics, QuickCollect } from '../components/Dashboard'
 
 export default createRoute((c) => {
@@ -29,6 +30,7 @@ export default createRoute((c) => {
         <Metrics values={metrics()} />
         <div class="grid gap-5 xl:grid-cols-[24rem_1fr]">
           <aside>
+            <AiParser filters={filters} />
             <QuickCollect filters={filters} />
           </aside>
           <section class="space-y-5">

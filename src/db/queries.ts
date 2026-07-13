@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { and, eq, inArray, like, or, sql } from 'drizzle-orm'
 import type { z } from 'zod'
 import { todayISO } from '../lib/date'
@@ -24,6 +25,7 @@ import {
   jobApplications,
   jobApplicationsToContacts,
   jobApplicationsToTags,
+  jobPostings,
   statuses,
   tags,
 } from './schema'
@@ -34,6 +36,7 @@ export type JobCardData = JobApplication & {
   companyWebsite: string | null
   tags: string[]
   contacts?: (typeof contacts.$inferSelect)[]
+  jobPosting?: typeof jobPostings.$inferSelect
 }
 
 const cleanTags = (value?: string | null) =>
@@ -99,6 +102,17 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
       .returning({ id: jobApplications.id })
       .get()
     replaceTags(tx, result.id, cleanTags(input.tags))
+    const rawText = input.jobPostText?.trim()
+    if (rawText) {
+      tx.insert(jobPostings)
+        .values({
+          jobApplicationId: result.id,
+          rawText,
+          capturedAt: date,
+          contentHash: createHash('sha256').update(rawText).digest('hex'),
+        })
+        .run()
+    }
     return result.id
   })
 }
@@ -224,6 +238,7 @@ export function getApplication(id: number): JobCardData | null {
     .where(eq(jobApplicationsToTags.jobApplicationId, id))
     .all()
     .map((tag) => tag.name)
+  const jobPosting = db.select().from(jobPostings).where(eq(jobPostings.jobApplicationId, id)).get()
   const jobContacts = db
     .select({ contact: contacts })
     .from(jobApplicationsToContacts)
@@ -237,6 +252,7 @@ export function getApplication(id: number): JobCardData | null {
     companyWebsite: row.companyWebsite,
     tags: jobTags,
     contacts: jobContacts,
+    jobPosting,
   }
 }
 
@@ -334,6 +350,7 @@ export function exportData() {
       })),
     followUps: db.select().from(followUps).all(),
     interviews: db.select().from(interviews).all(),
+    jobPostings: db.select().from(jobPostings).all(),
   }
 }
 
@@ -618,6 +635,28 @@ export function mergeImport(payload: ImportPayload) {
             notes: nullableText(incoming.notes),
           })
           .run()
+    }
+    for (const incoming of payload.jobPostings) {
+      const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
+      const rawText = textValue(incoming.rawText)
+      if (!applicationId || !rawText) continue
+      const values = {
+        jobApplicationId: applicationId,
+        rawText,
+        capturedAt: textValue(incoming.capturedAt) || todayISO(),
+        contentHash:
+          textValue(incoming.contentHash) || createHash('sha256').update(rawText).digest('hex'),
+        parsedAt: nullableText(incoming.parsedAt),
+        parserModel: nullableText(incoming.parserModel),
+        parserPromptVersion: nullableText(incoming.parserPromptVersion),
+      }
+      const existing = tx
+        .select()
+        .from(jobPostings)
+        .where(eq(jobPostings.jobApplicationId, applicationId))
+        .get()
+      if (existing) tx.update(jobPostings).set(values).where(eq(jobPostings.id, existing.id)).run()
+      else tx.insert(jobPostings).values(values).run()
     }
   })
 }
