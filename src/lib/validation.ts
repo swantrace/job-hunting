@@ -34,7 +34,6 @@ export const applicationSchema = z.object({
   matchLevel: z.preprocess(emptyToNull, z.enum(matchLevels).nullable()),
   applicationSource: optionalText(150),
   salary: optionalText(150),
-  contact: optionalText(300),
   notes: optionalText(5000),
   tags: optionalText(500),
 })
@@ -45,6 +44,14 @@ export const interviewSchema = z.object({
   interviewDate: isoDate,
   roundName: z.string().trim().min(1).max(150),
   notes: optionalText(2000),
+})
+export const contactSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(150),
+  email: optionalText(320).refine(
+    (value) => value === null || z.string().email().safeParse(value).success,
+    'Enter a valid email address',
+  ),
+  linkedinUrl: z.preprocess(emptyToNull, z.string().trim().url().max(2048).nullable().optional()),
 })
 
 export const sortValues = [

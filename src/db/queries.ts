@@ -6,10 +6,12 @@ import type { applicationSchema, filterSchema, quickCollectSchema } from '../lib
 import { db } from './client'
 import {
   companies,
+  contacts,
   followUps,
   interviews,
   type JobApplication,
   jobApplications,
+  jobApplicationsToContacts,
   jobApplicationsToTags,
   tags,
 } from './schema'
@@ -19,6 +21,7 @@ export type JobCardData = JobApplication & {
   companyName: string
   companyWebsite: string | null
   tags: string[]
+  contacts?: (typeof contacts.$inferSelect)[]
 }
 
 const cleanTags = (value?: string | null) =>
@@ -107,7 +110,6 @@ export function updateApplication(id: number, input: z.infer<typeof applicationS
         matchLevel: input.matchLevel,
         applicationSource: input.applicationSource,
         salary: input.salary,
-        contact: input.contact,
         notes: input.notes,
         status:
           existing.status === 'Rejected' || existing.status === 'Archived'
@@ -210,12 +212,62 @@ export function getApplication(id: number): JobCardData | null {
     .where(eq(jobApplicationsToTags.jobApplicationId, id))
     .all()
     .map((tag) => tag.name)
+  const jobContacts = db
+    .select({ contact: contacts })
+    .from(jobApplicationsToContacts)
+    .innerJoin(contacts, eq(jobApplicationsToContacts.contactId, contacts.id))
+    .where(eq(jobApplicationsToContacts.jobApplicationId, id))
+    .all()
+    .map((row) => row.contact)
   return {
     ...row.job,
     companyName: row.companyName,
     companyWebsite: row.companyWebsite,
     tags: jobTags,
+    contacts: jobContacts,
   }
+}
+
+export function addContactToApplication(
+  applicationId: number,
+  input: { name: string; email?: string | null; linkedinUrl?: string | null },
+) {
+  return db.transaction((tx) => {
+    const application = tx
+      .select({ companyId: jobApplications.companyId })
+      .from(jobApplications)
+      .where(eq(jobApplications.id, applicationId))
+      .get()
+    if (!application) return false
+
+    let contact = tx
+      .select()
+      .from(contacts)
+      .where(
+        and(
+          eq(contacts.companyId, application.companyId),
+          sql`lower(${contacts.name}) = lower(${input.name})`,
+        ),
+      )
+      .get()
+    if (!contact) {
+      contact = tx
+        .insert(contacts)
+        .values({
+          companyId: application.companyId,
+          name: input.name,
+          email: input.email ?? null,
+          linkedinUrl: input.linkedinUrl ?? null,
+        })
+        .returning()
+        .get()
+    }
+    tx.insert(jobApplicationsToContacts)
+      .values({ jobApplicationId: applicationId, contactId: contact.id })
+      .onConflictDoNothing()
+      .run()
+    return true
+  })
 }
 
 export function getActivity(id: number) {

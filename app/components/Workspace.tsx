@@ -32,82 +32,143 @@ export function Workspace({
         <button
           role="tab"
           class="tab tab-active"
+          data-workspace-tab="application"
+          aria-selected="true"
+          onclick="const tab=this.dataset.workspaceTab; document.querySelectorAll('[data-workspace-panel]').forEach((panel)=>panel.classList.toggle('hidden',panel.id!==`workspace-${tab}-panel`)); document.querySelectorAll('[data-workspace-tab]').forEach((button)=>{button.classList.toggle('tab-active',button===this);button.setAttribute('aria-selected',button===this?'true':'false')})"
           hx-get={`/applications/${job.id}/application-form?${q}`}
-          hx-target="#workspace-panel"
+          hx-target="#workspace-application-panel"
         >
           Application
         </button>
         <button
           role="tab"
           class="tab"
-          onclick="document.getElementById('activity-panel').scrollIntoView()"
+          data-workspace-tab="contacts"
+          aria-selected="false"
+          onclick="const tab=this.dataset.workspaceTab; document.querySelectorAll('[data-workspace-panel]').forEach((panel)=>panel.classList.toggle('hidden',panel.id!==`workspace-${tab}-panel`)); document.querySelectorAll('[data-workspace-tab]').forEach((button)=>{button.classList.toggle('tab-active',button===this);button.setAttribute('aria-selected',button===this?'true':'false')})"
+        >
+          Contacts
+        </button>
+        <button
+          role="tab"
+          class="tab"
+          data-workspace-tab="activity"
+          aria-selected="false"
+          onclick="const tab=this.dataset.workspaceTab; document.querySelectorAll('[data-workspace-panel]').forEach((panel)=>panel.classList.toggle('hidden',panel.id!==`workspace-${tab}-panel`)); document.querySelectorAll('[data-workspace-tab]').forEach((button)=>{button.classList.toggle('tab-active',button===this);button.setAttribute('aria-selected',button===this?'true':'false')})"
         >
           Activity
         </button>
       </div>
-      <div id="workspace-panel">
+      <div id="workspace-application-panel" data-workspace-panel>
         <ApplicationForm job={job} filters={filters} />
       </div>
-      <div id="activity-panel" class="divider mt-8">
-        Activity
+      <div id="workspace-contacts-panel" data-workspace-panel class="hidden">
+        <ContactsSection job={job} filters={filters} />
       </div>
-      <div class="grid gap-5 md:grid-cols-2">
-        <ActivityForm type="follow-up" id={job.id} filters={filters} />
-        <ActivityForm type="interview" id={job.id} filters={filters} />
-      </div>
-      <div class="mt-6 grid gap-4 md:grid-cols-2">
-        <History
-          title="Follow-ups"
-          rows={activity.followUps.map((x) => ({
-            date: x.actionDate,
-            title: x.notes || 'Follow-up',
-          }))}
-        />
-        <History
-          title="Interviews"
-          rows={activity.interviews.map((x) => ({
-            date: x.interviewDate,
-            title: x.roundName,
-            notes: x.notes,
-          }))}
-        />
-      </div>
-      <div class="divider mt-8">Manage</div>
-      <div class="flex flex-wrap gap-2">
-        {job.status !== 'Rejected' && job.status !== 'Archived' && (
-          <button
-            class="btn btn-error btn-outline btn-sm"
-            hx-patch={`/applications/${job.id}/status?${q}`}
-            hx-vals='{"action":"reject"}'
-            hx-target="#board"
-            hx-swap="outerHTML"
-          >
-            Mark rejected
-          </button>
-        )}
-        {job.status !== 'Archived' ? (
-          <button
-            class="btn btn-ghost btn-sm"
-            hx-patch={`/applications/${job.id}/status?${q}`}
-            hx-vals='{"action":"archive"}'
-            hx-target="#board"
-            hx-swap="outerHTML"
-          >
-            Archive
-          </button>
-        ) : (
-          <button
-            class="btn btn-success btn-outline btn-sm"
-            hx-patch={`/applications/${job.id}/status?${q}`}
-            hx-vals='{"action":"restore"}'
-            hx-target="#board"
-            hx-swap="outerHTML"
-          >
-            Restore
-          </button>
-        )}
+      <div id="workspace-activity-panel" data-workspace-panel class="hidden">
+        <div class="grid gap-5 md:grid-cols-2">
+          <ActivityForm type="follow-up" id={job.id} filters={filters} />
+          <ActivityForm type="interview" id={job.id} filters={filters} />
+        </div>
+        <div class="mt-6 grid gap-4 md:grid-cols-2">
+          <History
+            title="Follow-ups"
+            rows={activity.followUps.map((x) => ({
+              date: x.actionDate,
+              title: x.notes || 'Follow-up',
+            }))}
+          />
+          <History
+            title="Interviews"
+            rows={activity.interviews.map((x) => ({
+              date: x.interviewDate,
+              title: x.roundName,
+              notes: x.notes,
+            }))}
+          />
+        </div>
+        <div class="divider mt-8">Manage</div>
+        <div class="flex flex-wrap gap-2">
+          {job.status !== 'Rejected' && job.status !== 'Archived' && (
+            <button
+              class="btn btn-error btn-outline btn-sm"
+              hx-patch={`/applications/${job.id}/status?${q}`}
+              hx-vals='{"action":"reject"}'
+              hx-target="#board"
+              hx-swap="outerHTML"
+            >
+              Mark rejected
+            </button>
+          )}
+          {job.status !== 'Archived' ? (
+            <button
+              class="btn btn-ghost btn-sm"
+              hx-patch={`/applications/${job.id}/status?${q}`}
+              hx-vals='{"action":"archive"}'
+              hx-target="#board"
+              hx-swap="outerHTML"
+            >
+              Archive
+            </button>
+          ) : (
+            <button
+              class="btn btn-success btn-outline btn-sm"
+              hx-patch={`/applications/${job.id}/status?${q}`}
+              hx-vals='{"action":"restore"}'
+              hx-target="#board"
+              hx-swap="outerHTML"
+            >
+              Restore
+            </button>
+          )}
+        </div>
       </div>
     </div>
+  )
+}
+
+function ContactsSection({ job, filters }: { job: JobCardData; filters: Filters }) {
+  return (
+    <section class="mt-8">
+      <div class="divider">Contacts</div>
+      {job.contacts?.length ? (
+        <ul class="mb-4 space-y-2">
+          {job.contacts.map((contact) => (
+            <li class="rounded-box border border-base-300 p-3">
+              <div class="font-medium">{contact.name}</div>
+              <div class="flex flex-wrap gap-x-4 text-sm text-base-content/70">
+                {contact.email && (
+                  <a class="link" href={`mailto:${contact.email}`}>
+                    {contact.email}
+                  </a>
+                )}
+                {contact.linkedinUrl && (
+                  <a class="link" href={contact.linkedinUrl} target="_blank" rel="noreferrer">
+                    LinkedIn
+                  </a>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p class="mb-4 text-sm text-base-content/60">No contacts linked yet.</p>
+      )}
+      <form
+        class="card bg-base-200"
+        hx-post={`/applications/${job.id}/contacts?${query(filters)}`}
+        hx-target="#drawer-content"
+        hx-swap="innerHTML"
+        novalidate
+      >
+        <div class="card-body grid gap-3 p-4 sm:grid-cols-3">
+          <Field label="Name" name="name" required />
+          <Field label="Email" name="email" type="email" />
+          <Field label="LinkedIn URL" name="linkedinUrl" type="url" />
+          <button class="btn btn-outline btn-sm sm:col-span-3">Add contact</button>
+        </div>
+      </form>
+    </section>
   )
 }
 
@@ -181,7 +242,6 @@ export function ApplicationForm({
         <Field label="Resume version" name="resumeVersion" value={job.resumeVersion} />
         <Field label="Source" name="applicationSource" value={job.applicationSource} />
         <Field label="Salary" name="salary" value={job.salary} />
-        <Field label="Contact" name="contact" value={job.contact} />
         <div class="sm:col-span-2">
           <Field label="Direction tags" name="tags" value={job.tags.join(', ')} />
         </div>
