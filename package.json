@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "bun ./node_modules/vite/bin/vite.js --host 0.0.0.0 --port 5173 --strictPort",
     "build": "vite build --mode client && vite build",
-    "start": "cd dist && bun index.js",
+    "start": "bun run db:migrate && cd dist && bun index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",
+    "@flydotio/dockerfile": "^0.7.10",
     "@hono/vite-build": "^1.7.0",
     "@hono/vite-dev-server": "^0.25.1",
     "@tailwindcss/vite": "^4.1.14",

@@ -1,5 +1,5 @@
 import { jsxRenderer } from 'hono/jsx-renderer'
-import appCss from '../style.css?url'
+import { Link } from 'honox/server'
 
 export default jsxRenderer(({ children }) => (
   <html lang="en" data-theme="corporate">
@@ -8,7 +8,7 @@ export default jsxRenderer(({ children }) => (
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <meta name="description" content="Local-first job application tracker" />
       <title>Job Application Tracker</title>
-      <link rel="stylesheet" href={appCss} />
+      <Link href="/app/style.css" rel="stylesheet" />
       <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
       <script src="https://cdn.jsdelivr.net/npm/formbouncerjs@1.4.6/dist/bouncer.polyfills.min.js"></script>
     </head>

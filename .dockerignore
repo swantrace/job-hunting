@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+jobs.db
+jobs.db-shm
+jobs.db-wal
+coverage/
