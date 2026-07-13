@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1783903403999,
+      "tag": "0000_tidy_ender_wiggin",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1783903464485,
+      "tag": "0001_familiar_thunderball",
+      "breakpoints": true
+    }
+  ]
+}

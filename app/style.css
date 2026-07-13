@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes:
+    corporate --default,
+    business --prefersdark;
+}
+
+@source "./**/*.{ts,tsx}";
+@source "../src/**/*.{ts,tsx}";
+
+html {
+  background: var(--color-base-200);
+}
+.board-column {
+  min-height: 12rem;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  display: inline-block;
+}
+.htmx-indicator {
+  display: none;
+}
