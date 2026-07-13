@@ -11,7 +11,12 @@ export default createRoute((c) => {
         <header>
           <p class="text-sm font-semibold uppercase tracking-[.2em] text-primary">Command center</p>
           <h1 class="text-3xl font-bold">Job Application Tracker</h1>
-          <p class="mt-1 text-base-content/60">Keep every opportunity moving.</p>
+          <div class="mt-1 flex flex-wrap items-center gap-3">
+            <p class="text-base-content/60">Keep every opportunity moving.</p>
+            <a class="link link-primary text-sm" href="/manage">
+              Manage data
+            </a>
+          </div>
         </header>
         <Metrics values={metrics()} />
         <div class="grid gap-5 xl:grid-cols-[24rem_1fr]">
