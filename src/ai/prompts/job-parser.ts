@@ -14,7 +14,6 @@ Field rules:
 - location: include city/region and remote, hybrid, or onsite wording when stated.
 - url: use a URL only when one is explicitly present in the input; otherwise null.
 - postedDate: use YYYY-MM-DD only when explicitly stated; never infer today's date.
-- priority: use A for clearly urgent, highly relevant, or unusually senior roles; C for clearly low-fit roles; use B when uncertain.
 - tags: return concise lowercase categories such as backend, frontend, remote, fintech, python, or leadership; do not return sentences or duplicates.
 - applicationSource: identify the source only when stated, such as LinkedIn, company site, or referral.
 - salary: preserve the stated range and currency as plain text; use null when absent.

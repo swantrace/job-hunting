@@ -47,8 +47,9 @@ export function ParsedJobDraft({
           location: parsed.location ?? '',
           url: parsed.url ?? '',
           postedDate: parsed.postedDate ?? todayISO(),
-          priority: parsed.priority,
           tags: parsed.tags.join(', '),
+          salary: parsed.salary ?? '',
+          applicationSource: parsed.applicationSource ?? '',
           jobPostText,
         }}
       />

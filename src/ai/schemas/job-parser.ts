@@ -10,7 +10,6 @@ export const parsedJobSchema = z.object({
     .trim()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable(),
-  priority: z.enum(['A', 'B', 'C']),
   tags: z.array(z.string().trim().max(50)).max(20),
   applicationSource: z.string().trim().max(150).nullable(),
   salary: z.string().trim().max(150).nullable(),
@@ -43,11 +42,6 @@ export const jobParserResponseSchema = {
       type: ['string', 'null'],
       description: 'Explicit posting date in YYYY-MM-DD format, or null if unknown.',
     },
-    priority: {
-      type: 'string',
-      enum: ['A', 'B', 'C'],
-      description: 'A high priority, B normal/uncertain, C low priority.',
-    },
     tags: {
       type: 'array',
       items: { type: 'string' },
@@ -72,7 +66,6 @@ export const jobParserResponseSchema = {
     'location',
     'url',
     'postedDate',
-    'priority',
     'tags',
     'applicationSource',
     'salary',

@@ -18,7 +18,8 @@ export const quickCollectSchema = z.object({
   location: optionalText(200),
   url: optionalUrl,
   postedDate: isoDate,
-  priority: z.enum(priorities).default('B'),
+  salary: optionalText(150),
+  applicationSource: optionalText(150),
   tags: optionalText(500),
   jobPostText: optionalText(100000),
 })

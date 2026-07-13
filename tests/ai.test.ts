@@ -10,7 +10,6 @@ describe('AI job parser output', () => {
       location: null,
       url: null,
       postedDate: null,
-      priority: 'B',
       tags: ['backend', 'remote'],
       applicationSource: 'LinkedIn',
       salary: null,
