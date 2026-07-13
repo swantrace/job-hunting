@@ -13,9 +13,14 @@ export default createRoute((c) => {
           <h1 class="text-3xl font-bold">Job Application Tracker</h1>
           <div class="mt-1 flex flex-wrap items-center gap-3">
             <p class="text-base-content/60">Keep every opportunity moving.</p>
-            <a class="link link-primary text-sm" href="/manage">
-              Manage data
-            </a>
+            <div class="flex gap-3 text-sm">
+              <a class="link link-primary" href="/manage">
+                Manage data
+              </a>
+              <a class="link link-primary" href="/export">
+                Export JSON
+              </a>
+            </div>
           </div>
         </header>
         <Metrics values={metrics()} />
