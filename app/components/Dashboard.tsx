@@ -238,47 +238,131 @@ export function Board({
   filters: Filters
   oob?: boolean
 }) {
-  const statuses = filters.view === 'active' ? activeStatuses : [filters.view as JobStatus]
+  const statuses =
+    filters.today === '1'
+      ? (['Apply Today'] as const)
+      : filters.view === 'active'
+        ? activeStatuses
+        : [filters.view as JobStatus]
   return (
     <div
       id="board"
-      class={`grid gap-4 ${statuses.length > 1 ? 'xl:grid-cols-5 md:grid-cols-2' : ''}`}
+      class={`grid w-full gap-4 ${statuses.length > 1 ? 'xl:grid-cols-5 md:grid-cols-2' : ''}`}
       aria-live="polite"
       {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
     >
       {statuses.map((status) => (
-        <section class="board-column rounded-box bg-base-300/60 p-3">
+        <section class="board-column w-full rounded-box bg-base-300/60 p-3">
           <div class="mb-3 flex items-center justify-between">
             <h2 class="font-semibold">{status}</h2>
             <span class="badge badge-neutral">
               {jobs.filter((job) => job.status === status).length}
             </span>
           </div>
-          <div class="space-y-3">
-            {jobs
-              .filter((job) => job.status === status)
-              .map((job) => (
-                <JobCard job={job} filters={filters} />
-              ))}
-            {!jobs.some((job) => job.status === status) && (
-              <p class="py-8 text-center text-sm text-base-content/50">No applications</p>
-            )}
-          </div>
+          {filters.today === '1' ? (
+            <TodayTasksTable jobs={jobs.filter((job) => job.status === status)} filters={filters} />
+          ) : (
+            <div class="space-y-3">
+              {jobs
+                .filter((job) => job.status === status)
+                .map((job) => (
+                  <JobCard job={job} filters={filters} />
+                ))}
+              {!jobs.some((job) => job.status === status) && (
+                <p class="py-8 text-center text-sm text-base-content/50">No applications</p>
+              )}
+            </div>
+          )}
         </section>
       ))}
     </div>
   )
 }
 
-function JobCard({ job, filters }: { job: JobCardData; filters: Filters }) {
+function TodayTasksTable({ jobs, filters }: { jobs: JobCardData[]; filters: Filters }) {
+  if (!jobs.length)
+    return <p class="py-8 text-center text-sm text-base-content/50">No applications</p>
+  return (
+    <div class="overflow-x-auto rounded-box bg-base-100">
+      <table class="table table-zebra">
+        <thead>
+          <tr>
+            <th>Job title</th>
+            <th>Company</th>
+            <th>Location</th>
+            <th>Priority</th>
+            <th>Target date</th>
+            <th>Tags</th>
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {jobs.map((job) => {
+            const overdue = !!job.applyTodayTargetDate && job.applyTodayTargetDate < todayISO()
+            const query = enc(filters)
+            return (
+              <tr>
+                <td class="font-medium">{job.jobTitle}</td>
+                <td>{job.companyName}</td>
+                <td>{job.location || '—'}</td>
+                <td>
+                  <span
+                    class={`badge ${job.priority === 'A' ? 'badge-error' : job.priority === 'B' ? 'badge-warning' : 'badge-ghost'}`}
+                  >
+                    {job.priority}
+                  </span>
+                </td>
+                <td>
+                  <span class={overdue ? 'badge badge-error badge-sm' : ''}>
+                    {job.applyTodayTargetDate || '—'}
+                  </span>
+                </td>
+                <td>
+                  <div class="flex min-w-32 flex-wrap gap-1">
+                    {job.tags.length
+                      ? job.tags.map((tag) => (
+                          <span class="badge badge-outline badge-sm">{tag}</span>
+                        ))
+                      : '—'}
+                  </div>
+                </td>
+                <td>
+                  <button
+                    class="btn btn-primary btn-sm"
+                    hx-get={`/applications/${job.id}/workspace?${query}`}
+                    hx-target="#drawer-content"
+                    hx-swap="innerHTML"
+                    onclick="document.getElementById('workspace-toggle').checked=true"
+                  >
+                    Open
+                  </button>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function JobCard({
+  job,
+  filters,
+  compact = false,
+}: {
+  job: JobCardData
+  filters: Filters
+  compact?: boolean
+}) {
   const overdue =
     job.status === 'Apply Today' &&
     !!job.applyTodayTargetDate &&
     job.applyTodayTargetDate < todayISO()
   const query = enc(filters)
   return (
-    <article class="card bg-base-100 shadow-sm">
-      <div class="card-body gap-2 p-4">
+    <article class={`card bg-base-100 ${compact ? 'rounded-none shadow-none' : 'shadow-sm'}`}>
+      <div class={`card-body gap-2 p-4 ${compact ? 'flex-col md:flex-row md:items-center' : ''}`}>
         <div class="flex items-start justify-between gap-2">
           <div>
             <h3 class="font-semibold leading-tight">{job.jobTitle}</h3>
@@ -290,16 +374,16 @@ function JobCard({ job, filters }: { job: JobCardData; filters: Filters }) {
             {job.priority}
           </span>
         </div>
-        {job.location && <p class="text-xs">📍 {job.location}</p>}
-        {overdue && (
-          <span class="badge badge-error badge-sm">Overdue · {job.applyTodayTargetDate}</span>
-        )}
-        <div class="flex flex-wrap gap-1">
+        <div class="flex flex-1 flex-wrap items-center gap-2 text-xs">
+          {job.location && <span>📍 {job.location}</span>}
+          {overdue && (
+            <span class="badge badge-error badge-sm">Overdue · {job.applyTodayTargetDate}</span>
+          )}
           {job.tags.map((tag) => (
             <span class="badge badge-outline badge-sm">{tag}</span>
           ))}
         </div>
-        <div class="card-actions mt-2">
+        <div class="card-actions mt-2 md:mt-0">
           <button
             class="btn btn-primary btn-sm grow"
             hx-get={`/applications/${job.id}/workspace?${query}`}
