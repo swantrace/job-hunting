@@ -21,6 +21,10 @@ fly deploy
 
 The production start command runs Drizzle migrations before starting the server. Keep one Fly machine for this SQLite deployment because Fly volumes are attached to a single machine.
 
+### GitHub Actions deployment
+
+The workflow in `.github/workflows/ci-cd.yml` runs formatting, typechecking, tests, and a production build for pull requests. A push to `main` deploys to Fly.io only after those checks pass. Add a repository secret named `FLY_API_TOKEN` before merging the first deployable change.
+
 ### VS Code Remote / WSL
 
 The dev server listens on all interfaces at port `5173`. If `http://localhost:5173` is not reachable from your browser, open the VS Code **Ports** panel and forward port `5173`; VS Code will provide the correct localhost URL. You can also use the Network URL printed by Vite (for example, `http://172.17.x.x:5173/`).
