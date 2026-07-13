@@ -20,6 +20,9 @@ export default createRoute((c) => {
               <a class="link link-primary" href="/export">
                 Export JSON
               </a>
+              <a class="link link-primary" href="/import">
+                Import JSON
+              </a>
             </div>
           </div>
         </header>

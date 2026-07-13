@@ -1,6 +1,16 @@
 import { and, eq, inArray, like, or, sql } from 'drizzle-orm'
 import type { z } from 'zod'
 import { todayISO } from '../lib/date'
+import {
+  applicationKey,
+  companyKey,
+  contactKey,
+  type ImportPayload,
+  key,
+  nullableText,
+  tagKey,
+  textValue,
+} from '../lib/import'
 import { advanceStatus } from '../lib/transitions'
 import type { applicationSchema, filterSchema, quickCollectSchema } from '../lib/validation'
 import { db } from './client'
@@ -10,9 +20,11 @@ import {
   followUps,
   interviews,
   type JobApplication,
+  type JobStatus,
   jobApplications,
   jobApplicationsToContacts,
   jobApplicationsToTags,
+  statuses,
   tags,
 } from './schema'
 
@@ -284,18 +296,330 @@ export function listManagementData() {
 }
 
 export function exportData() {
+  const companyRows = db.select().from(companies).all()
+  const companyById = new Map(companyRows.map((company) => [company.id, company.name]))
+  const tagRows = db.select().from(tags).all()
+  const tagById = new Map(tagRows.map((tag) => [tag.id, tag.name]))
+  const contactRows = db.select().from(contacts).all()
+  const contactById = new Map(contactRows.map((contact) => [contact.id, contact]))
+  const applicationRows = db.select().from(jobApplications).all()
   return {
     schemaVersion: 1,
     exportedAt: new Date().toISOString(),
-    companies: db.select().from(companies).all(),
-    tags: db.select().from(tags).all(),
-    contacts: db.select().from(contacts).all(),
-    applications: db.select().from(jobApplications).all(),
-    applicationTags: db.select().from(jobApplicationsToTags).all(),
-    applicationContacts: db.select().from(jobApplicationsToContacts).all(),
+    companies: companyRows,
+    tags: tagRows,
+    contacts: contactRows.map((contact) => ({
+      ...contact,
+      companyName: companyById.get(contact.companyId),
+    })),
+    applications: applicationRows.map((application) => ({
+      ...application,
+      companyName: companyById.get(application.companyId),
+    })),
+    applicationTags: db
+      .select()
+      .from(jobApplicationsToTags)
+      .all()
+      .map((item) => ({
+        ...item,
+        tagName: tagById.get(item.tagId),
+      })),
+    applicationContacts: db
+      .select()
+      .from(jobApplicationsToContacts)
+      .all()
+      .map((item) => ({
+        ...item,
+        contact: contactById.get(item.contactId),
+      })),
     followUps: db.select().from(followUps).all(),
     interviews: db.select().from(interviews).all(),
   }
+}
+
+export type ImportPreview = {
+  schemaVersion: number
+  summary: Record<
+    string,
+    { created: number; updated: number; unchanged: number; conflicts: number }
+  >
+  conflicts: string[]
+}
+
+export function previewImport(payload: ImportPayload): ImportPreview {
+  const localCompanies = db.select().from(companies).all()
+  const localTags = db.select().from(tags).all()
+  const localContacts = db.select().from(contacts).all()
+  const localApplications = db.select().from(jobApplications).all()
+  const companyMap = new Map(localCompanies.map((item) => [key(item.name), item]))
+  const tagMap = new Map(localTags.map((item) => [key(item.name), item]))
+  const companyNames = new Map(localCompanies.map((item) => [item.id, item.name]))
+  const contactMap = new Map(
+    localContacts.map((item) => [contactKey(item, companyNames.get(item.companyId) ?? ''), item]),
+  )
+  const applicationMap = new Map(
+    localApplications.map((item) => [
+      applicationKey(item, companyNames.get(item.companyId) ?? ''),
+      item,
+    ]),
+  )
+  const conflicts: string[] = []
+  const compare = (
+    incoming: Record<string, unknown>,
+    existing: Record<string, unknown> | undefined,
+  ) => existing && JSON.stringify(incoming) === JSON.stringify(existing)
+  const count = (
+    items: Record<string, unknown>[],
+    map: Map<string, Record<string, unknown>>,
+    getKey: (item: Record<string, unknown>) => string,
+    label: string,
+  ) => {
+    let created = 0
+    let updated = 0
+    let unchanged = 0
+    for (const item of items) {
+      const itemKey = getKey(item)
+      if (!itemKey.replaceAll('|', '')) {
+        conflicts.push(`${label}: missing matching fields`)
+        continue
+      }
+      const existing = map.get(itemKey)
+      if (!existing) created++
+      else if (compare(item, existing)) unchanged++
+      else updated++
+    }
+    return { created, updated, unchanged, conflicts: conflicts.length }
+  }
+  const companiesSummary = count(payload.companies, companyMap, companyKey, 'Company')
+  const tagsSummary = count(payload.tags, tagMap, tagKey, 'Tag')
+  const contactsSummary = count(
+    payload.contacts,
+    contactMap,
+    (item) => contactKey(item, textValue(item.companyName)),
+    'Contact',
+  )
+  const applicationsSummary = count(
+    payload.applications,
+    applicationMap,
+    (item) => applicationKey(item, textValue(item.companyName)),
+    'Application',
+  )
+  return {
+    schemaVersion: payload.schemaVersion,
+    summary: {
+      companies: companiesSummary,
+      tags: tagsSummary,
+      contacts: contactsSummary,
+      applications: applicationsSummary,
+      followUps: { created: payload.followUps.length, updated: 0, unchanged: 0, conflicts: 0 },
+      interviews: { created: payload.interviews.length, updated: 0, unchanged: 0, conflicts: 0 },
+    },
+    conflicts,
+  }
+}
+
+export function mergeImport(payload: ImportPayload) {
+  return db.transaction((tx) => {
+    const companyIds = new Map<number, number>()
+    const tagIds = new Map<number, number>()
+    const contactIds = new Map<number, number>()
+    const applicationIds = new Map<number, number>()
+    const companiesByKey = new Map(
+      tx
+        .select()
+        .from(companies)
+        .all()
+        .map((item) => [key(item.name), item]),
+    )
+    const tagsByKey = new Map(
+      tx
+        .select()
+        .from(tags)
+        .all()
+        .map((item) => [key(item.name), item]),
+    )
+
+    for (const incoming of payload.companies) {
+      const name = textValue(incoming.name)
+      if (!name) continue
+      const existing = companiesByKey.get(companyKey(incoming))
+      if (existing) {
+        tx.update(companies)
+          .set({ website: nullableText(incoming.website) })
+          .where(eq(companies.id, existing.id))
+          .run()
+        companyIds.set(Number(incoming.id), existing.id)
+      } else {
+        const created = tx
+          .insert(companies)
+          .values({
+            name,
+            website: nullableText(incoming.website),
+            createdAt: textValue(incoming.createdAt) || todayISO(),
+          })
+          .returning()
+          .get()
+        companiesByKey.set(companyKey(incoming), created)
+        companyIds.set(Number(incoming.id), created.id)
+      }
+    }
+    for (const incoming of payload.tags) {
+      const name = textValue(incoming.name)
+      if (!name) continue
+      const existing = tagsByKey.get(tagKey(incoming))
+      if (existing) tagIds.set(Number(incoming.id), existing.id)
+      else {
+        const created = tx.insert(tags).values({ name }).returning().get()
+        tagsByKey.set(tagKey(incoming), created)
+        tagIds.set(Number(incoming.id), created.id)
+      }
+    }
+    const companyNameById = new Map(
+      tx
+        .select()
+        .from(companies)
+        .all()
+        .map((item) => [item.id, item.name]),
+    )
+    for (const incoming of payload.contacts) {
+      const companyId =
+        companyIds.get(Number(incoming.companyId)) ??
+        companiesByKey.get(key(incoming.companyName))?.id
+      const name = textValue(incoming.name)
+      if (!companyId || !name) continue
+      const companyName = companyNameById.get(companyId) ?? textValue(incoming.companyName)
+      const existing = tx
+        .select()
+        .from(contacts)
+        .where(eq(contacts.companyId, companyId))
+        .all()
+        .find((item) => contactKey(item, companyName) === contactKey(incoming, companyName))
+      const values = {
+        companyId,
+        name,
+        email: nullableText(incoming.email),
+        linkedinUrl: nullableText(incoming.linkedinUrl),
+      }
+      if (existing) {
+        tx.update(contacts).set(values).where(eq(contacts.id, existing.id)).run()
+        contactIds.set(Number(incoming.id), existing.id)
+      } else {
+        const created = tx.insert(contacts).values(values).returning().get()
+        contactIds.set(Number(incoming.id), created.id)
+      }
+    }
+    const applicationRows = tx.select().from(jobApplications).all()
+    for (const incoming of payload.applications) {
+      const companyId =
+        companyIds.get(Number(incoming.companyId)) ??
+        companiesByKey.get(key(incoming.companyName))?.id
+      const companyName = companyNameById.get(companyId ?? 0) ?? textValue(incoming.companyName)
+      const title = textValue(incoming.jobTitle)
+      const postedDate = textValue(incoming.postedDate)
+      if (!companyId || !title || !postedDate) continue
+      const existing = applicationRows.find(
+        (item) => applicationKey(item, companyName) === applicationKey(incoming, companyName),
+      )
+      const values = {
+        companyId,
+        jobTitle: title,
+        location: nullableText(incoming.location),
+        url: nullableText(incoming.url),
+        postedDate,
+        priority: (['A', 'B', 'C'].includes(textValue(incoming.priority))
+          ? textValue(incoming.priority)
+          : 'B') as 'A' | 'B' | 'C',
+        appliedDate: nullableText(incoming.appliedDate),
+        resumeVersion: nullableText(incoming.resumeVersion),
+        matchLevel: (['A', 'B'].includes(textValue(incoming.matchLevel))
+          ? textValue(incoming.matchLevel)
+          : null) as 'A' | 'B' | null,
+        applicationSource: nullableText(incoming.applicationSource),
+        salary: nullableText(incoming.salary),
+        notes: nullableText(incoming.notes),
+        status: (statuses.includes(textValue(incoming.status) as JobStatus)
+          ? textValue(incoming.status)
+          : 'Saved') as JobStatus,
+        statusBeforeArchive: nullableText(incoming.statusBeforeArchive) as JobStatus | null,
+        applyTodayTargetDate: nullableText(incoming.applyTodayTargetDate),
+        createdAt: textValue(incoming.createdAt) || todayISO(),
+        updatedAt: textValue(incoming.updatedAt) || todayISO(),
+      }
+      if (existing) {
+        tx.update(jobApplications).set(values).where(eq(jobApplications.id, existing.id)).run()
+        applicationIds.set(Number(incoming.id), existing.id)
+      } else {
+        const created = tx.insert(jobApplications).values(values).returning().get()
+        applicationIds.set(Number(incoming.id), created.id)
+      }
+    }
+    for (const relation of payload.applicationTags) {
+      const applicationId = applicationIds.get(Number(relation.jobApplicationId))
+      const tagId = tagIds.get(Number(relation.tagId)) ?? tagsByKey.get(key(relation.tagName))?.id
+      if (applicationId && tagId)
+        tx.insert(jobApplicationsToTags)
+          .values({ jobApplicationId: applicationId, tagId })
+          .onConflictDoNothing()
+          .run()
+    }
+    for (const relation of payload.applicationContacts) {
+      const applicationId = applicationIds.get(Number(relation.jobApplicationId))
+      const contactId = contactIds.get(Number(relation.contactId))
+      if (applicationId && contactId)
+        tx.insert(jobApplicationsToContacts)
+          .values({ jobApplicationId: applicationId, contactId })
+          .onConflictDoNothing()
+          .run()
+    }
+    for (const incoming of payload.followUps) {
+      const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
+      if (!applicationId || !textValue(incoming.actionDate)) continue
+      const exists = tx
+        .select()
+        .from(followUps)
+        .where(
+          and(
+            eq(followUps.jobApplicationId, applicationId),
+            eq(followUps.actionDate, textValue(incoming.actionDate)),
+          ),
+        )
+        .all()
+        .find((item) => item.notes === nullableText(incoming.notes))
+      if (!exists)
+        tx.insert(followUps)
+          .values({
+            jobApplicationId: applicationId,
+            actionDate: textValue(incoming.actionDate),
+            notes: nullableText(incoming.notes),
+          })
+          .run()
+    }
+    for (const incoming of payload.interviews) {
+      const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
+      if (!applicationId || !textValue(incoming.interviewDate) || !textValue(incoming.roundName))
+        continue
+      const exists = tx
+        .select()
+        .from(interviews)
+        .where(
+          and(
+            eq(interviews.jobApplicationId, applicationId),
+            eq(interviews.interviewDate, textValue(incoming.interviewDate)),
+            eq(interviews.roundName, textValue(incoming.roundName)),
+          ),
+        )
+        .get()
+      if (!exists)
+        tx.insert(interviews)
+          .values({
+            jobApplicationId: applicationId,
+            interviewDate: textValue(incoming.interviewDate),
+            roundName: textValue(incoming.roundName),
+            notes: nullableText(incoming.notes),
+          })
+          .run()
+    }
+  })
 }
 
 export function createTag(name: string) {
