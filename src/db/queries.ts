@@ -283,6 +283,21 @@ export function listManagementData() {
   }
 }
 
+export function exportData() {
+  return {
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    companies: db.select().from(companies).all(),
+    tags: db.select().from(tags).all(),
+    contacts: db.select().from(contacts).all(),
+    applications: db.select().from(jobApplications).all(),
+    applicationTags: db.select().from(jobApplicationsToTags).all(),
+    applicationContacts: db.select().from(jobApplicationsToContacts).all(),
+    followUps: db.select().from(followUps).all(),
+    interviews: db.select().from(interviews).all(),
+  }
+}
+
 export function createTag(name: string) {
   db.insert(tags).values({ name }).onConflictDoNothing().run()
 }
