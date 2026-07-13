@@ -270,6 +270,52 @@ export function addContactToApplication(
   })
 }
 
+export function listManagementData() {
+  return {
+    tags: db.select().from(tags).orderBy(sql`lower(${tags.name})`).all(),
+    companies: db.select().from(companies).orderBy(sql`lower(${companies.name})`).all(),
+    contacts: db
+      .select({ contact: contacts, companyName: companies.name })
+      .from(contacts)
+      .innerJoin(companies, eq(contacts.companyId, companies.id))
+      .orderBy(sql`lower(${contacts.name})`)
+      .all(),
+  }
+}
+
+export function createTag(name: string) {
+  db.insert(tags).values({ name }).onConflictDoNothing().run()
+}
+
+export function createCompany(name: string, website?: string | null) {
+  db.insert(companies)
+    .values({ name, website: website ?? null, createdAt: todayISO() })
+    .onConflictDoNothing()
+    .run()
+}
+
+export function createContact(input: {
+  companyId: number
+  name: string
+  email?: string | null
+  linkedinUrl?: string | null
+}) {
+  db.insert(contacts)
+    .values({ ...input, email: input.email ?? null, linkedinUrl: input.linkedinUrl ?? null })
+    .run()
+}
+
+export function deleteManagedItem(kind: 'tags' | 'companies' | 'contacts', id: number) {
+  try {
+    if (kind === 'tags') db.delete(tags).where(eq(tags.id, id)).run()
+    if (kind === 'companies') db.delete(companies).where(eq(companies.id, id)).run()
+    if (kind === 'contacts') db.delete(contacts).where(eq(contacts.id, id)).run()
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function getActivity(id: number) {
   return {
     followUps: db

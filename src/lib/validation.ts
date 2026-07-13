@@ -53,6 +53,14 @@ export const contactSchema = z.object({
   ),
   linkedinUrl: z.preprocess(emptyToNull, z.string().trim().url().max(2048).nullable().optional()),
 })
+export const tagSchema = z.object({ name: z.string().trim().min(1).max(80) })
+export const companySchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  website: optionalUrl,
+})
+export const managedContactSchema = contactSchema.extend({
+  companyId: z.coerce.number().int().positive(),
+})
 
 export const sortValues = [
   'updated_desc',
