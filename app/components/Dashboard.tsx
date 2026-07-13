@@ -176,14 +176,12 @@ export function QuickCollect({
             value={values.postedDate ?? todayISO()}
             message={error(errors, 'postedDate')}
           />
-          <label class="form-control">
-            <span class="label-text mb-1">Priority</span>
-            <select name="priority" class="select select-bordered">
-              <option>A</option>
-              <option selected={(values.priority ?? 'B') === 'B'}>B</option>
-              <option>C</option>
-            </select>
-          </label>
+          <Field label="Salary" name="salary" value={values.salary} />
+          <Field
+            label="Application source"
+            name="applicationSource"
+            value={values.applicationSource}
+          />
           <div class="sm:col-span-2">
             <Field
               label="Direction tags"

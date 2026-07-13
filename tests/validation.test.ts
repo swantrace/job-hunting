@@ -7,7 +7,8 @@ describe('request validation', () => {
       jobTitle: 'Engineer',
       companyName: 'Acme',
       postedDate: '2026-07-12',
-      priority: 'B',
+      salary: '$100k',
+      applicationSource: 'LinkedIn',
     })
     expect(result.success).toBe(true)
   })
@@ -18,7 +19,6 @@ describe('request validation', () => {
       companyName: 'Acme',
       postedDate: 'yesterday',
       url: 'not-a-url',
-      priority: 'B',
     })
     expect(result.success).toBe(false)
   })
