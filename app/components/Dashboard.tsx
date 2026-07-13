@@ -1,5 +1,5 @@
 import type { Child } from 'hono/jsx'
-import type { Filters, JobCardData } from '../../src/db/queries'
+import { type Filters, type JobCardData, listManagementData } from '../../src/db/queries'
 import type { JobStatus } from '../../src/db/schema'
 import { todayISO } from '../../src/lib/date'
 import type { FieldErrors } from '../../src/lib/validation'
@@ -119,6 +119,7 @@ export function QuickCollect({
   values?: Record<string, string>
 }) {
   const query = enc(filters)
+  const { companies, tags } = listManagementData()
   return (
     <form
       id="quick-form"
@@ -147,6 +148,7 @@ export function QuickCollect({
             required
             value={values.companyName}
             message={error(errors, 'companyName')}
+            list="company-options"
           />
           <Field
             label="Location"
@@ -184,6 +186,7 @@ export function QuickCollect({
               value={values.tags}
               placeholder="backend, remote, fintech"
               message={error(errors, 'tags')}
+              list="tag-options"
             />
           </div>
         </div>
@@ -191,6 +194,16 @@ export function QuickCollect({
           <button class="btn btn-primary">Save opportunity</button>
         </div>
       </div>
+      <datalist id="company-options">
+        {companies.map((company) => (
+          <option value={company.name} />
+        ))}
+      </datalist>
+      <datalist id="tag-options">
+        {tags.map((tag) => (
+          <option value={tag.name} />
+        ))}
+      </datalist>
     </form>
   )
 }
@@ -202,6 +215,7 @@ export function Field({
   value,
   required,
   placeholder,
+  list,
   message,
 }: {
   label: string
@@ -210,6 +224,7 @@ export function Field({
   value?: string | null
   required?: boolean
   placeholder?: string
+  list?: string
   message?: string
 }) {
   return (
@@ -222,6 +237,7 @@ export function Field({
         value={value ?? ''}
         required={required}
         placeholder={placeholder}
+        list={list}
         aria-invalid={message ? 'true' : undefined}
       />
       {message && <span class="mt-1 text-xs text-error">{message}</span>}

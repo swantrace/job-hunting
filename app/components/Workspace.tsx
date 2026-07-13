@@ -1,4 +1,4 @@
-import type { Filters, JobCardData } from '../../src/db/queries'
+import { type Filters, type JobCardData, listManagementData } from '../../src/db/queries'
 import { todayISO } from '../../src/lib/date'
 import type { FieldErrors } from '../../src/lib/validation'
 import { Field } from './Dashboard'
@@ -16,6 +16,7 @@ export function Workspace({
   activity: ReturnType<typeof import('../../src/db/queries').getActivity>
 }) {
   const q = query(filters)
+  const { companies, tags } = listManagementData()
   return (
     <div>
       <div class="mb-5 flex items-start justify-between">
@@ -60,7 +61,7 @@ export function Workspace({
         </button>
       </div>
       <div id="workspace-application-panel" data-workspace-panel>
-        <ApplicationForm job={job} filters={filters} />
+        <ApplicationForm job={job} filters={filters} companies={companies} tags={tags} />
       </div>
       <div id="workspace-contacts-panel" data-workspace-panel class="hidden">
         <ContactsSection job={job} filters={filters} />
@@ -176,11 +177,17 @@ export function ApplicationForm({
   job,
   filters,
   errors,
+  companies,
+  tags,
 }: {
   job: JobCardData
   filters: Filters
   errors?: FieldErrors
+  companies?: { name: string }[]
+  tags?: { name: string }[]
 }) {
+  const companyOptions = companies ?? listManagementData().companies
+  const tagOptions = tags ?? listManagementData().tags
   return (
     <form
       id="application-form"
@@ -204,6 +211,7 @@ export function ApplicationForm({
           required
           value={job.companyName}
           message={err(errors, 'companyName')}
+          list="workspace-company-options"
         />
         <Field label="Location" name="location" value={job.location} />
         <Field label="Job URL" name="url" type="url" value={job.url} message={err(errors, 'url')} />
@@ -243,7 +251,12 @@ export function ApplicationForm({
         <Field label="Source" name="applicationSource" value={job.applicationSource} />
         <Field label="Salary" name="salary" value={job.salary} />
         <div class="sm:col-span-2">
-          <Field label="Direction tags" name="tags" value={job.tags.join(', ')} />
+          <Field
+            label="Direction tags"
+            name="tags"
+            value={job.tags.join(', ')}
+            list="workspace-tag-options"
+          />
         </div>
         <label class="form-control sm:col-span-2">
           <span class="label-text mb-1">Notes</span>
@@ -252,6 +265,16 @@ export function ApplicationForm({
           </textarea>
         </label>
       </div>
+      <datalist id="workspace-company-options">
+        {companyOptions.map((company) => (
+          <option value={company.name} />
+        ))}
+      </datalist>
+      <datalist id="workspace-tag-options">
+        {tagOptions.map((tag) => (
+          <option value={tag.name} />
+        ))}
+      </datalist>
       <button class="btn btn-primary w-full">🚀 Sent Application</button>
     </form>
   )
