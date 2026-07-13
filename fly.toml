@@ -10,6 +10,9 @@ primary_region = 'yyz'
 
 [env]
   DB_FILE_NAME = "/data/jobs.db"
+  OPENAI_MODEL_JOB_PARSER=gpt-5-mini
+  OPENAI_MODEL_RESUME=gpt-5.5
+  OPENAI_MODEL_COVER_LETTER=gpt-5.4-mini
 
 [mounts]
   source = "data"

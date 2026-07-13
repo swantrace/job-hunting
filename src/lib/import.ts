@@ -13,6 +13,7 @@ export const importPayloadSchema = z.object({
   applicationContacts: z.array(record).default([]),
   followUps: z.array(record).default([]),
   interviews: z.array(record).default([]),
+  jobPostings: z.array(record).default([]),
 })
 
 export type ImportPayload = z.infer<typeof importPayloadSchema>

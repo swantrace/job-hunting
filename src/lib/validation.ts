@@ -20,6 +20,7 @@ export const quickCollectSchema = z.object({
   postedDate: isoDate,
   priority: z.enum(priorities).default('B'),
   tags: optionalText(500),
+  jobPostText: optionalText(100000),
 })
 
 export const applicationSchema = z.object({
