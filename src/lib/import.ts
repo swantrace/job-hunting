@@ -1,0 +1,43 @@
+import { z } from 'zod'
+
+const record = z.record(z.string(), z.unknown())
+
+export const importPayloadSchema = z.object({
+  schemaVersion: z.number().int().positive(),
+  exportedAt: z.string().optional(),
+  companies: z.array(record).default([]),
+  tags: z.array(record).default([]),
+  contacts: z.array(record).default([]),
+  applications: z.array(record).default([]),
+  applicationTags: z.array(record).default([]),
+  applicationContacts: z.array(record).default([]),
+  followUps: z.array(record).default([]),
+  interviews: z.array(record).default([]),
+})
+
+export type ImportPayload = z.infer<typeof importPayloadSchema>
+
+export const textValue = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
+export const nullableText = (value: unknown) => textValue(value) || null
+export const key = (...values: unknown[]) =>
+  values.map((value) => textValue(value).toLocaleLowerCase()).join('|')
+
+export function companyKey(company: Record<string, unknown>) {
+  return key(company.name)
+}
+
+export function tagKey(tag: Record<string, unknown>) {
+  return key(tag.name)
+}
+
+export function contactKey(contact: Record<string, unknown>, companyName: string) {
+  return key(companyName, contact.email || contact.name)
+}
+
+export function applicationKey(application: Record<string, unknown>, companyName: string) {
+  return key(
+    companyName,
+    application.jobTitle,
+    application.url || `${application.location}|${application.postedDate}`,
+  )
+}
