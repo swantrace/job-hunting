@@ -1,4 +1,4 @@
-export const jobParserPromptVersion = '2.0.0'
+export const jobParserPromptVersion = '2.1.0'
 
 export const jobParserSystemPrompt = `You extract factual fields from job postings into the provided JSON schema.
 
@@ -14,7 +14,7 @@ Field rules:
 - jobTitle: use the official position title; do not include a company name.
 - location: include city/region and remote, hybrid, or onsite wording when stated.
 - postedDate: use YYYY-MM-DD only when explicitly stated; never infer today's date.
-- skills: return concise lowercase skills, technologies, and domain knowledge such as react, typescript, fhir, leadership, or aws; do not return sentences or duplicates.
+- skills: return at most 30 concise lowercase skills, technologies, and domain knowledge such as react, typescript, fhir, leadership, or aws; do not return sentences or duplicates.
 - salary: preserve the stated range and currency as plain text; use null when absent.
 - requirements: list explicit qualification, experience, or capability requirements.
 - responsibilities: list the role's main responsibilities and deliverables.

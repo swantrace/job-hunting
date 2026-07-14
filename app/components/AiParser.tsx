@@ -3,9 +3,13 @@ import type { ParsedJobResult } from '../../src/lib/ai'
 import { todayISO } from '../../src/lib/date'
 import { QuickCollect } from './Dashboard'
 
-export function AiParser({ filters }: { filters: Filters }) {
+export function AiParser({ filters, oob = false }: { filters: Filters; oob?: boolean }) {
   return (
-    <section class="card bg-base-100 shadow-sm">
+    <section
+      id="ai-parser"
+      class="card bg-base-100 shadow-sm"
+      {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
+    >
       <div class="card-body p-5">
         <h2 class="card-title">AI job parser</h2>
         <p class="text-sm text-base-content/60">Paste a job post to create an editable draft.</p>

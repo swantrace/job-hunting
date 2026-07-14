@@ -1,4 +1,4 @@
-import { type Job, Queue, Worker } from 'bunqueue/client'
+import type { Queue, Worker } from 'bunqueue/client'
 import {
   completeGenerationRun,
   createGenerationRun,
@@ -7,7 +7,6 @@ import {
   listQueuedGenerationRuns,
   markGenerationRunProcessing,
 } from '../db/generation'
-import { generateApplicationArtifacts } from './generation'
 
 type GenerationQueueJob = { runId: number }
 
@@ -19,9 +18,22 @@ const queueDataPath = () =>
 
 let queue: Queue<GenerationQueueJob> | undefined
 let worker: Worker<GenerationQueueJob, { runId: number }> | undefined
+let bunQueueModule: Promise<typeof import('bunqueue/client')> | undefined
 
-function getQueue() {
-  queue ??= new Queue<GenerationQueueJob>(queueName, {
+function usePersistentQueue() {
+  return process.env.NODE_ENV === 'production'
+}
+
+async function getBunQueue() {
+  if (!usePersistentQueue()) return null
+  bunQueueModule ??= import('bunqueue/client')
+  return bunQueueModule
+}
+
+async function getQueue() {
+  const bunQueue = await getBunQueue()
+  if (!bunQueue) return null
+  queue ??= new bunQueue.Queue<GenerationQueueJob>(queueName, {
     embedded: true,
     dataPath: queueDataPath(),
     defaultJobOptions: { attempts: 3, backoff: 10_000, timeout: 180_000, durable: true },
@@ -29,17 +41,21 @@ function getQueue() {
   return queue
 }
 
-async function processGeneration(job: Job<GenerationQueueJob>) {
-  const run = getGenerationRun(job.data.runId)
-  if (!run) return { runId: job.data.runId }
+async function processGeneration(
+  runId: number,
+  updateProgress: (progress: number, message: string) => Promise<unknown>,
+) {
+  const run = getGenerationRun(runId)
+  if (!run) return { runId }
   if (run.status === 'Completed') return { runId: run.id }
   markGenerationRunProcessing(run.id)
-  await job.updateProgress(10, 'Preparing structured job context')
+  await updateProgress(10, 'Preparing structured job context')
   try {
+    const { generateApplicationArtifacts } = await import('./generation')
     const artifacts = await generateApplicationArtifacts(run.id)
-    await job.updateProgress(95, 'Saving generated documents')
+    await updateProgress(95, 'Saving generated documents')
     completeGenerationRun(run.id, artifacts)
-    await job.updateProgress(100, 'Complete')
+    await updateProgress(100, 'Complete')
     return { runId: run.id }
   } catch (error) {
     failGenerationRun(run.id, error)
@@ -47,14 +63,23 @@ async function processGeneration(job: Job<GenerationQueueJob>) {
   }
 }
 
-export function startGenerationWorker() {
-  if (worker) return worker
-  worker = new Worker<GenerationQueueJob, { runId: number }>(queueName, processGeneration, {
-    embedded: true,
-    dataPath: queueDataPath(),
-    concurrency: 1,
-    heartbeatInterval: 10_000,
-  })
+export async function startGenerationWorker() {
+  if (worker || !usePersistentQueue()) return worker
+  const bunQueue = await getBunQueue()
+  if (!bunQueue) return undefined
+  worker = new bunQueue.Worker<GenerationQueueJob, { runId: number }>(
+    queueName,
+    (job) =>
+      processGeneration(job.data.runId, (progress, message) =>
+        job.updateProgress(progress, message),
+      ),
+    {
+      embedded: true,
+      dataPath: queueDataPath(),
+      concurrency: 1,
+      heartbeatInterval: 10_000,
+    },
+  )
   worker.on('error', (error) => console.error('Generation worker error', error))
   return worker
 }
@@ -62,7 +87,14 @@ export function startGenerationWorker() {
 export async function enqueueGeneration(jobApplicationId: number) {
   const run = createGenerationRun(jobApplicationId)
   if (!run) return null
-  await getQueue().add(
+  const persistentQueue = await getQueue()
+  if (!persistentQueue) {
+    void processGeneration(run.id, async () => undefined).catch((error) =>
+      console.error('Development document generation failed', error),
+    )
+    return run
+  }
+  await persistentQueue.add(
     'generate-documents',
     { runId: run.id },
     { jobId: run.queueJobId, durable: true },
@@ -72,10 +104,18 @@ export async function enqueueGeneration(jobApplicationId: number) {
 
 export async function recoverQueuedGenerationRuns() {
   const queued = listQueuedGenerationRuns()
-  for (const run of queued)
-    await getQueue().add(
+  const persistentQueue = await getQueue()
+  for (const run of queued) {
+    if (!persistentQueue) {
+      void processGeneration(run.id, async () => undefined).catch((error) =>
+        console.error('Development document generation recovery failed', error),
+      )
+      continue
+    }
+    await persistentQueue.add(
       'generate-documents',
       { runId: run.id },
       { jobId: run.queueJobId, durable: true },
     )
+  }
 }

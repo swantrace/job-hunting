@@ -1,5 +1,6 @@
 import type { Filters, JobCardData } from '../../src/db/queries'
 import type { JobStatus } from '../../src/db/schema'
+import { AiParser } from './AiParser'
 import { Board, Metrics, QuickCollect } from './Dashboard'
 
 export function MutationResponse({
@@ -16,6 +17,7 @@ export function MutationResponse({
   return (
     <>
       {resetQuick && <QuickCollect filters={filters} />}
+      {resetQuick && <AiParser filters={filters} oob />}
       {resetQuick ? (
         <Board jobs={jobs} filters={filters} oob />
       ) : (
