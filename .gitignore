@@ -1,7 +1,12 @@
 node_modules/
 dist/
 .env
+profiles/candidate.profile.json
 jobs.db
 jobs.db-shm
 jobs.db-wal
+bunqueue.db
+bunqueue.db-shm
+bunqueue.db-wal
+/artifacts/
 coverage/

@@ -1,5 +1,6 @@
 import { createRoute } from 'honox/factory'
 import { createApplication, listApplications, metrics } from '../../../src/db/queries'
+import { enqueueGeneration } from '../../../src/lib/generation-queue'
 import { parseFilters, parseForm } from '../../../src/lib/request'
 import { quickCollectSchema } from '../../../src/lib/validation'
 import { Board, QuickCollect } from '../../components/Dashboard'
@@ -23,7 +24,15 @@ export const POST = createRoute(async (c) => {
       />,
       422,
     )
-  createApplication(parsed.data)
+  const id = createApplication(parsed.data)
+  if (parsed.data.parserPromptVersion) {
+    try {
+      await enqueueGeneration(id)
+    } catch (error) {
+      // The saved run remains Queued and will be recovered on the next server start.
+      console.error('Unable to enqueue document generation', error)
+    }
+  }
   return c.html(
     <MutationResponse
       jobs={listApplications(filters)}

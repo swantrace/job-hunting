@@ -1,3 +1,4 @@
+import { type GenerationRunWithArtifacts, listGenerationRuns } from '../../src/db/generation'
 import { type Filters, type JobCardData, listManagementData } from '../../src/db/queries'
 import { todayISO } from '../../src/lib/date'
 import { listProfiles } from '../../src/lib/profiles'
@@ -18,6 +19,7 @@ export function Workspace({
 }) {
   const q = query(filters)
   const { companies, skills } = listManagementData()
+  const generationRuns = listGenerationRuns(job.id)
   return (
     <div>
       <div class="mb-5 flex items-start justify-between">
@@ -72,6 +74,7 @@ export function Workspace({
           </details>
         )}
         {job.jobPostingAnalysis && <JobPostAnalysis analysis={job.jobPostingAnalysis} />}
+        <GenerationPanel jobId={job.id} filters={filters} runs={generationRuns} />
       </div>
       <div id="workspace-contacts-panel" data-workspace-panel class="hidden">
         <ContactsSection job={job} filters={filters} />
@@ -135,6 +138,88 @@ export function Workspace({
         </div>
       </div>
     </div>
+  )
+}
+
+export function GenerationPanel({
+  jobId,
+  filters,
+  runs,
+}: {
+  jobId: number
+  filters: Filters
+  runs: GenerationRunWithArtifacts[]
+}) {
+  const latest = runs[0]
+  const statusClass =
+    latest?.status === 'Completed'
+      ? 'badge-success'
+      : latest?.status === 'Failed'
+        ? 'badge-error'
+        : latest?.status === 'Processing'
+          ? 'badge-warning'
+          : 'badge-info'
+  const shouldPoll = latest?.status === 'Queued' || latest?.status === 'Processing'
+  return (
+    <section
+      id="generation-panel"
+      class="mt-6 rounded-box border border-base-300 p-4"
+      {...(shouldPoll
+        ? {
+            'hx-get': `/applications/${jobId}/generation-runs?${query(filters)}`,
+            'hx-trigger': 'every 3s',
+            'hx-swap': 'outerHTML',
+          }
+        : {})}
+    >
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="font-semibold">Application documents</h3>
+          <p class="text-sm text-base-content/60">
+            Generate a structured job context, tailored resume, and cover letter.
+          </p>
+        </div>
+        <form
+          hx-post={`/applications/${jobId}/generation-runs?${query(filters)}`}
+          hx-target="#generation-panel"
+          hx-swap="outerHTML"
+          hx-disabled-elt="find button"
+        >
+          <button class="btn btn-secondary btn-sm">
+            <span class="loading loading-spinner loading-xs htmx-indicator" />
+            {latest?.status === 'Failed' ? 'Retry generation' : 'Generate documents'}
+          </button>
+        </form>
+      </div>
+      {latest ? (
+        <div class="mt-4 space-y-3">
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <span class={`badge ${statusClass}`}>{latest.status}</span>
+            <span class="text-base-content/60">Attempts: {latest.attempts}</span>
+          </div>
+          {latest.errorMessage && (
+            <div class="alert alert-error text-sm">
+              <span>{latest.errorMessage}</span>
+            </div>
+          )}
+          {latest.artifacts.length > 0 && (
+            <div class="flex flex-wrap gap-2">
+              {latest.artifacts.map((artifact) => (
+                <a class="btn btn-outline btn-sm" href={`/artifacts/${artifact.id}`}>
+                  {artifact.type === 'job_context'
+                    ? 'Job context JSON'
+                    : artifact.type === 'resume'
+                      ? 'Resume DOCX'
+                      : 'Cover letter DOCX'}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <p class="mt-4 text-sm text-base-content/60">No document generation has been queued yet.</p>
+      )}
+    </section>
   )
 }
 
