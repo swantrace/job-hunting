@@ -6,6 +6,7 @@
       "!!node_modules",
       "!!dist",
       "!!drizzle",
+      "!!artifacts",
       "!!jobs.db",
       "!!jobs.db-shm",
       "!!jobs.db-wal"
