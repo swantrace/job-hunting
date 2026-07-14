@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { relative, resolve, sep } from 'node:path'
 import { createRoute } from 'honox/factory'
 import { getArtifact } from '../../../src/db/generation'
-import { getArtifactsRoot } from '../../../src/lib/generation'
+import { getArtifactsRoot } from '../../../src/lib/artifact-storage'
 import { parseId } from '../../../src/lib/request'
 
 export default createRoute(async (c) => {

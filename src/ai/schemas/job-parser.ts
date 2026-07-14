@@ -41,6 +41,7 @@ export const jobParserResponseSchema = {
     skills: {
       type: 'array',
       items: { type: 'string' },
+      maxItems: 30,
       description: 'Short, lowercase, deduplicated technical skills, domain knowledge, and tools.',
     },
     salary: {
@@ -50,38 +51,45 @@ export const jobParserResponseSchema = {
     requirements: {
       type: 'array',
       items: { type: 'string' },
+      maxItems: 30,
       description: 'Explicit qualifications, experience, or capability requirements.',
     },
     responsibilities: {
       type: 'array',
       items: { type: 'string' },
+      maxItems: 30,
       description: 'Core responsibilities and deliverables for the role.',
     },
     painPoints: {
       type: 'array',
       items: { type: 'string' },
+      maxItems: 20,
       description:
         'Business or technical problems the role appears intended to solve; empty when not supported.',
     },
     culture: {
       type: 'array',
       items: { type: 'string' },
+      maxItems: 20,
       description: 'Evidence-backed working-style or culture signals; empty when not supported.',
     },
     redFlags: {
       type: 'array',
       items: { type: 'string' },
+      maxItems: 20,
       description: 'Evidence-backed concerns or ambiguities; empty when none are evident.',
     },
     successMetrics: {
       type: 'array',
       items: { type: 'string' },
+      maxItems: 20,
       description:
         'How success is explicitly or plausibly measured in the role; empty when not supported.',
     },
     benefits: {
       type: 'array',
       items: { type: 'string' },
+      maxItems: 20,
       description: 'Compensation-adjacent benefits or perks explicitly stated; empty when absent.',
     },
     notes: {

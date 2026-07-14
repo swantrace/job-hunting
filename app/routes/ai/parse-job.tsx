@@ -1,5 +1,9 @@
 import { createRoute } from 'honox/factory'
-import { OpenAIRequestError, parseJobDescription } from '../../../src/lib/ai'
+import {
+  OpenAIRequestError,
+  OpenAIRequestTimeoutError,
+  parseJobDescription,
+} from '../../../src/lib/ai'
 import { parseFilters } from '../../../src/lib/request'
 import { AiParser, ParsedJobDraft } from '../../components/AiParser'
 
@@ -26,13 +30,18 @@ export const POST = createRoute(async (c) => {
     const message =
       error instanceof Error && error.message.includes('not configured')
         ? 'AI parsing is not configured on this server.'
-        : error instanceof OpenAIRequestError && error.status === 401
-          ? 'OpenAI rejected the API key. Check OPENAI_API_KEY.'
-          : error instanceof OpenAIRequestError && error.status === 404
-            ? 'The configured OpenAI model was not found. Check OPENAI_MODEL_JOB_PARSER.'
-            : error instanceof OpenAIRequestError && error.status === 429
-              ? 'OpenAI rate limit or account quota reached. Try again later.'
-              : 'AI parsing failed. Check the text and try again.'
-    return c.html(<div class="alert alert-error">{message}</div>, 502)
+        : error instanceof OpenAIRequestTimeoutError
+          ? 'AI parsing took too long. Please try again.'
+          : error instanceof OpenAIRequestError && error.status === 401
+            ? 'OpenAI rejected the API key. Check OPENAI_API_KEY.'
+            : error instanceof OpenAIRequestError && error.status === 404
+              ? 'The configured OpenAI model was not found. Check OPENAI_MODEL_JOB_PARSER.'
+              : error instanceof OpenAIRequestError && error.status === 429
+                ? 'OpenAI rate limit or account quota reached. Try again later.'
+                : 'AI parsing failed. Check the text and try again.'
+    return c.html(
+      <div class="alert alert-error">{message}</div>,
+      error instanceof OpenAIRequestTimeoutError ? 504 : 502,
+    )
   }
 })

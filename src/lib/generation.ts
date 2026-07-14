@@ -14,6 +14,7 @@ import {
   tailoredResumeSchema,
 } from '../ai/schemas/application-generation'
 import { getGenerationSource } from '../db/generation'
+import { getArtifactsRoot } from './artifact-storage'
 import { todayISO } from './date'
 import { getCandidateProfile, getProfile, resolveProjectAsset } from './profiles'
 
@@ -25,10 +26,6 @@ type ArtifactOutput = {
   filePath: string
   mimeType: string
 }
-
-export const getArtifactsRoot = () =>
-  process.env.ARTIFACTS_DIR ??
-  resolve(process.cwd(), process.cwd().endsWith('/dist') ? '..' : '.', 'artifacts')
 
 const filenamePart = (value: string) =>
   value

@@ -61,7 +61,7 @@ function readProfileFile(file: string) {
 
 export function listProfiles(): ProfileOption[] {
   const profiles = readdirSync(profileDirectory())
-    .filter((file) => file.endsWith('.profile.json'))
+    .filter((file) => file.endsWith('.profile.json') && file !== 'candidate.profile.json')
     .map((file) => {
       const profile = profileSchema.parse(readProfileFile(file))
       const filenameId = file.replace(/\.profile\.json$/, '')
