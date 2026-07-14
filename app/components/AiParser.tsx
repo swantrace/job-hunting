@@ -1,5 +1,5 @@
 import type { Filters } from '../../src/db/queries'
-import type { ParsedJob } from '../../src/lib/ai'
+import type { ParsedJobResult } from '../../src/lib/ai'
 import { todayISO } from '../../src/lib/date'
 import { QuickCollect } from './Dashboard'
 
@@ -9,7 +9,13 @@ export function AiParser({ filters }: { filters: Filters }) {
       <div class="card-body p-5">
         <h2 class="card-title">AI job parser</h2>
         <p class="text-sm text-base-content/60">Paste a job post to create an editable draft.</p>
-        <form hx-post="/ai/parse-job" hx-target="#ai-parser-result" hx-swap="innerHTML" novalidate>
+        <form
+          hx-post="/ai/parse-job"
+          hx-target="#ai-parser-result"
+          hx-swap="innerHTML"
+          hx-disabled-elt="find button"
+          novalidate
+        >
           <textarea
             class="textarea textarea-bordered min-h-40 w-full"
             name="description"
@@ -17,7 +23,10 @@ export function AiParser({ filters }: { filters: Filters }) {
             maxLength={20000}
             required
           />
-          <button class="btn btn-secondary mt-3 w-full">Parse with AI</button>
+          <button class="btn btn-secondary mt-3 w-full">
+            <span class="loading loading-spinner loading-sm htmx-indicator" />
+            Parse with AI
+          </button>
         </form>
         <div id="ai-parser-result" class="mt-4" />
       </div>
@@ -30,26 +39,36 @@ export function ParsedJobDraft({
   filters,
   jobPostText,
 }: {
-  parsed: ParsedJob
+  parsed: ParsedJobResult
   filters: Filters
   jobPostText: string
 }) {
   return (
     <div class="space-y-3">
-      <div class="alert alert-info text-sm">Review the AI draft before saving.</div>
+      <div class="alert alert-info text-sm">
+        Review the AI draft, then add Company, Job URL, Application source, and Direction before
+        saving.
+      </div>
       <QuickCollect
         filters={filters}
         formId="quick-form"
         oob
         values={{
           jobTitle: parsed.jobTitle,
-          companyName: parsed.companyName,
           location: parsed.location ?? '',
-          url: parsed.url ?? '',
           postedDate: parsed.postedDate ?? todayISO(),
-          tags: parsed.tags.join(', '),
+          skills: parsed.skills.join(', '),
           salary: parsed.salary ?? '',
-          applicationSource: parsed.applicationSource ?? '',
+          analysisRequirements: parsed.requirements.join('\n'),
+          analysisResponsibilities: parsed.responsibilities.join('\n'),
+          analysisPainPoints: parsed.painPoints.join('\n'),
+          analysisCulture: parsed.culture.join('\n'),
+          analysisRedFlags: parsed.redFlags.join('\n'),
+          analysisSuccessMetrics: parsed.successMetrics.join('\n'),
+          analysisBenefits: parsed.benefits.join('\n'),
+          analysisNotes: parsed.notes ?? '',
+          parserModel: parsed.parserModel,
+          parserPromptVersion: parsed.parserPromptVersion,
           jobPostText,
         }}
       />

@@ -9,7 +9,7 @@ import {
   type ImportPayload,
   key,
   nullableText,
-  tagKey,
+  skillKey,
   textValue,
 } from '../lib/import'
 import { advanceStatus } from '../lib/transitions'
@@ -24,22 +24,24 @@ import {
   type JobStatus,
   jobApplications,
   jobApplicationsToContacts,
-  jobApplicationsToTags,
+  jobApplicationsToSkills,
+  jobPostingAnalyses,
   jobPostings,
+  skills,
   statuses,
-  tags,
 } from './schema'
 
 export type Filters = z.infer<typeof filterSchema>
 export type JobCardData = JobApplication & {
   companyName: string
   companyWebsite: string | null
-  tags: string[]
+  skills: string[]
   contacts?: (typeof contacts.$inferSelect)[]
   jobPosting?: typeof jobPostings.$inferSelect
+  jobPostingAnalysis?: typeof jobPostingAnalyses.$inferSelect
 }
 
-const cleanTags = (value?: string | null) =>
+const cleanSkills = (value?: string | null) =>
   [
     ...new Set(
       (value ?? '')
@@ -69,14 +71,16 @@ function getOrCreateCompany(tx: DbExecutor, name: string, date: string) {
   return company
 }
 
-function replaceTags(tx: DbExecutor, jobId: number, names: string[]) {
-  tx.delete(jobApplicationsToTags).where(eq(jobApplicationsToTags.jobApplicationId, jobId)).run()
+function replaceSkills(tx: DbExecutor, jobId: number, names: string[]) {
+  tx.delete(jobApplicationsToSkills)
+    .where(eq(jobApplicationsToSkills.jobApplicationId, jobId))
+    .run()
   for (const name of names) {
-    tx.insert(tags).values({ name }).onConflictDoNothing().run()
-    const tag = tx.select().from(tags).where(sql`lower(${tags.name}) = lower(${name})`).get()
-    if (tag)
-      tx.insert(jobApplicationsToTags)
-        .values({ jobApplicationId: jobId, tagId: tag.id })
+    tx.insert(skills).values({ name }).onConflictDoNothing().run()
+    const skill = tx.select().from(skills).where(sql`lower(${skills.name}) = lower(${name})`).get()
+    if (skill)
+      tx.insert(jobApplicationsToSkills)
+        .values({ jobApplicationId: jobId, skillId: skill.id })
         .onConflictDoNothing()
         .run()
   }
@@ -91,6 +95,7 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
       .values({
         companyId: company.id,
         jobTitle: input.jobTitle,
+        direction: input.direction,
         location: input.location,
         url: input.url,
         postedDate: input.postedDate,
@@ -103,17 +108,39 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
       })
       .returning({ id: jobApplications.id })
       .get()
-    replaceTags(tx, result.id, cleanTags(input.tags))
+    replaceSkills(tx, result.id, cleanSkills(input.skills))
     const rawText = input.jobPostText?.trim()
     if (rawText) {
-      tx.insert(jobPostings)
+      const posting = tx
+        .insert(jobPostings)
         .values({
           jobApplicationId: result.id,
           rawText,
           capturedAt: date,
           contentHash: createHash('sha256').update(rawText).digest('hex'),
+          parsedAt: input.analysisRequirements ? date : null,
+          parserModel: input.parserModel,
+          parserPromptVersion: input.parserPromptVersion,
         })
-        .run()
+        .returning({ id: jobPostings.id })
+        .get()
+      if (input.parserPromptVersion)
+        tx.insert(jobPostingAnalyses)
+          .values({
+            jobPostingId: posting.id,
+            requirements: input.analysisRequirements,
+            responsibilities: input.analysisResponsibilities,
+            painPoints: input.analysisPainPoints,
+            culture: input.analysisCulture,
+            redFlags: input.analysisRedFlags,
+            successMetrics: input.analysisSuccessMetrics,
+            benefits: input.analysisBenefits,
+            notes: input.analysisNotes,
+            generatedAt: date,
+            model: input.parserModel,
+            promptVersion: input.parserPromptVersion,
+          })
+          .run()
     }
     return result.id
   })
@@ -129,6 +156,7 @@ export function updateApplication(id: number, input: z.infer<typeof applicationS
       .set({
         companyId: company.id,
         jobTitle: input.jobTitle,
+        direction: input.direction,
         location: input.location,
         url: input.url,
         postedDate: input.postedDate,
@@ -147,7 +175,7 @@ export function updateApplication(id: number, input: z.infer<typeof applicationS
       })
       .where(eq(jobApplications.id, id))
       .run()
-    replaceTags(tx, id, cleanTags(input.tags))
+    replaceSkills(tx, id, cleanSkills(input.skills))
     return true
   })
 }
@@ -202,13 +230,13 @@ export function listApplications(filters: Filters): JobCardData[] {
     .orderBy(orderMap[filters.sort])
     .all()
   if (!rows.length) return []
-  const tagRows = db
-    .select({ jobId: jobApplicationsToTags.jobApplicationId, name: tags.name })
-    .from(jobApplicationsToTags)
-    .innerJoin(tags, eq(jobApplicationsToTags.tagId, tags.id))
+  const skillRows = db
+    .select({ jobId: jobApplicationsToSkills.jobApplicationId, name: skills.name })
+    .from(jobApplicationsToSkills)
+    .innerJoin(skills, eq(jobApplicationsToSkills.skillId, skills.id))
     .where(
       inArray(
-        jobApplicationsToTags.jobApplicationId,
+        jobApplicationsToSkills.jobApplicationId,
         rows.map((row) => row.job.id),
       ),
     )
@@ -217,7 +245,7 @@ export function listApplications(filters: Filters): JobCardData[] {
     ...row.job,
     companyName: row.companyName,
     companyWebsite: row.companyWebsite,
-    tags: tagRows.filter((tag) => tag.jobId === row.job.id).map((tag) => tag.name),
+    skills: skillRows.filter((skill) => skill.jobId === row.job.id).map((skill) => skill.name),
   }))
 }
 
@@ -233,14 +261,21 @@ export function getApplication(id: number): JobCardData | null {
     .where(eq(jobApplications.id, id))
     .get()
   if (!row) return null
-  const jobTags = db
-    .select({ name: tags.name })
-    .from(jobApplicationsToTags)
-    .innerJoin(tags, eq(jobApplicationsToTags.tagId, tags.id))
-    .where(eq(jobApplicationsToTags.jobApplicationId, id))
+  const jobSkills = db
+    .select({ name: skills.name })
+    .from(jobApplicationsToSkills)
+    .innerJoin(skills, eq(jobApplicationsToSkills.skillId, skills.id))
+    .where(eq(jobApplicationsToSkills.jobApplicationId, id))
     .all()
-    .map((tag) => tag.name)
+    .map((skill) => skill.name)
   const jobPosting = db.select().from(jobPostings).where(eq(jobPostings.jobApplicationId, id)).get()
+  const jobPostingAnalysis = jobPosting
+    ? db
+        .select()
+        .from(jobPostingAnalyses)
+        .where(eq(jobPostingAnalyses.jobPostingId, jobPosting.id))
+        .get()
+    : undefined
   const jobContacts = db
     .select({ contact: contacts })
     .from(jobApplicationsToContacts)
@@ -252,9 +287,10 @@ export function getApplication(id: number): JobCardData | null {
     ...row.job,
     companyName: row.companyName,
     companyWebsite: row.companyWebsite,
-    tags: jobTags,
+    skills: jobSkills,
     contacts: jobContacts,
     jobPosting,
+    jobPostingAnalysis,
   }
 }
 
@@ -302,7 +338,7 @@ export function addContactToApplication(
 
 export function listManagementData() {
   return {
-    tags: db.select().from(tags).orderBy(sql`lower(${tags.name})`).all(),
+    skills: db.select().from(skills).orderBy(sql`lower(${skills.name})`).all(),
     companies: db.select().from(companies).orderBy(sql`lower(${companies.name})`).all(),
     contacts: db
       .select({ contact: contacts, companyName: companies.name })
@@ -316,16 +352,20 @@ export function listManagementData() {
 export function exportData() {
   const companyRows = db.select().from(companies).all()
   const companyById = new Map(companyRows.map((company) => [company.id, company.name]))
-  const tagRows = db.select().from(tags).all()
-  const tagById = new Map(tagRows.map((tag) => [tag.id, tag.name]))
+  const skillRows = db.select().from(skills).all()
+  const skillById = new Map(skillRows.map((skill) => [skill.id, skill.name]))
   const contactRows = db.select().from(contacts).all()
   const contactById = new Map(contactRows.map((contact) => [contact.id, contact]))
   const applicationRows = db.select().from(jobApplications).all()
+  const postingRows = db.select().from(jobPostings).all()
+  const postingApplicationById = new Map(
+    postingRows.map((posting) => [posting.id, posting.jobApplicationId]),
+  )
   return {
     schemaVersion: 1,
     exportedAt: new Date().toISOString(),
     companies: companyRows,
-    tags: tagRows,
+    skills: skillRows,
     contacts: contactRows.map((contact) => ({
       ...contact,
       companyName: companyById.get(contact.companyId),
@@ -334,13 +374,13 @@ export function exportData() {
       ...application,
       companyName: companyById.get(application.companyId),
     })),
-    applicationTags: db
+    applicationSkills: db
       .select()
-      .from(jobApplicationsToTags)
+      .from(jobApplicationsToSkills)
       .all()
       .map((item) => ({
         ...item,
-        tagName: tagById.get(item.tagId),
+        skillName: skillById.get(item.skillId),
       })),
     applicationContacts: db
       .select()
@@ -352,7 +392,15 @@ export function exportData() {
       })),
     followUps: db.select().from(followUps).all(),
     interviews: db.select().from(interviews).all(),
-    jobPostings: db.select().from(jobPostings).all(),
+    jobPostings: postingRows,
+    jobPostingAnalyses: db
+      .select()
+      .from(jobPostingAnalyses)
+      .all()
+      .map((analysis) => ({
+        ...analysis,
+        jobApplicationId: postingApplicationById.get(analysis.jobPostingId),
+      })),
   }
 }
 
@@ -367,11 +415,11 @@ export type ImportPreview = {
 
 export function previewImport(payload: ImportPayload): ImportPreview {
   const localCompanies = db.select().from(companies).all()
-  const localTags = db.select().from(tags).all()
+  const localSkills = db.select().from(skills).all()
   const localContacts = db.select().from(contacts).all()
   const localApplications = db.select().from(jobApplications).all()
   const companyMap = new Map(localCompanies.map((item) => [key(item.name), item]))
-  const tagMap = new Map(localTags.map((item) => [key(item.name), item]))
+  const skillMap = new Map(localSkills.map((item) => [key(item.name), item]))
   const companyNames = new Map(localCompanies.map((item) => [item.id, item.name]))
   const contactMap = new Map(
     localContacts.map((item) => [contactKey(item, companyNames.get(item.companyId) ?? ''), item]),
@@ -410,7 +458,7 @@ export function previewImport(payload: ImportPayload): ImportPreview {
     return { created, updated, unchanged, conflicts: conflicts.length }
   }
   const companiesSummary = count(payload.companies, companyMap, companyKey, 'Company')
-  const tagsSummary = count(payload.tags, tagMap, tagKey, 'Tag')
+  const skillsSummary = count(payload.skills, skillMap, skillKey, 'Skill')
   const contactsSummary = count(
     payload.contacts,
     contactMap,
@@ -427,7 +475,7 @@ export function previewImport(payload: ImportPayload): ImportPreview {
     schemaVersion: payload.schemaVersion,
     summary: {
       companies: companiesSummary,
-      tags: tagsSummary,
+      skills: skillsSummary,
       contacts: contactsSummary,
       applications: applicationsSummary,
       followUps: { created: payload.followUps.length, updated: 0, unchanged: 0, conflicts: 0 },
@@ -440,7 +488,7 @@ export function previewImport(payload: ImportPayload): ImportPreview {
 export function mergeImport(payload: ImportPayload) {
   return db.transaction((tx) => {
     const companyIds = new Map<number, number>()
-    const tagIds = new Map<number, number>()
+    const skillIds = new Map<number, number>()
     const contactIds = new Map<number, number>()
     const applicationIds = new Map<number, number>()
     const companiesByKey = new Map(
@@ -450,10 +498,10 @@ export function mergeImport(payload: ImportPayload) {
         .all()
         .map((item) => [key(item.name), item]),
     )
-    const tagsByKey = new Map(
+    const skillsByKey = new Map(
       tx
         .select()
-        .from(tags)
+        .from(skills)
         .all()
         .map((item) => [key(item.name), item]),
     )
@@ -482,15 +530,15 @@ export function mergeImport(payload: ImportPayload) {
         companyIds.set(Number(incoming.id), created.id)
       }
     }
-    for (const incoming of payload.tags) {
+    for (const incoming of payload.skills) {
       const name = textValue(incoming.name)
       if (!name) continue
-      const existing = tagsByKey.get(tagKey(incoming))
-      if (existing) tagIds.set(Number(incoming.id), existing.id)
+      const existing = skillsByKey.get(skillKey(incoming))
+      if (existing) skillIds.set(Number(incoming.id), existing.id)
       else {
-        const created = tx.insert(tags).values({ name }).returning().get()
-        tagsByKey.set(tagKey(incoming), created)
-        tagIds.set(Number(incoming.id), created.id)
+        const created = tx.insert(skills).values({ name }).returning().get()
+        skillsByKey.set(skillKey(incoming), created)
+        skillIds.set(Number(incoming.id), created.id)
       }
     }
     const companyNameById = new Map(
@@ -542,6 +590,7 @@ export function mergeImport(payload: ImportPayload) {
       const values = {
         companyId,
         jobTitle: title,
+        direction: textValue(incoming.direction) || 'fullstack',
         location: nullableText(incoming.location),
         url: nullableText(incoming.url),
         postedDate,
@@ -572,12 +621,15 @@ export function mergeImport(payload: ImportPayload) {
         applicationIds.set(Number(incoming.id), created.id)
       }
     }
-    for (const relation of payload.applicationTags) {
-      const applicationId = applicationIds.get(Number(relation.jobApplicationId))
-      const tagId = tagIds.get(Number(relation.tagId)) ?? tagsByKey.get(key(relation.tagName))?.id
-      if (applicationId && tagId)
-        tx.insert(jobApplicationsToTags)
-          .values({ jobApplicationId: applicationId, tagId })
+    for (const relation of payload.applicationSkills) {
+      const relationRecord = relation as Record<string, unknown>
+      const applicationId = applicationIds.get(Number(relationRecord.jobApplicationId))
+      const skillId =
+        skillIds.get(Number(relationRecord.skillId)) ??
+        skillsByKey.get(key(relationRecord.skillName))?.id
+      if (applicationId && skillId)
+        tx.insert(jobApplicationsToSkills)
+          .values({ jobApplicationId: applicationId, skillId })
           .onConflictDoNothing()
           .run()
     }
@@ -660,11 +712,46 @@ export function mergeImport(payload: ImportPayload) {
       if (existing) tx.update(jobPostings).set(values).where(eq(jobPostings.id, existing.id)).run()
       else tx.insert(jobPostings).values(values).run()
     }
+    for (const incoming of payload.jobPostingAnalyses) {
+      const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
+      if (!applicationId) continue
+      const posting = tx
+        .select()
+        .from(jobPostings)
+        .where(eq(jobPostings.jobApplicationId, applicationId))
+        .get()
+      if (!posting) continue
+      const values = {
+        jobPostingId: posting.id,
+        requirements: nullableText(incoming.requirements),
+        responsibilities: nullableText(incoming.responsibilities),
+        painPoints: nullableText(incoming.painPoints),
+        culture: nullableText(incoming.culture),
+        redFlags: nullableText(incoming.redFlags),
+        successMetrics: nullableText(incoming.successMetrics),
+        benefits: nullableText(incoming.benefits),
+        notes: nullableText(incoming.notes),
+        generatedAt: textValue(incoming.generatedAt) || todayISO(),
+        model: nullableText(incoming.model),
+        promptVersion: nullableText(incoming.promptVersion),
+      }
+      const existing = tx
+        .select()
+        .from(jobPostingAnalyses)
+        .where(eq(jobPostingAnalyses.jobPostingId, posting.id))
+        .get()
+      if (existing)
+        tx.update(jobPostingAnalyses)
+          .set(values)
+          .where(eq(jobPostingAnalyses.id, existing.id))
+          .run()
+      else tx.insert(jobPostingAnalyses).values(values).run()
+    }
   })
 }
 
-export function createTag(name: string) {
-  db.insert(tags).values({ name }).onConflictDoNothing().run()
+export function createSkill(name: string) {
+  db.insert(skills).values({ name }).onConflictDoNothing().run()
 }
 
 export function createCompany(name: string, website?: string | null) {
@@ -685,9 +772,9 @@ export function createContact(input: {
     .run()
 }
 
-export function deleteManagedItem(kind: 'tags' | 'companies' | 'contacts', id: number) {
+export function deleteManagedItem(kind: 'skills' | 'companies' | 'contacts', id: number) {
   try {
-    if (kind === 'tags') db.delete(tags).where(eq(tags.id, id)).run()
+    if (kind === 'skills') db.delete(skills).where(eq(skills.id, id)).run()
     if (kind === 'companies') db.delete(companies).where(eq(companies.id, id)).run()
     if (kind === 'contacts') db.delete(contacts).where(eq(contacts.id, id)).run()
     return true

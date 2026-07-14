@@ -2,6 +2,10 @@ import { jobParserPromptVersion, jobParserSystemPrompt } from '../ai/prompts/job
 import { jobParserResponseSchema, type ParsedJob, parsedJobSchema } from '../ai/schemas/job-parser'
 
 export { type ParsedJob, parsedJobSchema }
+export type ParsedJobResult = ParsedJob & {
+  parserModel: string
+  parserPromptVersion: string
+}
 
 export class OpenAIRequestError extends Error {
   constructor(
@@ -15,15 +19,16 @@ export class OpenAIRequestError extends Error {
 export async function parseJobDescription(
   env: Record<string, string | undefined>,
   description: string,
-) {
+): Promise<ParsedJobResult> {
   const apiKey = env.OPENAI_API_KEY
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured')
+  const model = env.OPENAI_MODEL_JOB_PARSER ?? env.OPENAI_MODEL_DEFAULT ?? 'gpt-5-mini'
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     signal: AbortSignal.timeout(30_000),
     body: JSON.stringify({
-      model: env.OPENAI_MODEL_JOB_PARSER ?? env.OPENAI_MODEL_DEFAULT ?? 'gpt-5-mini',
+      model,
       input: [
         {
           role: 'system',
@@ -66,15 +71,25 @@ export async function parseJobDescription(
   const parsed = parsedJobSchema.parse(JSON.parse(output))
   const nullString = (value: string | null) =>
     value?.trim().toLocaleLowerCase() === 'null' ? null : value
+  const cleanList = (values: string[]) => [
+    ...new Set(values.map((value) => value.trim()).filter((value) => value && value !== 'null')),
+  ]
   return {
     ...parsed,
     jobTitle: parsed.jobTitle.toLocaleLowerCase() === 'null' ? '' : parsed.jobTitle,
-    companyName: parsed.companyName.toLocaleLowerCase() === 'null' ? '' : parsed.companyName,
     location: nullString(parsed.location),
-    url: nullString(parsed.url),
     postedDate: nullString(parsed.postedDate),
-    applicationSource: nullString(parsed.applicationSource),
     salary: nullString(parsed.salary),
+    skills: cleanList(parsed.skills),
+    requirements: cleanList(parsed.requirements),
+    responsibilities: cleanList(parsed.responsibilities),
+    painPoints: cleanList(parsed.painPoints),
+    culture: cleanList(parsed.culture),
+    redFlags: cleanList(parsed.redFlags),
+    successMetrics: cleanList(parsed.successMetrics),
+    benefits: cleanList(parsed.benefits),
     notes: nullString(parsed.notes),
+    parserModel: model,
+    parserPromptVersion: jobParserPromptVersion,
   }
 }

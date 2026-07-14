@@ -6,6 +6,7 @@ describe('request validation', () => {
     const result = quickCollectSchema.safeParse({
       jobTitle: 'Engineer',
       companyName: 'Acme',
+      direction: 'fullstack',
       postedDate: '2026-07-12',
       salary: '$100k',
       applicationSource: 'LinkedIn',
@@ -17,8 +18,19 @@ describe('request validation', () => {
     const result = quickCollectSchema.safeParse({
       jobTitle: 'Engineer',
       companyName: 'Acme',
+      direction: 'fullstack',
       postedDate: 'yesterday',
       url: 'not-a-url',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  test('requires a direction backed by a profile file', () => {
+    const result = quickCollectSchema.safeParse({
+      jobTitle: 'Engineer',
+      companyName: 'Acme',
+      direction: 'invented-direction',
+      postedDate: '2026-07-12',
     })
     expect(result.success).toBe(false)
   })

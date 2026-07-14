@@ -36,6 +36,13 @@
       "when": 1783967389813,
       "tag": "0004_polite_thor",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1784059200000,
+      "tag": "0005_skills_direction_analysis",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { matchLevels, priorities, statuses } from '../db/schema'
 import { isISODate } from './date'
+import { hasProfile } from './profiles'
 
 const emptyToNull = (value: unknown) =>
   typeof value === 'string' && value.trim() === '' ? null : value
@@ -11,22 +12,41 @@ const optionalUrl = z.preprocess(
   z.string().trim().url().max(2048).nullable().optional(),
 )
 const isoDate = z.string().refine(isISODate, 'Use a valid YYYY-MM-DD date')
+const direction = z
+  .string()
+  .trim()
+  .min(1, 'Direction is required')
+  .max(80)
+  .refine(hasProfile, 'Choose a valid direction')
+const analysisText = optionalText(12000)
 
 export const quickCollectSchema = z.object({
   jobTitle: z.string().trim().min(1, 'Job title is required').max(200),
   companyName: z.string().trim().min(1, 'Company is required').max(200),
+  direction,
   location: optionalText(200),
   url: optionalUrl,
   postedDate: isoDate,
   salary: optionalText(150),
   applicationSource: optionalText(150),
-  tags: optionalText(500),
+  skills: optionalText(1000),
   jobPostText: optionalText(100000),
+  analysisRequirements: analysisText,
+  analysisResponsibilities: analysisText,
+  analysisPainPoints: analysisText,
+  analysisCulture: analysisText,
+  analysisRedFlags: analysisText,
+  analysisSuccessMetrics: analysisText,
+  analysisBenefits: analysisText,
+  analysisNotes: optionalText(5000),
+  parserModel: optionalText(100),
+  parserPromptVersion: optionalText(50),
 })
 
 export const applicationSchema = z.object({
   jobTitle: z.string().trim().min(1).max(200),
   companyName: z.string().trim().min(1).max(200),
+  direction,
   location: optionalText(200),
   url: optionalUrl,
   postedDate: isoDate,
@@ -37,7 +57,7 @@ export const applicationSchema = z.object({
   applicationSource: optionalText(150),
   salary: optionalText(150),
   notes: optionalText(5000),
-  tags: optionalText(500),
+  skills: optionalText(1000),
 })
 
 export const statusSchema = z.object({ action: z.enum(['today', 'reject', 'archive', 'restore']) })
@@ -55,7 +75,7 @@ export const contactSchema = z.object({
   ),
   linkedinUrl: z.preprocess(emptyToNull, z.string().trim().url().max(2048).nullable().optional()),
 })
-export const tagSchema = z.object({ name: z.string().trim().min(1).max(80) })
+export const skillSchema = z.object({ name: z.string().trim().min(1).max(80) })
 export const companySchema = z.object({
   name: z.string().trim().min(1).max(200),
   website: optionalUrl,

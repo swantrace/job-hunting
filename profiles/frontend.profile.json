@@ -1,0 +1,165 @@
+{
+  "id": "frontend",
+  "version": 2,
+  "label": "Senior React / Front-End Developer",
+  "templates": {
+    "resume": "templates/resume.template.docx",
+    "coverLetter": "templates/cover-letter.template.docx"
+  },
+  "targetTitle": "SENIOR REACT / FRONT-END DEVELOPER",
+  "summary": "Senior React and Front-End Developer with 8+ years of experience creating responsive, data-driven interfaces for healthcare, SaaS, and e-commerce products. Deep experience with React, Next.js, TypeScript, Redux, GraphQL, Material UI, Shopify Polaris, and modern build tooling. Combines component architecture and API integration skills with full-stack awareness to deliver maintainable interfaces and faster development workflows.",
+  "skills": [
+    {
+      "label": "Frontend",
+      "items": "React, Next.js, TypeScript, JavaScript, Redux, HTML5, CSS3, Tailwind CSS, Sass, Bootstrap"
+    },
+    {
+      "label": "UI & Testing",
+      "items": "Material UI, Shopify Polaris, App Bridge, Web Components, LHC-Forms, Jest, responsive design"
+    },
+    {
+      "label": "Data Integration",
+      "items": "GraphQL/Apollo, REST APIs, tRPC, FHIR R4/R5, SMART on FHIR, Shopify APIs"
+    },
+    {
+      "label": "Tooling",
+      "items": "Vite, Turborepo, Gatsby, Docker, GitHub Actions, Vercel, Fly.io"
+    },
+    {
+      "label": "Backend",
+      "items": "Node.js, Express, Prisma, Drizzle ORM, PostgreSQL, Redis, AWS"
+    }
+  ],
+  "experiences": [
+    {
+      "id": "shift",
+      "role": "Lead Engineer",
+      "company": "Shift Task Force",
+      "startDate": "2024-09",
+      "endDate": "2025-06",
+      "displayDates": "Sep 2024 – Jun 2025",
+      "bullets": [
+        {
+          "id": "shift-healthcare-ui",
+          "text": "Led delivery of healthcare web applications and integration demos, translating FHIR and consent workflows into usable practitioner and patient experiences."
+        },
+        {
+          "id": "shift-smart-fhir-ui",
+          "text": "Built a SMART on FHIR application with Medplum and OAuth2 to demonstrate consent-aware EHR-to-EHR data exchange."
+        }
+      ]
+    },
+    {
+      "id": "asu",
+      "role": "Research Consultant",
+      "company": "Arizona State University",
+      "startDate": "2023-08",
+      "endDate": "2024-12",
+      "displayDates": "Aug 2023 – Dec 2024",
+      "bullets": [
+        {
+          "id": "asu-react-dashboard",
+          "text": "Developed a Next.js and React dashboard for displaying and managing FHIR consent forms and questionnaire responses."
+        },
+        {
+          "id": "asu-lhc-forms",
+          "text": "Built an LHC-Forms interface for digital consent capture and contributed reusable FHIR profiles and value sets."
+        }
+      ]
+    },
+    {
+      "id": "fluorescent",
+      "role": "Frontend Developer",
+      "company": "Fluorescent Design Inc.",
+      "startDate": "2023-01",
+      "endDate": "2023-07",
+      "displayDates": "Jan 2023 – Jul 2023",
+      "bullets": [
+        {
+          "id": "fluorescent-react-shopify",
+          "text": "Built Shopify embedded applications with React, Polaris, App Bridge, and GraphQL for wishlist and bundle-pricing merchant workflows."
+        },
+        {
+          "id": "fluorescent-ui-monorepo",
+          "text": "Established reusable modules in a monorepo and collaborated across frontend and backend boundaries to ship production features."
+        }
+      ]
+    },
+    {
+      "id": "midato",
+      "role": "Full-Stack Developer",
+      "company": "Midato Health",
+      "startDate": "2022-01",
+      "endDate": "2022-10",
+      "displayDates": "Jan 2022 – Oct 2022",
+      "bullets": [
+        {
+          "id": "midato-react-portals",
+          "text": "Built patient and administrator portals with React, Redux, Material UI, GraphQL, and Next.js for a production consent platform."
+        },
+        {
+          "id": "midato-redux-vite",
+          "text": "Migrated proprietary state logic to Redux and replaced Webpack with Vite, reducing CI build time by 75%."
+        }
+      ]
+    },
+    {
+      "id": "datomar",
+      "role": "Full-Stack Developer",
+      "company": "Datomar Labs Venture Studio",
+      "startDate": "2020-07",
+      "endDate": "2021-12",
+      "displayDates": "Jul 2020 – Dec 2021",
+      "bullets": [
+        {
+          "id": "datomar-product-discovery",
+          "text": "Created real-time product filtering, comparison, and search experiences using Web Components, GraphQL, and Shopify APIs."
+        },
+        {
+          "id": "datomar-next-admin",
+          "text": "Built a Next.js and Polaris administration interface for product specifications, metafields, and bulk CSV imports."
+        }
+      ]
+    },
+    {
+      "id": "bold",
+      "role": "Support Developer",
+      "company": "Bold Commerce",
+      "startDate": "2017-07",
+      "endDate": "2020-06",
+      "displayDates": "Jul 2017 – Jun 2020",
+      "bullets": [
+        {
+          "id": "bold-js-integrations",
+          "text": "Developed Shopify theme and app customizations and authored a reusable JavaScript integration library, reducing support resolution time by 30%."
+        }
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Master of Computer Science",
+      "school": "Arizona State University"
+    },
+    {
+      "degree": "Diploma in Web Development",
+      "school": "RRC Polytech"
+    },
+    {
+      "degree": "Bachelor of Science in Statistics",
+      "school": "Tianjin University of Finance and Economics"
+    }
+  ],
+  "careerBreak": {
+    "start": "Jul 2025",
+    "end": "May 2026",
+    "reason": "Planned career break for marriage, family commitments, and international relocation.",
+    "showOnResume": false
+  },
+  "availabilityStatement": "Now based in Edmonton, fully settled in Canada, and available for a long-term full-time role.",
+  "coverLetter": {
+    "openingParagraph": "I am excited to apply for the {jobTitle} position at {company}. I am a senior front-end and full-stack developer with more than eight years of experience building responsive, data-driven products with React, Next.js, TypeScript, Redux, GraphQL, and modern UI systems.",
+    "evidenceParagraph": "My work includes patient and administrator portals, Shopify embedded applications, interactive product discovery experiences, and reusable component and integration libraries. I have migrated complex state management to Redux, introduced Vite to improve development and CI speed, and built interfaces with Material UI, Polaris, App Bridge, and Web Components.",
+    "closingParagraph": "I would welcome the opportunity to discuss how my experience could support {company} and the goals of this role. Thank you for your time and consideration."
+  }
+}

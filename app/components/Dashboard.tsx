@@ -2,6 +2,7 @@ import type { Child } from 'hono/jsx'
 import { type Filters, type JobCardData, listManagementData } from '../../src/db/queries'
 import type { JobStatus } from '../../src/db/schema'
 import { todayISO } from '../../src/lib/date'
+import { listProfiles } from '../../src/lib/profiles'
 import type { FieldErrors } from '../../src/lib/validation'
 
 const activeStatuses: JobStatus[] = ['Saved', 'Apply Today', 'Applied', 'Follow Up', 'Interviewing']
@@ -79,10 +80,10 @@ export function Filters({ filters }: { filters: Filters }) {
               ['updated_desc', 'Recently updated'],
               ['posted_desc', 'Posted: newest'],
               ['posted_asc', 'Posted: oldest'],
-              ['company_asc', 'Company: A–Z'],
-              ['company_desc', 'Company: Z–A'],
-              ['priority_asc', 'Priority: A–C'],
-              ['priority_desc', 'Priority: C–A'],
+              ['company_asc', 'Company: A-Z'],
+              ['company_desc', 'Company: Z-A'],
+              ['priority_asc', 'Priority: A-C'],
+              ['priority_desc', 'Priority: C-A'],
               ['target_asc', 'Today target'],
               ['applied_desc', 'Applied: newest'],
               ['applied_asc', 'Applied: oldest'],
@@ -123,7 +124,8 @@ export function QuickCollect({
   oob?: boolean
 }) {
   const query = enc(filters)
-  const { companies, tags } = listManagementData()
+  const { companies, skills } = listManagementData()
+  const profiles = listProfiles()
   return (
     <form
       id={formId}
@@ -155,6 +157,25 @@ export function QuickCollect({
             message={error(errors, 'companyName')}
             list="company-options"
           />
+          <label class="form-control">
+            <span class="label-text mb-1">Direction</span>
+            <select
+              class={`select select-bordered w-full ${error(errors, 'direction') ? 'select-error' : ''}`}
+              name="direction"
+              required
+              aria-invalid={error(errors, 'direction') ? 'true' : undefined}
+            >
+              <option value="">Choose a direction</option>
+              {profiles.map((profile) => (
+                <option value={profile.id} selected={values.direction === profile.id}>
+                  {profile.label}
+                </option>
+              ))}
+            </select>
+            {error(errors, 'direction') && (
+              <span class="mt-1 text-xs text-error">{error(errors, 'direction')}</span>
+            )}
+          </label>
           <Field
             label="Location"
             name="location"
@@ -184,15 +205,65 @@ export function QuickCollect({
           />
           <div class="sm:col-span-2">
             <Field
-              label="Direction tags"
-              name="tags"
-              value={values.tags}
-              placeholder="backend, remote, fintech"
-              message={error(errors, 'tags')}
-              list="tag-options"
+              label="Skills"
+              name="skills"
+              value={values.skills}
+              placeholder="react, typescript, fhir"
+              message={error(errors, 'skills')}
+              list="skill-options"
             />
           </div>
         </div>
+        {values.parserPromptVersion && (
+          <details class="mt-5 rounded-box border border-base-300 bg-base-200/40 p-4" open>
+            <summary class="cursor-pointer font-semibold">AI job-post analysis</summary>
+            <p class="mt-1 text-sm text-base-content/60">
+              Review and edit this AI draft. Use one item per line.
+            </p>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+              <AnalysisField
+                label="Requirements"
+                name="analysisRequirements"
+                value={values.analysisRequirements}
+              />
+              <AnalysisField
+                label="Responsibilities"
+                name="analysisResponsibilities"
+                value={values.analysisResponsibilities}
+              />
+              <AnalysisField
+                label="Pain points"
+                name="analysisPainPoints"
+                value={values.analysisPainPoints}
+              />
+              <AnalysisField
+                label="Culture signals"
+                name="analysisCulture"
+                value={values.analysisCulture}
+              />
+              <AnalysisField
+                label="Red flags"
+                name="analysisRedFlags"
+                value={values.analysisRedFlags}
+              />
+              <AnalysisField
+                label="Success metrics"
+                name="analysisSuccessMetrics"
+                value={values.analysisSuccessMetrics}
+              />
+              <AnalysisField
+                label="Benefits"
+                name="analysisBenefits"
+                value={values.analysisBenefits}
+              />
+              <AnalysisField
+                label="Additional facts"
+                name="analysisNotes"
+                value={values.analysisNotes}
+              />
+            </div>
+          </details>
+        )}
         <div class="card-actions mt-2 justify-end">
           <button class="btn btn-primary">Save opportunity</button>
         </div>
@@ -202,17 +273,32 @@ export function QuickCollect({
           {values.jobPostText}
         </textarea>
       )}
+      {values.parserModel && <input type="hidden" name="parserModel" value={values.parserModel} />}
+      {values.parserPromptVersion && (
+        <input type="hidden" name="parserPromptVersion" value={values.parserPromptVersion} />
+      )}
       <datalist id="company-options">
         {companies.map((company) => (
           <option value={company.name} />
         ))}
       </datalist>
-      <datalist id="tag-options">
-        {tags.map((tag) => (
-          <option value={tag.name} />
+      <datalist id="skill-options">
+        {skills.map((skill) => (
+          <option value={skill.name} />
         ))}
       </datalist>
     </form>
+  )
+}
+
+function AnalysisField({ label, name, value }: { label: string; name: string; value?: string }) {
+  return (
+    <label class="form-control">
+      <span class="label-text mb-1">{label}</span>
+      <textarea class="textarea textarea-bordered min-h-28" name={name}>
+        {value ?? ''}
+      </textarea>
+    </label>
   )
 }
 
@@ -316,7 +402,7 @@ function TodayTasksTable({ jobs, filters }: { jobs: JobCardData[]; filters: Filt
             <th>Location</th>
             <th>Priority</th>
             <th>Target date</th>
-            <th>Tags</th>
+            <th>Skills</th>
             <th class="text-right">Actions</th>
           </tr>
         </thead>
@@ -343,9 +429,9 @@ function TodayTasksTable({ jobs, filters }: { jobs: JobCardData[]; filters: Filt
                 </td>
                 <td>
                   <div class="flex min-w-32 flex-wrap gap-1">
-                    {job.tags.length
-                      ? job.tags.map((tag) => (
-                          <span class="badge badge-outline badge-sm">{tag}</span>
+                    {job.skills.length
+                      ? job.skills.map((skill) => (
+                          <span class="badge badge-outline badge-sm">{skill}</span>
                         ))
                       : '—'}
                   </div>
@@ -403,8 +489,8 @@ function JobCard({
           {overdue && (
             <span class="badge badge-error badge-sm">Overdue · {job.applyTodayTargetDate}</span>
           )}
-          {job.tags.map((tag) => (
-            <span class="badge badge-outline badge-sm">{tag}</span>
+          {job.skills.map((skill) => (
+            <span class="badge badge-outline badge-sm">{skill}</span>
           ))}
         </div>
         <div class="card-actions mt-2 md:mt-0">

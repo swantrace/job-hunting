@@ -23,7 +23,9 @@ export function ManagementPage({ data }: { data: ManagementData }) {
             ← Dashboard
           </a>
           <h1 class="mt-2 text-3xl font-bold">Manage data</h1>
-          <p class="text-base-content/60">Keep reusable tags, companies, and contacts organized.</p>
+          <p class="text-base-content/60">
+            Keep reusable skills, companies, and contacts organized.
+          </p>
         </div>
       </header>
       <ManagementContent data={data} />
@@ -36,10 +38,10 @@ export function ManagementContent({ data }: { data: ManagementData }) {
     <div id="management-content" class="grid gap-5 lg:grid-cols-3">
       <section class="card bg-base-100 shadow-sm">
         <div class="card-body">
-          <h2 class="card-title">Tags</h2>
+          <h2 class="card-title">Skills</h2>
           <form
             class="join"
-            hx-post="/manage/tags"
+            hx-post="/manage/skills"
             hx-target="#management-content"
             hx-swap="outerHTML"
           >
@@ -52,10 +54,10 @@ export function ManagementContent({ data }: { data: ManagementData }) {
             <button class="btn btn-primary join-item">Add</button>
           </form>
           <ul class="mt-3 divide-y divide-base-300">
-            {data.tags.map((tag) => (
+            {data.skills.map((skill) => (
               <li class="flex items-center justify-between py-2">
-                <span class="badge badge-outline">{tag.name}</span>
-                {deleteButton('tags', tag.id)}
+                <span class="badge badge-outline">{skill.name}</span>
+                {deleteButton('skills', skill.id)}
               </li>
             ))}
           </ul>
