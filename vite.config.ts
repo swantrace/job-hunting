@@ -7,7 +7,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   ssr: {
     // These packages are CommonJS and must execute through the runtime's CJS loader.
-    external: ['docxtemplater', 'pizzip'],
+    external: ['bunqueue', 'docxtemplater', 'pizzip'],
   },
   server: {
     host: '0.0.0.0',
