@@ -16,5 +16,16 @@ describe('JSON import format', () => {
     const parsed = importPayloadSchema.parse({ schemaVersion: 1 })
     expect(parsed.schemaVersion).toBe(1)
     expect(parsed.applications).toEqual([])
+    expect(parsed.skills).toEqual([])
+  })
+
+  test('normalizes legacy tag exports into skills', () => {
+    const parsed = importPayloadSchema.parse({
+      schemaVersion: 1,
+      tags: [{ id: 1, name: 'TypeScript' }],
+      applicationTags: [{ jobApplicationId: 4, tagId: 1, tagName: 'TypeScript' }],
+    })
+    expect(parsed.skills).toEqual([{ id: 1, name: 'TypeScript' }])
+    expect(parsed.applicationSkills[0]?.skillName).toBe('TypeScript')
   })
 })

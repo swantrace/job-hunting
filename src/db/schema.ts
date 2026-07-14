@@ -32,13 +32,13 @@ export const companies = sqliteTable(
   (table) => [uniqueIndex('companies_name_nocase_idx').on(sql`lower(${table.name})`)],
 )
 
-export const tags = sqliteTable(
-  'tags',
+export const skills = sqliteTable(
+  'skills',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     name: text('name').notNull(),
   },
-  (table) => [uniqueIndex('tags_name_nocase_idx').on(sql`lower(${table.name})`)],
+  (table) => [uniqueIndex('skills_name_nocase_idx').on(sql`lower(${table.name})`)],
 )
 
 // A contact belongs to one company. Applications connect to contacts through
@@ -72,6 +72,8 @@ export const jobApplications = sqliteTable(
       .notNull()
       .references(() => companies.id, { onDelete: 'restrict' }),
     jobTitle: text('job_title').notNull(),
+    // This is the id from profiles/<direction>.profile.json, such as "fullstack".
+    direction: text('direction').notNull().default('fullstack'),
     location: text('location'),
     url: text('url'),
     postedDate: text('posted_date').notNull(),
@@ -128,17 +130,42 @@ export const jobPostings = sqliteTable(
   ],
 )
 
-export const jobApplicationsToTags = sqliteTable(
-  'job_applications_to_tags',
+export const jobPostingAnalyses = sqliteTable(
+  'job_posting_analyses',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    jobPostingId: integer('job_posting_id')
+      .notNull()
+      .references(() => jobPostings.id, { onDelete: 'cascade' }),
+    requirements: text('requirements'),
+    responsibilities: text('responsibilities'),
+    painPoints: text('pain_points'),
+    culture: text('culture'),
+    redFlags: text('red_flags'),
+    successMetrics: text('success_metrics'),
+    benefits: text('benefits'),
+    notes: text('notes'),
+    generatedAt: text('generated_at').notNull(),
+    model: text('model'),
+    promptVersion: text('prompt_version'),
+  },
+  (table) => [
+    uniqueIndex('job_posting_analyses_posting_unique_idx').on(table.jobPostingId),
+    index('job_posting_analyses_generated_idx').on(table.generatedAt),
+  ],
+)
+
+export const jobApplicationsToSkills = sqliteTable(
+  'job_applications_to_skills',
   {
     jobApplicationId: integer('job_application_id')
       .notNull()
       .references(() => jobApplications.id, { onDelete: 'cascade' }),
-    tagId: integer('tag_id')
+    skillId: integer('skill_id')
       .notNull()
-      .references(() => tags.id, { onDelete: 'cascade' }),
+      .references(() => skills.id, { onDelete: 'cascade' }),
   },
-  (table) => [primaryKey({ columns: [table.jobApplicationId, table.tagId] })],
+  (table) => [primaryKey({ columns: [table.jobApplicationId, table.skillId] })],
 )
 
 export const jobApplicationsToContacts = sqliteTable(
@@ -188,3 +215,4 @@ export type JobStatus = (typeof statuses)[number]
 export type JobApplication = typeof jobApplications.$inferSelect
 export type Contact = typeof contacts.$inferSelect
 export type JobPosting = typeof jobPostings.$inferSelect
+export type JobPostingAnalysis = typeof jobPostingAnalyses.$inferSelect

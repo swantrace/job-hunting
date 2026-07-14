@@ -1,5 +1,6 @@
 import { type Filters, type JobCardData, listManagementData } from '../../src/db/queries'
 import { todayISO } from '../../src/lib/date'
+import { listProfiles } from '../../src/lib/profiles'
 import type { FieldErrors } from '../../src/lib/validation'
 import { Field } from './Dashboard'
 
@@ -16,7 +17,7 @@ export function Workspace({
   activity: ReturnType<typeof import('../../src/db/queries').getActivity>
 }) {
   const q = query(filters)
-  const { companies, tags } = listManagementData()
+  const { companies, skills } = listManagementData()
   return (
     <div>
       <div class="mb-5 flex items-start justify-between">
@@ -61,7 +62,7 @@ export function Workspace({
         </button>
       </div>
       <div id="workspace-application-panel" data-workspace-panel>
-        <ApplicationForm job={job} filters={filters} companies={companies} tags={tags} />
+        <ApplicationForm job={job} filters={filters} companies={companies} skills={skills} />
         {job.jobPosting && (
           <details class="mt-6 rounded-box border border-base-300 p-4">
             <summary class="cursor-pointer font-semibold">Saved job post</summary>
@@ -70,6 +71,7 @@ export function Workspace({
             </pre>
           </details>
         )}
+        {job.jobPostingAnalysis && <JobPostAnalysis analysis={job.jobPostingAnalysis} />}
       </div>
       <div id="workspace-contacts-panel" data-workspace-panel class="hidden">
         <ContactsSection job={job} filters={filters} />
@@ -186,16 +188,17 @@ export function ApplicationForm({
   filters,
   errors,
   companies,
-  tags,
+  skills,
 }: {
   job: JobCardData
   filters: Filters
   errors?: FieldErrors
   companies?: { name: string }[]
-  tags?: { name: string }[]
+  skills?: { name: string }[]
 }) {
   const companyOptions = companies ?? listManagementData().companies
-  const tagOptions = tags ?? listManagementData().tags
+  const skillOptions = skills ?? listManagementData().skills
+  const profiles = listProfiles()
   return (
     <form
       id="application-form"
@@ -222,6 +225,16 @@ export function ApplicationForm({
           list="workspace-company-options"
         />
         <Field label="Location" name="location" value={job.location} />
+        <label class="form-control">
+          <span class="label-text mb-1">Direction</span>
+          <select name="direction" class="select select-bordered">
+            {profiles.map((profile) => (
+              <option value={profile.id} selected={job.direction === profile.id}>
+                {profile.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <Field label="Job URL" name="url" type="url" value={job.url} message={err(errors, 'url')} />
         <Field
           label="Posted date"
@@ -260,10 +273,10 @@ export function ApplicationForm({
         <Field label="Salary" name="salary" value={job.salary} />
         <div class="sm:col-span-2">
           <Field
-            label="Direction tags"
-            name="tags"
-            value={job.tags.join(', ')}
-            list="workspace-tag-options"
+            label="Skills"
+            name="skills"
+            value={job.skills.join(', ')}
+            list="workspace-skill-options"
           />
         </div>
         <label class="form-control sm:col-span-2">
@@ -278,13 +291,45 @@ export function ApplicationForm({
           <option value={company.name} />
         ))}
       </datalist>
-      <datalist id="workspace-tag-options">
-        {tagOptions.map((tag) => (
-          <option value={tag.name} />
+      <datalist id="workspace-skill-options">
+        {skillOptions.map((skill) => (
+          <option value={skill.name} />
         ))}
       </datalist>
       <button class="btn btn-primary w-full">🚀 Sent Application</button>
     </form>
+  )
+}
+
+function JobPostAnalysis({
+  analysis,
+}: {
+  analysis: NonNullable<JobCardData['jobPostingAnalysis']>
+}) {
+  const fields = [
+    ['Requirements', analysis.requirements],
+    ['Responsibilities', analysis.responsibilities],
+    ['Pain points', analysis.painPoints],
+    ['Culture signals', analysis.culture],
+    ['Red flags', analysis.redFlags],
+    ['Success metrics', analysis.successMetrics],
+    ['Benefits', analysis.benefits],
+    ['Additional facts', analysis.notes],
+  ] as const
+  return (
+    <details class="mt-4 rounded-box border border-base-300 p-4">
+      <summary class="cursor-pointer font-semibold">AI job-post analysis</summary>
+      <div class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+        {fields.map(([label, value]) =>
+          value ? (
+            <section>
+              <h3 class="font-medium">{label}</h3>
+              <p class="mt-1 whitespace-pre-wrap text-base-content/70">{value}</p>
+            </section>
+          ) : null,
+        )}
+      </div>
+    </details>
   )
 }
 
