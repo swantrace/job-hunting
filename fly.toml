@@ -14,9 +14,9 @@ primary_region = 'yyz'
   ARTIFACTS_DIR = "/data/artifacts"
   OPENAI_MODEL_DEFAULT="gpt-5-mini"
   OPENAI_MODEL_JOB_PARSER="gpt-5-mini"
-  OPENAI_MODEL_RESUME="gpt-5.5"
+  OPENAI_MODEL_RESUME="gpt-5.6"
   OPENAI_MODEL_COVER_LETTER="gpt-5.6-terra"
-
+  GOOGLE_OAUTH_REDIRECT_URI="https://job-hunting.fly.dev/auth/google/callback"
 [mounts]
   source = "data"
   destination = "/data"

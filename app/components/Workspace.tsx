@@ -1,4 +1,8 @@
-import { type GenerationRunWithArtifacts, listGenerationRuns } from '../../src/db/generation'
+import {
+  type GenerationRunWithArtifacts,
+  getGoogleDriveConnection,
+  listGenerationRuns,
+} from '../../src/db/generation'
 import { type Filters, type JobCardData, listManagementData } from '../../src/db/queries'
 import { todayISO } from '../../src/lib/date'
 import { listProfiles } from '../../src/lib/profiles'
@@ -20,6 +24,7 @@ export function Workspace({
   const q = query(filters)
   const { companies, skills } = listManagementData()
   const generationRuns = listGenerationRuns(job.id)
+  const googleDriveConnected = !!getGoogleDriveConnection()
   return (
     <div>
       <div class="mb-5 flex items-start justify-between">
@@ -74,7 +79,12 @@ export function Workspace({
           </details>
         )}
         {job.jobPostingAnalysis && <JobPostAnalysis analysis={job.jobPostingAnalysis} />}
-        <GenerationPanel jobId={job.id} filters={filters} runs={generationRuns} />
+        <GenerationPanel
+          jobId={job.id}
+          filters={filters}
+          runs={generationRuns}
+          googleDriveConnected={googleDriveConnected}
+        />
       </div>
       <div id="workspace-contacts-panel" data-workspace-panel class="hidden">
         <ContactsSection job={job} filters={filters} />
@@ -145,10 +155,12 @@ export function GenerationPanel({
   jobId,
   filters,
   runs,
+  googleDriveConnected,
 }: {
   jobId: number
   filters: Filters
   runs: GenerationRunWithArtifacts[]
+  googleDriveConnected: boolean
 }) {
   const latest = runs[0]
   const statusClass =
@@ -191,6 +203,14 @@ export function GenerationPanel({
           </button>
         </form>
       </div>
+      {!googleDriveConnected && (
+        <div class="alert mt-4 text-sm">
+          <span>Connect Google Drive to upload generated documents automatically.</span>
+          <a class="btn btn-outline btn-sm" href="/auth/google/start">
+            Connect Google Drive
+          </a>
+        </div>
+      )}
       {latest ? (
         <div class="mt-4 space-y-3">
           <div class="flex flex-wrap items-center gap-2 text-sm">
@@ -205,13 +225,25 @@ export function GenerationPanel({
           {latest.artifacts.length > 0 && (
             <div class="flex flex-wrap gap-2">
               {latest.artifacts.map((artifact) => (
-                <a class="btn btn-outline btn-sm" href={`/artifacts/${artifact.id}`}>
-                  {artifact.type === 'job_context'
-                    ? 'Job context JSON'
-                    : artifact.type === 'resume'
-                      ? 'Resume DOCX'
-                      : 'Cover letter DOCX'}
-                </a>
+                <div class="join">
+                  <a class="btn btn-outline btn-sm join-item" href={`/artifacts/${artifact.id}`}>
+                    {artifact.type === 'job_context'
+                      ? 'Job context JSON'
+                      : artifact.type === 'resume'
+                        ? 'Resume DOCX'
+                        : 'Cover letter DOCX'}
+                  </a>
+                  {artifact.googleDriveUrl && (
+                    <a
+                      class="btn btn-outline btn-sm join-item"
+                      href={artifact.googleDriveUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Drive
+                    </a>
+                  )}
+                </div>
               ))}
             </div>
           )}

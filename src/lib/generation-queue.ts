@@ -4,7 +4,9 @@ import {
   createGenerationRun,
   failGenerationRun,
   getGenerationRun,
+  listGenerationRuns,
   listQueuedGenerationRuns,
+  markArtifactUploadFailed,
   markGenerationRunProcessing,
 } from '../db/generation'
 
@@ -55,6 +57,18 @@ async function processGeneration(
     const artifacts = await generateApplicationArtifacts(run.id)
     await updateProgress(95, 'Saving generated documents')
     completeGenerationRun(run.id, artifacts)
+    const { uploadArtifactToGoogleDrive } = await import('./google-drive')
+    const savedArtifacts =
+      listGenerationRuns(run.jobApplicationId).find((item) => item.id === run.id)?.artifacts ?? []
+    for (const artifact of savedArtifacts) {
+      try {
+        await uploadArtifactToGoogleDrive(artifact)
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Google Drive is not connected.') continue
+        markArtifactUploadFailed(artifact.id, error)
+        console.error('Google Drive upload failed', error)
+      }
+    }
     await updateProgress(100, 'Complete')
     return { runId: run.id }
   } catch (error) {

@@ -6,6 +6,7 @@ import {
   type GenerationRun,
   generatedArtifacts,
   generationRuns,
+  googleDriveConnections,
   jobApplications,
   jobApplicationsToSkills,
   jobPostingAnalyses,
@@ -180,6 +181,43 @@ export function getArtifact(id: number) {
       .where(eq(generatedArtifacts.id, id))
       .get() ?? null
   )
+}
+
+export function getGoogleDriveConnection() {
+  return (
+    db.select().from(googleDriveConnections).where(eq(googleDriveConnections.id, 1)).get() ?? null
+  )
+}
+
+export function saveGoogleDriveConnection(refreshTokenEncrypted: string, folderId: string) {
+  const date = todayISO()
+  db.insert(googleDriveConnections)
+    .values({ id: 1, refreshTokenEncrypted, folderId, createdAt: date, updatedAt: date })
+    .onConflictDoUpdate({
+      target: googleDriveConnections.id,
+      set: { refreshTokenEncrypted, folderId, updatedAt: date },
+    })
+    .run()
+}
+
+export function markArtifactUploaded(artifactId: number, fileId: string, url: string | null) {
+  db.update(generatedArtifacts)
+    .set({
+      googleDriveFileId: fileId,
+      googleDriveUrl: url,
+      googleDriveUploadedAt: todayISO(),
+      googleDriveError: null,
+    })
+    .where(eq(generatedArtifacts.id, artifactId))
+    .run()
+}
+
+export function markArtifactUploadFailed(artifactId: number, error: unknown) {
+  const message = error instanceof Error ? error.message : 'Google Drive upload failed.'
+  db.update(generatedArtifacts)
+    .set({ googleDriveError: message.slice(0, 1000) })
+    .where(eq(generatedArtifacts.id, artifactId))
+    .run()
 }
 
 export function generationRunBelongsToApplication(runId: number, jobApplicationId: number) {

@@ -50,6 +50,20 @@
       "when": 1784145600000,
       "tag": "0006_generation_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1784149200000,
+      "tag": "0007_google_drive",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1784152800000,
+      "tag": "0008_google_drive_artifacts",
+      "breakpoints": true
     }
   ]
 }

@@ -208,6 +208,10 @@ export const generatedArtifacts = sqliteTable(
     fileName: text('file_name').notNull(),
     filePath: text('file_path').notNull(),
     mimeType: text('mime_type').notNull(),
+    googleDriveFileId: text('google_drive_file_id'),
+    googleDriveUrl: text('google_drive_url'),
+    googleDriveUploadedAt: text('google_drive_uploaded_at'),
+    googleDriveError: text('google_drive_error'),
     createdAt: text('created_at').notNull(),
   },
   (table) => [
@@ -218,6 +222,14 @@ export const generatedArtifacts = sqliteTable(
     uniqueIndex('generated_artifacts_run_type_unique_idx').on(table.generationRunId, table.type),
   ],
 )
+
+export const googleDriveConnections = sqliteTable('google_drive_connections', {
+  id: integer('id').primaryKey(),
+  refreshTokenEncrypted: text('refresh_token_encrypted').notNull(),
+  folderId: text('folder_id').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+})
 
 export const jobApplicationsToContacts = sqliteTable(
   'job_applications_to_contacts',
