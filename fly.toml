@@ -10,10 +10,12 @@ primary_region = 'yyz'
 
 [env]
   DB_FILE_NAME = "/data/jobs.db"
+  QUEUE_FILE_NAME = "/data/bunqueue.db"
+  ARTIFACTS_DIR = "/data/artifacts"
   OPENAI_MODEL_DEFAULT="gpt-5-mini"
   OPENAI_MODEL_JOB_PARSER="gpt-5-mini"
   OPENAI_MODEL_RESUME="gpt-5.5"
-  OPENAI_MODEL_COVER_LETTER="gpt-5.4-mini"
+  OPENAI_MODEL_COVER_LETTER="gpt-5.6-terra"
 
 [mounts]
   source = "data"
