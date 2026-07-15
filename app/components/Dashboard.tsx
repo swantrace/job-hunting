@@ -489,9 +489,6 @@ function JobCard({
           {overdue && (
             <span class="badge badge-error badge-sm">Overdue · {job.applyTodayTargetDate}</span>
           )}
-          {job.skills.map((skill) => (
-            <span class="badge badge-outline badge-sm">{skill}</span>
-          ))}
         </div>
         <div class="card-actions mt-2 md:mt-0">
           <button
