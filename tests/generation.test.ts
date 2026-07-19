@@ -14,14 +14,17 @@ describe('application generation', () => {
         summary: 'Relevant experience.',
         skills: [{ label: 'Frontend', items: 'React, TypeScript' }],
         experienceBullets: [{ id: 'shift', bullets: ['Built production systems.'] }],
+        selectedProjectIds: [],
       }).success,
     ).toBe(true)
     expect(
       tailoredCoverLetterSchema.safeParse({
         salutation: 'Hiring Manager',
         openingParagraph: 'I am applying for this role.',
-        evidenceParagraph: 'My experience is relevant.',
+        evidenceParagraphs: [{ text: 'My experience is relevant.' }],
         companyInterestParagraph: 'The work is compelling.',
+        includeAuthorization: false,
+        authorizationParagraph: '',
         closingParagraph: 'Thank you for your consideration.',
       }).success,
     ).toBe(true)

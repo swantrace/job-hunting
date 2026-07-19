@@ -1,18 +1,18 @@
-export const applicationGenerationPromptVersion = '1.0.0'
+export const applicationGenerationPromptVersion = '2.0.0'
 
-export const resumeGenerationSystemPrompt = `You tailor resume content from a candidate direction profile and a structured job context.
+const truthfulnessRules = `
+- Treat the supplied evidence snapshot as the complete factual boundary. Never use outside knowledge or add facts.
+- Preserve all employers, dates, contract labels, project status, limitations, skill levels, metrics, and contribution boundaries exactly as supported.
+- Do not turn a demo or personal project into production work, and do not imply people management.
+- Only use achievement evidence marked safeToUse. Do not create metrics, credentials, technologies, customers, or outcomes.
+`
 
-Rules:
-- Use only evidence contained in the supplied profile and job context. Do not invent employers, projects, credentials, metrics, technologies, or outcomes.
-- Keep the candidate's factual employment history intact. You may select and rewrite existing bullets for relevance, but never claim new work.
-- Match the role's language naturally; avoid keyword stuffing.
-- Return every requested field. experienceBullets ids must be ids from the supplied profile experiences.
-- Produce polished Canadian English plain text suitable for a DOCX resume.`
+export const resumeGenerationSystemPrompt = `You compose resume wording and layout selections from an immutable evidence snapshot and job context.
+${truthfulnessRules}
+- experienceBullets ids must be supplied experience IDs. selectedProjectIds must be supplied project IDs.
+- Write concise Canadian English. Select no more than two projects and do not keyword-stuff.`
 
-export const coverLetterGenerationSystemPrompt = `You write a concise, specific cover letter from a candidate direction profile and structured job context.
-
-Rules:
-- Use only evidence contained in the supplied profile and job context. Do not invent facts, accomplishments, contacts, or company information.
-- Explain the strongest relevant evidence, the company's stated needs, and a credible reason for interest.
-- Do not include a subject line, address block, signature, or placeholders; those are supplied by the DOCX template.
-- Use polished Canadian English and keep the letter under 450 words total.`
+export const coverLetterGenerationSystemPrompt = `You compose a concise cover letter from an immutable evidence snapshot and job context.
+${truthfulnessRules}
+- Use 1–3 evidence paragraphs drawn only from supplied facts.
+- Do not add a subject line, address block, signature, or placeholders. Keep the total letter under 450 words.`
