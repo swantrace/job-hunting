@@ -52,28 +52,15 @@ export function Workspace({
           class="tab tab-active"
           data-workspace-tab="application"
           aria-selected="true"
-          onclick="const tab=this.dataset.workspaceTab; document.querySelectorAll('[data-workspace-panel]').forEach((panel)=>panel.classList.toggle('hidden',panel.id!==`workspace-${tab}-panel`)); document.querySelectorAll('[data-workspace-tab]').forEach((button)=>{button.classList.toggle('tab-active',button===this);button.setAttribute('aria-selected',button===this?'true':'false')})"
           hx-get={`/applications/${job.id}/application-form?${q}`}
           hx-target="#workspace-application-panel"
         >
           Application
         </button>
-        <button
-          role="tab"
-          class="tab"
-          data-workspace-tab="contacts"
-          aria-selected="false"
-          onclick="const tab=this.dataset.workspaceTab; document.querySelectorAll('[data-workspace-panel]').forEach((panel)=>panel.classList.toggle('hidden',panel.id!==`workspace-${tab}-panel`)); document.querySelectorAll('[data-workspace-tab]').forEach((button)=>{button.classList.toggle('tab-active',button===this);button.setAttribute('aria-selected',button===this?'true':'false')})"
-        >
+        <button role="tab" class="tab" data-workspace-tab="contacts" aria-selected="false">
           Contacts
         </button>
-        <button
-          role="tab"
-          class="tab"
-          data-workspace-tab="activity"
-          aria-selected="false"
-          onclick="const tab=this.dataset.workspaceTab; document.querySelectorAll('[data-workspace-panel]').forEach((panel)=>panel.classList.toggle('hidden',panel.id!==`workspace-${tab}-panel`)); document.querySelectorAll('[data-workspace-tab]').forEach((button)=>{button.classList.toggle('tab-active',button===this);button.setAttribute('aria-selected',button===this?'true':'false')})"
-        >
+        <button role="tab" class="tab" data-workspace-tab="activity" aria-selected="false">
           Activity
         </button>
       </div>
@@ -443,7 +430,14 @@ export function ApplicationForm({
             ))}
           </select>
         </label>
-        <Field label="Job URL" name="url" type="url" value={job.url} message={err(errors, 'url')} />
+        <Field
+          label="Job URL"
+          name="url"
+          type="url"
+          value={job.url}
+          message={err(errors, 'url')}
+          externalUrl={job.url}
+        />
         <Field
           label="Posted date"
           name="postedDate"
@@ -476,7 +470,6 @@ export function ApplicationForm({
             ))}
           </select>
         </label>
-        <Field label="Resume version" name="resumeVersion" value={job.resumeVersion} />
         <Field label="Source" name="applicationSource" value={job.applicationSource} />
         <Field label="Salary" name="salary" value={job.salary} />
         <div class="sm:col-span-2">
@@ -489,7 +482,7 @@ export function ApplicationForm({
         </div>
         <label class="form-control sm:col-span-2">
           <span class="label-text mb-1">Notes</span>
-          <textarea class="textarea textarea-bordered min-h-28" name="notes">
+          <textarea class="textarea textarea-bordered min-h-28 w-full" name="notes">
             {job.notes ?? ''}
           </textarea>
         </label>

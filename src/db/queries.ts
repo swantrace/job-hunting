@@ -772,6 +772,43 @@ export function createContact(input: {
     .run()
 }
 
+export function updateManagedItem(
+  kind: 'skills' | 'companies' | 'contacts',
+  id: number,
+  input:
+    | { name: string }
+    | { name: string; website?: string | null }
+    | { companyId: number; name: string; email?: string | null; linkedinUrl?: string | null },
+) {
+  if (kind === 'skills') {
+    db.update(skills).set({ name: input.name }).where(eq(skills.id, id)).run()
+    return
+  }
+  if (kind === 'companies') {
+    const company = input as { name: string; website?: string | null }
+    db.update(companies)
+      .set({ name: company.name, website: company.website ?? null })
+      .where(eq(companies.id, id))
+      .run()
+    return
+  }
+  const contact = input as {
+    companyId: number
+    name: string
+    email?: string | null
+    linkedinUrl?: string | null
+  }
+  db.update(contacts)
+    .set({
+      companyId: contact.companyId,
+      name: contact.name,
+      email: contact.email ?? null,
+      linkedinUrl: contact.linkedinUrl ?? null,
+    })
+    .where(eq(contacts.id, id))
+    .run()
+}
+
 export function deleteManagedItem(kind: 'skills' | 'companies' | 'contacts', id: number) {
   try {
     if (kind === 'skills') db.delete(skills).where(eq(skills.id, id)).run()

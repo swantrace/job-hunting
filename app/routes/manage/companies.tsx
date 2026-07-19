@@ -1,11 +1,12 @@
 import { createRoute } from 'honox/factory'
-import { createCompany, listManagementData } from '../../../src/db/queries'
+import { createCompany, listManagementData, updateManagedItem } from '../../../src/db/queries'
 import { parseForm } from '../../../src/lib/request'
 import { companySchema } from '../../../src/lib/validation'
 import { ManagementContent } from '../../components/Management'
 
 export const POST = createRoute(async (c) => {
-  const parsed = companySchema.safeParse(await parseForm(c))
+  const form = await parseForm(c)
+  const parsed = companySchema.safeParse(form)
   if (!parsed.success)
     return c.html(
       <div id="management-content" class="alert alert-error">
@@ -13,6 +14,9 @@ export const POST = createRoute(async (c) => {
       </div>,
       422,
     )
-  createCompany(parsed.data.name, parsed.data.website)
+  const editId = Number(form.editId)
+  if (Number.isSafeInteger(editId) && editId > 0)
+    updateManagedItem('companies', editId, parsed.data)
+  else createCompany(parsed.data.name, parsed.data.website)
   return c.html(<ManagementContent data={listManagementData()} />)
 })
