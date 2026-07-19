@@ -9,45 +9,6 @@ const profileSchema = z.object({
 
 export type ProfileOption = z.infer<typeof profileSchema>
 
-const documentProfileSchema = profileSchema.extend({
-  templates: z.object({
-    resume: z.string().trim().min(1),
-    coverLetter: z.string().trim().min(1),
-  }),
-  targetTitle: z.string().trim().min(1),
-  summary: z.string().trim().min(1),
-  skills: z.array(z.object({ label: z.string().trim().min(1), items: z.string().trim().min(1) })),
-  experiences: z.array(
-    z.object({
-      id: z.string().trim().min(1),
-      role: z.string().trim().min(1),
-      company: z.string().trim().min(1),
-      displayDates: z.string().trim().min(1),
-      bullets: z.array(z.object({ id: z.string().trim().min(1), text: z.string().trim().min(1) })),
-    }),
-  ),
-  education: z.array(
-    z.object({ degree: z.string().trim().min(1), school: z.string().trim().min(1) }),
-  ),
-  coverLetter: z.object({
-    openingParagraph: z.string().trim().min(1),
-    evidenceParagraph: z.string().trim().min(1),
-    closingParagraph: z.string().trim().min(1),
-  }),
-})
-
-const candidateProfileSchema = z.object({
-  candidateName: z.string().trim().min(1),
-  location: z.string().trim().min(1),
-  phone: z.string().trim().min(1),
-  email: z.string().trim().email(),
-  linkedin: z.string().trim().url(),
-  github: z.string().trim().url(),
-})
-
-export type DocumentProfile = z.infer<typeof documentProfileSchema>
-export type CandidateProfile = z.infer<typeof candidateProfileSchema>
-
 function profileDirectory() {
   const candidates = [resolve(process.cwd(), 'profiles'), resolve(process.cwd(), '../profiles')]
   const directory = candidates.find(existsSync)
@@ -61,7 +22,7 @@ function readProfileFile(file: string) {
 
 export function listProfiles(): ProfileOption[] {
   const profiles = readdirSync(profileDirectory())
-    .filter((file) => file.endsWith('.profile.json') && file !== 'candidate.profile.json')
+    .filter((file) => file.endsWith('.profile.json'))
     .map((file) => {
       const profile = profileSchema.parse(readProfileFile(file))
       const filenameId = file.replace(/\.profile\.json$/, '')
@@ -76,32 +37,6 @@ export function listProfiles(): ProfileOption[] {
 
 export function hasProfile(id: string) {
   return listProfiles().some((profile) => profile.id === id)
-}
-
-export function getProfile(id: string): DocumentProfile {
-  const file = `${id}.profile.json`
-  if (!existsSync(resolve(profileDirectory(), file)))
-    throw new Error(`Direction profile "${id}" was not found.`)
-  const profile = documentProfileSchema.parse(readProfileFile(file))
-  if (profile.id !== id) throw new Error(`Profile id "${profile.id}" must match filename "${id}".`)
-  return profile
-}
-
-export function getCandidateProfile(): CandidateProfile {
-  if (process.env.CANDIDATE_PROFILE_JSON) {
-    try {
-      return candidateProfileSchema.parse(JSON.parse(process.env.CANDIDATE_PROFILE_JSON))
-    } catch {
-      throw new Error('CANDIDATE_PROFILE_JSON is not a valid candidate profile.')
-    }
-  }
-  const configuredPath = process.env.CANDIDATE_PROFILE_FILE
-  const path = configuredPath ?? resolve(profileDirectory(), 'candidate.profile.json')
-  if (!existsSync(path))
-    throw new Error(
-      'Candidate profile is missing. Create profiles/candidate.profile.json locally, or set the CANDIDATE_PROFILE_JSON secret in production.',
-    )
-  return candidateProfileSchema.parse(JSON.parse(readFileSync(path, 'utf8')))
 }
 
 export function resolveProjectAsset(relativePath: string) {
