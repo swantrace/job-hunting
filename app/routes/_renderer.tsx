@@ -33,6 +33,26 @@ export default jsxRenderer(({ children }) => (
     const input = formRegion.querySelector('[data-primary-input]');
     if (input) input.focus();
   });
+  document.body.addEventListener('click', function (event) {
+    const target = event.target instanceof Element ? event.target : null;
+    const openWorkspace = target && target.closest('[data-open-workspace]');
+    if (openWorkspace) {
+      const drawerToggle = document.getElementById('workspace-toggle');
+      if (drawerToggle) drawerToggle.checked = true;
+      return;
+    }
+    const tabButton = target && target.closest('[data-workspace-tab]');
+    if (!tabButton) return;
+    const tab = tabButton.dataset.workspaceTab;
+    document.querySelectorAll('[data-workspace-panel]').forEach(function (panel) {
+      panel.classList.toggle('hidden', panel.id !== 'workspace-' + tab + '-panel');
+    });
+    document.querySelectorAll('[data-workspace-tab]').forEach(function (button) {
+      const active = button === tabButton;
+      button.classList.toggle('tab-active', active);
+      button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+  });
   document.body.addEventListener('htmx:responseError', function () {
     document.getElementById('flash').innerHTML = '<div class="alert alert-error">The request could not be completed.</div>';
   });

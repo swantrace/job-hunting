@@ -52,28 +52,15 @@ export function Workspace({
           class="tab tab-active"
           data-workspace-tab="application"
           aria-selected="true"
-          onclick="const tab=this.dataset.workspaceTab; document.querySelectorAll('[data-workspace-panel]').forEach((panel)=>panel.classList.toggle('hidden',panel.id!==`workspace-${tab}-panel`)); document.querySelectorAll('[data-workspace-tab]').forEach((button)=>{button.classList.toggle('tab-active',button===this);button.setAttribute('aria-selected',button===this?'true':'false')})"
           hx-get={`/applications/${job.id}/application-form?${q}`}
           hx-target="#workspace-application-panel"
         >
           Application
         </button>
-        <button
-          role="tab"
-          class="tab"
-          data-workspace-tab="contacts"
-          aria-selected="false"
-          onclick="const tab=this.dataset.workspaceTab; document.querySelectorAll('[data-workspace-panel]').forEach((panel)=>panel.classList.toggle('hidden',panel.id!==`workspace-${tab}-panel`)); document.querySelectorAll('[data-workspace-tab]').forEach((button)=>{button.classList.toggle('tab-active',button===this);button.setAttribute('aria-selected',button===this?'true':'false')})"
-        >
+        <button role="tab" class="tab" data-workspace-tab="contacts" aria-selected="false">
           Contacts
         </button>
-        <button
-          role="tab"
-          class="tab"
-          data-workspace-tab="activity"
-          aria-selected="false"
-          onclick="const tab=this.dataset.workspaceTab; document.querySelectorAll('[data-workspace-panel]').forEach((panel)=>panel.classList.toggle('hidden',panel.id!==`workspace-${tab}-panel`)); document.querySelectorAll('[data-workspace-tab]').forEach((button)=>{button.classList.toggle('tab-active',button===this);button.setAttribute('aria-selected',button===this?'true':'false')})"
-        >
+        <button role="tab" class="tab" data-workspace-tab="activity" aria-selected="false">
           Activity
         </button>
       </div>
