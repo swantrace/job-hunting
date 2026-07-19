@@ -1,10 +1,16 @@
+import { applicationGenerationPromptVersion } from '../../src/ai/prompts/application-generation'
 import {
   type GenerationRunWithArtifacts,
+  getGenerationEvidenceSnapshot,
   getGoogleDriveConnection,
   listGenerationRuns,
 } from '../../src/db/generation'
 import { type Filters, type JobCardData, listManagementData } from '../../src/db/queries'
 import { todayISO } from '../../src/lib/date'
+import {
+  type EvidenceSelectionSnapshot,
+  evidenceSelectionSnapshotSchema,
+} from '../../src/lib/evidence-selection'
 import { listProfiles } from '../../src/lib/profiles'
 import type { FieldErrors } from '../../src/lib/validation'
 import { Field } from './Dashboard'
@@ -24,6 +30,9 @@ export function Workspace({
   const q = query(filters)
   const { companies, skills } = listManagementData()
   const generationRuns = listGenerationRuns(job.id)
+  const latestEvidenceSnapshot = generationRuns[0]
+    ? getGenerationEvidenceSnapshot(generationRuns[0].id)
+    : null
   const googleDriveConnected = !!getGoogleDriveConnection()
   return (
     <div>
@@ -83,6 +92,7 @@ export function Workspace({
           jobId={job.id}
           filters={filters}
           runs={generationRuns}
+          evidenceSnapshot={latestEvidenceSnapshot?.snapshotJson ?? null}
           googleDriveConnected={googleDriveConnected}
         />
       </div>
@@ -155,11 +165,13 @@ export function GenerationPanel({
   jobId,
   filters,
   runs,
+  evidenceSnapshot,
   googleDriveConnected,
 }: {
   jobId: number
   filters: Filters
   runs: GenerationRunWithArtifacts[]
+  evidenceSnapshot: string | null
   googleDriveConnected: boolean
 }) {
   const latest = runs[0]
@@ -172,6 +184,7 @@ export function GenerationPanel({
           ? 'badge-warning'
           : 'badge-info'
   const shouldPoll = latest?.status === 'Queued' || latest?.status === 'Processing'
+  const snapshot = parseEvidenceSnapshot(evidenceSnapshot)
   return (
     <section
       id="generation-panel"
@@ -247,11 +260,89 @@ export function GenerationPanel({
               ))}
             </div>
           )}
+          {snapshot && <EvidenceReview snapshot={snapshot} runId={latest.id} />}
         </div>
       ) : (
         <p class="mt-4 text-sm text-base-content/60">No document generation has been queued yet.</p>
       )}
     </section>
+  )
+}
+
+function parseEvidenceSnapshot(value: string | null): EvidenceSelectionSnapshot | null {
+  if (!value) return null
+  try {
+    const parsed = evidenceSelectionSnapshotSchema.safeParse(JSON.parse(value))
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
+}
+
+function IdList({ ids }: { ids: string[] }) {
+  return ids.length ? (
+    <div class="flex flex-wrap gap-1">
+      {ids.map((id) => (
+        <span class="badge badge-outline badge-sm">{id}</span>
+      ))}
+    </div>
+  ) : (
+    <span class="text-base-content/60">None</span>
+  )
+}
+
+function EvidenceReview({
+  snapshot,
+  runId,
+}: {
+  snapshot: EvidenceSelectionSnapshot
+  runId: number
+}) {
+  const selection = snapshot.selection
+  return (
+    <details class="rounded-box border border-base-300 p-3 text-sm">
+      <summary class="cursor-pointer font-semibold">Evidence selection & generation record</summary>
+      <div class="mt-3 space-y-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="badge badge-neutral">Profile: {snapshot.profile.id}</span>
+          <span class="badge badge-outline">Profile updated: {snapshot.profile.lastUpdated}</span>
+          <span class="badge badge-outline">Prompt: {applicationGenerationPromptVersion}</span>
+          <a class="btn btn-ghost btn-xs" href={`/generation-snapshots/${runId}`}>
+            Download snapshot
+          </a>
+        </div>
+        <div class="grid gap-3 md:grid-cols-2">
+          <EvidenceGroup label="Experiences" ids={selection.experienceIds} />
+          <EvidenceGroup label="Achievements" ids={selection.achievementIds} />
+          <EvidenceGroup label="Projects" ids={selection.projectIds} />
+          <EvidenceGroup
+            label="Skills"
+            ids={[...selection.preferredSkillIds, ...selection.matchedConditionalSkillIds]}
+          />
+          <EvidenceGroup label="Cover-letter stories" ids={selection.storyIds} />
+          <EvidenceGroup label="Excluded for safety" ids={selection.excludedUnsafeAchievementIds} />
+        </div>
+        <div class="rounded-box bg-base-200 p-3 text-xs text-base-content/70">
+          <strong>Review gap:</strong> evidence not listed here was not available to the generator.
+          “Excluded for safety” items require a factual review before being enabled in career data.
+        </div>
+        <div class="text-xs text-base-content/60">
+          Career-data schema versions — candidate {snapshot.sourceVersions.candidate}, experiences{' '}
+          {snapshot.sourceVersions.experiences}, achievements {snapshot.sourceVersions.achievements}
+          , projects {snapshot.sourceVersions.projects}, skills {snapshot.sourceVersions.skills},
+          stories {snapshot.sourceVersions.stories}; profile {snapshot.sourceVersions.profile}.
+        </div>
+      </div>
+    </details>
+  )
+}
+
+function EvidenceGroup({ label, ids }: { label: string; ids: string[] }) {
+  return (
+    <div>
+      <p class="mb-1 font-medium">{label}</p>
+      <IdList ids={ids} />
+    </div>
   )
 }
 

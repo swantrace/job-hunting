@@ -14,5 +14,7 @@ describe('evidence selection snapshots', () => {
     expect(snapshot.selection.achievementIds).toContain('midato-vite-ci')
     expect(snapshot.selection.matchedConditionalSkillIds).toContain('fhir')
     expect(snapshot.selection.excludedUnsafeAchievementIds).toEqual([])
+    expect(snapshot.sourceVersions.profile).toBeGreaterThan(0)
+    expect(snapshot.profile.id).toBe('fullstack')
   })
 })
