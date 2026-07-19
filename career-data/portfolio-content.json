@@ -1,0 +1,297 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-07-18",
+  "publishingGuidelines": {
+    "recommendedLanguage": "English, with an optional Chinese version",
+    "qualityTarget": "Publish 8–12 evidence-rich articles before expanding the backlog.",
+    "requiredSections": [
+      "Context",
+      "My responsibility",
+      "Initial implementation",
+      "Problem or limitation",
+      "Options considered",
+      "Implementation",
+      "Verification",
+      "Trade-offs",
+      "Next steps",
+      "Repository or demo"
+    ],
+    "avoid": [
+      "Generic tutorial summaries",
+      "Claims not connected to personal work",
+      "AI-generated prose that Fred cannot defend in an interview"
+    ]
+  },
+  "topics": [
+    {
+      "id": "testing-codecept-playwright",
+      "priority": 1,
+      "status": "planned",
+      "title": "What I Learned from Running CodeceptJS with Playwright in a Healthcare Dashboard",
+      "type": "professional-retrospective",
+      "projects": ["dashboard-ui"],
+      "directions": ["frontend", "fullstack"]
+    },
+    {
+      "id": "oauth-2020-retrospective",
+      "priority": 1,
+      "status": "planned",
+      "title": "Revisiting an OAuth Integration I Built in 2020",
+      "type": "security-retrospective",
+      "projects": ["next-connect-shopify"],
+      "directions": ["fullstack", "fhir"]
+    },
+    {
+      "id": "bullmq-idempotent-jobs",
+      "priority": 1,
+      "status": "planned",
+      "title": "Making a BullMQ Job Idempotent with Deterministic Job IDs",
+      "type": "implementation-case-study",
+      "projects": ["english-speaking-coach"],
+      "directions": ["fullstack"]
+    },
+    {
+      "id": "fhir-e2e-testing",
+      "priority": 1,
+      "status": "planned",
+      "title": "Testing a FHIR Clinical Decision Workflow End to End",
+      "type": "implementation-case-study",
+      "projects": ["fhir-cql-apps"],
+      "directions": ["fullstack", "fhir"]
+    },
+    {
+      "id": "node-structured-logging",
+      "priority": 1,
+      "status": "planned",
+      "title": "From console.log to Structured Logging in a Node.js Worker",
+      "type": "implementation-lab",
+      "projects": ["english-speaking-coach"],
+      "directions": ["fullstack"]
+    },
+    {
+      "id": "schema-business-vs-performance",
+      "priority": 1,
+      "status": "planned",
+      "title": "Schema Design for Business Rules vs. Schema Design for Performance",
+      "type": "technical-reflection",
+      "projects": ["english-speaking-coach", "dashboard-backend"],
+      "directions": ["fullstack"]
+    },
+    {
+      "id": "react-compiler-memoization",
+      "priority": 1,
+      "status": "planned",
+      "title": "Do We Still Need useMemo and useCallback after React Compiler?",
+      "type": "measured-experiment",
+      "projects": [],
+      "directions": ["frontend"]
+    },
+    {
+      "id": "spa-change-of-mind",
+      "priority": 1,
+      "status": "planned",
+      "title": "Why I Changed My Mind about Single-Page Applications",
+      "type": "engineering-perspective",
+      "projects": ["job-hunting", "my-portfolio"],
+      "directions": ["frontend", "fullstack"]
+    },
+    {
+      "id": "modernize-playwright",
+      "priority": 2,
+      "status": "planned",
+      "title": "Modernizing an Older Playwright Test Suite: What I Would Change Today",
+      "type": "modernization",
+      "projects": ["dashboard-ui"],
+      "directions": ["frontend", "fullstack"]
+    },
+    {
+      "id": "accessibility-automation",
+      "priority": 2,
+      "status": "planned",
+      "title": "Adding Automated Accessibility Checks to a React Application",
+      "type": "implementation-lab",
+      "projects": ["fhir-cql-apps"],
+      "directions": ["frontend", "fhir"]
+    },
+    {
+      "id": "keyboard-patient-ui",
+      "priority": 2,
+      "status": "planned",
+      "title": "A Keyboard-Only Audit of a Patient Management Interface",
+      "type": "accessibility-audit",
+      "projects": ["fhir-cql-apps"],
+      "directions": ["frontend", "fhir"]
+    },
+    {
+      "id": "healthcare-form-accessibility",
+      "priority": 2,
+      "status": "planned",
+      "title": "Making Complex Healthcare Forms Accessible",
+      "type": "case-study",
+      "projects": ["asu-fhir-consent-management", "fhir-cql-apps"],
+      "directions": ["frontend", "fhir"]
+    },
+    {
+      "id": "postgres-index-experiment",
+      "priority": 2,
+      "status": "planned",
+      "title": "My First Practical PostgreSQL Indexing Experiment with EXPLAIN ANALYZE",
+      "type": "measured-experiment",
+      "projects": ["english-speaking-coach"],
+      "directions": ["fullstack"]
+    },
+    {
+      "id": "graphql-consent-api",
+      "priority": 2,
+      "status": "planned",
+      "title": "How I Built GraphQL APIs inside a Complex Consent Platform",
+      "type": "professional-retrospective",
+      "projects": ["dashboard-backend"],
+      "directions": ["fullstack", "fhir"]
+    },
+    {
+      "id": "bullmq-failure",
+      "priority": 2,
+      "status": "planned",
+      "title": "What Actually Happens When a BullMQ Worker Fails?",
+      "type": "failure-analysis",
+      "projects": ["english-speaking-coach"],
+      "directions": ["fullstack"]
+    },
+    {
+      "id": "queue-retry-backoff",
+      "priority": 2,
+      "status": "planned",
+      "title": "Retry, Backoff, and Dead-Letter Strategies for Background Jobs",
+      "type": "implementation-lab",
+      "projects": ["english-speaking-coach"],
+      "directions": ["fullstack"]
+    },
+    {
+      "id": "correlation-ids",
+      "priority": 2,
+      "status": "planned",
+      "title": "Adding Correlation IDs across an HTTP Request and BullMQ Job",
+      "type": "implementation-lab",
+      "projects": ["english-speaking-coach"],
+      "directions": ["fullstack"]
+    },
+    {
+      "id": "actuator-to-node",
+      "priority": 2,
+      "status": "planned",
+      "title": "What Spring Boot Actuator Taught Me about Observability in Node.js",
+      "type": "cross-ecosystem-learning",
+      "projects": ["english-speaking-coach", "eip-openmrs-sls"],
+      "directions": ["fullstack", "fhir"]
+    },
+    {
+      "id": "oauth-hmac-state-nonce",
+      "priority": 2,
+      "status": "planned",
+      "title": "Understanding HMAC, State, and Nonce through Shopify OAuth",
+      "type": "code-explainer",
+      "projects": ["next-connect-shopify"],
+      "directions": ["fullstack"]
+    },
+    {
+      "id": "oauth-security-review",
+      "priority": 2,
+      "status": "planned",
+      "title": "A Security Review of My Own Shopify OAuth Library",
+      "type": "security-review",
+      "projects": ["next-connect-shopify"],
+      "directions": ["fullstack", "fhir"]
+    },
+    {
+      "id": "shopify-vs-smart-oauth",
+      "priority": 2,
+      "status": "planned",
+      "title": "Shopify OAuth vs. SMART on FHIR Authorization",
+      "type": "comparison",
+      "projects": ["next-connect-shopify", "medplum-oauth", "medplum-shift"],
+      "directions": ["fullstack", "fhir"]
+    },
+    {
+      "id": "pkce-state-nonce",
+      "priority": 2,
+      "status": "planned",
+      "title": "Authorization Code, PKCE, State, and Nonce: Different Problems, Different Protections",
+      "type": "security-explainer",
+      "projects": ["medplum-oauth", "next-connect-shopify"],
+      "directions": ["fullstack", "fhir"]
+    },
+    {
+      "id": "fsh-consent",
+      "priority": 2,
+      "status": "planned",
+      "title": "How FHIR Shorthand Helped Us Model Research Consent",
+      "type": "professional-case-study",
+      "projects": ["asu-research-consent-on-fhir"],
+      "directions": ["fhir"]
+    },
+    {
+      "id": "fhir-profile-extension-valueset",
+      "priority": 2,
+      "status": "planned",
+      "title": "Profiles, Extensions, and Value Sets: What Each One Solves",
+      "type": "domain-explainer",
+      "projects": ["asu-research-consent-on-fhir", "demo-fhir-data"],
+      "directions": ["fhir"]
+    },
+    {
+      "id": "cql-to-elm",
+      "priority": 2,
+      "status": "planned",
+      "title": "From CQL Source to Executable ELM: The Complete Lifecycle",
+      "type": "implementation-explainer",
+      "projects": ["fhir-cql-apps"],
+      "directions": ["fhir"]
+    },
+    {
+      "id": "cds-hooks-plan-apply",
+      "priority": 2,
+      "status": "planned",
+      "title": "How CDS Hooks and FHIR PlanDefinition/$apply Work Together",
+      "type": "architecture-explainer",
+      "projects": ["fhir-cql-apps"],
+      "directions": ["fullstack", "fhir"]
+    },
+    {
+      "id": "medplum-vs-hapi",
+      "priority": 3,
+      "status": "planned",
+      "title": "Medplum vs. HAPI FHIR for Application Developers",
+      "type": "comparison",
+      "projects": ["medplum-shift", "fhir-cql-apps"],
+      "directions": ["fhir", "fullstack"]
+    },
+    {
+      "id": "measure-react-first",
+      "priority": 3,
+      "status": "planned",
+      "title": "Measuring React Performance before Optimizing It",
+      "type": "measured-experiment",
+      "projects": [],
+      "directions": ["frontend"]
+    },
+    {
+      "id": "spa-ssr-rsc-htmx",
+      "priority": 3,
+      "status": "planned",
+      "title": "SPA, SSR, Server Components, and HTMX: Choosing by Interaction Model",
+      "type": "architecture-comparison",
+      "projects": ["job-hunting", "my-portfolio"],
+      "directions": ["frontend", "fullstack"]
+    },
+    {
+      "id": "jsx-on-server",
+      "priority": 3,
+      "status": "planned",
+      "title": "Why I Still Like JSX Even When Rendering on the Server",
+      "type": "engineering-perspective",
+      "projects": ["job-hunting", "my-portfolio", "fhir-cql-apps"],
+      "directions": ["frontend", "fullstack"]
+    }
+  ]
+}

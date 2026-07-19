@@ -1,0 +1,514 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-07-18",
+  "levelDefinitions": {
+    "production-depth": "Used repeatedly in professional production work and can discuss design trade-offs in depth.",
+    "professional-use": "Used in paid professional work with a clear personal contribution.",
+    "project-use": "Implemented in a substantial personal, research, or demonstration project.",
+    "historical": "Used meaningfully in the past but requires review for current interviews.",
+    "learning": "Currently studying or experimenting; do not present as professional expertise."
+  },
+  "skills": [
+    {
+      "id": "javascript",
+      "label": "JavaScript",
+      "category": "language",
+      "level": "production-depth",
+      "lastUsed": "2026",
+      "directions": ["frontend", "fullstack"],
+      "evidence": ["experience:bold", "experience:datomar", "experience:midato"]
+    },
+    {
+      "id": "typescript",
+      "label": "TypeScript",
+      "category": "language",
+      "level": "professional-use",
+      "lastUsed": "2026",
+      "directions": ["frontend", "fullstack", "fhir"],
+      "evidence": ["project:english-speaking-coach", "project:fhir-cql-apps", "project:job-hunting"]
+    },
+    {
+      "id": "react",
+      "label": "React",
+      "category": "frontend",
+      "level": "production-depth",
+      "lastUsed": "2025",
+      "directions": ["frontend", "fullstack", "fhir"],
+      "evidence": [
+        "experience:midato",
+        "experience:fluorescent",
+        "experience:asu",
+        "experience:shift"
+      ]
+    },
+    {
+      "id": "nextjs",
+      "label": "Next.js",
+      "category": "frontend",
+      "level": "professional-use",
+      "lastUsed": "2025",
+      "directions": ["frontend", "fullstack", "fhir"],
+      "evidence": ["experience:asu", "experience:datomar", "project:next-connect-shopify"],
+      "needsReview": [
+        "Assess depth with App Router, React Server Components, caching, and streaming"
+      ]
+    },
+    {
+      "id": "redux",
+      "label": "Redux / Redux Toolkit",
+      "category": "frontend",
+      "level": "professional-use",
+      "lastUsed": "2022",
+      "directions": ["frontend", "fullstack"],
+      "evidence": ["experience:midato", "project:dashboard-ui"]
+    },
+    {
+      "id": "html-css",
+      "label": "HTML5 / CSS3",
+      "category": "frontend",
+      "level": "production-depth",
+      "lastUsed": "2026",
+      "directions": ["frontend", "fullstack"],
+      "evidence": ["experience:bold", "experience:datomar", "project:my-portfolio"]
+    },
+    {
+      "id": "tailwindcss",
+      "label": "Tailwind CSS",
+      "category": "frontend",
+      "level": "project-use",
+      "lastUsed": "2026",
+      "directions": ["frontend", "fullstack"],
+      "evidence": ["project:my-portfolio", "project:job-hunting"]
+    },
+    {
+      "id": "material-ui",
+      "label": "Material UI",
+      "category": "frontend",
+      "level": "professional-use",
+      "lastUsed": "2022",
+      "directions": ["frontend"],
+      "evidence": ["project:dashboard-ui"]
+    },
+    {
+      "id": "shopify-polaris",
+      "label": "Shopify Polaris / App Bridge",
+      "category": "frontend",
+      "level": "professional-use",
+      "lastUsed": "2023",
+      "directions": ["frontend", "fullstack"],
+      "evidence": ["experience:fluorescent", "project:shopify-app-starter"]
+    },
+    {
+      "id": "web-components",
+      "label": "Web Components / Haunted",
+      "category": "frontend",
+      "level": "professional-use",
+      "lastUsed": "2021",
+      "directions": ["frontend"],
+      "evidence": ["project:luxebbq-theme"]
+    },
+    {
+      "id": "accessibility",
+      "label": "Web Accessibility / WCAG",
+      "category": "frontend",
+      "level": "learning",
+      "lastUsed": null,
+      "directions": ["frontend", "fullstack"],
+      "evidence": [],
+      "resumeEligible": false,
+      "nextEvidence": "Complete a keyboard and screen-reader audit, fix issues, and add axe-backed automated tests."
+    },
+    {
+      "id": "react-performance",
+      "label": "React Performance Optimization",
+      "category": "frontend",
+      "level": "learning",
+      "lastUsed": "2026",
+      "directions": ["frontend"],
+      "evidence": ["achievement:midato-vite-ci"],
+      "resumeEligible": false,
+      "nextEvidence": "Profile a current React application and publish measured before/after results."
+    },
+    {
+      "id": "react-compiler",
+      "label": "React Compiler",
+      "category": "frontend",
+      "level": "learning",
+      "lastUsed": "2026",
+      "directions": ["frontend"],
+      "evidence": [],
+      "resumeEligible": false
+    },
+    {
+      "id": "honox",
+      "label": "HonoX / Server-Rendered JSX",
+      "category": "frontend",
+      "level": "project-use",
+      "lastUsed": "2026",
+      "directions": ["frontend", "fullstack", "fhir"],
+      "evidence": ["project:my-portfolio", "project:job-hunting", "project:fhir-cql-apps"]
+    },
+    {
+      "id": "htmx",
+      "label": "htmx",
+      "category": "frontend",
+      "level": "project-use",
+      "lastUsed": "2026",
+      "directions": ["frontend", "fullstack"],
+      "evidence": ["project:job-hunting"]
+    },
+    {
+      "id": "nodejs",
+      "label": "Node.js",
+      "category": "backend",
+      "level": "professional-use",
+      "lastUsed": "2026",
+      "directions": ["fullstack", "fhir"],
+      "evidence": ["experience:midato", "experience:datomar", "project:english-speaking-coach"]
+    },
+    {
+      "id": "express",
+      "label": "Express",
+      "category": "backend",
+      "level": "professional-use",
+      "lastUsed": "2025",
+      "directions": ["fullstack"],
+      "evidence": ["experience:midato", "project:async-express"]
+    },
+    {
+      "id": "graphql",
+      "label": "GraphQL / Apollo",
+      "category": "backend",
+      "level": "professional-use",
+      "lastUsed": "2023",
+      "directions": ["frontend", "fullstack", "fhir"],
+      "evidence": ["experience:midato", "experience:fluorescent", "project:dashboard-backend"]
+    },
+    {
+      "id": "rest-api",
+      "label": "REST APIs",
+      "category": "backend",
+      "level": "professional-use",
+      "lastUsed": "2026",
+      "directions": ["fullstack", "fhir"],
+      "evidence": ["project:next-connect-shopify", "project:fhir-cql-apps"]
+    },
+    {
+      "id": "postgresql",
+      "label": "PostgreSQL",
+      "category": "data",
+      "level": "professional-use",
+      "lastUsed": "2026",
+      "directions": ["fullstack", "fhir"],
+      "evidence": ["experience:shift", "project:english-speaking-coach"],
+      "needsReview": ["Add measured query-planning and indexing evidence"]
+    },
+    {
+      "id": "postgres-performance",
+      "label": "PostgreSQL Query Tuning",
+      "category": "data",
+      "level": "learning",
+      "lastUsed": null,
+      "directions": ["fullstack"],
+      "evidence": [],
+      "resumeEligible": false,
+      "nextEvidence": "Use EXPLAIN ANALYZE and document an index or query improvement in an existing project."
+    },
+    {
+      "id": "redis",
+      "label": "Redis",
+      "category": "data",
+      "level": "project-use",
+      "lastUsed": "2026",
+      "directions": ["fullstack"],
+      "evidence": ["project:english-speaking-coach", "project:medplum-shift"]
+    },
+    {
+      "id": "dynamodb",
+      "label": "DynamoDB",
+      "category": "data",
+      "level": "professional-use",
+      "lastUsed": "2022",
+      "directions": ["fullstack", "fhir"],
+      "evidence": ["experience:midato", "project:dashboard-backend"],
+      "needsReview": ["Clarify personal responsibility for indexes and data modeling"]
+    },
+    {
+      "id": "drizzle",
+      "label": "Drizzle ORM",
+      "category": "data",
+      "level": "project-use",
+      "lastUsed": "2026",
+      "directions": ["fullstack"],
+      "evidence": ["project:english-speaking-coach", "project:job-hunting"]
+    },
+    {
+      "id": "bullmq",
+      "label": "BullMQ",
+      "category": "backend",
+      "level": "project-use",
+      "lastUsed": "2026",
+      "directions": ["fullstack"],
+      "evidence": ["achievement:english-coach-queues"]
+    },
+    {
+      "id": "idempotency",
+      "label": "Idempotent Background Workflows",
+      "category": "system-design",
+      "level": "project-use",
+      "lastUsed": "2026",
+      "directions": ["fullstack"],
+      "evidence": ["achievement:english-coach-queues"],
+      "needsReview": ["Add tests for repeated delivery and partial failure"]
+    },
+    {
+      "id": "system-design",
+      "label": "System Design",
+      "category": "system-design",
+      "level": "project-use",
+      "lastUsed": "2026",
+      "directions": ["fullstack", "fhir"],
+      "evidence": ["project:english-speaking-coach", "project:job-hunting"],
+      "resumeEligible": false,
+      "nextEvidence": "Document architecture, trade-offs, failure modes, and load assumptions for one flagship project."
+    },
+    {
+      "id": "observability",
+      "label": "Observability",
+      "category": "operations",
+      "level": "learning",
+      "lastUsed": "2026",
+      "directions": ["fullstack", "fhir"],
+      "evidence": [
+        "repo:swantrace/english-speacking-coach:apps/backend/src/lib/queues/helpers/worker-logging.ts"
+      ],
+      "resumeEligible": false,
+      "nextEvidence": "Add structured logs, correlation IDs, metrics, health checks, and error reporting to a Node.js project."
+    },
+    {
+      "id": "playwright",
+      "label": "Playwright",
+      "category": "testing",
+      "level": "professional-use",
+      "lastUsed": "2022",
+      "directions": ["frontend", "fullstack"],
+      "evidence": ["achievement:dashboard-ui-playwright"]
+    },
+    {
+      "id": "unit-testing",
+      "label": "Unit Testing",
+      "category": "testing",
+      "level": "professional-use",
+      "lastUsed": "2026",
+      "directions": ["frontend", "fullstack", "fhir"],
+      "evidence": ["project:job-hunting", "project:fhir-cql-apps"],
+      "needsReview": ["Record frameworks and representative test suites"]
+    },
+    {
+      "id": "integration-testing",
+      "label": "Integration Testing",
+      "category": "testing",
+      "level": "professional-use",
+      "lastUsed": "2026",
+      "directions": ["frontend", "fullstack", "fhir"],
+      "evidence": ["achievement:dashboard-ui-playwright", "project:fhir-cql-apps"]
+    },
+    {
+      "id": "ci-cd",
+      "label": "CI/CD",
+      "category": "operations",
+      "level": "professional-use",
+      "lastUsed": "2026",
+      "directions": ["frontend", "fullstack", "fhir"],
+      "evidence": ["achievement:midato-vite-ci", "project:job-hunting", "project:fhir-cql-apps"]
+    },
+    {
+      "id": "docker",
+      "label": "Docker",
+      "category": "operations",
+      "level": "professional-use",
+      "lastUsed": "2026",
+      "directions": ["fullstack", "fhir"],
+      "evidence": ["experience:shift", "experience:fluorescent", "project:fhir-cql-apps"]
+    },
+    {
+      "id": "aws",
+      "label": "AWS",
+      "category": "operations",
+      "level": "professional-use",
+      "lastUsed": "2022",
+      "directions": ["fullstack", "fhir"],
+      "evidence": ["experience:midato", "project:dashboard-backend"],
+      "needsReview": [
+        "Separate hands-on services from services only encountered in the wider architecture"
+      ]
+    },
+    {
+      "id": "flyio",
+      "label": "Fly.io",
+      "category": "operations",
+      "level": "project-use",
+      "lastUsed": "2026",
+      "directions": ["fullstack", "fhir"],
+      "evidence": ["experience:shift", "project:job-hunting", "project:fhir-cql-apps"]
+    },
+    {
+      "id": "oauth2",
+      "label": "OAuth 2.0",
+      "category": "security",
+      "level": "professional-use",
+      "lastUsed": "2025",
+      "directions": ["fullstack", "fhir"],
+      "evidence": ["achievement:shopify-oauth-library", "achievement:shift-smart-fhir-transfer"],
+      "needsReview": [
+        "Do not use security-expert language",
+        "Modernize PKCE, token lifecycle, and threat-model evidence"
+      ]
+    },
+    {
+      "id": "pkce",
+      "label": "PKCE",
+      "category": "security",
+      "level": "project-use",
+      "lastUsed": "2025",
+      "directions": ["frontend", "fullstack", "fhir"],
+      "evidence": ["project:medplum-oauth"]
+    },
+    {
+      "id": "oidc",
+      "label": "OpenID Connect",
+      "category": "security",
+      "level": "learning",
+      "lastUsed": "2026",
+      "directions": ["fullstack", "fhir"],
+      "evidence": [],
+      "resumeEligible": false
+    },
+    {
+      "id": "udap",
+      "label": "UDAP Security",
+      "category": "security",
+      "level": "learning",
+      "lastUsed": "2026",
+      "directions": ["fhir"],
+      "evidence": [],
+      "resumeEligible": false
+    },
+    {
+      "id": "fhir",
+      "label": "HL7 FHIR R4/R5",
+      "category": "healthcare",
+      "level": "professional-use",
+      "lastUsed": "2026",
+      "directions": ["fhir", "fullstack"],
+      "evidence": [
+        "experience:midato",
+        "experience:asu",
+        "experience:shift",
+        "project:fhir-cql-apps"
+      ]
+    },
+    {
+      "id": "fsh",
+      "label": "FHIR Shorthand / SUSHI",
+      "category": "healthcare",
+      "level": "professional-use",
+      "lastUsed": "2025",
+      "directions": ["fhir"],
+      "evidence": ["achievement:asu-fsh-modeling", "project:demo-fhir-data"]
+    },
+    {
+      "id": "smart-on-fhir",
+      "label": "SMART on FHIR",
+      "category": "healthcare",
+      "level": "professional-use",
+      "lastUsed": "2025",
+      "directions": ["fhir", "fullstack"],
+      "evidence": ["achievement:shift-smart-fhir-transfer", "project:medplum-oauth"]
+    },
+    {
+      "id": "healthcare-consent",
+      "label": "Healthcare Consent Systems",
+      "category": "healthcare",
+      "level": "production-depth",
+      "lastUsed": "2025",
+      "directions": ["fhir", "fullstack", "frontend"],
+      "evidence": ["experience:midato", "experience:asu", "experience:shift"]
+    },
+    {
+      "id": "cds-hooks",
+      "label": "CDS Hooks",
+      "category": "healthcare",
+      "level": "project-use",
+      "lastUsed": "2026",
+      "directions": ["fhir", "fullstack"],
+      "evidence": ["achievement:fhir-clinical-reasoning-demo"]
+    },
+    {
+      "id": "cql",
+      "label": "Clinical Quality Language",
+      "category": "healthcare",
+      "level": "project-use",
+      "lastUsed": "2026",
+      "directions": ["fhir"],
+      "evidence": ["achievement:fhir-clinical-reasoning-demo"]
+    },
+    {
+      "id": "hl7v2",
+      "label": "HL7 v2",
+      "category": "healthcare",
+      "level": "learning",
+      "lastUsed": null,
+      "directions": ["fhir"],
+      "evidence": [],
+      "resumeEligible": false
+    },
+    {
+      "id": "terminology",
+      "label": "FHIR Terminology / LOINC / SNOMED CT / RxNorm",
+      "category": "healthcare",
+      "level": "learning",
+      "lastUsed": "2025",
+      "directions": ["fhir"],
+      "evidence": ["achievement:asu-fsh-modeling"],
+      "resumeEligible": false
+    },
+    {
+      "id": "java",
+      "label": "Java",
+      "category": "language",
+      "level": "project-use",
+      "lastUsed": "2025",
+      "directions": ["fullstack", "fhir"],
+      "evidence": ["project:eip-openmrs-sls"]
+    },
+    {
+      "id": "spring-boot",
+      "label": "Spring Boot",
+      "category": "backend",
+      "level": "learning",
+      "lastUsed": "2026",
+      "directions": ["fullstack", "fhir"],
+      "evidence": ["project:eip-openmrs-sls"],
+      "resumeEligible": false
+    },
+    {
+      "id": "elixir-phoenix",
+      "label": "Elixir / Phoenix",
+      "category": "backend",
+      "level": "historical",
+      "lastUsed": "2023",
+      "directions": ["fullstack"],
+      "evidence": ["experience:fluorescent"]
+    },
+    {
+      "id": "shopify",
+      "label": "Shopify Platform and APIs",
+      "category": "domain",
+      "level": "production-depth",
+      "lastUsed": "2023",
+      "directions": ["frontend", "fullstack"],
+      "evidence": ["experience:bold", "experience:datomar", "experience:fluorescent"]
+    }
+  ]
+}

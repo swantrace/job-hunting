@@ -1,169 +1,107 @@
 {
+  "schemaVersion": 1,
+  "lastUpdated": "2026-07-18",
   "id": "fullstack",
-  "version": 2,
   "label": "Senior Full-Stack Developer",
-  "templates": {
-    "resume": "templates/resume.template.docx",
-    "coverLetter": "templates/cover-letter.template.docx"
+  "targetTitles": [
+    "Senior Full-Stack Developer",
+    "Senior Full-Stack Engineer",
+    "Senior Software Engineer",
+    "Product Engineer",
+    "Full-Stack Software Developer"
+  ],
+  "positioning": "Hands-on senior individual contributor who delivers end-to-end web products with strong React expertise, Node.js APIs, data stores, cloud services, and deployment automation.",
+  "summaryInstructions": [
+    "Lead with 8+ years of production web development across healthcare and e-commerce.",
+    "Emphasize React, TypeScript, Node.js, GraphQL, PostgreSQL, AWS, Docker, and CI/CD only when matched to the job.",
+    "Use healthcare interoperability as a differentiator, not as a requirement for every full-stack role.",
+    "Do not imply people management from the Shift title.",
+    "Prefer end-to-end feature ownership language over broad architecture claims."
+  ],
+  "preferredSkillIds": [
+    "typescript",
+    "react",
+    "nextjs",
+    "nodejs",
+    "graphql",
+    "rest-api",
+    "postgresql",
+    "redis",
+    "drizzle",
+    "bullmq",
+    "docker",
+    "aws",
+    "ci-cd",
+    "oauth2"
+  ],
+  "conditionalSkillIds": [
+    "fhir",
+    "smart-on-fhir",
+    "shopify",
+    "flyio",
+    "htmx",
+    "honox",
+    "elixir-phoenix",
+    "java"
+  ],
+  "excludeUntilUpgraded": [
+    "accessibility",
+    "postgres-performance",
+    "observability",
+    "oidc",
+    "udap",
+    "spring-boot"
+  ],
+  "preferredAchievementIds": [
+    "midato-vite-ci",
+    "midato-consent-platform",
+    "shift-smart-fhir-transfer",
+    "shift-deployment",
+    "english-coach-queues",
+    "shopify-oauth-library",
+    "datomar-storefront",
+    "bold-integration-library"
+  ],
+  "preferredProjectIds": [
+    "english-speaking-coach",
+    "job-hunting",
+    "fhir-cql-apps",
+    "medplum-shift",
+    "luxebbq-theme",
+    "next-connect-shopify"
+  ],
+  "experienceSelection": {
+    "requiredIds": ["shift", "asu", "fluorescent", "midato", "datomar", "bold"],
+    "priorityOrder": ["shift", "midato", "asu", "fluorescent", "datomar", "bold"],
+    "maxBulletsByExperience": {
+      "shift": 3,
+      "asu": 2,
+      "fluorescent": 2,
+      "midato": 3,
+      "datomar": 2,
+      "bold": 1
+    }
   },
-  "targetTitle": "SENIOR FULL-STACK DEVELOPER",
-  "summary": "Senior Full-Stack Developer with 8+ years of experience building and supporting production web applications across healthcare and e-commerce. Delivers end-to-end solutions with React, Next.js, Node.js, TypeScript, GraphQL, PostgreSQL, Redis, and AWS, with hands-on experience in API design, authentication, data modeling, cloud deployment, and CI/CD. Known for modernizing legacy workflows and translating complex product requirements into maintainable, user-focused software.",
-  "skills": [
-    {
-      "label": "Languages",
-      "items": "JavaScript, TypeScript, Python, Java, Elixir, PHP"
-    },
-    {
-      "label": "Frontend",
-      "items": "React, Next.js, Redux, HTML5, CSS3, Tailwind CSS, Material UI, Jest"
-    },
-    {
-      "label": "Backend",
-      "items": "Node.js, Express, GraphQL/Apollo, REST APIs, Prisma, Drizzle ORM, BullMQ, Phoenix"
-    },
-    {
-      "label": "Data & Cloud",
-      "items": "PostgreSQL, Redis, DynamoDB, AWS Lambda, AppSync, Cognito, S3, Docker, Fly.io, Vercel, CI/CD"
-    },
-    {
-      "label": "Domain",
-      "items": "FHIR R4/R5, SMART on FHIR, OAuth2, consent systems, Shopify"
-    }
-  ],
-  "experiences": [
-    {
-      "id": "shift",
-      "role": "Lead Engineer",
-      "company": "Shift Task Force",
-      "startDate": "2024-09",
-      "endDate": "2025-06",
-      "displayDates": "Sep 2024 – Jun 2025",
-      "bullets": [
-        {
-          "id": "shift-platform-devops",
-          "text": "Led platform development and DevOps for healthcare integration environments, deploying containerized services and partner EHR sandboxes with Docker and Fly.io."
-        },
-        {
-          "id": "shift-smart-fhir",
-          "text": "Implemented a Medplum-based SMART on FHIR workflow for consent-aware EHR-to-EHR interoperability using OAuth2, CDS, and privacy services."
-        },
-        {
-          "id": "shift-integration-stack",
-          "text": "Built and maintained integration components spanning Node.js, Drizzle ORM, Java, Spring Boot, Apache Camel, Debezium, OpenMRS, and FHIR services."
-        }
-      ]
-    },
-    {
-      "id": "asu",
-      "role": "Research Consultant",
-      "company": "Arizona State University",
-      "startDate": "2023-08",
-      "endDate": "2024-12",
-      "displayDates": "Aug 2023 – Dec 2024",
-      "bullets": [
-        {
-          "id": "asu-consent-dashboard",
-          "text": "Developed a Next.js dashboard for managing FHIR consent forms and questionnaire responses using FHIR R5, authentication, and Vercel KV."
-        },
-        {
-          "id": "asu-fhir-profiles",
-          "text": "Authored reusable FHIR profiles and value sets with FSH and SUSHI for a scalable clinical research consent framework."
-        }
-      ]
-    },
-    {
-      "id": "fluorescent",
-      "role": "Frontend Developer",
-      "company": "Fluorescent Design Inc.",
-      "startDate": "2023-01",
-      "endDate": "2023-07",
-      "displayDates": "Jan 2023 – Jul 2023",
-      "bullets": [
-        {
-          "id": "fluorescent-shopify-apps",
-          "text": "Built Shopify embedded applications with React, Polaris, App Bridge, GraphQL, and a Phoenix backend for wishlist and bundle-pricing workflows."
-        },
-        {
-          "id": "fluorescent-monorepo",
-          "text": "Introduced a monorepo architecture and Docker-based development workflow to improve module reuse and deployment consistency."
-        }
-      ]
-    },
-    {
-      "id": "midato",
-      "role": "Full-Stack Developer",
-      "company": "Midato Health",
-      "startDate": "2022-01",
-      "endDate": "2022-10",
-      "displayDates": "Jan 2022 – Oct 2022",
-      "bullets": [
-        {
-          "id": "midato-consent-platform",
-          "text": "Built a production consent management platform with React, Redux, Node.js, GraphQL, AWS AppSync, Cognito, Lambda, and DynamoDB."
-        },
-        {
-          "id": "midato-vite-ci",
-          "text": "Replaced Webpack with Vite, cutting GitHub Actions build time from 8 minutes to 2 minutes and improving local feedback cycles."
-        }
-      ]
-    },
-    {
-      "id": "datomar",
-      "role": "Full-Stack Developer",
-      "company": "Datomar Labs Venture Studio",
-      "startDate": "2020-07",
-      "endDate": "2021-12",
-      "displayDates": "Jul 2020 – Dec 2021",
-      "bullets": [
-        {
-          "id": "datomar-shopify-storefront",
-          "text": "Developed a custom Shopify storefront and administration tools with Web Components, GraphQL, Next.js, Koa, and Shopify APIs."
-        },
-        {
-          "id": "datomar-catalog-tools",
-          "text": "Created bulk tag, metafield, and CSV workflows that reduced catalog maintenance time by 40%."
-        }
-      ]
-    },
-    {
-      "id": "bold",
-      "role": "Support Developer",
-      "company": "Bold Commerce",
-      "startDate": "2017-07",
-      "endDate": "2020-06",
-      "displayDates": "Jul 2017 – Jun 2020",
-      "bullets": [
-        {
-          "id": "bold-integration-library",
-          "text": "Built and documented reusable JavaScript and Liquid solutions for Shopify integrations, reducing internal support resolution time by 30%."
-        }
-      ]
-    }
-  ],
-  "education": [
-    {
-      "degree": "Master of Computer Science",
-      "school": "Arizona State University"
-    },
-    {
-      "degree": "Diploma in Web Development",
-      "school": "RRC Polytech"
-    },
-    {
-      "degree": "Bachelor of Science in Statistics",
-      "school": "Tianjin University of Finance and Economics"
-    }
-  ],
-  "careerBreak": {
-    "start": "Jul 2025",
-    "end": "May 2026",
-    "reason": "Planned career break for marriage, family commitments, and international relocation.",
-    "showOnResume": false
+  "coverLetterStrategy": {
+    "opening": "Connect the role's product and technical needs to Fred's end-to-end delivery experience.",
+    "evidenceCount": 2,
+    "preferredStoryIds": [
+      "vite-migration",
+      "shift-smart-transfer",
+      "bullmq-idempotency",
+      "luxebbq-product-discovery"
+    ],
+    "avoid": [
+      "Generic lists of every technology",
+      "Leadership claims not supported by actual responsibilities",
+      "FHIR detail when the employer is not in healthcare"
+    ]
   },
-  "availabilityStatement": "Now based in Edmonton, fully settled in Canada, and available for a long-term full-time role.",
-  "coverLetter": {
-    "openingParagraph": "I am applying for the {jobTitle} position at {company}. With more than eight years of experience delivering production software across healthcare and e-commerce, I bring hands-on strength across React, Next.js, Node.js, TypeScript, GraphQL, databases, and cloud deployment.",
-    "evidenceParagraph": "In my recent work, I have led full-stack delivery and DevOps for healthcare integration environments, built secure consent and interoperability applications, and worked across React interfaces, Node.js APIs, AWS services, PostgreSQL, DynamoDB, Docker, and CI/CD.",
-    "closingParagraph": "I would welcome the opportunity to discuss how my experience could support {company} and the goals of this role. Thank you for your time and consideration."
+  "resumeRules": {
+    "targetPages": 2,
+    "maximumPages": 2,
+    "includeCareerBreakByDefault": false,
+    "includeProjectsWhen": "Include one or two projects when they provide evidence missing from professional experience.",
+    "metricPolicy": "Use only achievements with safeToUse=true."
   }
 }

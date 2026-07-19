@@ -231,6 +231,22 @@ export const googleDriveConnections = sqliteTable('google_drive_connections', {
   updatedAt: text('updated_at').notNull(),
 })
 
+export const generationEvidenceSnapshots = sqliteTable(
+  'generation_evidence_snapshots',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    generationRunId: integer('generation_run_id')
+      .notNull()
+      .references(() => generationRuns.id, { onDelete: 'cascade' }),
+    snapshotJson: text('snapshot_json').notNull(),
+    filePath: text('file_path').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('generation_evidence_snapshots_run_unique_idx').on(table.generationRunId),
+  ],
+)
+
 export const jobApplicationsToContacts = sqliteTable(
   'job_applications_to_contacts',
   {

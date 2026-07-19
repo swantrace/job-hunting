@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-07-18",
+  "stories": [
+    {
+      "id": "vite-migration",
+      "title": "Replacing Webpack with Vite",
+      "experienceId": "midato",
+      "status": "ready-after-detail-review",
+      "directions": ["frontend", "fullstack"],
+      "competencies": ["technical-initiative", "performance", "migration", "ci-cd"],
+      "situation": "The frontend build and feedback cycle was slow in a healthcare consent platform.",
+      "task": "Modernize the build tooling without disrupting the existing application.",
+      "action": "Replaced Webpack with Vite and adapted the project and CI workflow.",
+      "result": "GitHub Actions build time decreased from 8 minutes to 2 minutes.",
+      "tradeoffs": null,
+      "needsReview": [
+        "Add migration obstacles",
+        "Add testing and rollback strategy",
+        "Confirm measurement method"
+      ]
+    },
+    {
+      "id": "playwright-healthcare-workflows",
+      "title": "Testing Healthcare Administration Workflows",
+      "experienceId": "midato",
+      "status": "needs-personal-contribution-detail",
+      "directions": ["frontend", "fullstack"],
+      "competencies": ["testing", "quality", "ci-cd"],
+      "situation": "A complex healthcare administration UI required cross-application integration coverage.",
+      "task": "Contribute reliable automated workflow tests.",
+      "action": "Used CodeceptJS with Playwright, including CI-aware waits and trace capture.",
+      "result": null,
+      "tradeoffs": "The older abstraction reduced direct Playwright control but provided readable scenario APIs.",
+      "needsReview": [
+        "Identify exact tests Fred authored",
+        "Describe one defect caught or regression prevented"
+      ]
+    },
+    {
+      "id": "shopify-integration-helper",
+      "title": "Turning Repeated Shopify Support Work into a Reusable Library",
+      "experienceId": "bold",
+      "status": "ready-after-metric-review",
+      "directions": ["frontend", "fullstack"],
+      "competencies": ["abstraction", "support", "documentation", "developer-productivity"],
+      "situation": "Recurring Shopify theme and app integration problems required similar JavaScript and Liquid fixes.",
+      "task": "Reduce repetition and make solutions easier for support developers to reuse.",
+      "action": "Designed and documented reusable integration helpers and patterns.",
+      "result": "Improved consistency and reduced repeated investigation; the previously claimed 30% reduction needs verification.",
+      "tradeoffs": "A generalized library required careful compatibility handling across merchant themes.",
+      "needsReview": ["Provide one concrete recurring problem", "Verify or remove the 30% metric"]
+    },
+    {
+      "id": "luxebbq-product-discovery",
+      "title": "Building Product Discovery beyond Traditional Liquid Rendering",
+      "experienceId": "datomar",
+      "status": "ready-after-permission-review",
+      "directions": ["frontend", "fullstack"],
+      "competencies": ["product-thinking", "frontend-architecture", "api-integration"],
+      "situation": "A large BBQ catalog needed interactive filtering, comparison, and guided product discovery.",
+      "task": "Create richer client-side product experiences than the existing Liquid theme supported.",
+      "action": "Built Web Component interfaces backed by Shopify Storefront GraphQL APIs and administration workflows.",
+      "result": "Delivered real-time catalog interactions and merchant tooling; the 40% maintenance metric needs verification.",
+      "tradeoffs": "A JavaScript-heavy storefront improved interactivity but increased frontend state and integration complexity.",
+      "needsReview": ["Confirm screenshots and public disclosure", "Verify metric"]
+    },
+    {
+      "id": "asu-consent-modeling",
+      "title": "Modeling Research Consent with FHIR Shorthand",
+      "experienceId": "asu",
+      "status": "ready-after-validation-review",
+      "directions": ["fhir"],
+      "competencies": ["domain-modeling", "standards", "research-collaboration"],
+      "situation": "Research consent required reusable and interoperable FHIR definitions.",
+      "task": "Contribute profiles, extensions, value sets, and usable consent interfaces.",
+      "action": "Authored FSH/SUSHI artifacts and contributed React/Next.js and LHC-Forms interfaces.",
+      "result": "Created reusable research consent artifacts and contributed to academic work.",
+      "tradeoffs": "FHIR conformance, research requirements, and user-friendly data capture had to be balanced.",
+      "needsReview": ["Add publication titles", "Record current validation status"]
+    },
+    {
+      "id": "shift-smart-transfer",
+      "title": "Consent-Aware EHR-to-EHR Transfer with SMART on FHIR",
+      "experienceId": "shift",
+      "status": "ready-after-security-review",
+      "directions": ["fullstack", "fhir"],
+      "competencies": ["oauth", "interoperability", "integration", "deployment"],
+      "situation": "A demonstration needed to launch from an EHR, retrieve patient data, apply privacy decisions, and transfer allowed resources.",
+      "task": "Implement the application flow and make the multi-service environment deployable.",
+      "action": "Built SMART launch and patient-context handling, processed FHIR bundles, integrated consent/privacy services, and automated Fly.io deployment.",
+      "result": "Produced a working interoperability demonstration across source and target environments.",
+      "tradeoffs": "Using Medplum accelerated the demo, while browser-held credentials and deployment secrets required later security cleanup.",
+      "needsReview": [
+        "Document exact team boundaries",
+        "Complete security cleanup before public promotion"
+      ]
+    },
+    {
+      "id": "bullmq-idempotency",
+      "title": "Designing Reliable Multi-Step Background Work in BullMQ",
+      "experienceId": null,
+      "status": "implementation-ready",
+      "directions": ["fullstack"],
+      "competencies": ["queues", "idempotency", "retries", "observability"],
+      "situation": "AI-assisted language analysis and session completion could not reliably run inside a single request.",
+      "task": "Move work to queues while reducing duplicate downstream analysis.",
+      "action": "Used BullMQ workers, schema-validated payloads, deterministic job IDs, database state checks, and worker failure logs.",
+      "result": "Separated request handling from long-running work and created a basis for retryable processing.",
+      "tradeoffs": "Partial failure, transcript persistence idempotency, retry policy, and dead-letter handling still need deeper tests.",
+      "needsReview": [
+        "Add repeat-delivery tests",
+        "Add explicit backoff and dead-letter strategy",
+        "Measure job latency and failure rates"
+      ]
+    },
+    {
+      "id": "oauth-retrospective",
+      "title": "Security Review of a Shopify OAuth Library Built in 2020",
+      "experienceId": "datomar",
+      "status": "excellent-writing-topic",
+      "directions": ["fullstack", "fhir"],
+      "competencies": ["oauth", "security", "reflection", "modernization"],
+      "situation": "Next.js Shopify applications needed reusable authorization and session middleware.",
+      "task": "Implement OAuth start, callback, HMAC validation, state/nonce protection, and authenticated API access.",
+      "action": "Built next-connect-shopify and later reviewed it against current security and framework expectations.",
+      "result": "Created reusable integration code and a concrete security-learning artifact.",
+      "tradeoffs": "The current code has outdated dependencies and correctness issues, including domain validation, error classification, async handling, and module-level mutable state.",
+      "needsReview": ["Modernize implementation", "Add threat model and automated tests"]
+    },
+    {
+      "id": "career-break-return",
+      "title": "Planned Career Break and Return to Canada",
+      "experienceId": null,
+      "status": "ready",
+      "directions": ["frontend", "fullstack", "fhir"],
+      "competencies": ["career-continuity", "availability"],
+      "situation": "The Shift contract ended in June 2025 while major marriage, family, and relocation commitments required time abroad.",
+      "task": "Complete the family transition and return to Canada ready for long-term work.",
+      "action": "Took a planned break from July 2025 through June 2026 and continued technical learning and project work where appropriate.",
+      "result": "Returned to Canada in July 2026 and became available for long-term full-time roles.",
+      "tradeoffs": null
+    }
+  ]
+}

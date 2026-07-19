@@ -4,7 +4,7 @@ import {
   tailoredResumeSchema,
 } from '../src/ai/schemas/application-generation'
 import { renderDocx } from '../src/lib/generation'
-import { getProfile, resolveProjectAsset } from '../src/lib/profiles'
+import { resolveProjectAsset } from '../src/lib/profiles'
 
 describe('application generation', () => {
   test('accepts structured tailored document drafts', () => {
@@ -28,22 +28,31 @@ describe('application generation', () => {
   })
 
   test('renders the existing resume DOCX template with loops', async () => {
-    const profile = getProfile('fullstack')
-    const buffer = await renderDocx(resolveProjectAsset(profile.templates.resume), {
+    const buffer = await renderDocx(resolveProjectAsset('templates/resume.template.docx'), {
       candidateName: 'Test Candidate',
       location: 'Edmonton, AB',
       phone: '+1 555 555 5555',
       email: 'test@example.com',
       linkedin: 'https://www.linkedin.com/in/test',
       github: 'https://github.com/test',
-      targetTitle: profile.targetTitle,
-      summary: profile.summary,
-      skills: profile.skills,
-      experiences: profile.experiences.map((experience) => ({
-        ...experience,
-        bullets: experience.bullets.map((bullet) => ({ text: bullet.text })),
-      })),
-      education: profile.education,
+      portfolio: 'https://example.com',
+      targetTitle: 'Full-Stack Developer',
+      summary: 'Relevant experience.',
+      skills: [{ label: 'Frontend', items: 'React, TypeScript' }],
+      experiences: [
+        {
+          role: 'Developer',
+          company: 'Example',
+          employmentLabel: 'Contract',
+          displayDates: '2024 – 2025',
+          bullets: [{ text: 'Built a feature.' }],
+        },
+      ],
+      showSelectedProjects: false,
+      selectedProjects: [],
+      showPublications: false,
+      publications: [],
+      education: [{ degree: 'MCS', school: 'Example University', graduationYear: '2020' }],
     })
     expect(buffer.subarray(0, 2).toString()).toBe('PK')
   })

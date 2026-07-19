@@ -4,6 +4,7 @@ import {
   createGenerationRun,
   failGenerationRun,
   getGenerationRun,
+  getGenerationSource,
   listGenerationRuns,
   listQueuedGenerationRuns,
   markArtifactUploadFailed,
@@ -53,6 +54,10 @@ async function processGeneration(
   markGenerationRunProcessing(run.id)
   await updateProgress(10, 'Preparing structured job context')
   try {
+    const source = getGenerationSource(run.id)
+    if (!source) throw new Error('Generation source no longer exists.')
+    const { persistEvidenceSelectionSnapshot } = await import('./evidence-selection')
+    await persistEvidenceSelectionSnapshot(source)
     const { generateApplicationArtifacts } = await import('./generation')
     const artifacts = await generateApplicationArtifacts(run.id)
     await updateProgress(95, 'Saving generated documents')
