@@ -25,6 +25,14 @@ export default jsxRenderer(({ children }) => (
   }
   document.addEventListener('DOMContentLoaded', initBouncer);
   document.body.addEventListener('htmx:afterSwap', initBouncer);
+  document.body.addEventListener('htmx:afterSwap', function (event) {
+    const target = event.detail.target;
+    const formRegion = target && target.matches && target.matches('[data-autofocus]') ? target : target && target.querySelector && target.querySelector('[data-autofocus]');
+    if (!formRegion) return;
+    formRegion.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const input = formRegion.querySelector('[data-primary-input]');
+    if (input) input.focus();
+  });
   document.body.addEventListener('htmx:responseError', function () {
     document.getElementById('flash').innerHTML = '<div class="alert alert-error">The request could not be completed.</div>';
   });

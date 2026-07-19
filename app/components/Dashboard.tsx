@@ -311,6 +311,7 @@ export function Field({
   placeholder,
   list,
   message,
+  externalUrl,
 }: {
   label: string
   name: string
@@ -320,20 +321,34 @@ export function Field({
   placeholder?: string
   list?: string
   message?: string
+  externalUrl?: string | null
 }) {
   return (
     <label class="form-control">
       <span class="label-text mb-1">{label}</span>
-      <input
-        class={`input input-bordered w-full ${message ? 'input-error' : ''}`}
-        name={name}
-        type={type}
-        value={value ?? ''}
-        required={required}
-        placeholder={placeholder}
-        list={list}
-        aria-invalid={message ? 'true' : undefined}
-      />
+      <div class="relative w-full">
+        <input
+          class={`input input-bordered w-full ${externalUrl ? 'pr-11' : ''} ${message ? 'input-error' : ''}`}
+          name={name}
+          type={type}
+          value={value ?? ''}
+          required={required}
+          placeholder={placeholder}
+          list={list}
+          aria-invalid={message ? 'true' : undefined}
+        />
+        {externalUrl && (
+          <a
+            class="btn btn-ghost btn-sm absolute right-1 top-1/2 -translate-y-1/2 border-0 px-2 text-base-content hover:bg-base-200"
+            href={externalUrl}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Open ${label}`}
+          >
+            ↗
+          </a>
+        )}
+      </div>
       {message && <span class="mt-1 text-xs text-error">{message}</span>}
     </label>
   )
@@ -412,7 +427,20 @@ function TodayTasksTable({ jobs, filters }: { jobs: JobCardData[]; filters: Filt
             const query = enc(filters)
             return (
               <tr>
-                <td class="font-medium">{job.jobTitle}</td>
+                <td class="font-medium">
+                  {job.jobTitle}
+                  {job.url && (
+                    <a
+                      class="ml-1 link"
+                      href={job.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`Open ${job.jobTitle} posting`}
+                    >
+                      ↗
+                    </a>
+                  )}
+                </td>
                 <td>{job.companyName}</td>
                 <td>{job.location || '—'}</td>
                 <td>
@@ -475,7 +503,20 @@ function JobCard({
       <div class={`card-body gap-2 p-4 ${compact ? 'flex-col md:flex-row md:items-center' : ''}`}>
         <div class="flex items-start justify-between gap-2">
           <div>
-            <h3 class="font-semibold leading-tight">{job.jobTitle}</h3>
+            <div class="flex items-center gap-1">
+              <h3 class="font-semibold leading-tight">{job.jobTitle}</h3>
+              {job.url && (
+                <a
+                  class="link"
+                  href={job.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Open ${job.jobTitle} posting`}
+                >
+                  ↗
+                </a>
+              )}
+            </div>
             <p class="text-sm text-base-content/70">{job.companyName}</p>
           </div>
           <span

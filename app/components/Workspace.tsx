@@ -443,7 +443,14 @@ export function ApplicationForm({
             ))}
           </select>
         </label>
-        <Field label="Job URL" name="url" type="url" value={job.url} message={err(errors, 'url')} />
+        <Field
+          label="Job URL"
+          name="url"
+          type="url"
+          value={job.url}
+          message={err(errors, 'url')}
+          externalUrl={job.url}
+        />
         <Field
           label="Posted date"
           name="postedDate"
@@ -476,7 +483,6 @@ export function ApplicationForm({
             ))}
           </select>
         </label>
-        <Field label="Resume version" name="resumeVersion" value={job.resumeVersion} />
         <Field label="Source" name="applicationSource" value={job.applicationSource} />
         <Field label="Salary" name="salary" value={job.salary} />
         <div class="sm:col-span-2">
@@ -489,7 +495,7 @@ export function ApplicationForm({
         </div>
         <label class="form-control sm:col-span-2">
           <span class="label-text mb-1">Notes</span>
-          <textarea class="textarea textarea-bordered min-h-28" name="notes">
+          <textarea class="textarea textarea-bordered min-h-28 w-full" name="notes">
             {job.notes ?? ''}
           </textarea>
         </label>
