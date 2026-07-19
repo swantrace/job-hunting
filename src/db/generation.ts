@@ -5,6 +5,7 @@ import {
   companies,
   type GenerationRun,
   generatedArtifacts,
+  generationEvidenceSnapshots,
   generationRuns,
   googleDriveConnections,
   jobApplications,
@@ -83,6 +84,32 @@ export function listQueuedGenerationRuns() {
 
 export function getGenerationRun(runId: number) {
   return db.select().from(generationRuns).where(eq(generationRuns.id, runId)).get() ?? null
+}
+
+export function saveGenerationEvidenceSnapshot(
+  runId: number,
+  snapshotJson: string,
+  filePath: string,
+) {
+  const date = todayISO()
+  return db
+    .insert(generationEvidenceSnapshots)
+    .values({ generationRunId: runId, snapshotJson, filePath, createdAt: date })
+    .onConflictDoUpdate({
+      target: generationEvidenceSnapshots.generationRunId,
+      set: { snapshotJson, filePath, createdAt: date },
+    })
+    .run()
+}
+
+export function getGenerationEvidenceSnapshot(runId: number) {
+  return (
+    db
+      .select()
+      .from(generationEvidenceSnapshots)
+      .where(eq(generationEvidenceSnapshots.generationRunId, runId))
+      .get() ?? null
+  )
 }
 
 export function getGenerationSource(runId: number): GenerationSource | null {
