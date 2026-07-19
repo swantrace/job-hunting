@@ -1,165 +1,97 @@
 {
+  "schemaVersion": 1,
+  "lastUpdated": "2026-07-18",
   "id": "fhir",
-  "version": 2,
-  "label": "Healthcare Full-Stack / FHIR Developer",
-  "templates": {
-    "resume": "templates/resume.template.docx",
-    "coverLetter": "templates/cover-letter.template.docx"
+  "label": "Healthcare / FHIR Software Engineer",
+  "targetTitles": [
+    "FHIR Developer",
+    "Healthcare Software Engineer",
+    "Healthcare Interoperability Engineer",
+    "Healthcare Integration Engineer",
+    "SMART on FHIR Developer",
+    "Healthcare Full-Stack Developer"
+  ],
+  "positioning": "Healthcare software engineer combining full-stack web development with hands-on FHIR R4/R5, consent modeling, SMART on FHIR, FHIR Shorthand, Medplum, HAPI FHIR, and interoperability demonstration experience.",
+  "summaryInstructions": [
+    "Lead with paid healthcare work across Midato Health, Arizona State University, and Shift Task Force.",
+    "Emphasize consent systems, FHIR modeling, SMART App Launch, EHR data exchange, and practitioner-facing workflows.",
+    "Treat CQL and CDS Hooks as current project evidence until deeper professional use exists.",
+    "Describe OAuth as implementation experience, not security expertise.",
+    "Do not claim HL7 v2, Epic/Cerner production integration, or terminology depth until evidence exists."
+  ],
+  "preferredSkillIds": [
+    "fhir",
+    "fsh",
+    "smart-on-fhir",
+    "healthcare-consent",
+    "oauth2",
+    "react",
+    "typescript",
+    "nodejs",
+    "graphql",
+    "rest-api",
+    "docker",
+    "ci-cd"
+  ],
+  "conditionalSkillIds": [
+    "cds-hooks",
+    "cql",
+    "pkce",
+    "postgresql",
+    "aws",
+    "flyio",
+    "java",
+    "spring-boot"
+  ],
+  "excludeUntilUpgraded": ["hl7v2", "terminology", "udap", "oidc", "observability"],
+  "preferredAchievementIds": [
+    "shift-smart-fhir-transfer",
+    "shift-deployment",
+    "asu-fsh-modeling",
+    "asu-consent-ui",
+    "midato-consent-platform",
+    "fhir-clinical-reasoning-demo"
+  ],
+  "preferredProjectIds": [
+    "fhir-cql-apps",
+    "medplum-shift",
+    "asu-research-consent-on-fhir",
+    "demo-fhir-data",
+    "asu-fhir-consent-management",
+    "eip-openmrs-sls"
+  ],
+  "experienceSelection": {
+    "requiredIds": ["shift", "asu", "midato", "fluorescent", "datomar", "bold"],
+    "priorityOrder": ["shift", "asu", "midato", "fluorescent", "datomar", "bold"],
+    "maxBulletsByExperience": {
+      "shift": 3,
+      "asu": 3,
+      "midato": 3,
+      "fluorescent": 1,
+      "datomar": 1,
+      "bold": 1
+    }
   },
-  "targetTitle": "HEALTHCARE FULL-STACK / FHIR DEVELOPER",
-  "summary": "Healthcare Full-Stack Developer with 8+ years in software development and focused experience delivering FHIR-based consent, interoperability, and clinical workflow solutions. Hands-on with FHIR R4/R5, SMART on FHIR, CDS Hooks, FSH, SUSHI, Medplum, OpenMRS, OAuth2, React, Next.js, Node.js, and AWS. Experienced in turning healthcare standards into usable applications, reusable profiles, integration services, and secure cloud deployments.",
-  "skills": [
-    {
-      "label": "Healthcare",
-      "items": "HL7 FHIR R4/R5, SMART on FHIR, CDS Hooks, FSH, SUSHI, Consent, ResearchStudy, ResearchSubject"
-    },
-    {
-      "label": "Platforms",
-      "items": "Medplum, OpenMRS, LHC-Forms, HAPI FHIR familiarity, OAuth2, privacy and consent services"
-    },
-    {
-      "label": "Application",
-      "items": "React, Next.js, TypeScript, Node.js, Express, GraphQL, REST APIs, Angular"
-    },
-    {
-      "label": "Integration",
-      "items": "Spring Boot, Apache Camel, Debezium, JSON, Shell, Docker, Fly.io"
-    },
-    {
-      "label": "Cloud & Data",
-      "items": "AWS Lambda, AppSync, Cognito, DynamoDB, PostgreSQL, Redis, Vercel, CI/CD"
-    }
-  ],
-  "experiences": [
-    {
-      "id": "shift",
-      "role": "Lead Engineer",
-      "company": "Shift Task Force",
-      "startDate": "2024-09",
-      "endDate": "2025-06",
-      "displayDates": "Sep 2024 – Jun 2025",
-      "bullets": [
-        {
-          "id": "shift-fhir-environments",
-          "text": "Led development and deployment of FHIR integration environments connecting sandbox EHR systems, privacy services, CDS components, and consent workflows."
-        },
-        {
-          "id": "shift-medplum-smart",
-          "text": "Implemented a Medplum-based SMART on FHIR application demonstrating consent-aware EHR-to-EHR interoperability with OAuth2 and Fly.io."
-        },
-        {
-          "id": "shift-openmrs-sls",
-          "text": "Architected an OpenMRS integration using Spring Boot, Apache Camel, Debezium, and FHIR transformation to deliver clinical events to a shared service."
-        }
-      ]
-    },
-    {
-      "id": "asu",
-      "role": "Research Consultant",
-      "company": "Arizona State University",
-      "startDate": "2023-08",
-      "endDate": "2024-12",
-      "displayDates": "Aug 2023 – Dec 2024",
-      "bullets": [
-        {
-          "id": "asu-r5-profiles",
-          "text": "Authored FHIR R5 profiles and value sets with FSH and SUSHI for research consent, ResearchStudy, and ResearchSubject workflows."
-        },
-        {
-          "id": "asu-consent-interfaces",
-          "text": "Developed Next.js and LHC-Forms interfaces for capturing, displaying, and managing digital consent and questionnaire responses."
-        },
-        {
-          "id": "asu-publications",
-          "text": "Co-authored academic publications on FHIR-based pediatric consent modeling and research study enrollment."
-        }
-      ]
-    },
-    {
-      "id": "fluorescent",
-      "role": "Frontend Developer",
-      "company": "Fluorescent Design Inc.",
-      "startDate": "2023-01",
-      "endDate": "2023-07",
-      "displayDates": "Jan 2023 – Jul 2023",
-      "bullets": [
-        {
-          "id": "fluorescent-production-react",
-          "text": "Built production React applications and GraphQL integrations, strengthening reusable UI and deployment practices later applied to healthcare products."
-        }
-      ]
-    },
-    {
-      "id": "midato",
-      "role": "Full-Stack Developer",
-      "company": "Midato Health",
-      "startDate": "2022-01",
-      "endDate": "2022-10",
-      "displayDates": "Jan 2022 – Oct 2022",
-      "bullets": [
-        {
-          "id": "midato-fhir-consent",
-          "text": "Built a production FHIR-compatible consent management platform with patient and administrator portals using React, Redux, Node.js, GraphQL, and AWS."
-        },
-        {
-          "id": "midato-secure-backend",
-          "text": "Implemented secure authentication and event-driven backend capabilities with Cognito, AppSync, Lambda, DynamoDB, SNS, and EventBridge."
-        }
-      ]
-    },
-    {
-      "id": "datomar",
-      "role": "Full-Stack Developer",
-      "company": "Datomar Labs Venture Studio",
-      "startDate": "2020-07",
-      "endDate": "2021-12",
-      "displayDates": "Jul 2020 – Dec 2021",
-      "bullets": [
-        {
-          "id": "datomar-full-stack-foundation",
-          "text": "Delivered full-stack applications and administration tools using modern JavaScript, GraphQL, and cloud APIs."
-        }
-      ]
-    },
-    {
-      "id": "bold",
-      "role": "Support Developer",
-      "company": "Bold Commerce",
-      "startDate": "2017-07",
-      "endDate": "2020-06",
-      "displayDates": "Jul 2017 – Jun 2020",
-      "bullets": [
-        {
-          "id": "bold-integration-foundation",
-          "text": "Built reusable JavaScript integrations and documentation for complex third-party application workflows."
-        }
-      ]
-    }
-  ],
-  "education": [
-    {
-      "degree": "Master of Computer Science",
-      "school": "Arizona State University"
-    },
-    {
-      "degree": "Diploma in Web Development",
-      "school": "RRC Polytech"
-    },
-    {
-      "degree": "Bachelor of Science in Statistics",
-      "school": "Tianjin University of Finance and Economics"
-    }
-  ],
-  "careerBreak": {
-    "start": "Jul 2025",
-    "end": "May 2026",
-    "reason": "Planned career break for marriage, family commitments, and international relocation.",
-    "showOnResume": false
+  "coverLetterStrategy": {
+    "opening": "Connect the employer's clinical workflow or interoperability problem to Fred's paid FHIR and consent experience.",
+    "evidenceCount": 2,
+    "preferredStoryIds": [
+      "shift-smart-transfer",
+      "asu-consent-modeling",
+      "vite-migration",
+      "oauth-retrospective"
+    ],
+    "avoid": [
+      "Generic enthusiasm for healthcare without technical evidence",
+      "Claiming production EHR-vendor integration not personally completed",
+      "Calling research or demo systems production systems"
+    ]
   },
-  "availabilityStatement": "Now based in Edmonton, fully settled in Canada, and available for a long-term full-time role.",
-  "coverLetter": {
-    "openingParagraph": "I am writing to apply for the {jobTitle} position at {company}. I combine more than eight years of software development experience with focused work in FHIR-based consent, interoperability, and clinical workflow solutions.",
-    "evidenceParagraph": "I have built SMART on FHIR applications, authored FHIR R5 profiles and value sets with FSH and SUSHI, developed patient and administrator consent portals, and integrated systems involving Medplum, OpenMRS, CDS components, OAuth2, React, Node.js, AWS, Docker, and Fly.io.",
-    "closingParagraph": "I would welcome the opportunity to discuss how my experience could support {company} and the goals of this role. Thank you for your time and consideration."
+  "resumeRules": {
+    "targetPages": 2,
+    "maximumPages": 2,
+    "includeCareerBreakByDefault": false,
+    "includeProjectsWhen": "Include the clinical reasoning demo or another current FHIR project to show recent hands-on work.",
+    "metricPolicy": "Use only achievements with safeToUse=true."
   }
 }

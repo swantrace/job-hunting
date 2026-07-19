@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-07-18",
+  "jobSearch": {
+    "status": "Active",
+    "acceptedDirections": ["fullstack", "frontend", "fhir"],
+    "directionPreference": "All three directions are genuinely liked and accepted; choose based on role fit rather than a fixed hierarchy.",
+    "targetCompensation": {
+      "amount": 150000,
+      "currency": "CAD",
+      "period": "year",
+      "minimumAcceptable": null,
+      "minimumNeedsVerification": true,
+      "totalCompensationFlexible": true
+    },
+    "locations": {
+      "current": "Edmonton, Alberta",
+      "preferredCanadianMarkets": ["Edmonton", "Vancouver / Lower Mainland", "Calgary"],
+      "otherCanadianLocations": "Open to strong opportunities",
+      "remoteCanada": true,
+      "remoteUnitedStates": true,
+      "remoteUnitedStatesNeedsLegalVerification": true,
+      "hybrid": true,
+      "onsite": "Potentially acceptable depending on location and family fit",
+      "relocation": "Open within Canada for a strong role"
+    },
+    "employmentTypes": {
+      "fullTime": true,
+      "longTerm": true,
+      "contract": null,
+      "contractNeedsVerification": true
+    },
+    "applicationCadence": {
+      "weeklyTarget": 60,
+      "dailyHours": 5,
+      "status": "Previously planned; confirm sustainability after first two weeks"
+    },
+    "preferredIndustries": [
+      "Digital health",
+      "Healthcare interoperability",
+      "SaaS",
+      "E-commerce",
+      "Developer tools"
+    ],
+    "avoid": [
+      "People-management roles presented as the main responsibility",
+      "Roles requiring fabricated depth in unfamiliar technologies"
+    ]
+  },
+  "directionDefinitions": {
+    "fullstack": {
+      "label": "Senior Full-Stack Developer",
+      "targetTitles": [
+        "Senior Full-Stack Developer",
+        "Senior Full-Stack Engineer",
+        "Senior Software Engineer",
+        "Product Engineer",
+        "Full-Stack Software Developer"
+      ]
+    },
+    "frontend": {
+      "label": "Senior React / Frontend Developer",
+      "targetTitles": [
+        "Senior Frontend Developer",
+        "Senior Frontend Engineer",
+        "Senior React Developer",
+        "Frontend Software Engineer",
+        "UI Engineer"
+      ]
+    },
+    "fhir": {
+      "label": "Healthcare / FHIR Software Engineer",
+      "targetTitles": [
+        "FHIR Developer",
+        "Healthcare Software Engineer",
+        "Interoperability Engineer",
+        "Healthcare Integration Engineer",
+        "SMART on FHIR Developer",
+        "Healthcare Full-Stack Developer"
+      ]
+    }
+  },
+  "needsReview": [
+    "Set minimum acceptable base salary.",
+    "Rank remote, hybrid, and onsite preferences by city.",
+    "Confirm whether short-term contracts are acceptable.",
+    "Confirm weekly application target after measuring customization time.",
+    "Confirm US-remote employment constraints from Canada."
+  ]
+}
