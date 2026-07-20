@@ -102,7 +102,7 @@ export function Filters({ filters }: { filters: Filters }) {
             value="1"
             checked={filters.today === '1'}
           />
-          <span class="label-text">Show only today’s tasks</span>
+          <span class="label-text">Show only today's tasks</span>
           <span id="loading" class="loading loading-spinner loading-sm htmx-indicator" />
         </label>
       </div>

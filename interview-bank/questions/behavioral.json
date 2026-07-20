@@ -40,6 +40,23 @@
       "targetSeniority": "senior",
       "answerIds": [],
       "status": "not-started"
+    },
+    {
+      "id": "tell-me-about-yourself-001",
+      "question": "Tell me about yourself, and what brings you to this opportunity?",
+      "category": "behavioral",
+      "directions": ["frontend", "fullstack", "fhir"],
+      "projectIds": [],
+      "achievementIds": [],
+      "storyIds": ["vite-migration", "shift-smart-transfer", "asu-consent-modeling"],
+      "priority": "high",
+      "targetSeniority": "senior",
+      "answerIds": [
+        "tell-me-about-yourself-fullstack-v1",
+        "tell-me-about-yourself-frontend-v1",
+        "tell-me-about-yourself-fhir-v1"
+      ],
+      "status": "draft"
     }
   ]
 }

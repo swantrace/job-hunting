@@ -110,6 +110,7 @@ const interviewQuestionFileSchema = documentSchema.extend({
 const interviewAnswerSchema = z.object({
   id: idSchema,
   questionId: idSchema,
+  directions: referenceIdsSchema,
   shortAnswer: z.string().trim().min(1).max(1200),
   longAnswer: z.string().trim().min(1).max(12000),
   status: z.enum(['draft', 'reviewed']),
@@ -330,8 +331,10 @@ export function validateInterviewBank(bank: InterviewBank, careerData: Canonical
     assertReferences(`interview question ${question.id} stories`, question.storyIds, storyIds)
     assertReferences(`interview question ${question.id} answers`, question.answerIds, answerIds)
   }
-  for (const answer of bank.answers)
+  for (const answer of bank.answers) {
     assertReferences(`interview answer ${answer.id} question`, [answer.questionId], questionIds)
+    assertReferences(`interview answer ${answer.id} directions`, answer.directions, directionIds)
+  }
   return bank
 }
 
