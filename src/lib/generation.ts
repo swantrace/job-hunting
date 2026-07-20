@@ -97,6 +97,15 @@ function allowed(label: string, ids: string[], allowedIds: string[]) {
       throw new Error(`${label} selected an unsupported evidence ID "${id}".`)
 }
 
+export function recipientName(salutation: string) {
+  return (
+    salutation
+      .replace(/^dear\s+/i, '')
+      .replace(/[,:;.!]+$/g, '')
+      .trim() || 'Hiring Team'
+  )
+}
+
 export async function generateApplicationArtifacts(runId: number): Promise<ArtifactOutput[]> {
   const source = getGenerationSource(runId)
   const saved = getGenerationEvidenceSnapshot(runId)
@@ -180,7 +189,6 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
     experiences: facts.experiences.map((item: any) => ({
       role: item.role,
       company: item.company,
-      employmentLabel: item.employmentType ?? '',
       displayDates: item.displayDates,
       bullets: (bullets.get(item.id) ?? []).map((text: string) => ({ text })),
     })),
@@ -210,7 +218,7 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
     companyLocation: source.application.location ?? '',
     targetRole: resume.targetTitle,
     jobPostingReference: source.application.jobTitle,
-    salutation: coverLetter.salutation,
+    salutation: recipientName(coverLetter.salutation),
     openingParagraph: coverLetter.openingParagraph,
     evidenceParagraphs: coverLetter.evidenceParagraphs,
     companyInterestParagraph: coverLetter.companyInterestParagraph,

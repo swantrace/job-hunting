@@ -3,7 +3,7 @@ import {
   tailoredCoverLetterSchema,
   tailoredResumeSchema,
 } from '../src/ai/schemas/application-generation'
-import { renderDocx } from '../src/lib/generation'
+import { recipientName, renderDocx } from '../src/lib/generation'
 import { resolveProjectAsset } from '../src/lib/profiles'
 
 describe('application generation', () => {
@@ -58,5 +58,10 @@ describe('application generation', () => {
       education: [{ degree: 'MCS', school: 'Example University', graduationYear: '2020' }],
     })
     expect(buffer.subarray(0, 2).toString()).toBe('PK')
+  })
+
+  test('normalizes a model salutation for the letter template', () => {
+    expect(recipientName('Dear Hiring Team,')).toBe('Hiring Team')
+    expect(recipientName('Hiring Manager')).toBe('Hiring Manager')
   })
 })

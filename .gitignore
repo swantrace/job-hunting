@@ -10,3 +10,4 @@ bunqueue.db-shm
 bunqueue.db-wal
 /artifacts/
 coverage/
+temp/
