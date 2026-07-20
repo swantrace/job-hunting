@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-07-19",
+  "questions": [
+    {
+      "id": "midato-vite-001",
+      "question": "Why did you replace Webpack with Vite?",
+      "category": "project-deep-dive",
+      "directions": ["frontend", "fullstack"],
+      "projectIds": ["dashboard-ui"],
+      "achievementIds": ["midato-vite-ci"],
+      "storyIds": ["vite-migration"],
+      "priority": "high",
+      "targetSeniority": "senior",
+      "answerIds": ["midato-vite-001-v1"],
+      "status": "not-started"
+    },
+    {
+      "id": "midato-vite-002",
+      "question": "What risks did you consider during the build-tool migration, and how would you validate or roll it back?",
+      "category": "project-deep-dive",
+      "directions": ["frontend", "fullstack"],
+      "projectIds": ["dashboard-ui"],
+      "achievementIds": ["midato-vite-ci"],
+      "storyIds": ["vite-migration"],
+      "priority": "high",
+      "targetSeniority": "senior",
+      "answerIds": [],
+      "status": "not-started"
+    },
+    {
+      "id": "shift-transfer-001",
+      "question": "Describe the end-to-end flow of your consent-aware SMART on FHIR transfer demonstration.",
+      "category": "project-deep-dive",
+      "directions": ["fullstack", "fhir"],
+      "projectIds": ["medplum-shift"],
+      "achievementIds": ["shift-smart-fhir-transfer"],
+      "storyIds": ["shift-smart-transfer"],
+      "priority": "high",
+      "targetSeniority": "senior",
+      "answerIds": [],
+      "status": "not-started"
+    }
+  ]
+}

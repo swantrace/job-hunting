@@ -85,6 +85,38 @@ const portfolioSchema = documentSchema
     ),
   })
   .passthrough()
+const interviewTaxonomySchema = documentSchema.extend({
+  categories: referenceIdsSchema,
+  priorities: referenceIdsSchema,
+  targetSeniorities: referenceIdsSchema,
+  statuses: referenceIdsSchema,
+})
+const interviewQuestionSchema = z.object({
+  id: idSchema,
+  question: z.string().trim().min(10).max(1000),
+  category: idSchema,
+  directions: referenceIdsSchema,
+  projectIds: referenceIdsSchema,
+  achievementIds: referenceIdsSchema,
+  storyIds: referenceIdsSchema,
+  priority: idSchema,
+  targetSeniority: idSchema,
+  answerIds: referenceIdsSchema,
+  status: idSchema,
+})
+const interviewQuestionFileSchema = documentSchema.extend({
+  questions: z.array(interviewQuestionSchema),
+})
+const interviewAnswerSchema = z.object({
+  id: idSchema,
+  questionId: idSchema,
+  shortAnswer: z.string().trim().min(1).max(1200),
+  longAnswer: z.string().trim().min(1).max(12000),
+  status: z.enum(['draft', 'reviewed']),
+})
+const interviewAnswersFileSchema = documentSchema.extend({
+  answers: z.array(interviewAnswerSchema),
+})
 
 export const careerProfileSchema = documentSchema
   .extend({
@@ -117,7 +149,13 @@ export type CanonicalCareerData = {
   profiles: z.infer<typeof careerProfileSchema>[]
 }
 
-function directory(name: 'career-data' | 'profiles') {
+export type InterviewBank = {
+  taxonomy: z.infer<typeof interviewTaxonomySchema>
+  questionFiles: Array<{ fileName: string; questions: z.infer<typeof interviewQuestionSchema>[] }>
+  answers: z.infer<typeof interviewAnswerSchema>[]
+}
+
+function directory(name: 'career-data' | 'profiles' | 'interview-bank') {
   const paths = [resolve(process.cwd(), name), resolve(process.cwd(), '..', name)]
   const path = paths.find(existsSync)
   if (!path) throw new Error(`${name} directory was not found.`)
@@ -251,4 +289,68 @@ export function loadCareerData(): CanonicalCareerData {
     }),
   }
   return validateCareerData(parsed)
+}
+
+export function validateInterviewBank(bank: InterviewBank, careerData: CanonicalCareerData) {
+  const directionIds = new Set(Object.keys(careerData.preferences.directionDefinitions))
+  const projectIds = new Set(careerData.projects.projects.map((item) => item.id))
+  const achievementIds = new Set(careerData.achievements.achievements.map((item) => item.id))
+  const storyIds = new Set(careerData.stories.stories.map((item) => item.id))
+  const questions = bank.questionFiles.flatMap((file) => file.questions)
+  const questionIds = new Set(questions.map((question) => question.id))
+  const answerIds = new Set(bank.answers.map((answer) => answer.id))
+  assertUnique(
+    'interview questions',
+    questions.map((question) => question.id),
+  )
+  assertUnique(
+    'interview answers',
+    bank.answers.map((answer) => answer.id),
+  )
+  for (const question of questions) {
+    if (!bank.taxonomy.categories.includes(question.category))
+      throw new Error(`Interview question "${question.id}" has an unknown category.`)
+    if (!bank.taxonomy.priorities.includes(question.priority))
+      throw new Error(`Interview question "${question.id}" has an unknown priority.`)
+    if (!bank.taxonomy.targetSeniorities.includes(question.targetSeniority))
+      throw new Error(`Interview question "${question.id}" has an unknown target seniority.`)
+    if (!bank.taxonomy.statuses.includes(question.status))
+      throw new Error(`Interview question "${question.id}" has an unknown status.`)
+    assertReferences(
+      `interview question ${question.id} directions`,
+      question.directions,
+      directionIds,
+    )
+    assertReferences(`interview question ${question.id} projects`, question.projectIds, projectIds)
+    assertReferences(
+      `interview question ${question.id} achievements`,
+      question.achievementIds,
+      achievementIds,
+    )
+    assertReferences(`interview question ${question.id} stories`, question.storyIds, storyIds)
+    assertReferences(`interview question ${question.id} answers`, question.answerIds, answerIds)
+  }
+  for (const answer of bank.answers)
+    assertReferences(`interview answer ${answer.id} question`, [answer.questionId], questionIds)
+  return bank
+}
+
+export function loadInterviewBank(careerData = loadCareerData()): InterviewBank {
+  const interviewBank = directory('interview-bank')
+  const taxonomy = interviewTaxonomySchema.parse(readJson(resolve(interviewBank, 'taxonomy.json')))
+  const fileNames = [
+    'questions/behavioral.json',
+    'questions/project-deep-dives.json',
+    'questions/technical-foundations.json',
+    'questions/role-specific.json',
+  ]
+  const questionFiles = fileNames.map((fileName) => ({
+    fileName,
+    questions: interviewQuestionFileSchema.parse(readJson(resolve(interviewBank, fileName)))
+      .questions,
+  }))
+  const answers = interviewAnswersFileSchema.parse(
+    readJson(resolve(interviewBank, 'answers/answers.json')),
+  ).answers
+  return validateInterviewBank({ taxonomy, questionFiles, answers }, careerData)
 }

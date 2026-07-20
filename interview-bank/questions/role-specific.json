@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-07-19",
+  "questions": [
+    {
+      "id": "fhir-consent-001",
+      "question": "How do FHIR profiles, extensions, and value sets help model a research consent workflow?",
+      "category": "role-specific",
+      "directions": ["fhir"],
+      "projectIds": ["asu-research-consent-on-fhir"],
+      "achievementIds": ["asu-fsh-modeling"],
+      "storyIds": ["asu-consent-modeling"],
+      "priority": "high",
+      "targetSeniority": "senior",
+      "answerIds": [],
+      "status": "not-started"
+    },
+    {
+      "id": "smart-fhir-security-001",
+      "question": "What security and privacy concerns would you review in a SMART on FHIR application that transfers patient data?",
+      "category": "role-specific",
+      "directions": ["fullstack", "fhir"],
+      "projectIds": ["medplum-shift"],
+      "achievementIds": ["shift-smart-fhir-transfer"],
+      "storyIds": ["shift-smart-transfer"],
+      "priority": "high",
+      "targetSeniority": "senior",
+      "answerIds": [],
+      "status": "not-started"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-07-19",
+  "categories": ["behavioral", "project-deep-dive", "technical-foundations", "role-specific"],
+  "priorities": ["high", "medium", "low"],
+  "targetSeniorities": ["junior", "mid", "senior", "staff"],
+  "statuses": ["not-started", "draft", "practiced", "reviewed"]
+}

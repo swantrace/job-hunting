@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-07-19",
+  "questions": [
+    {
+      "id": "testing-ci-001",
+      "question": "How do you decide which frontend workflows need integration tests, and how do you keep them reliable in CI?",
+      "category": "technical-foundations",
+      "directions": ["frontend", "fullstack"],
+      "projectIds": ["dashboard-ui"],
+      "achievementIds": ["dashboard-ui-playwright"],
+      "storyIds": ["playwright-healthcare-workflows"],
+      "priority": "high",
+      "targetSeniority": "senior",
+      "answerIds": [],
+      "status": "not-started"
+    },
+    {
+      "id": "queues-idempotency-001",
+      "question": "How would you make a multi-step background job safe to retry without duplicating downstream work?",
+      "category": "technical-foundations",
+      "directions": ["fullstack"],
+      "projectIds": ["english-speaking-coach"],
+      "achievementIds": ["english-coach-queues"],
+      "storyIds": ["bullmq-idempotency"],
+      "priority": "high",
+      "targetSeniority": "senior",
+      "answerIds": [],
+      "status": "not-started"
+    }
+  ]
+}

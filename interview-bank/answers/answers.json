@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-07-19",
+  "answers": [
+    {
+      "id": "midato-vite-001-v1",
+      "questionId": "midato-vite-001",
+      "shortAnswer": "I replaced Webpack with Vite because the frontend feedback loop had become too slow. The change reduced the GitHub Actions build from about eight minutes to two minutes, while also improving local iteration speed.",
+      "longAnswer": "On the Midato consent-platform frontend, the Webpack-based build and CI feedback loop had become a practical delivery bottleneck. I migrated the project and CI workflow to Vite to improve the developer experience without changing the product goal. The measurable result was a reduction in GitHub Actions build time from roughly eight minutes to two minutes, which made feedback substantially faster for the team. In an interview, I would also explain that I would validate a migration with the existing application and CI checks, and prepare a rollback path; the exact migration obstacles and measurement method are details I still need to document before presenting this as a full deep dive.",
+      "status": "draft"
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-07-19",
+  "questions": [
+    {
+      "id": "vite-migration-behavioral-001",
+      "question": "Tell me about a time you improved a slow developer workflow.",
+      "category": "behavioral",
+      "directions": ["frontend", "fullstack"],
+      "projectIds": ["dashboard-ui"],
+      "achievementIds": ["midato-vite-ci"],
+      "storyIds": ["vite-migration"],
+      "priority": "high",
+      "targetSeniority": "senior",
+      "answerIds": [],
+      "status": "not-started"
+    },
+    {
+      "id": "playwright-quality-001",
+      "question": "Tell me about a time you improved confidence in a risky user workflow.",
+      "category": "behavioral",
+      "directions": ["frontend", "fullstack"],
+      "projectIds": ["dashboard-ui"],
+      "achievementIds": ["dashboard-ui-playwright"],
+      "storyIds": ["playwright-healthcare-workflows"],
+      "priority": "high",
+      "targetSeniority": "senior",
+      "answerIds": [],
+      "status": "not-started"
+    },
+    {
+      "id": "career-break-001",
+      "question": "Can you walk me through your recent career break and what you are looking for now?",
+      "category": "behavioral",
+      "directions": ["frontend", "fullstack", "fhir"],
+      "projectIds": [],
+      "achievementIds": [],
+      "storyIds": ["career-break-return"],
+      "priority": "high",
+      "targetSeniority": "senior",
+      "answerIds": [],
+      "status": "not-started"
+    }
+  ]
+}
