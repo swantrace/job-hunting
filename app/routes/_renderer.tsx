@@ -23,8 +23,21 @@ export default jsxRenderer(({ children }) => (
     if (window.jobBouncer) window.jobBouncer.destroy();
     window.jobBouncer = new Bouncer('form[novalidate]', { disableSubmit: true });
   }
+  function dismissFlash() {
+    const flash = document.querySelector('#flash [data-flash-autodismiss]');
+    if (!flash || flash.dataset.dismissScheduled) return;
+    flash.dataset.dismissScheduled = 'true';
+    window.setTimeout(function () {
+      flash.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+      window.setTimeout(function () { flash.remove(); }, 300);
+    }, 4000);
+  }
   document.addEventListener('DOMContentLoaded', initBouncer);
-  document.body.addEventListener('htmx:afterSwap', initBouncer);
+  document.addEventListener('DOMContentLoaded', dismissFlash);
+  document.body.addEventListener('htmx:afterSwap', function (event) {
+    initBouncer(event);
+    dismissFlash();
+  });
   document.body.addEventListener('htmx:afterSwap', function (event) {
     const target = event.detail.target;
     const formRegion = target && target.matches && target.matches('[data-autofocus]') ? target : target && target.querySelector && target.querySelector('[data-autofocus]');

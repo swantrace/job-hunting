@@ -35,7 +35,9 @@ export const PUT = createRoute(async (c) => {
       <Board jobs={listApplications(filters)} filters={filters} oob />
       <Metrics values={metrics()} oob />
       <div id="flash" hx-swap-oob="innerHTML">
-        <div class="alert alert-success">Application marked as sent.</div>
+        <div class="alert alert-success" data-flash-autodismiss>
+          Application marked as sent.
+        </div>
       </div>
     </>,
   )
