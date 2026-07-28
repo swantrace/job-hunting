@@ -116,6 +116,7 @@ async function createFolder(token: string) {
 
 export async function connectGoogleDrive(code: string) {
   const refreshToken = await exchangeGoogleCode(code)
+  const existingConnection = getGoogleDriveConnection()
   const { clientId, clientSecret } = config()
   const body = new URLSearchParams({
     client_id: clientId,
@@ -130,7 +131,7 @@ export async function connectGoogleDrive(code: string) {
   })
   const token = ((await response.json()) as { access_token?: string }).access_token
   if (!response.ok || !token) throw new Error('Unable to verify Google Drive access.')
-  const folderId = await createFolder(token)
+  const folderId = existingConnection?.folderId ?? (await createFolder(token))
   saveGoogleDriveConnection(encryptGoogleRefreshToken(refreshToken), folderId)
 }
 
