@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-08-05",
+  "projects": [
+    {
+      "id": "example-project",
+      "name": "Example Project",
+      "skills": ["typescript"],
+      "directions": ["fullstack", "frontend"]
+    }
+  ]
+}

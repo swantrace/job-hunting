@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-08-05",
+  "experiences": [
+    {
+      "id": "example-company",
+      "company": "Example Company",
+      "role": "Software Developer",
+      "displayDates": "2024 – Present"
+    }
+  ]
+}

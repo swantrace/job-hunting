@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-08-05",
+  "skills": [
+    {
+      "id": "typescript",
+      "label": "TypeScript",
+      "directions": ["fullstack", "frontend"]
+    },
+    {
+      "id": "fhir",
+      "label": "FHIR",
+      "directions": ["fhir"]
+    }
+  ]
+}

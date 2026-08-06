@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-08-05",
+  "directionDefinitions": {
+    "fullstack": { "label": "Full-Stack Developer", "targetTitles": ["Full-Stack Developer"] },
+    "frontend": { "label": "Frontend Developer", "targetTitles": ["Frontend Developer"] },
+    "fhir": { "label": "FHIR Developer", "targetTitles": ["FHIR Developer"] }
+  }
+}

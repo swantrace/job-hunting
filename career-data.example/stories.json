@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-08-05",
+  "stories": [
+    {
+      "id": "example-story",
+      "experienceId": "example-company",
+      "directions": ["fullstack", "frontend"]
+    }
+  ]
+}

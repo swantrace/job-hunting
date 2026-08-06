@@ -1,6 +1,49 @@
 # Job Application Tracker
 
-A local-first, server-rendered job pipeline built with Bun, HonoX, htmx, Drizzle ORM, SQLite, Tailwind CSS, and daisyUI.
+A local-first, server-rendered job pipeline built with Bun, HonoX, htmx, Drizzle ORM, SQLite, Tailwind CSS, and daisyUI. It has no client-side React or Preact hydration runtime.
+
+## Data flow
+
+```mermaid
+flowchart LR
+  subgraph Capture
+    A[Paste job posting] --> B[AI job parser]
+    B --> C[Review and complete facts]
+    C --> D[Save opportunity]
+  end
+
+  subgraph Tracker
+    D --> E[(SQLite: jobs.db)]
+    E --> F[Server-rendered dashboard]
+    F <-->|htmx partial swaps| G[Browser]
+    F --> H[Application workspace]
+  end
+
+  subgraph Generation
+    H --> I[Job requirements analysis]
+    J[Canonical career data] --> K[Evidence selection snapshot]
+    I --> K
+    L[Direction profile] --> K
+    K --> M[Resume and cover-letter generation]
+    M --> N[DOCX artifacts]
+    N --> O[Optional Google Drive upload]
+    K --> E
+    N --> E
+  end
+```
+
+## Career data setup
+
+The repository ships with `career-data.example/` and `profiles.example/`: a small, valid dataset that lets a fresh clone start and run tests. To generate your own documents, initialize the runtime directories from those examples and replace the placeholders with accurate, interview-defensible facts:
+
+```sh
+cp -R career-data.example career-data
+cp -R profiles.example profiles
+```
+
+Keep stable IDs when editing. Profiles select and order facts by ID; they should not duplicate the underlying experience, achievement, project, or skill records. The runtime uses `career-data/` and `profiles/` when present, and falls back to the examples otherwise.
+
+For a deployed Fly instance, persist these directories on the mounted `/data` volume, then set `CAREER_DATA_DIR=/data/career-data` and `CAREER_PROFILES_DIR=/data/profiles`.
 
 ## Run locally
 
@@ -35,9 +78,22 @@ Set `ARTIFACTS_DIR=/data/artifacts` and `QUEUE_FILE_NAME=/data/bunqueue.db` in F
 
 The production start command runs Drizzle migrations before starting the server. Keep one Fly machine for this SQLite deployment because Fly volumes are attached to a single machine.
 
+## How to use the tracker
+
+1. In **Applications**, paste a posting and use **Parse with AI**, or enter the known facts directly in Quick collect.
+2. Review the draft. Add the job URL, source, company, and direction yourself, then save it as **Saved**.
+3. Move a role to **Apply Today** when it becomes a task. Complete the application workspace and select **Sent application** after applying.
+4. Record follow-ups and interviews in the workspace. These activities advance the visible pipeline without overwriting a more advanced status.
+5. Generate a resume and cover letter only after configuring OpenAI and career data. Review the evidence snapshot and generated files before using them.
+6. Manage reusable companies, contacts, and skills from the management area. Export JSON periodically as a backup.
+
+### Configuration
+
+Copy `.env.example` to `.env` for local development. `OPENAI_API_KEY` is needed only for AI parsing and document generation. Google OAuth variables are needed only for optional Drive uploads. `CAREER_DATA_DIR` and `CAREER_PROFILES_DIR` optionally point to the runtime fact directories; local defaults are `career-data` and `profiles`.
+
 ### GitHub Actions deployment
 
-The workflow in `.github/workflows/ci-cd.yml` runs formatting, typechecking, tests, and a production build for pull requests. A push to `main` deploys to Fly.io only after those checks pass. Add a repository secret named `FLY_API_TOKEN` before merging the first deployable change.
+The workflow in `.github/workflows/ci-cd.yml` runs formatting, typechecking, tests, and a production build for pull requests and pushes to `main`. It does not deploy automatically. To deploy, open **Actions**, select **CI and Fly Deploy**, choose **Run workflow** from `main`, and run it after CI passes. Add a repository secret named `FLY_API_TOKEN` before the first manual deployment.
 
 ### VS Code Remote / WSL
 
