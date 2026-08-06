@@ -10,8 +10,17 @@ const profileSchema = z.object({
 export type ProfileOption = z.infer<typeof profileSchema>
 
 function profileDirectory() {
-  const candidates = [resolve(process.cwd(), 'profiles'), resolve(process.cwd(), '../profiles')]
-  const directory = candidates.find(existsSync)
+  const configuredPath = process.env.CAREER_PROFILES_DIR?.trim()
+  const candidates = [
+    configuredPath,
+    resolve(process.cwd(), 'profiles'),
+    resolve(process.cwd(), '../profiles'),
+    resolve(process.cwd(), 'profiles.example'),
+    resolve(process.cwd(), '../profiles.example'),
+  ]
+  const directory = candidates
+    .filter((candidate): candidate is string => Boolean(candidate))
+    .find(existsSync)
   if (!directory) throw new Error('Profiles directory was not found.')
   return directory
 }
