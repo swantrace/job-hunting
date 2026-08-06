@@ -118,8 +118,17 @@ export type CanonicalCareerData = {
 }
 
 function directory(name: 'career-data' | 'profiles') {
-  const paths = [resolve(process.cwd(), name), resolve(process.cwd(), '..', name)]
-  const path = paths.find(existsSync)
+  const exampleName = `${name}.example`
+  const configuredPath =
+    process.env[name === 'career-data' ? 'CAREER_DATA_DIR' : 'CAREER_PROFILES_DIR']?.trim()
+  const paths = [
+    configuredPath,
+    resolve(process.cwd(), name),
+    resolve(process.cwd(), '..', name),
+    resolve(process.cwd(), exampleName),
+    resolve(process.cwd(), '..', exampleName),
+  ]
+  const path = paths.filter((candidate): candidate is string => Boolean(candidate)).find(existsSync)
   if (!path) throw new Error(`${name} directory was not found.`)
   return path
 }

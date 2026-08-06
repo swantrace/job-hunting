@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-08-05",
+  "topics": [
+    {
+      "id": "example-article",
+      "projects": ["example-project"],
+      "directions": ["fullstack"]
+    }
+  ]
+}

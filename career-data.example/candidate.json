@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "lastUpdated": "2026-08-05",
+  "identity": {
+    "fullName": "Example Candidate",
+    "email": "candidate@example.com"
+  },
+  "education": [
+    {
+      "id": "example-degree",
+      "degree": "Example Degree",
+      "school": "Example University"
+    }
+  ]
+}
