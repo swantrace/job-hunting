@@ -4,11 +4,15 @@ import { enqueueGeneration } from '../../../src/lib/generation-queue'
 import { parseFilters, parseForm } from '../../../src/lib/request'
 import { quickCollectSchema } from '../../../src/lib/validation'
 import { Board, QuickCollect } from '../../components/Dashboard'
+import { DashboardPage } from '../../components/DashboardPage'
 import { MutationResponse } from '../../components/Responses'
 
 export const GET = createRoute((c) => {
   const filters = parseFilters(c)
-  return c.html(<Board jobs={listApplications(filters)} filters={filters} />)
+  // Fragment for HTMX filter swaps; full page for direct navigation/reload.
+  if (c.req.header('HX-Request') === 'true')
+    return c.html(<Board jobs={listApplications(filters)} filters={filters} />)
+  return c.render(<DashboardPage filters={filters} />)
 })
 
 export const POST = createRoute(async (c) => {

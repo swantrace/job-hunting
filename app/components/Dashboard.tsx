@@ -43,6 +43,8 @@ export function Filters({ filters }: { filters: Filters }) {
       hx-get="/applications"
       hx-target="#board"
       hx-swap="outerHTML"
+      hx-push-url="true"
+      hx-sync="this:replace"
       hx-indicator="#loading"
       hx-trigger="input changed delay:350ms from:input[name='q'], search from:input[name='q'], change from:select, change from:input[name='today']"
     >
@@ -98,6 +100,18 @@ export function Filters({ filters }: { filters: Filters }) {
           <span>Show only today’s tasks</span>
           <span id="loading" class="loading loading-spinner loading-sm htmx-indicator" />
         </label>
+        <div class="md:col-span-5 flex justify-end">
+          <a
+            class="btn btn-ghost btn-sm"
+            href="/applications"
+            hx-get="/applications"
+            hx-target="#board"
+            hx-swap="outerHTML"
+            hx-push-url="true"
+          >
+            Clear filters
+          </a>
+        </div>
       </div>
     </form>
   )
