@@ -14,3 +14,5 @@ bunqueue.db-wal
 coverage/
 temp/
 /interview-prep.md
+ui-template/
+.dsh/
