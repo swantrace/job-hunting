@@ -9,7 +9,8 @@ import {
 import { parseFilters, parseForm, parseId } from '../../../../src/lib/request'
 import { interviewSchema } from '../../../../src/lib/validation'
 import { Board, Metrics } from '../../../components/Dashboard'
-import { Workspace } from '../../../components/Workspace'
+import { ActivityPanel } from '../../../components/workspace/ActivityPanel'
+import { WorkspaceHeader } from '../../../components/workspace/WorkspaceHeader'
 
 export const POST = createRoute(async (c) => {
   const id = parseId(c.req.param('id'))
@@ -19,11 +20,11 @@ export const POST = createRoute(async (c) => {
   const parsed = interviewSchema.safeParse(await parseForm(c))
   if (!parsed.success || !addInterview(id, parsed.data))
     return c.html(
-      <Workspace
+      <ActivityPanel
         job={job}
         filters={filters}
         activity={getActivity(id)}
-        activeTab="activity"
+        active
         errorForm="interview"
         errors={parsed.success ? undefined : parsed.error.flatten().fieldErrors}
       />,
@@ -33,9 +34,10 @@ export const POST = createRoute(async (c) => {
   const updated = getApplication(id)!
   return c.html(
     <>
-      <Workspace job={updated} filters={filters} activity={getActivity(id)} />
+      <ActivityPanel job={updated} filters={filters} activity={getActivity(id)} active />
       <Board jobs={listApplications(filters)} filters={filters} oob />
       <Metrics values={metrics()} oob />
+      <WorkspaceHeader job={updated} oob />
     </>,
   )
 })

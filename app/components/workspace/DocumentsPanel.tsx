@@ -13,21 +13,31 @@ export function DocumentsPanel({
   runs,
   evidenceSnapshot,
   googleDriveConnected,
+  active = false,
 }: {
   jobId: number
   filters: Filters
   runs: GenerationRunWithArtifacts[]
   evidenceSnapshot: string | null
   googleDriveConnected: boolean
+  active?: boolean
 }) {
   return (
-    <GenerationPanel
-      jobId={jobId}
-      filters={filters}
-      runs={runs}
-      evidenceSnapshot={evidenceSnapshot}
-      googleDriveConnected={googleDriveConnected}
-    />
+    <div
+      id="workspace-documents-panel"
+      role="tabpanel"
+      aria-labelledby="workspace-tab-documents"
+      data-workspace-panel
+      class={active ? '' : 'hidden'}
+    >
+      <GenerationPanel
+        jobId={jobId}
+        filters={filters}
+        runs={runs}
+        evidenceSnapshot={evidenceSnapshot}
+        googleDriveConnected={googleDriveConnected}
+      />
+    </div>
   )
 }
 

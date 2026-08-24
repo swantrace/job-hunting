@@ -10,16 +10,24 @@ export function ActivityPanel({
   activity,
   errors,
   errorForm,
+  active = false,
 }: {
   job: JobCardData
   filters: Filters
   activity: ReturnType<typeof import('../../../src/db/queries').getActivity>
   errors?: FieldErrors
   errorForm?: WorkspaceErrorForm
+  active?: boolean
 }) {
   const q = query(filters)
   return (
-    <>
+    <div
+      id="workspace-activity-panel"
+      role="tabpanel"
+      aria-labelledby="workspace-tab-activity"
+      data-workspace-panel
+      class={active ? '' : 'hidden'}
+    >
       <div class="grid gap-5 md:grid-cols-2">
         <ActivityForm
           type="follow-up"
@@ -86,7 +94,7 @@ export function ActivityPanel({
           </button>
         )}
       </div>
-    </>
+    </div>
   )
 }
 
@@ -106,8 +114,9 @@ function ActivityForm({
     <form
       class="card bg-base-200"
       hx-post={`/applications/${id}/${interview ? 'interviews' : 'follow-ups'}?${query(filters)}`}
-      hx-target="#drawer-content"
-      hx-swap="innerHTML"
+      hx-target="#workspace-activity-panel"
+      hx-swap="outerHTML"
+      hx-vals='{"workspaceTab":"activity"}'
       hx-disabled-elt="find button"
       novalidate
     >

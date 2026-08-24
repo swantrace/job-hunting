@@ -5,9 +5,23 @@ import type { FieldErrors } from '../../../src/lib/validation'
 import { InputField, SelectField, TextareaField } from '../ui/FormField'
 import { err, query } from './helpers'
 
-export function ApplicationPanel({ job, filters }: { job: JobCardData; filters: Filters }) {
+export function ApplicationPanel({
+  job,
+  filters,
+  active = false,
+}: {
+  job: JobCardData
+  filters: Filters
+  active?: boolean
+}) {
   return (
-    <>
+    <div
+      id="workspace-application-panel"
+      role="tabpanel"
+      aria-labelledby="workspace-tab-application"
+      data-workspace-panel
+      class={active ? '' : 'hidden'}
+    >
       <ApplicationForm job={job} filters={filters} />
       {job.jobPosting && (
         <details class="mt-6 rounded-box border border-base-300 p-4">
@@ -18,7 +32,7 @@ export function ApplicationPanel({ job, filters }: { job: JobCardData; filters: 
         </details>
       )}
       {job.jobPostingAnalysis && <JobPostAnalysis analysis={job.jobPostingAnalysis} />}
-    </>
+    </div>
   )
 }
 
