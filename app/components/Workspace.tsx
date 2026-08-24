@@ -13,7 +13,7 @@ import {
 } from '../../src/lib/evidence-selection'
 import { listProfiles } from '../../src/lib/profiles'
 import type { FieldErrors } from '../../src/lib/validation'
-import { Field } from './Dashboard'
+import { InputField, SelectField, TextareaField } from './ui/FormField'
 
 const query = (filters: Filters) => new URLSearchParams(filters).toString()
 const err = (errors: FieldErrors | undefined, key: string) => errors?.[key]?.[0]
@@ -400,13 +400,16 @@ function ContactsSection({ job, filters }: { job: JobCardData; filters: Filters 
         hx-post={`/applications/${job.id}/contacts?${query(filters)}`}
         hx-target="#drawer-content"
         hx-swap="innerHTML"
+        hx-disabled-elt="find button"
         novalidate
       >
         <div class="card-body grid gap-3 p-4 sm:grid-cols-3">
-          <Field label="Name" name="name" required />
-          <Field label="Email" name="email" type="email" />
-          <Field label="LinkedIn URL" name="linkedinUrl" type="url" />
-          <button class="btn btn-outline btn-sm sm:col-span-3">Add contact</button>
+          <InputField label="Name" name="name" required />
+          <InputField label="Email" name="email" type="email" />
+          <InputField label="LinkedIn URL" name="linkedinUrl" type="url" />
+          <button class="btn btn-outline btn-sm sm:col-span-3">
+            <span class="loading loading-spinner loading-sm htmx-indicator" /> Add contact
+          </button>
         </div>
       </form>
     </section>
@@ -435,92 +438,81 @@ export function ApplicationForm({
       hx-put={`/applications/${job.id}?${query(filters)}`}
       hx-target="#application-form"
       hx-swap="outerHTML"
+      hx-disabled-elt="find button"
       novalidate
       class="space-y-4"
     >
       <div class="grid gap-3 sm:grid-cols-2">
-        <Field
+        <InputField
           label="Job title"
           name="jobTitle"
           required
           value={job.jobTitle}
-          message={err(errors, 'jobTitle')}
+          error={err(errors, 'jobTitle')}
         />
-        <Field
+        <InputField
           label="Company"
           name="companyName"
           required
           value={job.companyName}
-          message={err(errors, 'companyName')}
+          error={err(errors, 'companyName')}
           list="workspace-company-options"
         />
-        <Field label="Location" name="location" value={job.location} />
-        <label class="form-control">
-          <span class="label-text mb-1">Direction</span>
-          <select name="direction" class="select select-bordered">
-            {profiles.map((profile) => (
-              <option value={profile.id} selected={job.direction === profile.id}>
-                {profile.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <Field
+        <InputField label="Location" name="location" value={job.location} />
+        <SelectField name="direction" label="Direction">
+          {profiles.map((profile) => (
+            <option value={profile.id} selected={job.direction === profile.id}>
+              {profile.label}
+            </option>
+          ))}
+        </SelectField>
+        <InputField
           label="Job URL"
           name="url"
           type="url"
           value={job.url}
-          message={err(errors, 'url')}
+          error={err(errors, 'url')}
           externalUrl={job.url}
         />
-        <Field
+        <InputField
           label="Posted date"
           name="postedDate"
           type="date"
           required
           value={job.postedDate}
-          message={err(errors, 'postedDate')}
+          error={err(errors, 'postedDate')}
         />
-        <Field
+        <InputField
           label="Applied date"
           name="appliedDate"
           type="date"
           value={job.appliedDate ?? todayISO()}
-          message={err(errors, 'appliedDate')}
+          error={err(errors, 'appliedDate')}
         />
-        <label class="form-control">
-          <span class="label-text mb-1">Priority</span>
-          <select name="priority" class="select select-bordered">
-            {['A', 'B', 'C'].map((x) => (
-              <option selected={job.priority === x}>{x}</option>
-            ))}
-          </select>
-        </label>
-        <label class="form-control">
-          <span class="label-text mb-1">Match level</span>
-          <select name="matchLevel" class="select select-bordered">
-            <option value="">Not set</option>
-            {['A', 'B'].map((x) => (
-              <option selected={job.matchLevel === x}>{x}</option>
-            ))}
-          </select>
-        </label>
-        <Field label="Source" name="applicationSource" value={job.applicationSource} />
-        <Field label="Salary" name="salary" value={job.salary} />
+        <SelectField name="priority" label="Priority">
+          {['A', 'B', 'C'].map((x) => (
+            <option selected={job.priority === x}>{x}</option>
+          ))}
+        </SelectField>
+        <SelectField name="matchLevel" label="Match level">
+          <option value="">Not set</option>
+          {['A', 'B'].map((x) => (
+            <option selected={job.matchLevel === x}>{x}</option>
+          ))}
+        </SelectField>
+        <InputField label="Source" name="applicationSource" value={job.applicationSource} />
+        <InputField label="Salary" name="salary" value={job.salary} />
         <div class="sm:col-span-2">
-          <Field
+          <InputField
             label="Skills"
             name="skills"
             value={job.skills.join(', ')}
             list="workspace-skill-options"
           />
         </div>
-        <label class="form-control sm:col-span-2">
-          <span class="label-text mb-1">Notes</span>
-          <textarea class="textarea textarea-bordered min-h-28 w-full" name="notes">
-            {job.notes ?? ''}
-          </textarea>
-        </label>
+        <div class="sm:col-span-2">
+          <TextareaField label="Notes" name="notes" value={job.notes ?? ''} rows={5} />
+        </div>
       </div>
       <datalist id="workspace-company-options">
         {companyOptions.map((company) => (
@@ -532,7 +524,9 @@ export function ApplicationForm({
           <option value={skill.name} />
         ))}
       </datalist>
-      <button class="btn btn-primary w-full">🚀 Sent Application</button>
+      <button class="btn btn-primary w-full">
+        <span class="loading loading-spinner loading-sm htmx-indicator" /> 🚀 Sent Application
+      </button>
     </form>
   )
 }
@@ -585,23 +579,23 @@ function ActivityForm({
       hx-post={`/applications/${id}/${interview ? 'interviews' : 'follow-ups'}?${query(filters)}`}
       hx-target="#drawer-content"
       hx-swap="innerHTML"
+      hx-disabled-elt="find button"
       novalidate
     >
       <div class="card-body p-4">
         <h3 class="font-semibold">Add {interview ? 'interview' : 'follow-up'}</h3>
-        {interview && <Field label="Round" name="roundName" required />}
-        <Field
+        {interview && <InputField label="Round" name="roundName" required />}
+        <InputField
           label="Date"
           name={interview ? 'interviewDate' : 'actionDate'}
           type="date"
           required
           value={todayISO()}
         />
-        <label class="form-control">
-          <span class="label-text mb-1">Notes</span>
-          <textarea class="textarea textarea-bordered" name="notes"></textarea>
-        </label>
-        <button class="btn btn-secondary btn-sm mt-2">Add</button>
+        <TextareaField label="Notes" name="notes" />
+        <button class="btn btn-secondary btn-sm mt-2">
+          <span class="loading loading-spinner loading-sm htmx-indicator" /> Add
+        </button>
       </div>
     </form>
   )

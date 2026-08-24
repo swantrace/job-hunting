@@ -250,7 +250,6 @@ export function TextareaField({
       <textarea
         id={resolvedId}
         name={name}
-        value={value ?? ''}
         required={required}
         disabled={disabled}
         placeholder={placeholder}

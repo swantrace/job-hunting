@@ -4,6 +4,7 @@ import type { JobStatus } from '../../src/db/schema'
 import { todayISO } from '../../src/lib/date'
 import { listProfiles } from '../../src/lib/profiles'
 import type { FieldErrors } from '../../src/lib/validation'
+import { InputField, SelectField, TextareaField } from './ui/FormField'
 
 const activeStatuses: JobStatus[] = ['Saved', 'Apply Today', 'Applied', 'Follow Up', 'Interviewing']
 const enc = (filters: Filters) => new URLSearchParams(filters).toString()
@@ -44,56 +45,46 @@ export function Filters({ filters }: { filters: Filters }) {
       hx-trigger="input changed delay:350ms from:input[name='q'], search from:input[name='q'], change from:select, change from:input[name='today']"
     >
       <div class="card-body grid gap-3 p-4 md:grid-cols-5">
-        <label class="form-control md:col-span-2">
-          <span class="label-text mb-1">Search</span>
-          <input
-            class="input input-bordered w-full"
-            type="search"
+        <div class="md:col-span-2">
+          <InputField
             name="q"
+            label="Search"
+            type="search"
             value={filters.q}
             placeholder="Title or company"
           />
-        </label>
-        <label class="form-control">
-          <span class="label-text mb-1">Priority</span>
-          <select class="select select-bordered" name="priority">
-            <option value="">All priorities</option>
-            {['A', 'B', 'C'].map((p) => (
-              <option selected={filters.priority === p}>{p}</option>
-            ))}
-          </select>
-        </label>
-        <label class="form-control">
-          <span class="label-text mb-1">View</span>
-          <select class="select select-bordered" name="view">
-            <option value="active" selected={filters.view === 'active'}>
-              Active
+        </div>
+        <SelectField name="priority" label="Priority">
+          <option value="">All priorities</option>
+          {['A', 'B', 'C'].map((p) => (
+            <option selected={filters.priority === p}>{p}</option>
+          ))}
+        </SelectField>
+        <SelectField name="view" label="View">
+          <option value="active" selected={filters.view === 'active'}>
+            Active
+          </option>
+          <option selected={filters.view === 'Rejected'}>Rejected</option>
+          <option selected={filters.view === 'Archived'}>Archived</option>
+        </SelectField>
+        <SelectField name="sort" label="Sort">
+          {[
+            ['updated_desc', 'Recently updated'],
+            ['posted_desc', 'Posted: newest'],
+            ['posted_asc', 'Posted: oldest'],
+            ['company_asc', 'Company: A-Z'],
+            ['company_desc', 'Company: Z-A'],
+            ['priority_asc', 'Priority: A-C'],
+            ['priority_desc', 'Priority: C-A'],
+            ['target_asc', 'Today target'],
+            ['applied_desc', 'Applied: newest'],
+            ['applied_asc', 'Applied: oldest'],
+          ].map(([v, l]) => (
+            <option value={v} selected={filters.sort === v}>
+              {l}
             </option>
-            <option selected={filters.view === 'Rejected'}>Rejected</option>
-            <option selected={filters.view === 'Archived'}>Archived</option>
-          </select>
-        </label>
-        <label class="form-control">
-          <span class="label-text mb-1">Sort</span>
-          <select class="select select-bordered" name="sort">
-            {[
-              ['updated_desc', 'Recently updated'],
-              ['posted_desc', 'Posted: newest'],
-              ['posted_asc', 'Posted: oldest'],
-              ['company_asc', 'Company: A-Z'],
-              ['company_desc', 'Company: Z-A'],
-              ['priority_asc', 'Priority: A-C'],
-              ['priority_desc', 'Priority: C-A'],
-              ['target_asc', 'Today target'],
-              ['applied_desc', 'Applied: newest'],
-              ['applied_asc', 'Applied: oldest'],
-            ].map(([v, l]) => (
-              <option value={v} selected={filters.sort === v}>
-                {l}
-              </option>
-            ))}
-          </select>
-        </label>
+          ))}
+        </SelectField>
         <label class="label cursor-pointer justify-start gap-3 md:col-span-5">
           <input
             class="toggle toggle-primary"
@@ -102,7 +93,7 @@ export function Filters({ filters }: { filters: Filters }) {
             value="1"
             checked={filters.today === '1'}
           />
-          <span class="label-text">Show only today’s tasks</span>
+          <span>Show only today’s tasks</span>
           <span id="loading" class="loading loading-spinner loading-sm htmx-indicator" />
         </label>
       </div>
@@ -133,6 +124,7 @@ export function QuickCollect({
       hx-post={`/applications?${query}`}
       hx-target={`#${formId}`}
       hx-swap="outerHTML"
+      hx-disabled-elt="find button"
       novalidate
       {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
     >
@@ -142,74 +134,68 @@ export function QuickCollect({
           Save the lead now. Complete the details when you apply.
         </p>
         <div class="grid gap-3 sm:grid-cols-2">
-          <Field
+          <InputField
             label="Job title"
             name="jobTitle"
             required
             value={values.jobTitle}
-            message={error(errors, 'jobTitle')}
+            error={error(errors, 'jobTitle')}
           />
-          <Field
+          <InputField
             label="Company"
             name="companyName"
             required
             value={values.companyName}
-            message={error(errors, 'companyName')}
+            error={error(errors, 'companyName')}
             list="company-options"
           />
-          <label class="form-control">
-            <span class="label-text mb-1">Direction</span>
-            <select
-              class={`select select-bordered w-full ${error(errors, 'direction') ? 'select-error' : ''}`}
-              name="direction"
-              required
-              aria-invalid={error(errors, 'direction') ? 'true' : undefined}
-            >
-              <option value="">Choose a direction</option>
-              {profiles.map((profile) => (
-                <option value={profile.id} selected={values.direction === profile.id}>
-                  {profile.label}
-                </option>
-              ))}
-            </select>
-            {error(errors, 'direction') && (
-              <span class="mt-1 text-xs text-error">{error(errors, 'direction')}</span>
-            )}
-          </label>
-          <Field
+          <SelectField
+            name="direction"
+            label="Direction"
+            required
+            error={error(errors, 'direction')}
+          >
+            <option value="">Choose a direction</option>
+            {profiles.map((profile) => (
+              <option value={profile.id} selected={values.direction === profile.id}>
+                {profile.label}
+              </option>
+            ))}
+          </SelectField>
+          <InputField
             label="Location"
             name="location"
             value={values.location}
-            message={error(errors, 'location')}
+            error={error(errors, 'location')}
           />
-          <Field
+          <InputField
             label="Job URL"
             name="url"
             type="url"
             value={values.url}
-            message={error(errors, 'url')}
+            error={error(errors, 'url')}
           />
-          <Field
+          <InputField
             label="Posted date"
             name="postedDate"
             type="date"
             required
             value={values.postedDate ?? todayISO()}
-            message={error(errors, 'postedDate')}
+            error={error(errors, 'postedDate')}
           />
-          <Field label="Salary" name="salary" value={values.salary} />
-          <Field
+          <InputField label="Salary" name="salary" value={values.salary} />
+          <InputField
             label="Application source"
             name="applicationSource"
             value={values.applicationSource}
           />
           <div class="sm:col-span-2">
-            <Field
+            <InputField
               label="Skills"
               name="skills"
               value={values.skills}
               placeholder="react, typescript, fhir"
-              message={error(errors, 'skills')}
+              error={error(errors, 'skills')}
               list="skill-options"
             />
           </div>
@@ -221,42 +207,42 @@ export function QuickCollect({
               Review and edit this AI draft. Use one item per line.
             </p>
             <div class="mt-4 grid gap-3 sm:grid-cols-2">
-              <AnalysisField
+              <TextareaField
                 label="Requirements"
                 name="analysisRequirements"
                 value={values.analysisRequirements}
               />
-              <AnalysisField
+              <TextareaField
                 label="Responsibilities"
                 name="analysisResponsibilities"
                 value={values.analysisResponsibilities}
               />
-              <AnalysisField
+              <TextareaField
                 label="Pain points"
                 name="analysisPainPoints"
                 value={values.analysisPainPoints}
               />
-              <AnalysisField
+              <TextareaField
                 label="Culture signals"
                 name="analysisCulture"
                 value={values.analysisCulture}
               />
-              <AnalysisField
+              <TextareaField
                 label="Red flags"
                 name="analysisRedFlags"
                 value={values.analysisRedFlags}
               />
-              <AnalysisField
+              <TextareaField
                 label="Success metrics"
                 name="analysisSuccessMetrics"
                 value={values.analysisSuccessMetrics}
               />
-              <AnalysisField
+              <TextareaField
                 label="Benefits"
                 name="analysisBenefits"
                 value={values.analysisBenefits}
               />
-              <AnalysisField
+              <TextareaField
                 label="Additional facts"
                 name="analysisNotes"
                 value={values.analysisNotes}
@@ -265,7 +251,9 @@ export function QuickCollect({
           </details>
         )}
         <div class="card-actions mt-2 justify-end">
-          <button class="btn btn-primary">Save opportunity</button>
+          <button class="btn btn-primary">
+            <span class="loading loading-spinner loading-sm htmx-indicator" /> Save opportunity
+          </button>
         </div>
       </div>
       {values.jobPostText && (
@@ -288,69 +276,6 @@ export function QuickCollect({
         ))}
       </datalist>
     </form>
-  )
-}
-
-function AnalysisField({ label, name, value }: { label: string; name: string; value?: string }) {
-  return (
-    <label class="form-control">
-      <span class="label-text mb-1">{label}</span>
-      <textarea class="textarea textarea-bordered min-h-28" name={name}>
-        {value ?? ''}
-      </textarea>
-    </label>
-  )
-}
-
-export function Field({
-  label,
-  name,
-  type = 'text',
-  value,
-  required,
-  placeholder,
-  list,
-  message,
-  externalUrl,
-}: {
-  label: string
-  name: string
-  type?: string
-  value?: string | null
-  required?: boolean
-  placeholder?: string
-  list?: string
-  message?: string
-  externalUrl?: string | null
-}) {
-  return (
-    <label class="form-control">
-      <span class="label-text mb-1">{label}</span>
-      <div class="relative w-full">
-        <input
-          class={`input input-bordered w-full ${externalUrl ? 'pr-11' : ''} ${message ? 'input-error' : ''}`}
-          name={name}
-          type={type}
-          value={value ?? ''}
-          required={required}
-          placeholder={placeholder}
-          list={list}
-          aria-invalid={message ? 'true' : undefined}
-        />
-        {externalUrl && (
-          <a
-            class="btn btn-ghost btn-sm absolute right-1 top-1/2 -translate-y-1/2 border-0 px-2 text-base-content hover:bg-base-200"
-            href={externalUrl}
-            target="_blank"
-            rel="noreferrer"
-            aria-label={`Open ${label}`}
-          >
-            ↗
-          </a>
-        )}
-      </div>
-      {message && <span class="mt-1 text-xs text-error">{message}</span>}
-    </label>
   )
 }
 
