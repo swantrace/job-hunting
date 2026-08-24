@@ -167,3 +167,29 @@ Note: Hono JSX serializes to server-rendered HTML, so an inline
 `onClick={showModal()}` cannot be emitted; the modal is instead opened by a
 `data-open-ai-modal` attribute wired to a global click handler in `_renderer.tsx`,
 which calls `dialog.showModal()`.
+
+---
+
+## 🔁 Information-architecture + view refactor (confirmed direction)
+
+Following a design review, the app was reorganized (commits `577dc30`, `13f5343`):
+
+- **`/` is now a stats dashboard** (`StatsDashboard`) — `#metrics` counts plus a
+  "View applications" CTA. All capture actions live on the Applications page.
+- **`/applications` is the full applications page** (`ApplicationsPage`) — a
+  result count, filter bar, and the application list/board. HTMX filter swaps
+  still return the `#board` fragment.
+- **Navigation** (`AppNavigation`): active-state highlight, button-like styling;
+  sidebar is **collapsible on desktop** (default open) and an off-canvas drawer on
+  mobile. `Import`/`Export` moved out of the nav into a persistent global header.
+- **View mode**: `List` (default) or `Board` (Kanban), toggled in the filter bar.
+- **Enriched filter bar**: search, priority, **status multi-select**, sort,
+  **column-visibility multi-select**, and a **"due today"** filter (replacing the
+  old "show only today's tasks" toggle).
+- **Filter model extended**: `filterSchema` now has `view` (`list|board`),
+  `statuses` (CSV), and `attributes` (CSV); `parseFilters` gathers repeated
+  multi-select params via `c.req.queries()`; `listApplications` filters by
+  `statusesFromFilters()` so empty = active statuses, `today` narrows to due-today.
+
+The `#board` fragment remains the single mutation target; it now renders either
+the list table or the Kanban depending on `view`.
