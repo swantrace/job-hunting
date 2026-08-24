@@ -1,18 +1,13 @@
 import type { ImportPreview as Preview } from '../../src/db/queries'
+import { AppShell } from './layout/AppShell'
 import { FileField } from './ui/FormField'
 
 export function ImportPage() {
   return (
-    <main class="mx-auto min-h-screen max-w-3xl space-y-5 p-4 lg:p-7">
-      <a class="link text-sm" href="/">
-        ← Dashboard
-      </a>
-      <div>
-        <h1 class="text-3xl font-bold">Import JSON backup</h1>
-        <p class="text-base-content/60">
-          Preview changes first. Local-only records are never deleted.
-        </p>
-      </div>
+    <AppShell
+      title="Import JSON backup"
+      description="Preview changes first. Local-only records are never deleted."
+    >
       <form
         class="card bg-base-100 shadow-sm"
         hx-post="/import"
@@ -29,7 +24,7 @@ export function ImportPage() {
         </div>
       </form>
       <div id="import-result" />
-    </main>
+    </AppShell>
   )
 }
 

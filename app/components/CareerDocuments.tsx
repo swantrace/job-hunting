@@ -1,21 +1,16 @@
 import type { BaselineGenerationRunWithArtifacts } from '../../src/db/generation'
 import { listProfiles } from '../../src/lib/profiles'
+import { AppShell } from './layout/AppShell'
 import { InputField, SelectField } from './ui/FormField'
 
 export function CareerDocumentsPage({ runs }: { runs: BaselineGenerationRunWithArtifacts[] }) {
   return (
-    <main class="mx-auto min-h-screen max-w-5xl space-y-6 p-4 lg:p-7">
-      <header>
-        <a class="link text-sm" href="/">
-          ← Dashboard
-        </a>
-        <h1 class="mt-2 text-3xl font-bold">Career documents</h1>
-        <p class="text-base-content/60">
-          Create a direction-specific baseline resume before a particular job post exists.
-        </p>
-      </header>
+    <AppShell
+      title="Career documents"
+      description="Create a direction-specific baseline resume before a particular job post exists."
+    >
       <BaselineGenerationPanel runs={runs} />
-    </main>
+    </AppShell>
   )
 }
 

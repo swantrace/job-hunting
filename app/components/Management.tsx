@@ -1,4 +1,5 @@
 import type { listManagementData } from '../../src/db/queries'
+import { AppShell } from './layout/AppShell'
 import { InputField, SelectField } from './ui/FormField'
 
 type ManagementData = ReturnType<typeof listManagementData>
@@ -18,16 +19,12 @@ const deleteButton = (kind: ManagementKind, id: number) => (
 
 export function ManagementPage({ data }: { data: ManagementData }) {
   return (
-    <main class="mx-auto min-h-screen max-w-7xl space-y-5 p-4 lg:p-7">
-      <header>
-        <a class="link text-sm" href="/">
-          ← Dashboard
-        </a>
-        <h1 class="mt-2 text-3xl font-bold">Manage data</h1>
-        <p class="text-base-content/60">Keep reusable skills, companies, and contacts organized.</p>
-      </header>
+    <AppShell
+      title="Manage data"
+      description="Keep reusable skills, companies, and contacts organized."
+    >
       <ManagementContent data={data} />
-    </main>
+    </AppShell>
   )
 }
 

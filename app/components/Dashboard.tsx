@@ -483,7 +483,7 @@ function JobCard({
   )
 }
 
-export function AppShell({ children, drawer }: { children: Child; drawer?: Child }) {
+export function WorkspaceDrawer({ children, drawer }: { children: Child; drawer?: Child }) {
   return (
     <div class="drawer drawer-end">
       <input id="workspace-toggle" type="checkbox" class="drawer-toggle" />
