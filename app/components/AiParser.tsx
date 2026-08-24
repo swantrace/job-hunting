@@ -2,6 +2,7 @@ import type { Filters } from '../../src/db/queries'
 import type { ParsedJobResult } from '../../src/lib/ai'
 import { todayISO } from '../../src/lib/date'
 import { QuickCollect } from './Dashboard'
+import { TextareaField } from './ui/FormField'
 
 export function AiParser({ filters, oob = false }: { filters: Filters; oob?: boolean }) {
   return (
@@ -20,11 +21,12 @@ export function AiParser({ filters, oob = false }: { filters: Filters; oob?: boo
           hx-disabled-elt="find button"
           novalidate
         >
-          <textarea
-            class="textarea textarea-bordered min-h-40 w-full"
+          <TextareaField
             name="description"
+            label="Job description"
             placeholder="Paste the job description here..."
             maxLength={20000}
+            rows={8}
             required
           />
           <button class="btn btn-secondary mt-3 w-full">

@@ -101,6 +101,8 @@ export type InputFieldProps = FieldBaseProps & {
   maxLength?: number
   /** When present, renders an adjacent "open in new tab" action outside the label. */
   externalUrl?: string | null
+  /** Marks the control as the primary focus target for auto-focus regions. */
+  dataPrimaryInput?: boolean
 }
 
 export function InputField({
@@ -119,6 +121,7 @@ export function InputField({
   list,
   maxLength,
   externalUrl,
+  dataPrimaryInput,
   labelAction,
 }: InputFieldProps) {
   const resolvedId = resolveFieldId(id, namespace, name)
@@ -136,6 +139,7 @@ export function InputField({
       maxLength={maxLength}
       aria-invalid={errorText ? 'true' : undefined}
       aria-describedby={describedByIds(resolvedId, help, errorText)}
+      {...(dataPrimaryInput ? { 'data-primary-input': 'true' } : {})}
       class={`input w-full ${externalUrl ? 'join-item' : ''} ${errorText ? 'input-error' : ''}`}
     />
   )

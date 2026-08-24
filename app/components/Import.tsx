@@ -1,4 +1,5 @@
 import type { ImportPreview as Preview } from '../../src/db/queries'
+import { FileField } from './ui/FormField'
 
 export function ImportPage() {
   return (
@@ -18,16 +19,13 @@ export function ImportPage() {
         hx-target="#import-result"
         hx-swap="innerHTML"
         hx-encoding="multipart/form-data"
+        hx-disabled-elt="find button"
       >
         <div class="card-body gap-4">
-          <input
-            class="file-input file-input-bordered w-full"
-            type="file"
-            name="backup"
-            accept="application/json,.json"
-            required
-          />
-          <button class="btn btn-primary">Preview import</button>
+          <FileField name="backup" label="Backup file" accept="application/json,.json" required />
+          <button class="btn btn-primary">
+            <span class="loading loading-spinner loading-sm htmx-indicator" /> Preview import
+          </button>
         </div>
       </form>
       <div id="import-result" />

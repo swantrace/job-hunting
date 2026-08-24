@@ -1,5 +1,6 @@
 import type { BaselineGenerationRunWithArtifacts } from '../../src/db/generation'
 import { listProfiles } from '../../src/lib/profiles'
+import { InputField, SelectField } from './ui/FormField'
 
 export function CareerDocumentsPage({ runs }: { runs: BaselineGenerationRunWithArtifacts[] }) {
   return (
@@ -50,33 +51,24 @@ export function BaselineGenerationPanel({ runs }: { runs: BaselineGenerationRunW
           hx-disabled-elt="find button"
           novalidate
         >
-          <label class="form-control">
-            <span class="label-text">Direction</span>
-            <select class="select select-bordered" name="direction">
-              {profiles.map((profile) => (
-                <option value={profile.id}>{profile.label}</option>
-              ))}
-            </select>
-          </label>
-          <label class="form-control">
-            <span class="label-text">Target title</span>
-            <input
-              class="input input-bordered"
-              name="targetTitle"
-              placeholder="FHIR Software Engineer (optional)"
-            />
-          </label>
-          <label class="form-control md:col-span-2">
-            <span class="label-text">Optional keywords</span>
-            <input
-              class="input input-bordered"
+          <SelectField name="direction" label="Direction">
+            {profiles.map((profile) => (
+              <option value={profile.id}>{profile.label}</option>
+            ))}
+          </SelectField>
+          <InputField
+            name="targetTitle"
+            label="Target title"
+            placeholder="FHIR Software Engineer (optional)"
+          />
+          <div class="md:col-span-2">
+            <InputField
               name="targetKeywords"
+              label="Optional keywords"
               placeholder="FHIR, SMART on FHIR, interoperability"
+              help="Comma-separated; only profile-allowed conditional skills may be added."
             />
-            <span class="label-text-alt">
-              Comma-separated; only profile-allowed conditional skills may be added.
-            </span>
-          </label>
+          </div>
           <div class="md:col-span-2">
             <button class="btn btn-primary">
               <span class="loading loading-spinner loading-xs htmx-indicator" /> Generate resume
