@@ -143,3 +143,27 @@ visual-regression snapshots. The server-rendered contracts are covered by
 | `POST /import`, `POST /import/confirm` | `#import-result` innerHTML | — | alert child |
 
 Nested OOB processing is disabled; all OOB fragments are top-level siblings.
+
+---
+
+## 🔧 Post-roadmap follow-up: dashboard capture refactor
+
+After reviewing live screenshots (commit `027a8db`) the cramped three-column
+layout was replaced so the Kanban gets the full content width:
+
+- The `AI job parser` and `Quick collect` cards were removed from the horizontal
+  grid and moved out of the content flow.
+- **AI parser** now lives in a daisyUI 5 `<dialog id="ai_parser_modal" class="modal">`
+  (`opportunities/AiParserModal.tsx`), opened by the `🤖 AI 解析职位` button in the
+  filter toolbar.
+- **Quick collect** now lives in a right-hand `drawer drawer-end`
+  (`opportunities/QuickCollectDrawer.tsx`), opened by the `➕ 快捷录入` label.
+- The board is horizontally scrollable (`flex flex-row gap-6 overflow-x-auto`),
+  each column `w-[310px] min-w-[310px] shrink-0`, and cards use
+  `card bg-base-100 shadow-sm border border-base-300/40 p-4`.
+- The left system navigation (`layout/AppShell`, `AppNavigation`) is unchanged.
+
+Note: Hono JSX serializes to server-rendered HTML, so an inline
+`onClick={showModal()}` cannot be emitted; the modal is instead opened by a
+`data-open-ai-modal` attribute wired to a global click handler in `_renderer.tsx`,
+which calls `dialog.showModal()`.
