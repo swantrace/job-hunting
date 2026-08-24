@@ -37,6 +37,14 @@ describe('request validation', () => {
 
   test('allowlists sort and filter values', () => {
     const result = filterSchema.parse({ sort: 'drop table jobs', priority: 'Z', view: 'secret' })
-    expect(result).toEqual({ q: '', priority: '', view: 'active', today: '', sort: 'updated_desc' })
+    expect(result).toEqual({
+      q: '',
+      priority: '',
+      statuses: '',
+      view: 'list',
+      today: '',
+      attributes: '',
+      sort: 'updated_desc',
+    })
   })
 })

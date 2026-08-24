@@ -3,8 +3,8 @@ import { createApplication, listApplications, metrics } from '../../../src/db/qu
 import { enqueueGeneration } from '../../../src/lib/generation-queue'
 import { parseFilters, parseForm } from '../../../src/lib/request'
 import { quickCollectSchema } from '../../../src/lib/validation'
+import { ApplicationsPage } from '../../components/ApplicationsPage'
 import { Board, QuickCollect } from '../../components/Dashboard'
-import { DashboardPage } from '../../components/DashboardPage'
 import { MutationResponse } from '../../components/Responses'
 
 export const GET = createRoute((c) => {
@@ -12,7 +12,7 @@ export const GET = createRoute((c) => {
   // Fragment for HTMX filter swaps; full page for direct navigation/reload.
   if (c.req.header('HX-Request') === 'true')
     return c.html(<Board jobs={listApplications(filters)} filters={filters} />)
-  return c.render(<DashboardPage filters={filters} />)
+  return c.render(<ApplicationsPage filters={filters} />)
 })
 
 export const POST = createRoute(async (c) => {

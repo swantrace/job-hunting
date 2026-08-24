@@ -13,7 +13,12 @@ import {
   textValue,
 } from '../lib/import'
 import { advanceStatus } from '../lib/transitions'
-import type { applicationSchema, filterSchema, quickCollectSchema } from '../lib/validation'
+import {
+  type applicationSchema,
+  type filterSchema,
+  type quickCollectSchema,
+  statusesFromFilters,
+} from '../lib/validation'
 import { db } from './client'
 import {
   companies,
@@ -179,25 +184,10 @@ export function updateApplication(id: number, input: z.infer<typeof applicationS
 
 export function listApplications(filters: Filters): JobCardData[] {
   const conditions = []
-  if (filters.view === 'active')
-    conditions.push(
-      inArray(jobApplications.status, [
-        'Saved',
-        'Apply Today',
-        'Applied',
-        'Follow Up',
-        'Interviewing',
-      ]),
-    )
-  else conditions.push(eq(jobApplications.status, filters.view))
+  const statusesToShow = statusesFromFilters(filters)
+  conditions.push(inArray(jobApplications.status, statusesToShow))
+  if (filters.today) conditions.push(eq(jobApplications.applyTodayTargetDate, todayISO()))
   if (filters.priority) conditions.push(eq(jobApplications.priority, filters.priority))
-  if (filters.today)
-    conditions.push(
-      and(
-        eq(jobApplications.status, 'Apply Today'),
-        eq(jobApplications.applyTodayTargetDate, todayISO()),
-      )!,
-    )
   if (filters.q) {
     const escaped = filters.q.replace(/[\\%_]/g, '\\$&')
     const pattern = `%${escaped}%`

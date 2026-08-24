@@ -4,10 +4,7 @@ import { FileField } from './ui/FormField'
 
 export function ImportPage() {
   return (
-    <AppShell
-      title="Import JSON backup"
-      description="Preview changes first. Local-only records are never deleted."
-    >
+    <AppShell title="Import JSON backup" currentPath="/import">
       <form
         class="card bg-base-100 shadow-sm"
         hx-post="/import"

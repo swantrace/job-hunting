@@ -5,10 +5,7 @@ import { InputField, SelectField } from './ui/FormField'
 
 export function CareerDocumentsPage({ runs }: { runs: BaselineGenerationRunWithArtifacts[] }) {
   return (
-    <AppShell
-      title="Career documents"
-      description="Create a direction-specific baseline resume before a particular job post exists."
-    >
+    <AppShell title="Career documents" currentPath="/career-documents">
       <BaselineGenerationPanel runs={runs} />
     </AppShell>
   )

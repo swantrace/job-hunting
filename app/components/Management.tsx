@@ -20,10 +20,7 @@ const deleteButton = (kind: ManagementKind, id: number) => (
 
 export function ManagementPage({ data }: { data: ManagementData }) {
   return (
-    <AppShell
-      title="Manage data"
-      description="Keep reusable skills, companies, and contacts organized."
-    >
+    <AppShell title="Manage data" currentPath="/manage">
       <ManagementContent data={data} />
     </AppShell>
   )

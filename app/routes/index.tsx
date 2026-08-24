@@ -1,5 +1,4 @@
 import { createRoute } from 'honox/factory'
-import { parseFilters } from '../../src/lib/request'
-import { DashboardPage } from '../components/DashboardPage'
+import { StatsDashboard } from '../components/StatsDashboard'
 
-export default createRoute((c) => c.render(<DashboardPage filters={parseFilters(c)} />))
+export default createRoute((c) => c.render(<StatsDashboard />))

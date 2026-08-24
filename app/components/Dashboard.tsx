@@ -3,15 +3,23 @@ import { type Filters, type JobCardData, listManagementData } from '../../src/db
 import type { JobStatus } from '../../src/db/schema'
 import { formatDisplayDate, todayISO } from '../../src/lib/date'
 import { listProfiles } from '../../src/lib/profiles'
-import type { FieldErrors } from '../../src/lib/validation'
+import {
+  type ApplicationAttribute,
+  applicationAttributeLabels,
+  applicationAttributes,
+  defaultAttributes,
+  type FieldErrors,
+  parseCsvList,
+  statusesFromFilters,
+} from '../../src/lib/validation'
 import { EmptyState } from './ui/EmptyState'
 import { InputField, SelectField, TextareaField } from './ui/FormField'
 import { Icon } from './ui/Icon'
+import { StatusBadge } from './ui/StatusBadge'
 
 const activeStatuses: JobStatus[] = ['Saved', 'Apply Today', 'Applied', 'Follow Up', 'Interviewing']
 const enc = (filters: Filters) => new URLSearchParams(filters).toString()
 const error = (errors: FieldErrors | undefined, name: string) => errors?.[name]?.[0]
-
 export function Metrics({
   values,
   oob = false,
@@ -36,6 +44,19 @@ export function Metrics({
 }
 
 export function Filters({ filters }: { filters: Filters }) {
+  const statusOptions: JobStatus[] = [
+    'Saved',
+    'Apply Today',
+    'Applied',
+    'Follow Up',
+    'Interviewing',
+    'Rejected',
+    'Archived',
+  ]
+  const selectedStatuses = parseCsvList(filters.statuses).length
+    ? (parseCsvList(filters.statuses) as JobStatus[])
+    : ([...activeStatuses] as JobStatus[])
+  const attributes = parseAttributes(filters.attributes)
   return (
     <form
       id="filters"
@@ -46,9 +67,9 @@ export function Filters({ filters }: { filters: Filters }) {
       hx-push-url="true"
       hx-sync="this:replace"
       hx-indicator="#loading"
-      hx-trigger="input changed delay:350ms from:input[name='q'], search from:input[name='q'], change from:select, change from:input[name='today']"
+      hx-trigger="input changed delay:350ms from:input[name='q'], search from:input[name='q'], change from:select, change from:input[name='statuses'], change from:input[name='today']"
     >
-      <div class="card-body grid gap-3 p-4 md:grid-cols-5">
+      <div class="card-body grid gap-3 p-4 md:grid-cols-4">
         <div class="md:col-span-2">
           <InputField
             name="q"
@@ -58,19 +79,39 @@ export function Filters({ filters }: { filters: Filters }) {
             placeholder="Title or company"
           />
         </div>
+        <SelectField name="view" label="View">
+          <option value="list" selected={filters.view === 'list'}>
+            List
+          </option>
+          <option value="board" selected={filters.view === 'board'}>
+            Board
+          </option>
+        </SelectField>
         <SelectField name="priority" label="Priority">
           <option value="">All priorities</option>
           {['A', 'B', 'C'].map((p) => (
             <option selected={filters.priority === p}>{p}</option>
           ))}
         </SelectField>
-        <SelectField name="view" label="View">
-          <option value="active" selected={filters.view === 'active'}>
-            Active
-          </option>
-          <option selected={filters.view === 'Rejected'}>Rejected</option>
-          <option selected={filters.view === 'Archived'}>Archived</option>
-        </SelectField>
+        <div class="md:col-span-2">
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">Status</legend>
+            <div class="flex flex-wrap gap-x-4 gap-y-2">
+              {statusOptions.map((status) => (
+                <label class="label cursor-pointer gap-2">
+                  <input
+                    type="checkbox"
+                    class="checkbox checkbox-sm"
+                    name="statuses"
+                    value={status}
+                    checked={selectedStatuses.includes(status)}
+                  />
+                  <span class="text-sm">{status}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        </div>
         <SelectField name="sort" label="Sort">
           {[
             ['updated_desc', 'Recently updated'],
@@ -89,7 +130,14 @@ export function Filters({ filters }: { filters: Filters }) {
             </option>
           ))}
         </SelectField>
-        <label class="label cursor-pointer justify-start gap-3 md:col-span-5">
+        <SelectField name="attributes" label="Columns" multiple>
+          {applicationAttributes.map((attr) => (
+            <option value={attr} selected={attributes.includes(attr)}>
+              {applicationAttributeLabels[attr]}
+            </option>
+          ))}
+        </SelectField>
+        <label class="label cursor-pointer justify-start gap-3 md:col-span-4">
           <input
             class="toggle toggle-primary"
             type="checkbox"
@@ -97,10 +145,10 @@ export function Filters({ filters }: { filters: Filters }) {
             value="1"
             checked={filters.today === '1'}
           />
-          <span>Show only today’s tasks</span>
+          <span>Show due today</span>
           <span id="loading" class="loading loading-spinner loading-sm htmx-indicator" />
         </label>
-        <div class="md:col-span-5 flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center justify-between gap-2 md:col-span-4">
           <div class="flex flex-wrap gap-2">
             <button
               type="button"
@@ -317,12 +365,23 @@ export function Board({
   filters: Filters
   oob?: boolean
 }) {
-  const statuses =
-    filters.today === '1'
-      ? (['Apply Today'] as const)
-      : filters.view === 'active'
-        ? activeStatuses
-        : [filters.view as JobStatus]
+  return filters.view === 'board' ? (
+    <KanbanBoard jobs={jobs} filters={filters} oob={oob} />
+  ) : (
+    <ListBoard jobs={jobs} filters={filters} oob={oob} />
+  )
+}
+
+function KanbanBoard({
+  jobs,
+  filters,
+  oob,
+}: {
+  jobs: JobCardData[]
+  filters: Filters
+  oob?: boolean
+}) {
+  const statuses = statusesFromFilters(filters)
   return (
     <div
       id="board"
@@ -357,6 +416,119 @@ export function Board({
       ))}
     </div>
   )
+}
+
+const parseAttributes = (value?: string): ApplicationAttribute[] => {
+  const selected = parseCsvList(value).filter((item): item is ApplicationAttribute =>
+    (applicationAttributes as readonly string[]).includes(item),
+  )
+  return selected.length ? selected : [...defaultAttributes]
+}
+
+function ListBoard({
+  jobs,
+  filters,
+  oob,
+}: {
+  jobs: JobCardData[]
+  filters: Filters
+  oob?: boolean
+}) {
+  const attributes = parseAttributes(filters.attributes)
+  const query = enc(filters)
+  return (
+    <div
+      id="board"
+      class="overflow-x-auto rounded-box bg-base-100 shadow-sm"
+      {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
+    >
+      {jobs.length ? (
+        <table class="table table-zebra">
+          <thead>
+            <tr>
+              {attributes.map((attr) => (
+                <th class={attr === 'title' ? 'min-w-48' : undefined}>
+                  {applicationAttributeLabels[attr]}
+                </th>
+              ))}
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {jobs.map((job) => (
+              <tr>
+                {attributes.map((attr) => (
+                  <td>{renderCell(job, attr)}</td>
+                ))}
+                <td class="text-right">
+                  <button
+                    class="btn btn-sm"
+                    hx-get={`/applications/${job.id}/workspace?${query}`}
+                    hx-target="#drawer-content"
+                    hx-swap="innerHTML"
+                    data-open-workspace
+                  >
+                    Open
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <EmptyState
+          title="No applications"
+          description="Adjust the filters or add a new application."
+        />
+      )}
+    </div>
+  )
+}
+
+function renderCell(job: JobCardData, attr: ApplicationAttribute) {
+  switch (attr) {
+    case 'company':
+      return job.companyWebsite ? (
+        <a class="link font-medium" href={job.companyWebsite} target="_blank" rel="noreferrer">
+          {job.companyName}
+        </a>
+      ) : (
+        <span class="font-medium">{job.companyName}</span>
+      )
+    case 'title':
+      return (
+        <span class="inline-flex items-center gap-1">
+          <span class="font-medium">{job.jobTitle}</span>
+          {job.url && (
+            <a
+              class="link"
+              href={job.url}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Open ${job.jobTitle} posting`}
+            >
+              <Icon name="external" className="size-3.5" />
+            </a>
+          )}
+        </span>
+      )
+    case 'location':
+      return job.location || '—'
+    case 'priority':
+      return <span class="badge badge-outline">Priority {job.priority}</span>
+    case 'status':
+      return <StatusBadge status={job.status} />
+    case 'appliedDate':
+      return job.appliedDate ? formatDisplayDate(job.appliedDate) : '—'
+    case 'targetDate':
+      return job.applyTodayTargetDate ? formatDisplayDate(job.applyTodayTargetDate) : '—'
+    case 'source':
+      return job.applicationSource || '—'
+    case 'matchLevel':
+      return job.matchLevel || '—'
+    case 'notes':
+      return <span class="block max-w-xs truncate">{job.notes || '—'}</span>
+  }
 }
 
 function TodayTasksTable({ jobs, filters }: { jobs: JobCardData[]; filters: Filters }) {

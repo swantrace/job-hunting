@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { matchLevels, priorities, statuses } from '../db/schema'
+import { type JobStatus, matchLevels, priorities, statuses } from '../db/schema'
 import { isISODate } from './date'
 import { hasProfile } from './profiles'
 
@@ -106,10 +106,66 @@ export const sortValues = [
 export const filterSchema = z.object({
   q: z.string().trim().max(200).catch(''),
   priority: z.enum(['', ...priorities]).catch(''),
-  view: z.enum(['active', 'Rejected', 'Archived']).catch('active'),
+  statuses: z.string().trim().max(200).catch(''),
+  view: z.enum(['list', 'board']).catch('list'),
   today: z.enum(['', '1']).catch(''),
+  attributes: z.string().trim().max(500).catch(''),
   sort: z.enum(sortValues).catch('updated_desc'),
 })
+
+export const applicationAttributes = [
+  'company',
+  'title',
+  'location',
+  'priority',
+  'status',
+  'appliedDate',
+  'targetDate',
+  'source',
+  'matchLevel',
+  'notes',
+] as const
+export type ApplicationAttribute = (typeof applicationAttributes)[number]
+export const applicationAttributeLabels: Record<ApplicationAttribute, string> = {
+  company: 'Company',
+  title: 'Job title',
+  location: 'Location',
+  priority: 'Priority',
+  status: 'Status',
+  appliedDate: 'Applied date',
+  targetDate: 'Target date',
+  source: 'Source',
+  matchLevel: 'Match level',
+  notes: 'Notes',
+}
+export const defaultAttributes = [
+  'company',
+  'title',
+  'status',
+  'priority',
+  'location',
+  'appliedDate',
+] as ApplicationAttribute[]
+
+export const parseCsvList = (value?: string) =>
+  (value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+export const activeStatuses = [
+  'Saved',
+  'Apply Today',
+  'Applied',
+  'Follow Up',
+  'Interviewing',
+] as const
+
+export const statusesFromFilters = (filters: { statuses: string; today: string }): JobStatus[] => {
+  if (filters.today === '1') return ['Apply Today']
+  const requested = parseCsvList(filters.statuses) as JobStatus[]
+  return requested.length ? requested : ([...activeStatuses] as JobStatus[])
+}
 
 export const workspaceTabs = ['application', 'contacts', 'activity', 'documents'] as const
 export type WorkspaceTab = (typeof workspaceTabs)[number]

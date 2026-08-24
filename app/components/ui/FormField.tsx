@@ -174,6 +174,7 @@ export function InputField({
 }
 
 export type SelectFieldProps = FieldBaseProps & {
+  multiple?: boolean
   children: Child
 }
 
@@ -184,6 +185,7 @@ export function SelectField({
   label,
   required,
   disabled,
+  multiple,
   help,
   error,
   message,
@@ -204,6 +206,7 @@ export function SelectField({
       <select
         id={resolvedId}
         name={name}
+        multiple={multiple}
         required={required}
         disabled={disabled}
         aria-invalid={errorText ? 'true' : undefined}

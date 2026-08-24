@@ -87,7 +87,15 @@ mock.module('../../../src/lib/evidence-selection', () => ({
 }))
 
 mock.module('../../../src/lib/request', () => ({
-  parseFilters: () => ({ priority: '', q: '', sort: 'updated_desc', today: '', view: 'active' }),
+  parseFilters: () => ({
+    attributes: '',
+    priority: '',
+    q: '',
+    sort: 'updated_desc',
+    statuses: '',
+    today: '',
+    view: 'list',
+  }),
   parseForm: async () => ({ action: 'today' }),
   parseId: (value: string) => Number(value),
   parseWorkspaceTab: (c: { req: { query: (name: string) => string | undefined } }) =>
