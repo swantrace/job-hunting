@@ -8,8 +8,19 @@ export const PATCH = createRoute(async (c) => {
   const id = parseId(c.req.param('id'))
   const filters = parseFilters(c)
   const parsed = statusSchema.safeParse(await parseForm(c))
-  if (!id || !parsed.success || !changeStatus(id, parsed.data.action))
-    return c.html(<div class="alert alert-error">Invalid status change.</div>, 422)
+  if (!id || !parsed.success || !changeStatus(id, parsed.data.action)) {
+    // The board is the swap target: return the unchanged board plus an OOB flash,
+    // never a bare alert that would replace the whole board.
+    return c.html(
+      <>
+        <Board jobs={listApplications(filters)} filters={filters} />
+        <div id="flash" hx-swap-oob="innerHTML">
+          <div class="alert alert-error">Invalid status change.</div>
+        </div>
+      </>,
+      422,
+    )
+  }
   return c.html(
     <>
       <Board jobs={listApplications(filters)} filters={filters} />

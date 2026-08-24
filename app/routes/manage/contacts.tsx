@@ -9,9 +9,11 @@ export const POST = createRoute(async (c) => {
   const parsed = managedContactSchema.safeParse(form)
   if (!parsed.success)
     return c.html(
-      <div id="management-content" class="alert alert-error">
-        Invalid contact.
-      </div>,
+      <ManagementContent
+        data={listManagementData()}
+        error="Invalid contact."
+        errorKind="contacts"
+      />,
       422,
     )
   const editId = Number(form.editId)

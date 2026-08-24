@@ -31,12 +31,40 @@ export function ManagementPage({ data }: { data: ManagementData }) {
   )
 }
 
-export function ManagementContent({ data }: { data: ManagementData }) {
+export function ManagementContent({
+  data,
+  error,
+  errorKind,
+  editId,
+}: {
+  data: ManagementData
+  error?: string
+  errorKind?: ManagementKind
+  editId?: number
+}) {
   return (
     <div id="management-content" class="grid gap-5 lg:grid-cols-3">
-      <ManagementCard kind="skills" title="Skills" data={data} />
-      <ManagementCard kind="companies" title="Companies" data={data} />
-      <ManagementCard kind="contacts" title="Contacts" data={data} />
+      <ManagementCard
+        kind="skills"
+        title="Skills"
+        data={data}
+        error={errorKind === 'skills' ? error : undefined}
+        editId={errorKind === 'skills' ? editId : undefined}
+      />
+      <ManagementCard
+        kind="companies"
+        title="Companies"
+        data={data}
+        error={errorKind === 'companies' ? error : undefined}
+        editId={errorKind === 'companies' ? editId : undefined}
+      />
+      <ManagementCard
+        kind="contacts"
+        title="Contacts"
+        data={data}
+        error={errorKind === 'contacts' ? error : undefined}
+        editId={errorKind === 'contacts' ? editId : undefined}
+      />
     </div>
   )
 }
@@ -45,16 +73,20 @@ function ManagementCard({
   kind,
   title,
   data,
+  error,
+  editId,
 }: {
   kind: ManagementKind
   title: string
   data: ManagementData
+  error?: string
+  editId?: number
 }) {
   return (
     <section class="card bg-base-100 shadow-sm">
       <div class="card-body">
         <h2 class="card-title">{title}</h2>
-        <ManagementForm kind={kind} data={data} />
+        <ManagementForm kind={kind} data={data} editId={editId} error={error} />
         <ul class="mt-3 divide-y divide-base-300">
           {kind === 'skills'
             ? data.skills.map((skill) => (
@@ -124,10 +156,12 @@ export function ManagementForm({
   kind,
   data,
   editId,
+  error,
 }: {
   kind: ManagementKind
   data: ManagementData
   editId?: number
+  error?: string
 }) {
   const editing = !!editId
   const skill = editId ? data.skills.find((item) => item.id === editId) : undefined
@@ -152,6 +186,11 @@ export function ManagementForm({
         hx-disabled-elt="find button"
       >
         <p class="text-sm font-medium">{title}</p>
+        {error ? (
+          <div class="alert alert-error text-sm" role="alert">
+            {error}
+          </div>
+        ) : null}
         {kind === 'skills' ? (
           <>
             <InputField

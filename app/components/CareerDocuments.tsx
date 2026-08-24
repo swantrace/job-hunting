@@ -19,7 +19,13 @@ export function CareerDocumentsPage({ runs }: { runs: BaselineGenerationRunWithA
   )
 }
 
-export function BaselineGenerationPanel({ runs }: { runs: BaselineGenerationRunWithArtifacts[] }) {
+export function BaselineGenerationPanel({
+  runs,
+  error,
+}: {
+  runs: BaselineGenerationRunWithArtifacts[]
+  error?: string
+}) {
   const profiles = listProfiles()
   const latest = runs[0]
   const polling = latest?.status === 'Queued' || latest?.status === 'Processing'
@@ -36,6 +42,11 @@ export function BaselineGenerationPanel({ runs }: { runs: BaselineGenerationRunW
         : {})}
     >
       <div class="card-body">
+        {error ? (
+          <div class="alert alert-error" role="alert">
+            {error}
+          </div>
+        ) : null}
         <div>
           <h2 class="card-title">Generate baseline resume</h2>
           <p class="text-sm text-base-content/60">

@@ -14,9 +14,10 @@ export const POST = createRoute(async (c) => {
   const parsed = baselineGenerationSchema.safeParse(await parseForm(c))
   if (!parsed.success)
     return c.html(
-      <div class="alert alert-error">
-        {parsed.error.issues.map((issue) => issue.message).join(' ')}
-      </div>,
+      <BaselineGenerationPanel
+        runs={listBaselineGenerationRuns()}
+        error={parsed.error.issues.map((issue) => issue.message).join(' ')}
+      />,
       422,
     )
   const keywords = (parsed.data.targetKeywords ?? '')

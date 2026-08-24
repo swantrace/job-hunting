@@ -18,14 +18,23 @@ import { InputField, SelectField, TextareaField } from './ui/FormField'
 const query = (filters: Filters) => new URLSearchParams(filters).toString()
 const err = (errors: FieldErrors | undefined, key: string) => errors?.[key]?.[0]
 
+export type WorkspaceTab = 'application' | 'contacts' | 'activity' | 'documents'
+export type WorkspaceErrorForm = 'contact' | 'follow-up' | 'interview'
+
 export function Workspace({
   job,
   filters,
   activity,
+  activeTab = 'application',
+  errors,
+  errorForm,
 }: {
   job: JobCardData
   filters: Filters
   activity: ReturnType<typeof import('../../src/db/queries').getActivity>
+  activeTab?: WorkspaceTab
+  errors?: FieldErrors
+  errorForm?: WorkspaceErrorForm
 }) {
   const q = query(filters)
   const { companies, skills } = listManagementData()
@@ -49,22 +58,36 @@ export function Workspace({
       <div role="tablist" class="tabs tabs-box mb-4">
         <button
           role="tab"
-          class="tab tab-active"
+          class={`tab ${activeTab === 'application' ? 'tab-active' : ''}`}
           data-workspace-tab="application"
-          aria-selected="true"
+          aria-selected={activeTab === 'application' ? 'true' : 'false'}
           hx-get={`/applications/${job.id}/application-form?${q}`}
           hx-target="#workspace-application-panel"
         >
           Application
         </button>
-        <button role="tab" class="tab" data-workspace-tab="contacts" aria-selected="false">
+        <button
+          role="tab"
+          class={`tab ${activeTab === 'contacts' ? 'tab-active' : ''}`}
+          data-workspace-tab="contacts"
+          aria-selected={activeTab === 'contacts' ? 'true' : 'false'}
+        >
           Contacts
         </button>
-        <button role="tab" class="tab" data-workspace-tab="activity" aria-selected="false">
+        <button
+          role="tab"
+          class={`tab ${activeTab === 'activity' ? 'tab-active' : ''}`}
+          data-workspace-tab="activity"
+          aria-selected={activeTab === 'activity' ? 'true' : 'false'}
+        >
           Activity
         </button>
       </div>
-      <div id="workspace-application-panel" data-workspace-panel>
+      <div
+        id="workspace-application-panel"
+        data-workspace-panel
+        class={activeTab !== 'application' ? 'hidden' : ''}
+      >
         <ApplicationForm job={job} filters={filters} companies={companies} skills={skills} />
         {job.jobPosting && (
           <details class="mt-6 rounded-box border border-base-300 p-4">
@@ -83,13 +106,35 @@ export function Workspace({
           googleDriveConnected={googleDriveConnected}
         />
       </div>
-      <div id="workspace-contacts-panel" data-workspace-panel class="hidden">
-        <ContactsSection job={job} filters={filters} />
+      <div
+        id="workspace-contacts-panel"
+        data-workspace-panel
+        class={activeTab !== 'contacts' ? 'hidden' : ''}
+      >
+        <ContactsSection
+          job={job}
+          filters={filters}
+          errors={errorForm === 'contact' ? errors : undefined}
+        />
       </div>
-      <div id="workspace-activity-panel" data-workspace-panel class="hidden">
+      <div
+        id="workspace-activity-panel"
+        data-workspace-panel
+        class={activeTab !== 'activity' ? 'hidden' : ''}
+      >
         <div class="grid gap-5 md:grid-cols-2">
-          <ActivityForm type="follow-up" id={job.id} filters={filters} />
-          <ActivityForm type="interview" id={job.id} filters={filters} />
+          <ActivityForm
+            type="follow-up"
+            id={job.id}
+            filters={filters}
+            errors={errorForm === 'follow-up' ? errors : undefined}
+          />
+          <ActivityForm
+            type="interview"
+            id={job.id}
+            filters={filters}
+            errors={errorForm === 'interview' ? errors : undefined}
+          />
         </div>
         <div class="mt-6 grid gap-4 md:grid-cols-2">
           <History
@@ -368,7 +413,15 @@ function EvidenceGroup({ label, ids }: { label: string; ids: string[] }) {
   )
 }
 
-function ContactsSection({ job, filters }: { job: JobCardData; filters: Filters }) {
+function ContactsSection({
+  job,
+  filters,
+  errors,
+}: {
+  job: JobCardData
+  filters: Filters
+  errors?: FieldErrors
+}) {
   return (
     <section class="mt-8">
       <div class="divider">Contacts</div>
@@ -404,9 +457,14 @@ function ContactsSection({ job, filters }: { job: JobCardData; filters: Filters 
         novalidate
       >
         <div class="card-body grid gap-3 p-4 sm:grid-cols-3">
-          <InputField label="Name" name="name" required />
-          <InputField label="Email" name="email" type="email" />
-          <InputField label="LinkedIn URL" name="linkedinUrl" type="url" />
+          <InputField label="Name" name="name" required error={errors?.name?.[0]} />
+          <InputField label="Email" name="email" type="email" error={errors?.email?.[0]} />
+          <InputField
+            label="LinkedIn URL"
+            name="linkedinUrl"
+            type="url"
+            error={errors?.linkedinUrl?.[0]}
+          />
           <button class="btn btn-outline btn-sm sm:col-span-3">
             <span class="loading loading-spinner loading-sm htmx-indicator" /> Add contact
           </button>
@@ -567,10 +625,12 @@ function ActivityForm({
   type,
   id,
   filters,
+  errors,
 }: {
   type: 'follow-up' | 'interview'
   id: number
   filters: Filters
+  errors?: FieldErrors
 }) {
   const interview = type === 'interview'
   return (
@@ -584,15 +644,18 @@ function ActivityForm({
     >
       <div class="card-body p-4">
         <h3 class="font-semibold">Add {interview ? 'interview' : 'follow-up'}</h3>
-        {interview && <InputField label="Round" name="roundName" required />}
+        {interview && (
+          <InputField label="Round" name="roundName" required error={errors?.roundName?.[0]} />
+        )}
         <InputField
           label="Date"
           name={interview ? 'interviewDate' : 'actionDate'}
           type="date"
           required
           value={todayISO()}
+          error={errors?.[interview ? 'interviewDate' : 'actionDate']?.[0]}
         />
-        <TextareaField label="Notes" name="notes" />
+        <TextareaField label="Notes" name="notes" error={errors?.notes?.[0]} />
         <button class="btn btn-secondary btn-sm mt-2">
           <span class="loading loading-spinner loading-sm htmx-indicator" /> Add
         </button>

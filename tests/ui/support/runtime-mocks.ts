@@ -45,6 +45,10 @@ mock.module('honox/factory', () => ({
 
 mock.module('../../../src/db/queries', () => ({
   changeStatus: () => true,
+  createCompany: () => true,
+  createContact: () => true,
+  createSkill: () => true,
+  deleteManagedItem: () => true,
   getActivity: () => ({ followUps: [], interviews: [] }),
   getApplication: () => mockJob,
   listApplications: () => [mockJob],
@@ -57,12 +61,19 @@ mock.module('../../../src/db/queries', () => ({
     Saved: 1,
   }),
   updateApplication: () => true,
+  updateManagedItem: () => true,
 }))
 
 mock.module('../../../src/db/generation', () => ({
   getGenerationEvidenceSnapshot: () => null,
   getGoogleDriveConnection: () => null,
+  listBaselineGenerationRuns: () => [],
   listGenerationRuns: () => [],
+}))
+
+mock.module('../../../src/lib/generation-queue', () => ({
+  enqueueBaselineGeneration: async () => {},
+  enqueueGeneration: async () => {},
 }))
 
 mock.module('../../../src/lib/profiles', () => ({
@@ -83,5 +94,14 @@ mock.module('../../../src/lib/request', () => ({
 
 mock.module('../../../src/lib/validation', () => ({
   applicationSchema: { safeParse: mockApplicationSafeParse },
+  baselineGenerationSchema: {
+    safeParse: () => ({
+      success: false,
+      error: { issues: [{ message: 'Direction is required' }] },
+    }),
+  },
+  companySchema: { safeParse: () => ({ success: false }) },
+  managedContactSchema: { safeParse: () => ({ success: false }) },
+  skillSchema: { safeParse: () => ({ success: false }) },
   statusSchema: { safeParse: mockStatusSafeParse },
 }))

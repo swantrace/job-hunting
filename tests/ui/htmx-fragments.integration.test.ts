@@ -136,3 +136,34 @@ describe('global HTMX validation response policy', () => {
     expect(renderer).not.toMatch(/[45]\\d\\d.*swap:\s*true/)
   })
 })
+
+describe('validation error fragment contracts', () => {
+  test('career-documents 422 returns the full baseline panel, not a bare alert', async () => {
+    const { POST } = (await import('../../app/routes/career-documents/generation-runs')) as Record<
+      string,
+      unknown
+    >
+    const app = new Hono()
+    app.post('/career-documents/generation-runs', POST as never)
+    const response = await app.request('/career-documents/generation-runs', { method: 'POST' })
+    const html = await response.text()
+
+    expect(response.status).toBe(422)
+    expect(recordsFor(html, 'baseline-generation-panel')).toEqual([
+      expect.objectContaining({ depth: 0, id: 'baseline-generation-panel' }),
+    ])
+  })
+
+  test('management 422 returns the full management content, not a bare alert', async () => {
+    const { POST } = (await import('../../app/routes/manage/skills')) as Record<string, unknown>
+    const app = new Hono()
+    app.post('/manage/skills', POST as never)
+    const response = await app.request('/manage/skills', { method: 'POST' })
+    const html = await response.text()
+
+    expect(response.status).toBe(422)
+    expect(recordsFor(html, 'management-content')).toEqual([
+      expect.objectContaining({ depth: 0, id: 'management-content' }),
+    ])
+  })
+})
