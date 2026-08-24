@@ -299,12 +299,15 @@ export function Board({
   return (
     <div
       id="board"
-      class={`grid w-full gap-4 ${statuses.length > 1 ? 'xl:grid-cols-5 md:grid-cols-2' : ''}`}
-      aria-live="polite"
+      class="flex w-full gap-4 overflow-x-auto pb-2"
       {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
     >
       {statuses.map((status) => (
-        <section class="board-column w-full rounded-box bg-base-300/60 p-3">
+        <section
+          class={`board-column rounded-box bg-base-300/60 p-3 ${
+            statuses.length === 1 ? 'w-full flex-none' : 'w-80 min-w-80 flex-none'
+          }`}
+        >
           <div class="mb-3 flex items-center justify-between">
             <h2 class="font-semibold">{status}</h2>
             <span class="badge badge-neutral">
