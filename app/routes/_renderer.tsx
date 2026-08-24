@@ -12,7 +12,8 @@ export default jsxRenderer(({ children }) => (
       <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
       <script
         dangerouslySetInnerHTML={{
-          __html: `htmx.config.responseHandling = [
+          __html: `htmx.config.allowNestedOobSwaps = false;
+htmx.config.responseHandling = [
   { code: '204', swap: false },
   { code: '422', swap: true },
   { code: '[23]..', swap: true },
