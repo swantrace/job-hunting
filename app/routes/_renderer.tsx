@@ -10,6 +10,17 @@ export default jsxRenderer(({ children }) => (
       <title>Job Application Tracker</title>
       <Link href="/app/style.css" rel="stylesheet" />
       <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `htmx.config.responseHandling = [
+  { code: '204', swap: false },
+  { code: '422', swap: true },
+  { code: '[23]..', swap: true },
+  { code: '[45]..', swap: false, error: true },
+  { code: '...' },
+];`,
+        }}
+      />
       <script src="https://cdn.jsdelivr.net/npm/formbouncerjs@1.4.6/dist/bouncer.polyfills.min.js"></script>
     </head>
     <body>
