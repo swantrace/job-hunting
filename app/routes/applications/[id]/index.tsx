@@ -8,7 +8,9 @@ import {
 import { parseFilters, parseForm, parseId } from '../../../../src/lib/request'
 import { applicationSchema } from '../../../../src/lib/validation'
 import { Board, Metrics } from '../../../components/Dashboard'
+import { FlashMessage } from '../../../components/responses/FlashMessage'
 import { ApplicationForm } from '../../../components/Workspace'
+import { WorkspaceHeader } from '../../../components/workspace/WorkspaceHeader'
 
 export const PUT = createRoute(async (c) => {
   const id = parseId(c.req.param('id'))
@@ -34,11 +36,8 @@ export const PUT = createRoute(async (c) => {
       <ApplicationForm job={updated} filters={filters} />
       <Board jobs={listApplications(filters)} filters={filters} oob />
       <Metrics values={metrics()} oob />
-      <div id="flash" hx-swap-oob="innerHTML">
-        <div class="alert alert-success" data-flash-autodismiss>
-          Application marked as sent.
-        </div>
-      </div>
+      <WorkspaceHeader job={updated} oob />
+      <FlashMessage autoDismiss>Application marked as sent.</FlashMessage>
     </>,
   )
 })

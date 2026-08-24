@@ -1,8 +1,12 @@
 import type { JobCardData } from '../../../src/db/queries'
 
-export function WorkspaceHeader({ job }: { job: JobCardData }) {
+export function WorkspaceHeader({ job, oob = false }: { job: JobCardData; oob?: boolean }) {
   return (
-    <header id="workspace-header" class="mb-5 flex items-start justify-between">
+    <header
+      id="workspace-header"
+      class="mb-5 flex items-start justify-between"
+      {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
+    >
       <div>
         <p class="text-sm text-base-content/60">{job.companyName}</p>
         <h2 class="text-2xl font-bold">{job.jobTitle}</h2>
