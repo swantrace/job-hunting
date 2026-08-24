@@ -37,7 +37,7 @@ export const PUT = createRoute(async (c) => {
       <Board jobs={listApplications(filters)} filters={filters} oob />
       <Metrics values={metrics()} oob />
       <WorkspaceHeader job={updated} oob />
-      <FlashMessage autoDismiss>Application marked as sent.</FlashMessage>
+      <FlashMessage autoDismiss>Changes saved.</FlashMessage>
     </>,
   )
 })

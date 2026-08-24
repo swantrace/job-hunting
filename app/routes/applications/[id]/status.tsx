@@ -22,11 +22,22 @@ export const PATCH = createRoute(async (c) => {
     )
   }
   const updated = getApplication(id)
+  const message =
+    parsed.data.action === 'applied'
+      ? 'Application marked as applied.'
+      : parsed.data.action === 'today'
+        ? 'Added to today’s tasks.'
+        : parsed.data.action === 'reject'
+          ? 'Application rejected.'
+          : parsed.data.action === 'archive'
+            ? 'Application archived.'
+            : 'Application restored.'
   return c.html(
     <>
       <Board jobs={listApplications(filters)} filters={filters} />
       <Metrics values={metrics()} oob />
       {updated && <WorkspaceHeader job={updated} oob />}
+      <FlashMessage autoDismiss>{message}</FlashMessage>
     </>,
   )
 })

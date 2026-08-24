@@ -167,10 +167,7 @@ export function updateApplication(id: number, input: z.infer<typeof applicationS
         applicationSource: input.applicationSource,
         salary: input.salary,
         notes: input.notes,
-        status:
-          existing.status === 'Rejected' || existing.status === 'Archived'
-            ? existing.status
-            : 'Applied',
+        status: existing.status,
         updatedAt: date,
       })
       .where(eq(jobApplications.id, id))
@@ -848,13 +845,21 @@ export function metrics() {
   >
 }
 
-export function changeStatus(id: number, action: 'today' | 'reject' | 'archive' | 'restore') {
+export function changeStatus(
+  id: number,
+  action: 'today' | 'reject' | 'archive' | 'restore' | 'applied',
+) {
   const job = db.select().from(jobApplications).where(eq(jobApplications.id, id)).get()
   if (!job) return false
   const date = todayISO()
   if (action === 'today')
     db.update(jobApplications)
       .set({ status: 'Apply Today', applyTodayTargetDate: date, updatedAt: date })
+      .where(eq(jobApplications.id, id))
+      .run()
+  if (action === 'applied')
+    db.update(jobApplications)
+      .set({ status: 'Applied', appliedDate: date, updatedAt: date })
       .where(eq(jobApplications.id, id))
       .run()
   if (action === 'reject')

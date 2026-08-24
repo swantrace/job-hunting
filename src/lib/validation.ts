@@ -60,7 +60,9 @@ export const applicationSchema = z.object({
   skills: optionalText(1000),
 })
 
-export const statusSchema = z.object({ action: z.enum(['today', 'reject', 'archive', 'restore']) })
+export const statusSchema = z.object({
+  action: z.enum(['today', 'reject', 'archive', 'restore', 'applied']),
+})
 export const followUpSchema = z.object({ actionDate: isoDate, notes: optionalText(2000) })
 export const interviewSchema = z.object({
   interviewDate: isoDate,

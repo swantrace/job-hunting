@@ -144,9 +144,22 @@ export function ApplicationForm({
           <option value={skill.name} />
         ))}
       </datalist>
-      <button class="btn btn-primary w-full">
-        <span class="loading loading-spinner loading-sm htmx-indicator" /> 🚀 Sent Application
+      <button class="btn btn-primary w-full" type="submit">
+        <span class="loading loading-spinner loading-sm htmx-indicator" /> Save changes
       </button>
+      {(job.status === 'Saved' || job.status === 'Apply Today') && (
+        <button
+          class="btn btn-secondary w-full"
+          type="button"
+          hx-patch={`/applications/${job.id}/status?${query(filters)}`}
+          hx-vals='{"action":"applied"}'
+          hx-target="#board"
+          hx-swap="outerHTML"
+          hx-disabled-elt="this"
+        >
+          <span class="loading loading-spinner loading-sm htmx-indicator" /> Mark as applied
+        </button>
+      )}
     </form>
   )
 }
