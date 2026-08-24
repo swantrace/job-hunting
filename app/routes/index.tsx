@@ -18,6 +18,9 @@ export default createRoute((c) => {
               <a class="link link-primary" href="/manage">
                 Manage data
               </a>
+              <a class="link link-primary" href="/career-documents">
+                Career documents
+              </a>
               <a class="link link-primary" href="/export">
                 Export JSON
               </a>

@@ -8,6 +8,7 @@
       "claim": "Delivered an example feature with documented outcomes.",
       "skills": ["typescript"],
       "directions": ["fullstack", "frontend"],
+      "publicationIds": [],
       "safeToUse": true,
       "evidence": ["example:replace-with-your-evidence"]
     }

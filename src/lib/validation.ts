@@ -83,6 +83,11 @@ export const companySchema = z.object({
 export const managedContactSchema = contactSchema.extend({
   companyId: z.coerce.number().int().positive(),
 })
+export const baselineGenerationSchema = z.object({
+  direction,
+  targetTitle: optionalText(200),
+  targetKeywords: optionalText(1000),
+})
 
 export const sortValues = [
   'updated_desc',

@@ -13,3 +13,4 @@ bunqueue.db-wal
 /artifacts/
 coverage/
 temp/
+/interview-prep.md

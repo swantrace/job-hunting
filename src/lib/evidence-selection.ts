@@ -1,7 +1,12 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { z } from 'zod'
-import { type GenerationSource, saveGenerationEvidenceSnapshot } from '../db/generation'
+import {
+  type GenerationSource,
+  getBaselineGenerationRun,
+  saveBaselineGenerationEvidenceSnapshot,
+  saveGenerationEvidenceSnapshot,
+} from '../db/generation'
 import { getArtifactsRoot } from './artifact-storage'
 import { loadCareerData } from './career-data'
 import { todayISO } from './date'
@@ -19,6 +24,7 @@ export const evidenceSelectionSnapshotSchema = z.object({
     candidate: z.number().int(),
     experiences: z.number().int(),
     achievements: z.number().int(),
+    publications: z.number().int(),
     projects: z.number().int(),
     skills: z.number().int(),
     stories: z.number().int(),
@@ -28,6 +34,7 @@ export const evidenceSelectionSnapshotSchema = z.object({
   selection: z.object({
     experienceIds: z.array(z.string()),
     achievementIds: z.array(z.string()),
+    publicationIds: z.array(z.string()),
     projectIds: z.array(z.string()),
     preferredSkillIds: z.array(z.string()),
     matchedConditionalSkillIds: z.array(z.string()),
@@ -38,6 +45,7 @@ export const evidenceSelectionSnapshotSchema = z.object({
     candidate: z.unknown(),
     experiences: z.array(z.unknown()),
     achievements: z.array(z.unknown()),
+    publications: z.array(z.unknown()),
     projects: z.array(z.unknown()),
     skills: z.array(z.unknown()),
     stories: z.array(z.unknown()),
@@ -45,6 +53,20 @@ export const evidenceSelectionSnapshotSchema = z.object({
 })
 
 export type EvidenceSelectionSnapshot = z.infer<typeof evidenceSelectionSnapshotSchema>
+
+export const baselineEvidenceSelectionSnapshotSchema = evidenceSelectionSnapshotSchema
+  .omit({ generationRunId: true, application: true })
+  .extend({
+    baselineGenerationRunId: z.number().int().positive(),
+    baseline: z.object({
+      direction: z.string(),
+      targetTitle: z.string(),
+      targetKeywords: z.array(z.string()),
+    }),
+  })
+export type BaselineEvidenceSelectionSnapshot = z.infer<
+  typeof baselineEvidenceSelectionSnapshotSchema
+>
 
 const normalise = (value: string) =>
   value.trim().toLowerCase().replaceAll('_', '-').replaceAll(' ', '-')
@@ -67,6 +89,10 @@ export function buildEvidenceSelectionSnapshot(
     .map((id) => data.achievements.achievements.find((item) => item.id === id))
     .filter((item): item is NonNullable<typeof item> => !!item)
   const achievements = preferredAchievements.filter((item) => item.safeToUse)
+  const publications = profile.preferredPublicationIds
+    .map((id) => data.publications.publications.find((item) => item.id === id))
+    .filter((item): item is NonNullable<typeof item> => !!item)
+    .filter((item) => item.safeToUse)
   const projects = profile.preferredProjectIds
     .map((id) => data.projects.projects.find((item) => item.id === id))
     .filter((item): item is NonNullable<typeof item> => !!item)
@@ -94,6 +120,7 @@ export function buildEvidenceSelectionSnapshot(
       candidate: data.candidate.schemaVersion,
       experiences: data.experiences.schemaVersion,
       achievements: data.achievements.schemaVersion,
+      publications: data.publications.schemaVersion,
       projects: data.projects.schemaVersion,
       skills: data.skills.schemaVersion,
       stories: data.stories.schemaVersion,
@@ -103,6 +130,7 @@ export function buildEvidenceSelectionSnapshot(
     selection: {
       experienceIds: experiences.map((item) => item.id),
       achievementIds: achievements.map((item) => item.id),
+      publicationIds: publications.map((item) => item.id),
       projectIds: projects.map((item) => item.id),
       preferredSkillIds: preferredSkills.map((item) => item.id),
       matchedConditionalSkillIds: matchedConditionalSkills.map((item) => item.id),
@@ -115,6 +143,7 @@ export function buildEvidenceSelectionSnapshot(
       candidate: data.candidate,
       experiences,
       achievements,
+      publications,
       projects,
       skills: [...preferredSkills, ...matchedConditionalSkills],
       stories,
@@ -130,5 +159,96 @@ export async function persistEvidenceSelectionSnapshot(source: GenerationSource)
   const json = JSON.stringify(snapshot, null, 2)
   await writeFile(destination, json)
   saveGenerationEvidenceSnapshot(source.run.id, json, relativePath)
+  return snapshot
+}
+
+export function buildBaselineEvidenceSelectionSnapshot(
+  run: NonNullable<ReturnType<typeof getBaselineGenerationRun>>,
+): BaselineEvidenceSelectionSnapshot {
+  const data = loadCareerData()
+  const profile = data.profiles.find((item) => item.id === run.direction)
+  if (!profile) throw new Error(`No canonical profile exists for direction "${run.direction}".`)
+  let targetKeywords: string[]
+  try {
+    const parsed = JSON.parse(run.targetKeywords)
+    targetKeywords = z.array(z.string().trim().min(1).max(100)).catch([]).parse(parsed)
+  } catch {
+    targetKeywords = []
+  }
+  const terms = new Set(targetKeywords.map(normalise))
+  const experiences = profile.experienceSelection.priorityOrder
+    .map((id) => data.experiences.experiences.find((item) => item.id === id))
+    .filter((item): item is NonNullable<typeof item> => !!item)
+  const preferredAchievements = profile.preferredAchievementIds
+    .map((id) => data.achievements.achievements.find((item) => item.id === id))
+    .filter((item): item is NonNullable<typeof item> => !!item)
+  const achievements = preferredAchievements.filter((item) => item.safeToUse)
+  const publications = profile.preferredPublicationIds
+    .map((id) => data.publications.publications.find((item) => item.id === id))
+    .filter((item): item is NonNullable<typeof item> => !!item)
+    .filter((item) => item.safeToUse)
+  const projects = profile.preferredProjectIds
+    .map((id) => data.projects.projects.find((item) => item.id === id))
+    .filter((item): item is NonNullable<typeof item> => !!item)
+  const preferredSkills = profile.preferredSkillIds
+    .map((id) => data.skills.skills.find((item) => item.id === id))
+    .filter((item): item is NonNullable<typeof item> => !!item)
+  const matchedConditionalSkills = profile.conditionalSkillIds
+    .filter((id) => terms.has(normalise(id)))
+    .map((id) => data.skills.skills.find((item) => item.id === id))
+    .filter((item): item is NonNullable<typeof item> => !!item)
+  const stories = profile.coverLetterStrategy.preferredStoryIds
+    .map((id) => data.stories.stories.find((item) => item.id === id))
+    .filter((item): item is NonNullable<typeof item> => !!item)
+  return baselineEvidenceSelectionSnapshotSchema.parse({
+    version: 1,
+    generatedAt: todayISO(),
+    baselineGenerationRunId: run.id,
+    baseline: { direction: run.direction, targetTitle: run.targetTitle, targetKeywords },
+    sourceVersions: {
+      candidate: data.candidate.schemaVersion,
+      experiences: data.experiences.schemaVersion,
+      achievements: data.achievements.schemaVersion,
+      publications: data.publications.schemaVersion,
+      projects: data.projects.schemaVersion,
+      skills: data.skills.schemaVersion,
+      stories: data.stories.schemaVersion,
+      profile: profile.schemaVersion,
+    },
+    profile: { id: profile.id, lastUpdated: profile.lastUpdated },
+    selection: {
+      experienceIds: experiences.map((item) => item.id),
+      achievementIds: achievements.map((item) => item.id),
+      publicationIds: publications.map((item) => item.id),
+      projectIds: projects.map((item) => item.id),
+      preferredSkillIds: preferredSkills.map((item) => item.id),
+      matchedConditionalSkillIds: matchedConditionalSkills.map((item) => item.id),
+      storyIds: stories.map((item) => item.id),
+      excludedUnsafeAchievementIds: preferredAchievements
+        .filter((item) => !item.safeToUse)
+        .map((item) => item.id),
+    },
+    facts: {
+      candidate: data.candidate,
+      experiences,
+      achievements,
+      publications,
+      projects,
+      skills: [...preferredSkills, ...matchedConditionalSkills],
+      stories,
+    },
+  })
+}
+
+export async function persistBaselineEvidenceSelectionSnapshot(runId: number) {
+  const run = getBaselineGenerationRun(runId)
+  if (!run) throw new Error('Baseline generation run no longer exists.')
+  const snapshot = buildBaselineEvidenceSelectionSnapshot(run)
+  const relativePath = `baseline-run-${run.id}/evidence-selection.json`
+  const destination = resolve(getArtifactsRoot(), relativePath)
+  await mkdir(resolve(destination, '..'), { recursive: true })
+  const json = JSON.stringify(snapshot, null, 2)
+  await writeFile(destination, json)
+  saveBaselineGenerationEvidenceSnapshot(run.id, json, relativePath)
   return snapshot
 }
