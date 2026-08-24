@@ -100,7 +100,20 @@ export function Filters({ filters }: { filters: Filters }) {
           <span>Show only today’s tasks</span>
           <span id="loading" class="loading loading-spinner loading-sm htmx-indicator" />
         </label>
-        <div class="md:col-span-5 flex justify-end">
+        <div class="md:col-span-5 flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              data-open-ai-modal
+              aria-haspopup="dialog"
+            >
+              🤖 AI 解析职位
+            </button>
+            <label for="quick-collect-toggle" class="btn btn-outline btn-sm">
+              ➕ 快捷录入
+            </label>
+          </div>
           <a
             class="btn btn-ghost btn-sm"
             href="/applications"
@@ -313,13 +326,13 @@ export function Board({
   return (
     <div
       id="board"
-      class="flex w-full gap-4 overflow-x-auto pb-2"
+      class="flex w-full flex-row items-start gap-6 overflow-x-auto pb-2"
       {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
     >
       {statuses.map((status) => (
         <section
           class={`board-column rounded-box bg-base-300/60 p-3 ${
-            statuses.length === 1 ? 'w-full flex-none' : 'w-80 min-w-80 flex-none'
+            statuses.length === 1 ? 'w-full shrink-0' : 'w-[310px] min-w-[310px] shrink-0'
           }`}
         >
           <div class="mb-3 flex items-center justify-between">
@@ -436,8 +449,8 @@ function JobCard({
     job.applyTodayTargetDate < todayISO()
   const query = enc(filters)
   return (
-    <article class={`card bg-base-100 ${compact ? 'rounded-none shadow-none' : 'shadow-sm'}`}>
-      <div class={`card-body gap-2 p-4 ${compact ? 'flex-col md:flex-row md:items-center' : ''}`}>
+    <article class="card border border-base-300/40 bg-base-100 p-4 shadow-sm">
+      <div class={`card-body gap-2 p-0 ${compact ? 'flex-col md:flex-row md:items-center' : ''}`}>
         <div class="flex items-start justify-between gap-2">
           <div>
             <div class="flex items-center gap-1">
