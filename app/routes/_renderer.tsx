@@ -67,14 +67,16 @@ export default jsxRenderer(({ children }) => (
     }
     const tabButton = target && target.closest('[data-workspace-tab]');
     if (!tabButton) return;
+    const shell = document.getElementById('workspace-shell') || document;
     const tab = tabButton.dataset.workspaceTab;
-    document.querySelectorAll('[data-workspace-panel]').forEach(function (panel) {
+    shell.querySelectorAll('[data-workspace-panel]').forEach(function (panel) {
       panel.classList.toggle('hidden', panel.id !== 'workspace-' + tab + '-panel');
     });
-    document.querySelectorAll('[data-workspace-tab]').forEach(function (button) {
+    shell.querySelectorAll('[data-workspace-tab]').forEach(function (button) {
       const active = button === tabButton;
       button.classList.toggle('tab-active', active);
       button.setAttribute('aria-selected', active ? 'true' : 'false');
+      button.tabIndex = active ? 0 : -1;
     });
   });
   document.body.addEventListener('htmx:responseError', function () {

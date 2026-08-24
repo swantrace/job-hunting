@@ -1,7 +1,9 @@
 import type { Context } from 'hono'
-import { filterSchema, formObject } from './validation'
+import { filterSchema, formObject, workspaceTabSchema } from './validation'
 
 export const parseFilters = (c: Context) => filterSchema.parse(c.req.query())
+export const parseWorkspaceTab = (c: Context) =>
+  workspaceTabSchema.parse(c.req.query('workspaceTab'))
 export async function parseForm(c: Context) {
   return formObject(await c.req.formData())
 }

@@ -2,15 +2,7 @@ import { describe, expect, mock, test } from 'bun:test'
 import { resolve } from 'node:path'
 import { recordsFor } from './support/html-contract'
 
-const documentsPanelModule = resolve(process.cwd(), 'app/components/workspace/DocumentsPanel.tsx')
 const networkRouteModule = resolve(process.cwd(), 'app/routes/network/index.tsx')
-
-mock.module(documentsPanelModule, () => ({
-  renderDocumentsPanel: ({ active }: { active: boolean }) =>
-    `<section id="workspace-documents-panel" role="tabpanel"${
-      active ? '' : ' class="hidden"'
-    }>Documents placeholder</section>`,
-}))
 
 mock.module(networkRouteModule, () => ({
   GET: () =>
@@ -20,25 +12,11 @@ mock.module(networkRouteModule, () => ({
     ),
 }))
 
-type DocumentsPanelStub = {
-  renderDocumentsPanel: (options: { active: boolean }) => string
-}
-
 type NetworkRouteStub = {
   GET: () => Response
 }
 
 describe('planned modules remain testable before their files exist', () => {
-  test('Documents panel stub preserves the reserved workspace boundary', async () => {
-    const stub = (await import(documentsPanelModule)) as DocumentsPanelStub
-    const html = stub.renderDocumentsPanel({ active: true })
-
-    expect(recordsFor(html, 'workspace-documents-panel')).toEqual([
-      expect.objectContaining({ depth: 0, id: 'workspace-documents-panel', tag: 'section' }),
-    ])
-    expect(html).toContain('role="tabpanel"')
-  })
-
   test('Network route stub returns a complete page boundary', async () => {
     const stub = (await import(networkRouteModule)) as NetworkRouteStub
     const response = stub.GET()

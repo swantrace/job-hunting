@@ -90,6 +90,8 @@ mock.module('../../../src/lib/request', () => ({
   parseFilters: () => ({ priority: '', q: '', sort: 'updated_desc', today: '', view: 'active' }),
   parseForm: async () => ({ action: 'today' }),
   parseId: (value: string) => Number(value),
+  parseWorkspaceTab: (c: { req: { query: (name: string) => string | undefined } }) =>
+    c.req.query('workspaceTab') ?? 'application',
 }))
 
 mock.module('../../../src/lib/validation', () => ({

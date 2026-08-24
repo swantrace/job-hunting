@@ -109,5 +109,9 @@ export const filterSchema = z.object({
   sort: z.enum(sortValues).catch('updated_desc'),
 })
 
+export const workspaceTabs = ['application', 'contacts', 'activity', 'documents'] as const
+export type WorkspaceTab = (typeof workspaceTabs)[number]
+export const workspaceTabSchema = z.enum(workspaceTabs).catch('application')
+
 export type FieldErrors = Record<string, string[] | undefined>
 export const formObject = (form: FormData) => Object.fromEntries(form.entries())
