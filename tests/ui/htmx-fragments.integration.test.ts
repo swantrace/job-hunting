@@ -127,6 +127,34 @@ describe('422 form fragment boundaries', () => {
   })
 })
 
+describe('application save response envelope', () => {
+  test('returns one form main fragment plus top-level OOB board/metrics/header/flash', async () => {
+    mockApplicationSafeParse.mockReturnValue({ success: true, data: {} } as never)
+    const response = await (await createRouteHarness()).request('/applications/7', {
+      body: new URLSearchParams({ jobTitle: 'Updated' }),
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      method: 'PUT',
+    })
+    const html = await response.text()
+
+    expect(response.status).toBe(200)
+    for (const id of ['application-form', 'board', 'metrics', 'workspace-header', 'flash']) {
+      expect(recordsFor(html, id).length).toBeLessThanOrEqual(1)
+    }
+    expect(recordsFor(html, 'application-form')).toEqual([
+      expect.objectContaining({ depth: 0, id: 'application-form', oob: undefined }),
+    ])
+    for (const id of ['board', 'metrics', 'workspace-header']) {
+      expect(recordsFor(html, id)).toEqual([
+        expect.objectContaining({ depth: 0, id, oob: 'outerHTML' }),
+      ])
+    }
+    expect(recordsFor(html, 'flash')).toEqual([
+      expect.objectContaining({ depth: 0, id: 'flash', oob: 'innerHTML' }),
+    ])
+  })
+})
+
 describe('global HTMX validation response policy', () => {
   test('explicitly opts 422 responses into swapping without treating every 4xx as swappable', () => {
     const renderer = readFileSync(resolve(process.cwd(), 'app/routes/_renderer.tsx'), 'utf8')
