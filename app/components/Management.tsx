@@ -1,6 +1,7 @@
 import type { listManagementData } from '../../src/db/queries'
 import { AppShell } from './layout/AppShell'
 import { InputField, SelectField } from './ui/FormField'
+import { Icon } from './ui/Icon'
 
 type ManagementData = ReturnType<typeof listManagementData>
 export type ManagementKind = 'skills' | 'companies' | 'contacts'
@@ -106,7 +107,7 @@ function ManagementCard({
                           target="_blank"
                           rel="noreferrer"
                         >
-                          {company.name} ↗
+                          {company.name} <Icon name="external" className="inline size-3" />
                         </a>
                       ) : (
                         <span class="font-medium">{company.name}</span>

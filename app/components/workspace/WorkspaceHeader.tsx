@@ -1,4 +1,6 @@
 import type { JobCardData } from '../../../src/db/queries'
+import { Icon } from '../ui/Icon'
+import { StatusBadge } from '../ui/StatusBadge'
 
 export function WorkspaceHeader({ job, oob = false }: { job: JobCardData; oob?: boolean }) {
   return (
@@ -10,10 +12,12 @@ export function WorkspaceHeader({ job, oob = false }: { job: JobCardData; oob?: 
       <div>
         <p class="text-sm text-base-content/60">{job.companyName}</p>
         <h2 class="text-2xl font-bold">{job.jobTitle}</h2>
-        <span class="badge badge-primary mt-2">{job.status}</span>
+        <div class="mt-2">
+          <StatusBadge status={job.status} />
+        </div>
       </div>
       <label for="workspace-toggle" class="btn btn-circle btn-ghost" aria-label="Close">
-        ✕
+        <Icon name="close" />
       </label>
     </header>
   )

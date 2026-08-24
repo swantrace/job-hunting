@@ -2,7 +2,7 @@ import { jsxRenderer } from 'hono/jsx-renderer'
 import { Link } from 'honox/server'
 
 export default jsxRenderer(({ children }) => (
-  <html lang="en" data-theme="corporate">
+  <html lang="en">
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />

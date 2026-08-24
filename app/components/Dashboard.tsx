@@ -1,10 +1,12 @@
 import type { Child } from 'hono/jsx'
 import { type Filters, type JobCardData, listManagementData } from '../../src/db/queries'
 import type { JobStatus } from '../../src/db/schema'
-import { todayISO } from '../../src/lib/date'
+import { formatDisplayDate, todayISO } from '../../src/lib/date'
 import { listProfiles } from '../../src/lib/profiles'
 import type { FieldErrors } from '../../src/lib/validation'
+import { EmptyState } from './ui/EmptyState'
 import { InputField, SelectField, TextareaField } from './ui/FormField'
+import { Icon } from './ui/Icon'
 
 const activeStatuses: JobStatus[] = ['Saved', 'Apply Today', 'Applied', 'Follow Up', 'Interviewing']
 const enc = (filters: Filters) => new URLSearchParams(filters).toString()
@@ -318,9 +320,7 @@ export function Board({
                 .map((job) => (
                   <JobCard job={job} filters={filters} />
                 ))}
-              {!jobs.some((job) => job.status === status) && (
-                <p class="py-8 text-center text-sm text-base-content/50">No applications</p>
-              )}
+              {!jobs.some((job) => job.status === status) && <EmptyState title="No applications" />}
             </div>
           )}
         </section>
@@ -330,8 +330,7 @@ export function Board({
 }
 
 function TodayTasksTable({ jobs, filters }: { jobs: JobCardData[]; filters: Filters }) {
-  if (!jobs.length)
-    return <p class="py-8 text-center text-sm text-base-content/50">No applications</p>
+  if (!jobs.length) return <EmptyState title="Nothing due today" />
   return (
     <div class="overflow-x-auto rounded-box bg-base-100">
       <table class="table table-zebra">
@@ -362,22 +361,18 @@ function TodayTasksTable({ jobs, filters }: { jobs: JobCardData[]; filters: Filt
                       rel="noreferrer"
                       aria-label={`Open ${job.jobTitle} posting`}
                     >
-                      ↗
+                      <Icon name="external" className="size-3.5" />
                     </a>
                   )}
                 </td>
                 <td>{job.companyName}</td>
                 <td>{job.location || '—'}</td>
                 <td>
-                  <span
-                    class={`badge ${job.priority === 'A' ? 'badge-error' : job.priority === 'B' ? 'badge-warning' : 'badge-ghost'}`}
-                  >
-                    {job.priority}
-                  </span>
+                  <span class="badge badge-outline">Priority {job.priority}</span>
                 </td>
                 <td>
                   <span class={overdue ? 'badge badge-error badge-sm' : ''}>
-                    {job.applyTodayTargetDate || '—'}
+                    {job.applyTodayTargetDate ? formatDisplayDate(job.applyTodayTargetDate) : '—'}
                   </span>
                 </td>
                 <td>
@@ -391,7 +386,7 @@ function TodayTasksTable({ jobs, filters }: { jobs: JobCardData[]; filters: Filt
                 </td>
                 <td>
                   <button
-                    class="btn btn-primary btn-sm"
+                    class="btn btn-sm"
                     hx-get={`/applications/${job.id}/workspace?${query}`}
                     hx-target="#drawer-content"
                     hx-swap="innerHTML"
@@ -438,27 +433,29 @@ function JobCard({
                   rel="noreferrer"
                   aria-label={`Open ${job.jobTitle} posting`}
                 >
-                  ↗
+                  <Icon name="external" className="size-3.5" />
                 </a>
               )}
             </div>
             <p class="text-sm text-base-content/70">{job.companyName}</p>
           </div>
-          <span
-            class={`badge ${job.priority === 'A' ? 'badge-error' : job.priority === 'B' ? 'badge-warning' : 'badge-ghost'}`}
-          >
-            {job.priority}
-          </span>
+          <span class="badge badge-outline">Priority {job.priority}</span>
         </div>
         <div class="flex flex-1 flex-wrap items-center gap-2 text-xs">
-          {job.location && <span>📍 {job.location}</span>}
+          {job.location && (
+            <span class="inline-flex items-center gap-1">
+              <Icon name="location" className="size-3.5" /> {job.location}
+            </span>
+          )}
           {overdue && (
-            <span class="badge badge-error badge-sm">Overdue · {job.applyTodayTargetDate}</span>
+            <span class="badge badge-error badge-sm">
+              Overdue · {formatDisplayDate(job.applyTodayTargetDate!)}
+            </span>
           )}
         </div>
         <div class="card-actions mt-2 md:mt-0">
           <button
-            class="btn btn-primary btn-sm grow"
+            class="btn btn-sm grow"
             hx-get={`/applications/${job.id}/workspace?${query}`}
             hx-target="#drawer-content"
             hx-swap="innerHTML"

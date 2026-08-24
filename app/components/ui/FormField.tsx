@@ -1,4 +1,5 @@
 import type { Child } from 'hono/jsx'
+import { Icon } from './Icon'
 
 /**
  * Server-only daisyUI 5 form primitives.
@@ -162,7 +163,7 @@ export function InputField({
             rel="noreferrer"
             aria-label={`Open ${label} in a new tab`}
           >
-            ↗
+            <Icon name="external" />
           </a>
         </div>
       ) : (

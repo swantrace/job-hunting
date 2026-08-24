@@ -1,5 +1,5 @@
 import type { Filters, JobCardData } from '../../../src/db/queries'
-import { todayISO } from '../../../src/lib/date'
+import { formatDisplayDate, todayISO } from '../../../src/lib/date'
 import type { FieldErrors } from '../../../src/lib/validation'
 import { InputField, TextareaField } from '../ui/FormField'
 import { query, type WorkspaceErrorForm } from './helpers'
@@ -156,7 +156,7 @@ function History({
         <ul class="timeline timeline-vertical timeline-compact">
           {rows.map((row) => (
             <li>
-              <div class="timeline-start text-xs">{row.date}</div>
+              <div class="timeline-start text-xs">{formatDisplayDate(row.date)}</div>
               <div class="timeline-middle">●</div>
               <div class="timeline-end mb-4">
                 <strong>{row.title}</strong>
