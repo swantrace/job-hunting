@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import * as schema from '../../src/db/schema'
+import { mergeSkills } from '../../src/db/skill-service'
 import { type CareerSkillsInput, syncCareerSkills } from '../../src/lib/skills/sync-career-skills'
 import { migratedDatabase } from '../support/sqlite'
 
@@ -94,6 +95,61 @@ describe('career skill synchronization', () => {
       expect(
         sqlite.query('SELECT count(*) AS count FROM skills').get() as { count: number },
       ).toEqual({ count: 1 })
+    } finally {
+      sqlite.close()
+    }
+  })
+
+  test('never resolves a career skill to a merged skill', () => {
+    const { sqlite, db } = database()
+    try {
+      const target = sqlite
+        .query(
+          `INSERT INTO skills (key, name, review_status, origin, created_at, updated_at)
+           VALUES ('react', 'react', 'pending', 'manual', '2026-08-28', '2026-08-28') RETURNING id`,
+        )
+        .get() as { id: number }
+      const source = sqlite
+        .query(
+          `INSERT INTO skills (key, name, review_status, origin, created_at, updated_at)
+           VALUES ('react-js', 'react.js', 'pending', 'manual', '2026-08-28', '2026-08-28') RETURNING id`,
+        )
+        .get() as { id: number }
+      sqlite
+        .query(
+          `INSERT INTO skill_aliases (skill_id, alias, normalized_alias, origin, created_at)
+           VALUES (?, 'react', 'react', 'manual', '2026-08-28')`,
+        )
+        .run(target.id)
+      sqlite
+        .query(
+          `INSERT INTO skill_aliases (skill_id, alias, normalized_alias, origin, created_at)
+           VALUES (?, 'react.js', 'react.js', 'manual', '2026-08-28')`,
+        )
+        .run(source.id)
+
+      mergeSkills(source.id, target.id, db)
+
+      const report = syncCareerSkills(
+        db,
+        careerSkills([
+          { id: 'react', label: 'React', category: 'frontend', aliases: ['react.js'] },
+        ]),
+        { apply: true },
+      )
+
+      expect(report.conflicted).toBe(0)
+      const mergedRow = sqlite
+        .query('SELECT review_status, career_skill_id FROM skills WHERE id = ?')
+        .get(source.id) as { review_status: string; career_skill_id: string | null }
+      expect(mergedRow.review_status).toBe('merged')
+      expect(mergedRow.career_skill_id).toBeNull()
+
+      const targetRow = sqlite
+        .query('SELECT career_skill_id, review_status FROM skills WHERE id = ?')
+        .get(target.id) as { career_skill_id: string | null; review_status: string }
+      expect(targetRow.career_skill_id).toBe('react')
+      expect(targetRow.review_status).toBe('approved')
     } finally {
       sqlite.close()
     }

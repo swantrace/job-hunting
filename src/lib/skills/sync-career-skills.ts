@@ -110,14 +110,24 @@ export function syncCareerSkills(
 
   const run = (tx: DbExecutor) => {
     const allSkills = tx.select().from(skills).all()
+    // Merged skills are redirects, not live concepts: never resolve a career
+    // skill to a merged source row.
+    const activeSkills = allSkills.filter((skill) => skill.reviewStatus !== 'merged')
+    const activeSkillIds = new Set(activeSkills.map((skill) => skill.id))
     const allAliases = tx.select().from(skillAliases).all()
     const byCareerId = new Map(
-      allSkills.filter((skill) => skill.careerSkillId).map((skill) => [skill.careerSkillId, skill]),
+      activeSkills
+        .filter((skill) => skill.careerSkillId)
+        .map((skill) => [skill.careerSkillId, skill]),
     )
-    const byKey = new Map(allSkills.map((skill) => [skill.key, skill]))
-    const byName = new Map(allSkills.map((skill) => [normalizeSkillAlias(skill.name), skill]))
-    const byAlias = new Map(allAliases.map((alias) => [alias.normalizedAlias, alias]))
-    const skillById = new Map(allSkills.map((skill) => [skill.id, skill]))
+    const byKey = new Map(activeSkills.map((skill) => [skill.key, skill]))
+    const byName = new Map(activeSkills.map((skill) => [normalizeSkillAlias(skill.name), skill]))
+    const byAlias = new Map(
+      allAliases
+        .filter((alias) => activeSkillIds.has(alias.skillId))
+        .map((alias) => [alias.normalizedAlias, alias]),
+    )
+    const skillById = new Map(activeSkills.map((skill) => [skill.id, skill]))
 
     for (const career of data.skills.skills) {
       const existing = byCareerId.get(career.id)
