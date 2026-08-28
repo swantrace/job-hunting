@@ -60,6 +60,13 @@ htmx.config.responseHandling = [
   });
   document.body.addEventListener('click', function (event) {
     const target = event.target instanceof Element ? event.target : null;
+    const openQuickCollect = target && target.closest('[data-open-quick-collect]');
+    const closeQuickCollect = target && target.closest('[data-close-quick-collect]');
+    if (openQuickCollect || closeQuickCollect) {
+      const quickCollectToggle = document.getElementById('quick-collect-toggle');
+      if (quickCollectToggle) quickCollectToggle.checked = Boolean(openQuickCollect);
+      return;
+    }
     const openWorkspace = target && target.closest('[data-open-workspace]');
     if (openWorkspace) {
       const drawerToggle = document.getElementById('workspace-toggle');

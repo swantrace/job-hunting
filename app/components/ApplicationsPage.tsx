@@ -3,16 +3,40 @@ import { Board, Filters as FiltersForm, WorkspaceDrawer } from './Dashboard'
 import { AppShell } from './layout/AppShell'
 import { AiParserModal } from './opportunities/AiParserModal'
 import { QuickCollectDrawer } from './opportunities/QuickCollectDrawer'
+import { Icon } from './ui/Icon'
 
 export function ApplicationsPage({ filters }: { filters: Filters }) {
   const jobs = listApplications(filters)
   return (
-    <AppShell title="Applications" currentPath="/applications">
+    <AppShell
+      title="Applications"
+      currentPath="/applications"
+      actions={
+        <>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            data-open-quick-collect
+            aria-label="Quick add an application"
+          >
+            <Icon name="plus" />
+            <span class="hidden sm:inline">Quick add</span>
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            data-open-ai-modal
+            aria-haspopup="dialog"
+            aria-label="Parse a job post with AI"
+          >
+            <Icon name="sparkle" />
+            <span class="hidden sm:inline">Parse job post</span>
+          </button>
+        </>
+      }
+    >
       <WorkspaceDrawer>
         <QuickCollectDrawer filters={filters}>
-          <p class="mb-4 text-sm text-base-content/60">
-            {jobs.length} application{jobs.length === 1 ? '' : 's'} found
-          </p>
           <FiltersForm filters={filters} />
           <Board jobs={jobs} filters={filters} />
         </QuickCollectDrawer>

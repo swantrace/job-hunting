@@ -1,4 +1,5 @@
 import { mock } from 'bun:test'
+import type { JobCardData } from '../../../src/db/queries'
 
 export const mockStatusSafeParse = mock(() => ({
   data: { action: 'today' },
@@ -35,9 +36,10 @@ export const mockJob = {
   salary: null,
   skills: [],
   status: 'Saved',
+  statusBeforeArchive: null,
   updatedAt: '2026-08-20',
   url: 'https://example.com/jobs/7',
-}
+} satisfies JobCardData
 
 mock.module('honox/factory', () => ({
   createRoute: <T>(handler: T) => handler,
@@ -103,6 +105,30 @@ mock.module('../../../src/lib/request', () => ({
 }))
 
 mock.module('../../../src/lib/validation', () => ({
+  applicationAttributeLabels: {
+    appliedDate: 'Applied date',
+    company: 'Company',
+    location: 'Location',
+    matchLevel: 'Match level',
+    notes: 'Notes',
+    priority: 'Priority',
+    source: 'Source',
+    status: 'Status',
+    targetDate: 'Target date',
+    title: 'Job title',
+  },
+  applicationAttributes: [
+    'company',
+    'title',
+    'location',
+    'priority',
+    'status',
+    'appliedDate',
+    'targetDate',
+    'source',
+    'matchLevel',
+    'notes',
+  ],
   applicationSchema: { safeParse: mockApplicationSafeParse },
   baselineGenerationSchema: {
     safeParse: () => ({
@@ -111,7 +137,19 @@ mock.module('../../../src/lib/validation', () => ({
     }),
   },
   companySchema: { safeParse: () => ({ success: false }) },
+  defaultAttributes: ['company', 'title', 'status', 'priority', 'location', 'appliedDate'],
   managedContactSchema: { safeParse: () => ({ success: false }) },
+  parseCsvList: (value = '') =>
+    value
+      .split(',')
+      .map((item: string) => item.trim())
+      .filter(Boolean),
   skillSchema: { safeParse: () => ({ success: false }) },
   statusSchema: { safeParse: mockStatusSafeParse },
+  statusesFromFilters: (filters: { statuses: string; today: string }) =>
+    filters.today === '1'
+      ? ['Apply Today']
+      : filters.statuses
+        ? filters.statuses.split(',')
+        : ['Saved', 'Apply Today', 'Applied', 'Follow Up', 'Interviewing'],
 }))

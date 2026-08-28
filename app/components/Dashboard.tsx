@@ -60,118 +60,131 @@ export function Filters({ filters }: { filters: Filters }) {
   return (
     <form
       id="filters"
-      class="card bg-base-100 shadow-sm"
+      class="card border border-base-300 bg-base-100"
       hx-get="/applications"
       hx-target="#board"
       hx-swap="outerHTML"
       hx-push-url="true"
       hx-sync="this:replace"
       hx-indicator="#loading"
-      hx-trigger="input changed delay:350ms from:input[name='q'], search from:input[name='q'], change from:select, change from:input[name='statuses'], change from:input[name='today']"
+      hx-trigger="input changed delay:350ms from:input[name='q'], search from:input[name='q'], change from:select, change from:input[name='statuses'], change from:input[name='attributes'], change from:input[name='today']"
     >
-      <div class="card-body grid gap-3 p-4 md:grid-cols-4">
-        <div class="md:col-span-2">
-          <InputField
-            name="q"
-            label="Search"
-            type="search"
-            value={filters.q}
-            placeholder="Title or company"
-          />
+      <div class="card-body gap-4 p-4 sm:p-5">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 class="font-semibold">Filter applications</h2>
+            <p class="text-sm text-base-content/60">Search and refine the applications below.</p>
+          </div>
+          <a class="btn btn-ghost btn-sm" href="/applications">
+            Clear all
+          </a>
         </div>
-        <SelectField name="view" label="View">
-          <option value="list" selected={filters.view === 'list'}>
-            List
-          </option>
-          <option value="board" selected={filters.view === 'board'}>
-            Board
-          </option>
-        </SelectField>
-        <SelectField name="priority" label="Priority">
-          <option value="">All priorities</option>
-          {['A', 'B', 'C'].map((p) => (
-            <option selected={filters.priority === p}>{p}</option>
-          ))}
-        </SelectField>
-        <div class="md:col-span-2">
-          <fieldset class="fieldset">
-            <legend class="fieldset-legend">Status</legend>
-            <div class="flex flex-wrap gap-x-4 gap-y-2">
-              {statusOptions.map((status) => (
-                <label class="label cursor-pointer gap-2">
-                  <input
-                    type="checkbox"
-                    class="checkbox checkbox-sm"
-                    name="statuses"
-                    value={status}
-                    checked={selectedStatuses.includes(status)}
-                  />
-                  <span class="text-sm">{status}</span>
-                </label>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-12">
+          <div class="sm:col-span-2 lg:col-span-4">
+            <InputField
+              name="q"
+              label="Search"
+              type="search"
+              value={filters.q}
+              placeholder="Title or company"
+            />
+          </div>
+          <div class="lg:col-span-2">
+            <SelectField name="view" label="View">
+              <option value="list" selected={filters.view === 'list'}>
+                List
+              </option>
+              <option value="board" selected={filters.view === 'board'}>
+                Board
+              </option>
+            </SelectField>
+          </div>
+          <div class="lg:col-span-2">
+            <SelectField name="priority" label="Priority">
+              <option value="">All priorities</option>
+              {['A', 'B', 'C'].map((p) => (
+                <option selected={filters.priority === p}>{p}</option>
               ))}
-            </div>
+            </SelectField>
+          </div>
+          <div class="lg:col-span-2">
+            <SelectField name="sort" label="Sort by">
+              {[
+                ['updated_desc', 'Recently updated'],
+                ['posted_desc', 'Posted: newest'],
+                ['posted_asc', 'Posted: oldest'],
+                ['company_asc', 'Company: A–Z'],
+                ['company_desc', 'Company: Z–A'],
+                ['priority_asc', 'Priority: A–C'],
+                ['priority_desc', 'Priority: C–A'],
+                ['target_asc', 'Today target'],
+                ['applied_desc', 'Applied: newest'],
+                ['applied_asc', 'Applied: oldest'],
+              ].map(([v, l]) => (
+                <option value={v} selected={filters.sort === v}>
+                  {l}
+                </option>
+              ))}
+            </SelectField>
+          </div>
+          <fieldset class="fieldset lg:col-span-2">
+            <legend class="fieldset-legend">Columns</legend>
+            <details class="dropdown dropdown-end w-full">
+              <summary class="btn w-full justify-between border-base-300 bg-base-100 font-normal">
+                <span>Choose columns</span>
+                <Icon name="chevronDown" />
+              </summary>
+              <div class="dropdown-content z-30 mt-2 w-72 rounded-box border border-base-300 bg-base-100 p-3 shadow-lg">
+                <p class="px-2 pb-2 text-sm font-semibold">Visible columns</p>
+                <div class="grid grid-cols-2 gap-1">
+                  {applicationAttributes.map((attr) => (
+                    <label class="label cursor-pointer justify-start gap-2 rounded-lg px-2 py-2 hover:bg-base-200">
+                      <input
+                        type="checkbox"
+                        class="checkbox checkbox-sm"
+                        name="attributes"
+                        value={attr}
+                        checked={attributes.includes(attr)}
+                      />
+                      <span class="text-sm">{applicationAttributeLabels[attr]}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </details>
           </fieldset>
-        </div>
-        <SelectField name="sort" label="Sort">
-          {[
-            ['updated_desc', 'Recently updated'],
-            ['posted_desc', 'Posted: newest'],
-            ['posted_asc', 'Posted: oldest'],
-            ['company_asc', 'Company: A-Z'],
-            ['company_desc', 'Company: Z-A'],
-            ['priority_asc', 'Priority: A-C'],
-            ['priority_desc', 'Priority: C-A'],
-            ['target_asc', 'Today target'],
-            ['applied_desc', 'Applied: newest'],
-            ['applied_asc', 'Applied: oldest'],
-          ].map(([v, l]) => (
-            <option value={v} selected={filters.sort === v}>
-              {l}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField name="attributes" label="Columns" multiple>
-          {applicationAttributes.map((attr) => (
-            <option value={attr} selected={attributes.includes(attr)}>
-              {applicationAttributeLabels[attr]}
-            </option>
-          ))}
-        </SelectField>
-        <label class="label cursor-pointer justify-start gap-3 md:col-span-4">
-          <input
-            class="toggle toggle-primary"
-            type="checkbox"
-            name="today"
-            value="1"
-            checked={filters.today === '1'}
-          />
-          <span>Show due today</span>
-          <span id="loading" class="loading loading-spinner loading-sm htmx-indicator" />
-        </label>
-        <div class="flex flex-wrap items-center justify-between gap-2 md:col-span-4">
-          <div class="flex flex-wrap gap-2">
-            <button
-              type="button"
-              class="btn btn-primary btn-sm"
-              data-open-ai-modal
-              aria-haspopup="dialog"
-            >
-              🤖 AI 解析职位
-            </button>
-            <label for="quick-collect-toggle" class="btn btn-outline btn-sm">
-              ➕ 快捷录入
+          <div class="sm:col-span-2 lg:col-span-9">
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">Status</legend>
+              <div class="flex flex-wrap gap-x-4 gap-y-2">
+                {statusOptions.map((status) => (
+                  <label class="label cursor-pointer gap-2">
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm"
+                      name="statuses"
+                      value={status}
+                      checked={selectedStatuses.includes(status)}
+                    />
+                    <span class="text-sm">{status}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </div>
+          <div class="flex items-end lg:col-span-3 lg:justify-end">
+            <label class="label min-h-12 cursor-pointer justify-start gap-3 lg:justify-end">
+              <input
+                class="toggle toggle-primary"
+                type="checkbox"
+                name="today"
+                value="1"
+                checked={filters.today === '1'}
+              />
+              <span>Due today only</span>
+              <span id="loading" class="loading loading-spinner loading-sm htmx-indicator" />
             </label>
           </div>
-          <a
-            class="btn btn-ghost btn-sm"
-            href="/applications"
-            hx-get="/applications"
-            hx-target="#board"
-            hx-swap="outerHTML"
-            hx-push-url="true"
-          >
-            Clear filters
-          </a>
         </div>
       </div>
     </form>
@@ -365,29 +378,39 @@ export function Board({
   filters: Filters
   oob?: boolean
 }) {
-  return filters.view === 'board' ? (
-    <KanbanBoard jobs={jobs} filters={filters} oob={oob} />
-  ) : (
-    <ListBoard jobs={jobs} filters={filters} oob={oob} />
+  return (
+    <section
+      id="board"
+      class="mt-5"
+      aria-live="polite"
+      {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
+    >
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
+        <p class="text-sm text-base-content/70">
+          <span class="font-semibold text-base-content">{jobs.length}</span> application
+          {jobs.length === 1 ? '' : 's'} found
+        </p>
+        <span class="badge badge-ghost badge-sm">
+          {filters.today === '1'
+            ? 'Due today'
+            : filters.view === 'board'
+              ? 'Board view'
+              : 'List view'}
+        </span>
+      </div>
+      {filters.view === 'board' ? (
+        <KanbanBoard jobs={jobs} filters={filters} />
+      ) : (
+        <ListBoard jobs={jobs} filters={filters} />
+      )}
+    </section>
   )
 }
 
-function KanbanBoard({
-  jobs,
-  filters,
-  oob,
-}: {
-  jobs: JobCardData[]
-  filters: Filters
-  oob?: boolean
-}) {
+function KanbanBoard({ jobs, filters }: { jobs: JobCardData[]; filters: Filters }) {
   const statuses = statusesFromFilters(filters)
   return (
-    <div
-      id="board"
-      class="flex w-full flex-row items-start gap-6 overflow-x-auto pb-2"
-      {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
-    >
+    <div class="flex w-full flex-row items-start gap-4 overflow-x-auto pb-2">
       {statuses.map((status) => (
         <section
           class={`board-column rounded-box bg-base-300/60 p-3 ${
@@ -425,56 +448,55 @@ const parseAttributes = (value?: string): ApplicationAttribute[] => {
   return selected.length ? selected : [...defaultAttributes]
 }
 
-function ListBoard({
-  jobs,
-  filters,
-  oob,
-}: {
-  jobs: JobCardData[]
-  filters: Filters
-  oob?: boolean
-}) {
+function ListBoard({ jobs, filters }: { jobs: JobCardData[]; filters: Filters }) {
   const attributes = parseAttributes(filters.attributes)
   const query = enc(filters)
   return (
-    <div
-      id="board"
-      class="overflow-x-auto rounded-box bg-base-100 shadow-sm"
-      {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
-    >
+    <div class="overflow-hidden rounded-box border border-base-300 bg-base-100">
       {jobs.length ? (
-        <table class="table table-zebra">
-          <thead>
-            <tr>
-              {attributes.map((attr) => (
-                <th class={attr === 'title' ? 'min-w-48' : undefined}>
-                  {applicationAttributeLabels[attr]}
-                </th>
-              ))}
-              <th class="text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {jobs.map((job) => (
-              <tr>
-                {attributes.map((attr) => (
-                  <td>{renderCell(job, attr)}</td>
+        <>
+          <div class="hidden overflow-x-auto md:block">
+            <table class="table table-sm">
+              <caption class="sr-only">Job applications</caption>
+              <thead>
+                <tr>
+                  {attributes.map((attr) => (
+                    <th class={attr === 'title' ? 'min-w-48' : undefined}>
+                      {applicationAttributeLabels[attr]}
+                    </th>
+                  ))}
+                  <th class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.map((job) => (
+                  <tr class="border-base-200 hover:bg-base-200/50">
+                    {attributes.map((attr) => (
+                      <td>{renderCell(job, attr)}</td>
+                    ))}
+                    <td class="text-right">
+                      <button
+                        class="btn btn-ghost btn-sm"
+                        hx-get={`/applications/${job.id}/workspace?${query}`}
+                        hx-target="#drawer-content"
+                        hx-swap="innerHTML"
+                        data-open-workspace
+                        aria-label={`View ${job.jobTitle} at ${job.companyName}`}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-                <td class="text-right">
-                  <button
-                    class="btn btn-sm"
-                    hx-get={`/applications/${job.id}/workspace?${query}`}
-                    hx-target="#drawer-content"
-                    hx-swap="innerHTML"
-                    data-open-workspace
-                  >
-                    Open
-                  </button>
-                </td>
-              </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="divide-y divide-base-200 md:hidden">
+            {jobs.map((job) => (
+              <MobileApplicationRow job={job} query={query} />
             ))}
-          </tbody>
-        </table>
+          </div>
+        </>
       ) : (
         <EmptyState
           title="No applications"
@@ -482,6 +504,86 @@ function ListBoard({
         />
       )}
     </div>
+  )
+}
+
+function MobileApplicationRow({
+  job,
+  query,
+  showTargetDate = false,
+}: {
+  job: JobCardData
+  query: string
+  showTargetDate?: boolean
+}) {
+  const date = showTargetDate ? job.applyTodayTargetDate : job.appliedDate
+  const overdue =
+    showTargetDate && !!job.applyTodayTargetDate && job.applyTodayTargetDate < todayISO()
+  return (
+    <article class="p-4">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="truncate text-sm text-base-content/60">{job.companyName}</p>
+          <h3 class="mt-0.5 font-semibold">
+            <span>{job.jobTitle}</span>
+            {job.url ? (
+              <a
+                class="ms-1 inline-flex align-middle"
+                href={job.url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open ${job.jobTitle} posting`}
+              >
+                <Icon name="external" className="size-3.5" />
+              </a>
+            ) : null}
+          </h3>
+        </div>
+        <StatusBadge status={job.status} />
+      </div>
+      <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-base-content/70">
+        <PriorityBadge priority={job.priority} small />
+        {job.location ? (
+          <span class="inline-flex items-center gap-1">
+            <Icon name="location" className="size-3.5" /> {job.location}
+          </span>
+        ) : null}
+        {date ? (
+          <span class={overdue ? 'font-medium text-error' : undefined}>
+            {showTargetDate ? 'Target' : 'Applied'} · {formatDisplayDate(date)}
+          </span>
+        ) : null}
+      </div>
+      <div class="mt-3 flex justify-end">
+        <button
+          class="btn btn-ghost btn-sm"
+          hx-get={`/applications/${job.id}/workspace?${query}`}
+          hx-target="#drawer-content"
+          hx-swap="innerHTML"
+          data-open-workspace
+        >
+          View details
+        </button>
+      </div>
+    </article>
+  )
+}
+
+function PriorityBadge({
+  priority,
+  small = false,
+}: {
+  priority: JobCardData['priority']
+  small?: boolean
+}) {
+  return (
+    <span
+      class={`badge badge-outline min-w-20 shrink-0 justify-center whitespace-nowrap ${
+        small ? 'badge-sm' : ''
+      }`}
+    >
+      Priority {priority}
+    </span>
   )
 }
 
@@ -515,7 +617,7 @@ function renderCell(job: JobCardData, attr: ApplicationAttribute) {
     case 'location':
       return job.location || '—'
     case 'priority':
-      return <span class="badge badge-outline">Priority {job.priority}</span>
+      return <PriorityBadge priority={job.priority} />
     case 'status':
       return <StatusBadge status={job.status} />
     case 'appliedDate':
@@ -533,75 +635,73 @@ function renderCell(job: JobCardData, attr: ApplicationAttribute) {
 
 function TodayTasksTable({ jobs, filters }: { jobs: JobCardData[]; filters: Filters }) {
   if (!jobs.length) return <EmptyState title="Nothing due today" />
+  const query = enc(filters)
   return (
-    <div class="overflow-x-auto rounded-box bg-base-100">
-      <table class="table table-zebra">
-        <thead>
-          <tr>
-            <th>Job title</th>
-            <th>Company</th>
-            <th>Location</th>
-            <th>Priority</th>
-            <th>Target date</th>
-            <th>Skills</th>
-            <th class="text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {jobs.map((job) => {
-            const overdue = !!job.applyTodayTargetDate && job.applyTodayTargetDate < todayISO()
-            const query = enc(filters)
-            return (
-              <tr>
-                <td class="font-medium">
-                  {job.jobTitle}
-                  {job.url && (
-                    <a
-                      class="ml-1 link"
-                      href={job.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`Open ${job.jobTitle} posting`}
+    <div class="overflow-hidden rounded-box border border-base-300 bg-base-100">
+      <div class="hidden overflow-x-auto md:block">
+        <table class="table table-sm">
+          <caption class="sr-only">Applications due today</caption>
+          <thead>
+            <tr>
+              <th>Job title</th>
+              <th>Company</th>
+              <th>Location</th>
+              <th>Priority</th>
+              <th>Target date</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {jobs.map((job) => {
+              const overdue = !!job.applyTodayTargetDate && job.applyTodayTargetDate < todayISO()
+              return (
+                <tr class="border-base-200 hover:bg-base-200/50">
+                  <td class="font-medium">
+                    {job.jobTitle}
+                    {job.url && (
+                      <a
+                        class="ml-1 inline-flex align-middle"
+                        href={job.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`Open ${job.jobTitle} posting`}
+                      >
+                        <Icon name="external" className="size-3.5" />
+                      </a>
+                    )}
+                  </td>
+                  <td>{job.companyName}</td>
+                  <td>{job.location || '—'}</td>
+                  <td>
+                    <PriorityBadge priority={job.priority} />
+                  </td>
+                  <td>
+                    <span class={overdue ? 'badge badge-error badge-sm' : ''}>
+                      {job.applyTodayTargetDate ? formatDisplayDate(job.applyTodayTargetDate) : '—'}
+                    </span>
+                  </td>
+                  <td class="text-right">
+                    <button
+                      class="btn btn-ghost btn-sm"
+                      hx-get={`/applications/${job.id}/workspace?${query}`}
+                      hx-target="#drawer-content"
+                      hx-swap="innerHTML"
+                      data-open-workspace
                     >
-                      <Icon name="external" className="size-3.5" />
-                    </a>
-                  )}
-                </td>
-                <td>{job.companyName}</td>
-                <td>{job.location || '—'}</td>
-                <td>
-                  <span class="badge badge-outline">Priority {job.priority}</span>
-                </td>
-                <td>
-                  <span class={overdue ? 'badge badge-error badge-sm' : ''}>
-                    {job.applyTodayTargetDate ? formatDisplayDate(job.applyTodayTargetDate) : '—'}
-                  </span>
-                </td>
-                <td>
-                  <div class="flex min-w-32 flex-wrap gap-1">
-                    {job.skills.length
-                      ? job.skills.map((skill) => (
-                          <span class="badge badge-outline badge-sm">{skill}</span>
-                        ))
-                      : '—'}
-                  </div>
-                </td>
-                <td>
-                  <button
-                    class="btn btn-sm"
-                    hx-get={`/applications/${job.id}/workspace?${query}`}
-                    hx-target="#drawer-content"
-                    hx-swap="innerHTML"
-                    data-open-workspace
-                  >
-                    Open
-                  </button>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                      View
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div class="divide-y divide-base-200 md:hidden">
+        {jobs.map((job) => (
+          <MobileApplicationRow job={job} query={query} showTargetDate />
+        ))}
+      </div>
     </div>
   )
 }
@@ -641,7 +741,7 @@ function JobCard({
             </div>
             <p class="text-sm text-base-content/70">{job.companyName}</p>
           </div>
-          <span class="badge badge-outline">Priority {job.priority}</span>
+          <PriorityBadge priority={job.priority} />
         </div>
         <div class="flex flex-1 flex-wrap items-center gap-2 text-xs">
           {job.location && (

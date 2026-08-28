@@ -1,5 +1,6 @@
 import type { Filters } from '../../../src/db/queries'
 import { AiParser } from '../AiParser'
+import { Icon } from '../ui/Icon'
 
 export function AiParserModal({ filters }: { filters: Filters }) {
   return (
@@ -7,10 +8,10 @@ export function AiParserModal({ filters }: { filters: Filters }) {
       <div class="modal-box max-w-2xl">
         <form method="dialog">
           <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close">
-            ✕
+            <Icon name="close" />
           </button>
         </form>
-        <h3 class="text-lg font-bold">AI 解析职位</h3>
+        <h3 class="text-lg font-bold">Parse a job post</h3>
         <div class="py-2">
           <AiParser filters={filters} />
         </div>
