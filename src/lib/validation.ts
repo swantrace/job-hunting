@@ -78,6 +78,19 @@ export const contactSchema = z.object({
   linkedinUrl: z.preprocess(emptyToNull, z.string().trim().url().max(2048).nullable().optional()),
 })
 export const skillSchema = z.object({ name: z.string().trim().min(1).max(80) })
+export const skillDecisionSchema = z
+  .object({
+    action: z.enum(['skip', 'include']),
+    reason: z.string().trim().max(2000).default(''),
+  })
+  .superRefine((value, ctx) => {
+    if (value.action === 'include' && value.reason.trim() === '')
+      ctx.addIssue({
+        code: 'custom',
+        message: 'A reason is required to include this skill.',
+        path: ['reason'],
+      })
+  })
 export const companySchema = z.object({
   name: z.string().trim().min(1).max(200),
   website: optionalUrl,

@@ -12,6 +12,7 @@ import {
   skillKey,
   textValue,
 } from '../lib/import'
+import { normalizeSkillAlias } from '../lib/skills/normalize'
 import { advanceStatus } from '../lib/transitions'
 import {
   type applicationSchema,
@@ -35,6 +36,12 @@ import {
   skills,
   statuses,
 } from './schema'
+import {
+  type DbExecutor,
+  getOrCreateSkill,
+  insertSkill,
+  reconcileSkillNames,
+} from './skill-queries'
 
 export type Filters = z.infer<typeof filterSchema>
 export type JobCardData = JobApplication & {
@@ -56,8 +63,6 @@ const cleanSkills = (value?: string | null) =>
     ),
   ].slice(0, 20)
 
-type DbExecutor = Pick<typeof db, 'select' | 'insert' | 'delete'>
-
 function getOrCreateCompany(tx: DbExecutor, name: string, date: string) {
   let company = tx
     .select()
@@ -77,18 +82,7 @@ function getOrCreateCompany(tx: DbExecutor, name: string, date: string) {
 }
 
 function replaceSkills(tx: DbExecutor, jobId: number, names: string[]) {
-  tx.delete(jobApplicationsToSkills)
-    .where(eq(jobApplicationsToSkills.jobApplicationId, jobId))
-    .run()
-  for (const name of names) {
-    tx.insert(skills).values({ name }).onConflictDoNothing().run()
-    const skill = tx.select().from(skills).where(sql`lower(${skills.name}) = lower(${name})`).get()
-    if (skill)
-      tx.insert(jobApplicationsToSkills)
-        .values({ jobApplicationId: jobId, skillId: skill.id })
-        .onConflictDoNothing()
-        .run()
-  }
+  reconcileSkillNames(tx, jobId, names)
 }
 
 export function createApplication(input: z.infer<typeof quickCollectSchema>) {
@@ -521,9 +515,10 @@ export function mergeImport(payload: ImportPayload) {
       const name = textValue(incoming.name)
       if (!name) continue
       const existing = skillsByKey.get(skillKey(incoming))
-      if (existing) skillIds.set(Number(incoming.id), existing.id)
-      else {
-        const created = tx.insert(skills).values({ name }).returning().get()
+      if (existing) {
+        skillIds.set(Number(incoming.id), existing.id)
+      } else {
+        const created = insertSkill(tx, { name, origin: 'import' })
         skillsByKey.set(skillKey(incoming), created)
         skillIds.set(Number(incoming.id), created.id)
       }
@@ -614,11 +609,19 @@ export function mergeImport(payload: ImportPayload) {
       const skillId =
         skillIds.get(Number(relationRecord.skillId)) ??
         skillsByKey.get(key(relationRecord.skillName))?.id
-      if (applicationId && skillId)
+      if (applicationId && skillId) {
+        const date = todayISO()
         tx.insert(jobApplicationsToSkills)
-          .values({ jobApplicationId: applicationId, skillId })
+          .values({
+            jobApplicationId: applicationId,
+            skillId,
+            rawLabel: textValue(relationRecord.skillName) || null,
+            createdAt: date,
+            updatedAt: date,
+          })
           .onConflictDoNothing()
           .run()
+      }
     }
     for (const relation of payload.applicationContacts) {
       const applicationId = applicationIds.get(Number(relation.jobApplicationId))
@@ -738,7 +741,7 @@ export function mergeImport(payload: ImportPayload) {
 }
 
 export function createSkill(name: string) {
-  db.insert(skills).values({ name }).onConflictDoNothing().run()
+  getOrCreateSkill(db, name, 'manual')
 }
 
 export function createCompany(name: string, website?: string | null) {
@@ -768,7 +771,14 @@ export function updateManagedItem(
     | { companyId: number; name: string; email?: string | null; linkedinUrl?: string | null },
 ) {
   if (kind === 'skills') {
-    db.update(skills).set({ name: input.name }).where(eq(skills.id, id)).run()
+    db.update(skills)
+      .set({
+        name: input.name,
+        key: normalizeSkillAlias(input.name),
+        updatedAt: todayISO(),
+      })
+      .where(eq(skills.id, id))
+      .run()
     return
   }
   if (kind === 'companies') {
