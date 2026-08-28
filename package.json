@@ -16,7 +16,8 @@
     "test:unit": "bun test tests/*.test.ts tests/skills",
     "test:skills": "bun test tests/skills",
     "test:ui-contracts": "bun test tests/ui",
-    "skills:audit": "bun run src/cli/audit-skills.ts"
+    "skills:audit": "bun run src/cli/audit-skills.ts",
+    "skills:sync": "bun run src/cli/sync-career-skills.ts"
   },
   "dependencies": {
     "bunqueue": "^2.8.32",
