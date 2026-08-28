@@ -13,6 +13,7 @@ export function DocumentsPanel({
   runs,
   evidenceSnapshot,
   googleDriveConnected,
+  generationReady = true,
   active = false,
 }: {
   jobId: number
@@ -20,6 +21,7 @@ export function DocumentsPanel({
   runs: GenerationRunWithArtifacts[]
   evidenceSnapshot: string | null
   googleDriveConnected: boolean
+  generationReady?: boolean
   active?: boolean
 }) {
   return (
@@ -36,6 +38,7 @@ export function DocumentsPanel({
         runs={runs}
         evidenceSnapshot={evidenceSnapshot}
         googleDriveConnected={googleDriveConnected}
+        generationReady={generationReady}
       />
     </div>
   )
@@ -47,12 +50,14 @@ export function GenerationPanel({
   runs,
   evidenceSnapshot,
   googleDriveConnected,
+  generationReady = true,
 }: {
   jobId: number
   filters: Filters
   runs: GenerationRunWithArtifacts[]
   evidenceSnapshot: string | null
   googleDriveConnected: boolean
+  generationReady?: boolean
 }) {
   const latest = runs[0]
   const statusClass =
@@ -90,12 +95,20 @@ export function GenerationPanel({
           hx-swap="outerHTML"
           hx-disabled-elt="find button"
         >
-          <button class="btn btn-secondary btn-sm">
+          <button class="btn btn-secondary btn-sm" disabled={!generationReady}>
             <span class="loading loading-spinner loading-xs htmx-indicator" />
             {latest?.status === 'Failed' ? 'Retry generation' : 'Generate documents'}
           </button>
         </form>
       </div>
+      {!generationReady && (
+        <div class="alert alert-warning mt-4 text-sm" role="alert">
+          <span>
+            Generation is disabled until every “not in career data” skill is skipped or included.
+            Review skills first.
+          </span>
+        </div>
+      )}
       {!googleDriveConnected && (
         <div class="alert mt-4 text-sm">
           <span>Connect Google Drive to upload generated documents automatically.</span>

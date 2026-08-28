@@ -4,7 +4,10 @@ import {
   listGenerationRuns,
 } from '../../../src/db/generation'
 import type { Filters, JobCardData } from '../../../src/db/queries'
-import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
+import {
+  type ApplicationSkillRequirement,
+  hasPendingSkillDecisions,
+} from '../../../src/db/skill-queries'
 import type { FieldErrors, WorkspaceTab } from '../../../src/lib/validation'
 import { ActivityPanel } from './ActivityPanel'
 import { ApplicationPanel } from './ApplicationPanel'
@@ -64,6 +67,7 @@ export function WorkspaceShell({
         runs={generationRuns}
         evidenceSnapshot={latestEvidenceSnapshot?.snapshotJson ?? null}
         googleDriveConnected={googleDriveConnected}
+        generationReady={!hasPendingSkillDecisions(job.id)}
         active={activeTab === 'documents'}
       />
       <SkillGapPanel

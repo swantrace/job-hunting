@@ -13,11 +13,10 @@ import {
   generationRuns,
   googleDriveConnections,
   jobApplications,
-  jobApplicationsToSkills,
   jobPostingAnalyses,
   jobPostings,
-  skills,
 } from './schema'
+import { listApplicationSkillRequirements } from './skill-queries'
 
 export type GenerationRunWithArtifacts = GenerationRun & {
   artifacts: (typeof generatedArtifacts.$inferSelect)[]
@@ -32,6 +31,7 @@ export type GenerationSource = {
   application: typeof jobApplications.$inferSelect
   company: typeof companies.$inferSelect
   skills: string[]
+  requirements: ReturnType<typeof listApplicationSkillRequirements>
   jobPosting: typeof jobPostings.$inferSelect | undefined
   analysis: typeof jobPostingAnalyses.$inferSelect | undefined
 }
@@ -286,18 +286,13 @@ export function getGenerationSource(runId: number): GenerationSource | null {
         .where(eq(jobPostingAnalyses.jobPostingId, jobPosting.id))
         .get()
     : undefined
-  const jobSkills = db
-    .select({ name: skills.name })
-    .from(jobApplicationsToSkills)
-    .innerJoin(skills, eq(jobApplicationsToSkills.skillId, skills.id))
-    .where(eq(jobApplicationsToSkills.jobApplicationId, row.application.id))
-    .all()
-    .map((skill) => skill.name)
+  const requirements = listApplicationSkillRequirements(row.application.id)
   return {
     run,
     application: row.application,
     company: row.company,
-    skills: jobSkills,
+    skills: requirements.map((item) => item.skillName),
+    requirements,
     jobPosting,
     analysis,
   }

@@ -26,6 +26,7 @@ import type {
   EvidenceSelectionSnapshot,
 } from './evidence-selection'
 import { resolveProjectAsset } from './profiles'
+import { generationEligibleRequirements } from './skills/generation-eligibility'
 
 type JsonSchema = Record<string, unknown>
 type ArtifactOutput = {
@@ -124,6 +125,8 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.')
   const snapshot = JSON.parse(saved.snapshotJson) as EvidenceSelectionSnapshot
   const facts = snapshot.facts as any
+  const requirements = snapshot.skillRequirements ?? []
+  const includedRequirements = generationEligibleRequirements(requirements)
   const jobContext = {
     version: 2,
     generatedAt: todayISO(),
@@ -135,7 +138,13 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
       location: source.application.location,
       postedDate: source.application.postedDate,
       salary: source.application.salary,
-      skills: source.skills,
+      skills: includedRequirements.map((requirement) => requirement.skillName),
+      skillProvenance: includedRequirements.map((requirement) => ({
+        skill: requirement.skillName,
+        source:
+          requirement.analysisResult === 'proven-match' ? 'career-evidence' : 'application-only',
+        reason: requirement.analysisResult === 'proven-match' ? null : requirement.decisionReason,
+      })),
     },
     analysis: {
       requirements: splitLines(source.analysis.requirements),

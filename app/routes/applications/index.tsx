@@ -1,6 +1,5 @@
 import { createRoute } from 'honox/factory'
 import { createApplication, listApplications, metrics } from '../../../src/db/queries'
-import { enqueueGeneration } from '../../../src/lib/generation-queue'
 import { parseFilters, parseForm } from '../../../src/lib/request'
 import { parseSkillRequirementsValue, quickCollectSchema } from '../../../src/lib/validation'
 import { ApplicationsPage } from '../../components/ApplicationsPage'
@@ -29,15 +28,9 @@ export const POST = createRoute(async (c) => {
       />,
       422,
     )
-  const id = createApplication(parsed.data)
-  if (parsed.data.parserPromptVersion) {
-    try {
-      await enqueueGeneration(id)
-    } catch (error) {
-      // The saved run remains Queued and will be recovered on the next server start.
-      console.error('Unable to enqueue document generation', error)
-    }
-  }
+  // Saving an AI-parsed opportunity only persists the posting, analysis, and
+  // requirements. Document generation is explicit and starts from the review.
+  createApplication(parsed.data)
   return c.html(
     <MutationResponse
       jobs={listApplications(filters)}

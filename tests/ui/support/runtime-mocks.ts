@@ -40,6 +40,7 @@ export const mockGetApplicationSkillRequirement = mock((): any => undefined)
 export const mockListApplicationSkillRequirements = mock((): any => [])
 export const mockSkipRemainingSkillDecisions = mock((): any => {})
 export const mockUpdateSkillDecision = mock((): any => {})
+export const mockHasPendingSkillDecisions = mock(() => false)
 
 export const mockJob = {
   appliedDate: null,
@@ -75,6 +76,7 @@ mock.module('honox/factory', () => ({
 
 mock.module('../../../src/db/queries', () => ({
   changeStatus: () => true,
+  createApplication: () => 5,
   createCompany: () => true,
   createContact: () => true,
   createSkill: () => true,
@@ -101,9 +103,12 @@ mock.module('../../../src/db/generation', () => ({
   listGenerationRuns: () => [],
 }))
 
+export const mockEnqueueGeneration = mock(async () => ({ id: 1 }))
+export const mockEnqueueBaselineGeneration = mock(async () => ({ id: 1 }))
+
 mock.module('../../../src/lib/generation-queue', () => ({
-  enqueueBaselineGeneration: async () => {},
-  enqueueGeneration: async () => {},
+  enqueueBaselineGeneration: mockEnqueueBaselineGeneration,
+  enqueueGeneration: mockEnqueueGeneration,
 }))
 
 mock.module('../../../src/lib/profiles', () => ({
@@ -148,7 +153,7 @@ mock.module('../../../src/lib/validation', () => ({
 mock.module('../../../src/db/skill-queries', () => ({
   ...realSkillQueries,
   getApplicationSkillRequirement: mockGetApplicationSkillRequirement,
-  hasPendingSkillDecisions: () => false,
+  hasPendingSkillDecisions: mockHasPendingSkillDecisions,
   listApplicationSkillRequirements: mockListApplicationSkillRequirements,
   skipRemainingSkillDecisions: mockSkipRemainingSkillDecisions,
   updateSkillDecision: mockUpdateSkillDecision,
