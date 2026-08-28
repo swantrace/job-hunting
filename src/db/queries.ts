@@ -6,12 +6,14 @@ import {
   applicationKey,
   companyKey,
   contactKey,
+  detectImportConflicts,
   type ImportPayload,
   key,
   nullableText,
   skillKey,
   textValue,
 } from '../lib/import'
+import type { SkillCategory, SkillOrigin, SkillReviewStatus } from '../lib/skills/constants'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
 import { advanceStatus } from '../lib/transitions'
 import {
@@ -33,6 +35,7 @@ import {
   jobApplicationsToSkills,
   jobPostingAnalyses,
   jobPostings,
+  skillAliases,
   skills,
   statuses,
 } from './schema'
@@ -351,6 +354,7 @@ export function exportData() {
     exportedAt: new Date().toISOString(),
     companies: companyRows,
     skills: skillRows,
+    skillAliases: db.select().from(skillAliases).all(),
     contacts: contactRows.map((contact) => ({
       ...contact,
       companyName: companyById.get(contact.companyId),
@@ -466,7 +470,7 @@ export function previewImport(payload: ImportPayload): ImportPreview {
       followUps: { created: payload.followUps.length, updated: 0, unchanged: 0, conflicts: 0 },
       interviews: { created: payload.interviews.length, updated: 0, unchanged: 0, conflicts: 0 },
     },
-    conflicts,
+    conflicts: [...conflicts, ...detectImportConflicts(payload)],
   }
 }
 
@@ -480,13 +484,6 @@ export function mergeImport(payload: ImportPayload) {
       tx
         .select()
         .from(companies)
-        .all()
-        .map((item) => [key(item.name), item]),
-    )
-    const skillsByKey = new Map(
-      tx
-        .select()
-        .from(skills)
         .all()
         .map((item) => [key(item.name), item]),
     )
@@ -515,17 +512,94 @@ export function mergeImport(payload: ImportPayload) {
         companyIds.set(Number(incoming.id), created.id)
       }
     }
+    const skillRows = tx.select().from(skills).all()
+    const skillsByKey = new Map(skillRows.map((item) => [item.key, item]))
+    const skillsByCareerId = new Map(
+      skillRows.filter((item) => item.careerSkillId).map((item) => [item.careerSkillId, item]),
+    )
+    const skillsByName = new Map(skillRows.map((item) => [normalizeSkillAlias(item.name), item]))
+    const categoryValues = new Set<string>([
+      'languages-web',
+      'frontend',
+      'backend-apis',
+      'databases-caching',
+      'messaging-async',
+      'cloud-devops',
+      'testing-quality',
+      'security-identity',
+      'ai-ml',
+      'architecture-practices',
+      'domain-platforms',
+    ])
+    const reviewValues = new Set<string>(['pending', 'approved', 'rejected', 'merged'])
+    const originValues = new Set<string>(['career-data', 'job-parser', 'manual', 'import'])
+    const category = (value: unknown) =>
+      typeof value === 'string' && categoryValues.has(value) ? (value as SkillCategory) : null
+    const reviewStatus = (value: unknown) =>
+      typeof value === 'string' && reviewValues.has(value)
+        ? (value as SkillReviewStatus)
+        : 'pending'
+    const origin = (value: unknown) =>
+      typeof value === 'string' && originValues.has(value) ? (value as SkillOrigin) : 'import'
+
     for (const incoming of payload.skills) {
       const name = textValue(incoming.name)
       if (!name) continue
-      const existing = skillsByKey.get(skillKey(incoming))
+      const careerSkillId = textValue(incoming.careerSkillId) || null
+      const incomingKey = textValue(incoming.key) || normalizeSkillAlias(name)
+      const existing =
+        (careerSkillId && skillsByCareerId.get(careerSkillId)) ||
+        skillsByKey.get(incomingKey) ||
+        skillsByName.get(normalizeSkillAlias(name))
       if (existing) {
+        tx.update(skills)
+          .set({
+            key: existing.careerSkillId ? existing.key : incomingKey,
+            name,
+            category: category(incoming.category) ?? existing.category,
+            reviewStatus: existing.careerSkillId
+              ? existing.reviewStatus
+              : reviewStatus(incoming.reviewStatus),
+            origin: existing.careerSkillId ? existing.origin : origin(incoming.origin),
+            careerSkillId: careerSkillId ?? existing.careerSkillId,
+            updatedAt: todayISO(),
+          })
+          .where(eq(skills.id, existing.id))
+          .run()
         skillIds.set(Number(incoming.id), existing.id)
       } else {
-        const created = insertSkill(tx, { name, origin: 'import' })
-        skillsByKey.set(skillKey(incoming), created)
+        const created = insertSkill(tx, {
+          name,
+          key: incomingKey,
+          category: category(incoming.category),
+          reviewStatus: reviewStatus(incoming.reviewStatus),
+          origin: origin(incoming.origin),
+          careerSkillId,
+        })
+        skillsByKey.set(created.key, created)
         skillIds.set(Number(incoming.id), created.id)
       }
+    }
+    for (const incoming of payload.skillAliases) {
+      const skillId = skillIds.get(Number(incoming.skillId))
+      const alias = textValue(incoming.alias)
+      if (!skillId || !alias) continue
+      const normalized = normalizeSkillAlias(alias)
+      const existing = tx
+        .select()
+        .from(skillAliases)
+        .where(eq(skillAliases.normalizedAlias, normalized))
+        .get()
+      if (!existing)
+        tx.insert(skillAliases)
+          .values({
+            skillId,
+            alias,
+            normalizedAlias: normalized,
+            origin: 'import',
+            createdAt: todayISO(),
+          })
+          .run()
     }
     const companyNameById = new Map(
       tx
@@ -615,13 +689,36 @@ export function mergeImport(payload: ImportPayload) {
         skillsByKey.get(key(relationRecord.skillName))?.id
       if (applicationId && skillId) {
         const date = todayISO()
+        const importanceValue = relationRecord.importance
+        const analysisResultValue = relationRecord.analysisResult
+        const userDecisionValue = relationRecord.userDecision
+        const reason = textValue(relationRecord.decisionReason) || null
         tx.insert(jobApplicationsToSkills)
           .values({
             jobApplicationId: applicationId,
             skillId,
-            rawLabel: textValue(relationRecord.skillName) || null,
-            createdAt: date,
-            updatedAt: date,
+            rawLabel:
+              textValue(relationRecord.rawLabel) || textValue(relationRecord.skillName) || null,
+            sourceText: textValue(relationRecord.sourceText) || null,
+            importance: (['required', 'preferred', 'mentioned'] as const).includes(
+              importanceValue as never,
+            )
+              ? (importanceValue as 'required' | 'preferred' | 'mentioned')
+              : 'mentioned',
+            parserConfidence:
+              typeof relationRecord.parserConfidence === 'number'
+                ? relationRecord.parserConfidence
+                : null,
+            analysisResult:
+              analysisResultValue === 'proven-match' ? 'proven-match' : 'not-in-career-data',
+            userDecision: (['pending', 'skip', 'include'] as const).includes(
+              userDecisionValue as never,
+            )
+              ? (userDecisionValue as 'pending' | 'skip' | 'include')
+              : 'pending',
+            decisionReason: reason,
+            createdAt: textValue(relationRecord.createdAt) || date,
+            updatedAt: textValue(relationRecord.updatedAt) || date,
           })
           .onConflictDoNothing()
           .run()

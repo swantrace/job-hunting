@@ -2,11 +2,13 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
+import { Hono } from 'hono'
 import { AppNavigation } from '../../app/components/layout/AppNavigation'
 import { mergeCompanies } from '../../src/db/company-service'
 import * as schema from '../../src/db/schema'
 import { migratedDatabase } from '../support/sqlite'
 import { renderJsx } from './support/html-contract'
+import './support/runtime-mocks'
 
 const resources = [
   {
@@ -158,5 +160,18 @@ describe('planned resource page UI contracts', () => {
     } finally {
       sqlite.close()
     }
+  })
+
+  test('redirects the old /manage URL to the Skills page', async () => {
+    const { default: manageRoute } = (await import('../../app/routes/manage/index')) as Record<
+      string,
+      unknown
+    >
+    const app = new Hono()
+    app.get('/manage', manageRoute as never)
+    const response = await app.request('/manage')
+
+    expect(response.status).toBe(302)
+    expect(response.headers.get('Location')).toBe('/skills')
   })
 })

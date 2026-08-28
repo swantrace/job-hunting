@@ -113,7 +113,7 @@ Use `bun run skills:sync --if-present` in startup scripts when career data may n
 3. Move a role to **Apply Today** when it becomes a task. Complete the application workspace and select **Sent application** after applying.
 4. Record follow-ups and interviews in the workspace. These activities advance the visible pipeline without overwriting a more advanced status.
 5. Generate a resume and cover letter only after configuring OpenAI and career data. Review the evidence snapshot and generated files before using them.
-6. Manage reusable companies, contacts, and skills from the management area. Export JSON periodically as a backup.
+6. Manage reusable companies, contacts, and skills from their dedicated pages under Career and Network. Export JSON periodically as a backup.
 
 ### Configuration
 
@@ -126,6 +126,26 @@ The workflow in `.github/workflows/ci-cd.yml` runs formatting, typechecking, tes
 ### VS Code Remote / WSL
 
 The dev server listens on all interfaces at port `5173`. If `http://localhost:5173` is not reachable from your browser, open the VS Code **Ports** panel and forward port `5173`; VS Code will provide the correct localhost URL. You can also use the Network URL printed by Vite (for example, `http://172.17.x.x:5173/`).
+
+## Skill review, scores, and generation readiness
+
+- A parsed job post produces structured skill requirements, each with a canonical name, category, importance, source excerpt, and confidence.
+- Requirements resolve against the SQLite taxonomy: proven matches reuse career skills; unknown concepts become pending skills only when the opportunity is saved.
+- The application workspace has a **Review** tab. Every `not-in-career-data` skill must be skipped or included with a reason before document generation is enabled.
+- Dual scores are shown: **canonical match** (proven matches only) and **application coverage** (proven matches plus user-confirmed includes). Skipped and pending requirements count as uncovered.
+- An include is application-only: it never changes career data or the canonical score, and its mandatory reason is the only allowed claim in generated documents.
+
+## Resource pages
+
+Skills, Companies, and Contacts are separate bookmarkable pages under the Career and Network navigation sections. The old `/manage` URL redirects to `/skills`.
+
+- `/skills` — review, approve, reject, recategorize, alias, and merge skills.
+- `/companies` — search companies, open websites, and merge duplicates.
+- `/contacts` — manage contacts independently while they remain available in application workspaces.
+
+## Backup and migration
+
+Back up `jobs.db` before applying migrations or running `skills:sync --apply` in production. See `docs/migrations.md` for the migration, backup, and restore checklist. After restoring a backup, re-run `bun run skills:sync --apply` to re-link career mappings.
 
 ## Useful commands
 
