@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { jobParserPromptVersion, jobParserSystemPrompt } from '../src/ai/prompts/job-parser'
-import { jobParserResponseSchema } from '../src/ai/schemas/job-parser'
+import { jobParserResponseSchema, skillRequirementItemSchema } from '../src/ai/schemas/job-parser'
 import { parsedJobSchema } from '../src/lib/ai'
 
 describe('AI job parser output', () => {
@@ -44,5 +44,39 @@ describe('AI job parser output', () => {
     expect(jobParserSystemPrompt).toContain('application source')
     expect(jobParserSystemPrompt).toContain('postedDate')
     expect(jobParserResponseSchema.properties.skills.maxItems).toBe(30)
+  })
+
+  test('rejects malformed skill confidence and source excerpts', () => {
+    const valid = skillRequirementItemSchema.safeParse({
+      rawLabel: 'Kafka',
+      canonicalLabel: 'Kafka',
+      category: 'messaging-async',
+      importance: 'required',
+      sourceText: 'Kafka experience',
+      confidence: 0.96,
+    })
+    expect(valid.success).toBe(true)
+
+    expect(
+      skillRequirementItemSchema.safeParse({
+        rawLabel: 'Kafka',
+        canonicalLabel: 'Kafka',
+        category: 'messaging-async',
+        importance: 'required',
+        sourceText: 'Kafka experience',
+        confidence: 1.2,
+      }).success,
+    ).toBe(false)
+
+    expect(
+      skillRequirementItemSchema.safeParse({
+        rawLabel: 'Kafka',
+        canonicalLabel: 'Kafka',
+        category: 'messaging-async',
+        importance: 'required',
+        sourceText: '',
+        confidence: 0.96,
+      }).success,
+    ).toBe(false)
   })
 })

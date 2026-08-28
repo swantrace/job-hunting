@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { type JobStatus, matchLevels, priorities, statuses } from '../db/schema'
 import { isISODate } from './date'
 import { hasProfile } from './profiles'
+import { skillCategories, skillImportances } from './skills/constants'
 
 const emptyToNull = (value: unknown) =>
   typeof value === 'string' && value.trim() === '' ? null : value
@@ -20,6 +21,34 @@ const direction = z
   .refine(hasProfile, 'Choose a valid direction')
 const analysisText = optionalText(12000)
 
+export const skillRequirementSchema = z.object({
+  rawLabel: z.string().trim().min(1).max(120),
+  canonicalLabel: z.string().trim().min(1).max(120),
+  category: z.enum(skillCategories).nullable(),
+  importance: z.enum(skillImportances),
+  sourceText: z.string().trim().max(1000).nullable().optional(),
+  confidence: z.number().min(0).max(1).nullable().optional(),
+})
+
+export const skillRequirementListSchema = z.array(skillRequirementSchema).max(30)
+export type SkillRequirementDraft = z.infer<typeof skillRequirementSchema>
+
+function parseSkillRequirementsField(value: unknown) {
+  if (typeof value !== 'string' || value.trim() === '') return undefined
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
+}
+
+export function parseSkillRequirementsValue(value: unknown): SkillRequirementDraft[] | undefined {
+  const prepared = parseSkillRequirementsField(value)
+  if (prepared === undefined) return undefined
+  const parsed = skillRequirementListSchema.safeParse(prepared)
+  return parsed.success ? parsed.data : undefined
+}
+
 export const quickCollectSchema = z.object({
   jobTitle: z.string().trim().min(1, 'Job title is required').max(200),
   companyName: z.string().trim().min(1, 'Company is required').max(200),
@@ -30,6 +59,10 @@ export const quickCollectSchema = z.object({
   salary: optionalText(150),
   applicationSource: optionalText(150),
   skills: optionalText(1000),
+  skillRequirements: z.preprocess(
+    parseSkillRequirementsField,
+    skillRequirementListSchema.optional(),
+  ),
   jobPostText: optionalText(100000),
   analysisRequirements: analysisText,
   analysisResponsibilities: analysisText,

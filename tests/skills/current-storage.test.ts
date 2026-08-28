@@ -5,6 +5,9 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
+import * as schema from '../../src/db/schema'
+import { persistSkillRequirements } from '../../src/db/skill-queries'
+import { migratedDatabase } from '../support/sqlite'
 
 const baselineMigrationIndex = 10
 
@@ -155,5 +158,29 @@ describe('existing skill storage migration baseline', () => {
     }
   })
 
-  test.todo('stores all 30 structured parser requirements without the legacy 20-skill truncation', () => {})
+  test('stores all 30 structured parser requirements without the legacy 20-skill truncation', () => {
+    const sqlite = migratedDatabase()
+    const db = drizzle({ client: sqlite, schema })
+    try {
+      const { applicationId } = seedApplication(sqlite)
+      const requirements = Array.from({ length: 30 }, (_, index) => ({
+        rawLabel: `Skill ${index}`,
+        canonicalLabel: `skill-${index}`,
+        category: 'languages-web' as const,
+        importance: 'required' as const,
+        sourceText: `Requires skill ${index}`,
+        confidence: 0.9,
+      }))
+      persistSkillRequirements(db, applicationId, requirements)
+
+      const count = sqlite
+        .query(
+          'SELECT count(*) AS count FROM job_applications_to_skills WHERE job_application_id = ?',
+        )
+        .get(applicationId) as { count: number }
+      expect(count.count).toBe(30)
+    } finally {
+      sqlite.close()
+    }
+  })
 })

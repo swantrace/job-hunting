@@ -40,6 +40,7 @@ import {
   type DbExecutor,
   getOrCreateSkill,
   insertSkill,
+  persistSkillRequirements,
   reconcileSkillNames,
 } from './skill-queries'
 
@@ -53,15 +54,14 @@ export type JobCardData = JobApplication & {
   jobPostingAnalysis?: typeof jobPostingAnalyses.$inferSelect
 }
 
-const cleanSkills = (value?: string | null) =>
-  [
-    ...new Set(
-      (value ?? '')
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean),
-    ),
-  ].slice(0, 20)
+const cleanSkills = (value?: string | null) => [
+  ...new Set(
+    (value ?? '')
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  ),
+]
 
 function getOrCreateCompany(tx: DbExecutor, name: string, date: string) {
   let company = tx
@@ -107,7 +107,11 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
       })
       .returning({ id: jobApplications.id })
       .get()
-    replaceSkills(tx, result.id, cleanSkills(input.skills))
+    if (input.skillRequirements?.length) {
+      persistSkillRequirements(tx, result.id, input.skillRequirements)
+    } else {
+      replaceSkills(tx, result.id, cleanSkills(input.skills))
+    }
     const rawText = input.jobPostText?.trim()
     if (rawText) {
       const posting = tx

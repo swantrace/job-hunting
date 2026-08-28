@@ -10,8 +10,10 @@ import {
   defaultAttributes,
   type FieldErrors,
   parseCsvList,
+  type SkillRequirementDraft,
   statusesFromFilters,
 } from '../../src/lib/validation'
+import { SkillRequirementsEditor } from './SkillRequirementsEditor'
 import { EmptyState } from './ui/EmptyState'
 import { InputField, SelectField, TextareaField } from './ui/FormField'
 import { Icon } from './ui/Icon'
@@ -197,12 +199,14 @@ export function QuickCollect({
   values = {},
   formId = 'quick-form',
   oob = false,
+  skillRequirements,
 }: {
   filters: Filters
   errors?: FieldErrors
   values?: Record<string, string>
   formId?: string
   oob?: boolean
+  skillRequirements?: SkillRequirementDraft[]
 }) {
   const query = enc(filters)
   const { companies, skills } = listManagementData()
@@ -279,16 +283,20 @@ export function QuickCollect({
             name="applicationSource"
             value={values.applicationSource}
           />
-          <div class="sm:col-span-2">
-            <InputField
-              label="Skills"
-              name="skills"
-              value={values.skills}
-              placeholder="react, typescript, fhir"
-              error={error(errors, 'skills')}
-              list="skill-options"
-            />
-          </div>
+          {skillRequirements ? (
+            <SkillRequirementsEditor requirements={skillRequirements} />
+          ) : (
+            <div class="sm:col-span-2">
+              <InputField
+                label="Skills"
+                name="skills"
+                value={values.skills}
+                placeholder="react, typescript, fhir"
+                error={error(errors, 'skills')}
+                list="skill-options"
+              />
+            </div>
+          )}
         </div>
         {values.parserPromptVersion && (
           <details class="mt-5 rounded-box border border-base-300 bg-base-200/40 p-4" open>

@@ -2,7 +2,7 @@ import { createRoute } from 'honox/factory'
 import { createApplication, listApplications, metrics } from '../../../src/db/queries'
 import { enqueueGeneration } from '../../../src/lib/generation-queue'
 import { parseFilters, parseForm } from '../../../src/lib/request'
-import { quickCollectSchema } from '../../../src/lib/validation'
+import { parseSkillRequirementsValue, quickCollectSchema } from '../../../src/lib/validation'
 import { ApplicationsPage } from '../../components/ApplicationsPage'
 import { Board, QuickCollect } from '../../components/Dashboard'
 import { MutationResponse } from '../../components/Responses'
@@ -25,6 +25,7 @@ export const POST = createRoute(async (c) => {
         filters={filters}
         errors={parsed.error.flatten().fieldErrors}
         values={raw as Record<string, string>}
+        skillRequirements={parseSkillRequirementsValue(raw.skillRequirements)}
       />,
       422,
     )

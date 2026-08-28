@@ -1,11 +1,25 @@
 import { and, eq, notInArray } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
-import type { SkillCategory, SkillOrigin, SkillReviewStatus } from '../lib/skills/constants'
+import type {
+  SkillCategory,
+  SkillImportance,
+  SkillOrigin,
+  SkillReviewStatus,
+} from '../lib/skills/constants'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
 import { db } from './client'
 import { jobApplicationsToSkills, type Skill, skillAliases, skills } from './schema'
 
 export type DbExecutor = Pick<typeof db, 'select' | 'insert' | 'delete' | 'update'>
+
+export type SkillRequirementInput = {
+  rawLabel: string
+  canonicalLabel: string
+  category: SkillCategory | null
+  importance: SkillImportance
+  sourceText?: string | null
+  confidence?: number | null
+}
 
 export function resolveSkillByKey(tx: DbExecutor, key: string): Skill | undefined {
   return tx.select().from(skills).where(eq(skills.key, key)).get()
@@ -76,6 +90,112 @@ export function getOrCreateSkill(
 ): Skill {
   const existing = resolveSkill(tx, name)
   return existing ?? insertSkill(tx, { name, origin })
+}
+
+function resolveApprovedSkill(tx: DbExecutor, normalized: string): Skill | undefined {
+  const byKey = tx
+    .select()
+    .from(skills)
+    .where(and(eq(skills.key, normalized), eq(skills.reviewStatus, 'approved')))
+    .get()
+  if (byKey) return byKey
+  const alias = tx
+    .select()
+    .from(skillAliases)
+    .where(eq(skillAliases.normalizedAlias, normalized))
+    .get()
+  if (!alias) return undefined
+  return tx
+    .select()
+    .from(skills)
+    .where(and(eq(skills.id, alias.skillId), eq(skills.reviewStatus, 'approved')))
+    .get()
+}
+
+function addAliasIfAbsent(tx: DbExecutor, skillId: number, alias: string, origin: SkillOrigin) {
+  const normalized = normalizeSkillAlias(alias)
+  const existing = tx
+    .select()
+    .from(skillAliases)
+    .where(eq(skillAliases.normalizedAlias, normalized))
+    .get()
+  if (existing) return
+  tx.insert(skillAliases)
+    .values({ skillId, alias, normalizedAlias: normalized, origin, createdAt: todayISO() })
+    .run()
+}
+
+/**
+ * Persists structured parser requirements for one application. Approved skills
+ * are reused, unknown concepts become pending skills only at save time, and
+ * repeated canonical skills collapse into a single relation. The relationship
+ * stores raw label, source excerpt, importance, confidence, and analysis result.
+ */
+export function persistSkillRequirements(
+  tx: DbExecutor,
+  jobId: number,
+  requirements: SkillRequirementInput[],
+) {
+  const date = todayISO()
+  const seen = new Set<string>()
+  const skillIdByCanonical = new Map<string, number>()
+  const rawLabelBySkillId = new Map<number, string>()
+
+  for (const requirement of requirements) {
+    const canonicalLabel = requirement.canonicalLabel.trim() || requirement.rawLabel.trim()
+    const canonical = normalizeSkillAlias(canonicalLabel)
+    if (seen.has(canonical)) continue
+    seen.add(canonical)
+
+    let skill = resolveApprovedSkill(tx, canonical)
+    if (!skill) {
+      skill = resolveSkillByKey(tx, canonical) ?? resolveSkillByAlias(tx, canonical)
+    }
+    if (!skill) {
+      skill = insertSkill(tx, {
+        name: canonicalLabel,
+        category: requirement.category,
+        reviewStatus: 'pending',
+        origin: 'job-parser',
+      })
+    }
+    const rawLabel = requirement.rawLabel.trim() || canonicalLabel
+    addAliasIfAbsent(tx, skill.id, rawLabel, 'job-parser')
+    skillIdByCanonical.set(canonical, skill.id)
+    rawLabelBySkillId.set(skill.id, rawLabel)
+
+    tx.insert(jobApplicationsToSkills)
+      .values({
+        jobApplicationId: jobId,
+        skillId: skill.id,
+        rawLabel,
+        sourceText: requirement.sourceText?.trim() || null,
+        importance: requirement.importance,
+        parserConfidence: requirement.confidence ?? null,
+        analysisResult: skill.careerSkillId ? 'proven-match' : 'not-in-career-data',
+        userDecision: 'pending',
+        createdAt: date,
+        updatedAt: date,
+      })
+      .onConflictDoNothing()
+      .run()
+  }
+
+  const skillIds = [...skillIdByCanonical.values()]
+  if (skillIds.length) {
+    tx.delete(jobApplicationsToSkills)
+      .where(
+        and(
+          eq(jobApplicationsToSkills.jobApplicationId, jobId),
+          notInArray(jobApplicationsToSkills.skillId, skillIds),
+        ),
+      )
+      .run()
+  } else {
+    tx.delete(jobApplicationsToSkills)
+      .where(eq(jobApplicationsToSkills.jobApplicationId, jobId))
+      .run()
+  }
 }
 
 /**
