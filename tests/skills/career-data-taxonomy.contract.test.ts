@@ -1,11 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
-import {
-  type CanonicalCareerData,
-  loadCareerData,
-  validateCareerData,
-} from '../../src/lib/career-data'
+import { type CanonicalCareerData, validateCareerData } from '../../src/lib/career-data'
+import { loadExampleCareerData } from '../support/career-data'
 
 const constantsModule = resolve(process.cwd(), 'src/lib/skills/constants.ts')
 const careerTaxonomyTest = existsSync(constantsModule) ? test : test.todo
@@ -18,7 +15,7 @@ type MutableSkill = Record<string, unknown> & {
 }
 
 function dataWithTaxonomyFields() {
-  const data = structuredClone(loadCareerData()) as CanonicalCareerData
+  const data = structuredClone(loadExampleCareerData()) as CanonicalCareerData
   const skills = data.skills.skills as MutableSkill[]
   for (const skill of skills) {
     skill.category = 'frontend'

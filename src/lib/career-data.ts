@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { z } from 'zod'
+import { skillCategories } from './skills/constants'
+import { normalizeSkillAlias } from './skills/normalize'
 
 const idSchema = z
   .string()
@@ -82,7 +84,13 @@ const projectsSchema = documentSchema.extend({
 const skillsSchema = documentSchema.extend({
   skills: z.array(
     z
-      .object({ id: idSchema, label: z.string().min(1), directions: referenceIdsSchema })
+      .object({
+        id: idSchema,
+        label: z.string().min(1),
+        category: z.enum(skillCategories),
+        aliases: z.array(z.string().trim().min(1).max(120)).default([]),
+        directions: referenceIdsSchema,
+      })
       .passthrough(),
   ),
 })
@@ -207,6 +215,49 @@ export function validateCareerData(data: CanonicalCareerData) {
     'skills',
     data.skills.skills.map((item) => item.id),
   )
+  const skillCategorySet = new Set<string>(skillCategories)
+  const normalizedSkillIds = new Map<string, string>()
+  const normalizedSkillLabels = new Map<string, string>()
+  for (const skill of data.skills.skills) {
+    if (!skillCategorySet.has(skill.category))
+      throw new Error(`Skill "${skill.id}" has an invalid category "${skill.category}".`)
+    const normalizedId = normalizeSkillAlias(skill.id)
+    const idOwner = normalizedSkillIds.get(normalizedId)
+    if (idOwner && idOwner !== skill.id)
+      throw new Error(
+        `Skill "${skill.id}" and skill "${idOwner}" share the normalized id "${normalizedId}".`,
+      )
+    normalizedSkillIds.set(normalizedId, skill.id)
+    const normalizedLabel = normalizeSkillAlias(skill.label)
+    const labelOwner = normalizedSkillLabels.get(normalizedLabel)
+    if (labelOwner && labelOwner !== skill.id)
+      throw new Error(
+        `Skill "${skill.id}" and skill "${labelOwner}" share the normalized label "${normalizedLabel}".`,
+      )
+    normalizedSkillLabels.set(normalizedLabel, skill.id)
+  }
+  const aliasOwners = new Map<string, string>()
+  for (const skill of data.skills.skills) {
+    for (const alias of skill.aliases ?? []) {
+      const normalizedAlias = normalizeSkillAlias(alias)
+      const owner = aliasOwners.get(normalizedAlias)
+      if (owner)
+        throw new Error(
+          `Skill "${skill.id}" and skill "${owner}" share the normalized alias "${normalizedAlias}".`,
+        )
+      const idOwner = normalizedSkillIds.get(normalizedAlias)
+      if (idOwner && idOwner !== skill.id)
+        throw new Error(
+          `Skill "${skill.id}" alias "${alias}" collides with the id of skill "${idOwner}".`,
+        )
+      const labelOwner = normalizedSkillLabels.get(normalizedAlias)
+      if (labelOwner && labelOwner !== skill.id)
+        throw new Error(
+          `Skill "${skill.id}" alias "${alias}" collides with the label of skill "${labelOwner}".`,
+        )
+      aliasOwners.set(normalizedAlias, skill.id)
+    }
+  }
   assertUnique(
     'stories',
     data.stories.stories.map((item) => item.id),

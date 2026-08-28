@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { normalizeSkillAlias } from '../../src/lib/skills/normalize'
 import {
   createBaselineMigrationFolder,
   migratedDatabase,
@@ -63,5 +64,19 @@ describe('current skill storage normalization', () => {
       sqlite.close()
       removeTempDir(folder)
     }
+  })
+})
+
+describe('shared skill alias normalization', () => {
+  test('folds Unicode, trims, lowercases, and collapses whitespace', () => {
+    expect(normalizeSkillAlias('  Node.JS  ')).toBe('node.js')
+    expect(normalizeSkillAlias('Node   JS')).toBe('node js')
+    expect(normalizeSkillAlias('ＴｙｐｅＳｃｒｉｐｔ')).toBe('typescript')
+  })
+
+  test('preserves punctuation that changes technical meaning', () => {
+    const cFamily = ['C', 'C++', 'C#'].map(normalizeSkillAlias)
+    expect(new Set(cFamily).size).toBe(3)
+    expect(normalizeSkillAlias('.NET')).not.toBe(normalizeSkillAlias('net'))
   })
 })

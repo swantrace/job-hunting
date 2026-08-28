@@ -5,11 +5,15 @@
     {
       "id": "typescript",
       "label": "TypeScript",
+      "category": "languages-web",
+      "aliases": ["TS"],
       "directions": ["fullstack", "frontend"]
     },
     {
       "id": "fhir",
       "label": "FHIR",
+      "category": "domain-platforms",
+      "aliases": ["HL7 FHIR"],
       "directions": ["fhir"]
     }
   ]

@@ -1,4 +1,5 @@
 import { Database } from 'bun:sqlite'
+import { normalizeSkillAlias } from '../lib/skills/normalize'
 
 /**
  * Read-only skill taxonomy audit.
@@ -13,9 +14,7 @@ const dbFile = process.env.DB_FILE_NAME ?? 'jobs.db'
 
 type SkillRow = { id: number; name: string; applications: number }
 
-function normalize(value: string) {
-  return value.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ')
-}
+const normalize = normalizeSkillAlias
 
 function aliasFingerprint(value: string) {
   return normalize(value).replace(/[.\-_/\s]+/g, '')
