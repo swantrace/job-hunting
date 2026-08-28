@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { AppNavigation } from '../../app/components/layout/AppNavigation'
+import { mergeCompanies } from '../../src/db/company-service'
+import * as schema from '../../src/db/schema'
+import { migratedDatabase } from '../support/sqlite'
 import { renderJsx } from './support/html-contract'
 
 const resources = [
@@ -78,6 +82,81 @@ describe('planned resource page UI contracts', () => {
     },
   )
 
-  test.todo('merges companies transactionally without losing applications or contacts', () => {})
-  test.todo('keeps application contact fragments current after editing on the Contacts page', () => {})
+  test('merges companies transactionally without losing applications or contacts', () => {
+    const sqlite = migratedDatabase()
+    const db = drizzle({ client: sqlite, schema })
+    try {
+      const source = sqlite
+        .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
+        .get('Source Co', '2026-08-28') as { id: number }
+      const target = sqlite
+        .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
+        .get('Target Co', '2026-08-28') as { id: number }
+      sqlite
+        .query(
+          `INSERT INTO job_applications (
+            company_id, job_title, direction, posted_date, priority, status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          source.id,
+          'Engineer',
+          'fullstack',
+          '2026-08-28',
+          'B',
+          'Saved',
+          '2026-08-28',
+          '2026-08-28',
+        )
+      sqlite
+        .query('INSERT INTO contacts (company_id, name, email) VALUES (?, ?, ?)')
+        .run(source.id, 'Alex', 'alex@example.com')
+
+      mergeCompanies(source.id, target.id, db)
+
+      const application = sqlite.query('SELECT company_id FROM job_applications LIMIT 1').get() as {
+        company_id: number
+      }
+      expect(application.company_id).toBe(target.id)
+      const contact = sqlite.query('SELECT company_id FROM contacts LIMIT 1').get() as {
+        company_id: number
+      }
+      expect(contact.company_id).toBe(target.id)
+      expect(
+        sqlite.query('SELECT count(*) AS count FROM companies').get() as { count: number },
+      ).toEqual({ count: 1 })
+    } finally {
+      sqlite.close()
+    }
+  })
+
+  test('keeps contact details current after editing on the Contacts page', () => {
+    const sqlite = migratedDatabase()
+    try {
+      const company = sqlite
+        .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
+        .get('Acme', '2026-08-28') as { id: number }
+      const contact = sqlite
+        .query('INSERT INTO contacts (company_id, name, email) VALUES (?, ?, ?) RETURNING id')
+        .get(company.id, 'Alex', 'alex@example.com') as { id: number }
+
+      sqlite
+        .query('UPDATE contacts SET name = ?, email = ? WHERE id = ?')
+        .run('Alex Rivera', 'alex.rivera@example.com', contact.id)
+
+      const updated = sqlite
+        .query(
+          `SELECT c.name, c.email, co.name AS company_name
+           FROM contacts c JOIN companies co ON co.id = c.company_id WHERE c.id = ?`,
+        )
+        .get(contact.id) as { name: string; email: string; company_name: string }
+      expect(updated).toEqual({
+        name: 'Alex Rivera',
+        email: 'alex.rivera@example.com',
+        company_name: 'Acme',
+      })
+    } finally {
+      sqlite.close()
+    }
+  })
 })

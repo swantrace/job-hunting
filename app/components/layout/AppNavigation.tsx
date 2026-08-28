@@ -4,10 +4,19 @@ import { Icon } from '../ui/Icon'
 const links = [
   { href: '/', icon: 'dashboard', label: 'Dashboard', section: 'Workspace' },
   { href: '/applications', icon: 'briefcase', label: 'Applications', section: 'Workspace' },
-  { href: '/career-documents', icon: 'document', label: 'Career documents', section: 'Tools' },
-  { href: '/manage', icon: 'database', label: 'Manage data', section: 'Tools' },
+  {
+    href: '/career-documents',
+    icon: 'document',
+    label: 'Career documents',
+    section: 'Career',
+  },
+  { href: '/skills', icon: 'tag', label: 'Skills', section: 'Career' },
+  { href: '/companies', icon: 'building', label: 'Companies', section: 'Network' },
+  { href: '/contacts', icon: 'users', label: 'Contacts', section: 'Network' },
   { href: '/import', icon: 'archive', label: 'Backup & restore', section: 'Tools' },
 ] satisfies { href: string; icon: IconName; label: string; section: string }[]
+
+const sections = ['Workspace', 'Career', 'Network', 'Tools'] as const
 
 export function AppNavigation({ currentPath = '/' }: { currentPath?: string }) {
   return (
@@ -27,7 +36,7 @@ export function AppNavigation({ currentPath = '/' }: { currentPath?: string }) {
           <Icon name="close" />
         </label>
       </div>
-      {['Workspace', 'Tools'].map((section) => (
+      {sections.map((section) => (
         <div class="mb-5">
           <p class="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-base-content/50">
             {section}

@@ -99,6 +99,32 @@ const icons = {
       <line x1="3" y1="10" x2="21" y2="10" />
     </>
   ),
+  tag: (
+    <>
+      <path d="M12 2H2v10l9.3 9.3a2 2 0 0 0 2.8 0l7.2-7.2a2 2 0 0 0 0-2.8L12 2z" />
+      <circle cx="7" cy="7" r="1.5" />
+    </>
+  ),
+  building: (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="1" />
+      <line x1="9" y1="8" x2="9" y2="8.01" />
+      <line x1="15" y1="8" x2="15" y2="8.01" />
+      <line x1="9" y1="12" x2="9" y2="12.01" />
+      <line x1="15" y1="12" x2="15" y2="12.01" />
+      <line x1="9" y1="16" x2="9" y2="16.01" />
+      <line x1="15" y1="16" x2="15" y2="16.01" />
+      <path d="M10 21v-4h4v4" />
+    </>
+  ),
+  users: (
+    <>
+      <circle cx="9" cy="8" r="4" />
+      <path d="M2 21v-1a7 7 0 0 1 14 0v1" />
+      <path d="M16 3.5a4 4 0 0 1 0 7.5" />
+      <path d="M22 21v-1a7 7 0 0 0-5-6.7" />
+    </>
+  ),
 } as const
 
 export type IconName = keyof typeof icons

@@ -1,5 +1,5 @@
 import { createRoute } from 'honox/factory'
-import { listManagementData } from '../../../src/db/queries'
-import { ManagementPage } from '../../components/Management'
 
-export default createRoute((c) => c.render(<ManagementPage data={listManagementData()} />))
+// The combined Manage Data screen was replaced by dedicated Skills, Companies,
+// and Contacts pages. Keep the old URL as a temporary compatibility redirect.
+export default createRoute((c) => c.redirect('/skills'))
