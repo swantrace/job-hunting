@@ -40,7 +40,21 @@ function main() {
     return
   }
 
-  const data = loadCareerData()
+  let data
+  try {
+    data = loadCareerData()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (ifPresent) {
+      // Never take the server down for mounted-but-invalid career data.
+      console.warn(`career-data is present but failed validation; skipping sync: ${message}`)
+      return
+    }
+    console.error(`career-data failed validation: ${message}`)
+    process.exitCode = 1
+    return
+  }
+
   const report = syncCareerSkills(db, data, { apply })
   if (apply) recomputeMatchResults(db, data)
 

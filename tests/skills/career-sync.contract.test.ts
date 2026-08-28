@@ -134,4 +134,42 @@ describe('planned career skill synchronization CLI contract', () => {
       rmSync(fixture.root, { force: true, recursive: true })
     }
   })
+
+  syncTest('skips gracefully with --if-present when career data fails validation', () => {
+    const fixture = createFixture()
+    try {
+      const skillsPath = resolve(fixture.careerDataDir, 'skills.json')
+      writeFileSync(
+        skillsPath,
+        `${JSON.stringify(
+          {
+            schemaVersion: 1,
+            lastUpdated: '2026-08-05',
+            skills: [
+              {
+                id: 'typescript',
+                label: 'TypeScript',
+                category: 'miscellaneous',
+                aliases: [],
+                directions: ['fullstack'],
+              },
+            ],
+          },
+          null,
+          2,
+        )}\n`,
+      )
+
+      expectSuccess(run(['src/db/migrate.ts'], fixture))
+      const result = run(['src/cli/sync-career-skills.ts', '--if-present', '--apply'], fixture)
+      expect(result.exitCode).toBe(0)
+
+      const sqlite = new Database(fixture.databaseFile, { readonly: true })
+      const count = sqlite.query('SELECT count(*) AS count FROM skills').get() as { count: number }
+      expect(count.count).toBe(0)
+      sqlite.close()
+    } finally {
+      rmSync(fixture.root, { force: true, recursive: true })
+    }
+  })
 })
