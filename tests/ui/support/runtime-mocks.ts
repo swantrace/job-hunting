@@ -1,5 +1,9 @@
 import { mock } from 'bun:test'
+import { z } from 'zod'
 import type { JobCardData } from '../../../src/db/queries'
+import * as realSkillQueries from '../../../src/db/skill-queries'
+import * as realCareerData from '../../../src/lib/career-data'
+import * as realValidation from '../../../src/lib/validation'
 
 export const mockStatusSafeParse = mock(() => ({
   data: { action: 'today' },
@@ -12,6 +16,30 @@ export const mockApplicationSafeParse = mock(() => ({
   },
   success: false,
 }))
+
+// Reconstructed from src/lib/validation so a leaked mock still validates
+// Skip/Include exactly like production; UI tests override it via mockReturnValue.
+const realSkillDecisionSchema = z
+  .object({
+    action: z.enum(['skip', 'include']),
+    reason: z.string().trim().max(2000).default(''),
+  })
+  .superRefine((value, ctx) => {
+    if (value.action === 'include' && value.reason.trim() === '')
+      ctx.addIssue({
+        code: 'custom',
+        message: 'A reason is required to include this skill.',
+        path: ['reason'],
+      })
+  })
+
+export const mockSkillDecisionSafeParse = (value: unknown) =>
+  realSkillDecisionSchema.safeParse(value)
+
+export const mockGetApplicationSkillRequirement = mock((): any => undefined)
+export const mockListApplicationSkillRequirements = mock((): any => [])
+export const mockSkipRemainingSkillDecisions = mock((): any => {})
+export const mockUpdateSkillDecision = mock((): any => {})
 
 export const mockJob = {
   appliedDate: null,
@@ -98,58 +126,35 @@ mock.module('../../../src/lib/request', () => ({
     today: '',
     view: 'list',
   }),
-  parseForm: async () => ({ action: 'today' }),
+  parseForm: async (c: { req: { formData: () => Promise<FormData> } }) => {
+    try {
+      return Object.fromEntries((await c.req.formData()).entries())
+    } catch {
+      return {}
+    }
+  },
   parseId: (value: string) => Number(value),
   parseWorkspaceTab: (c: { req: { query: (name: string) => string | undefined } }) =>
     c.req.query('workspaceTab') ?? 'application',
 }))
 
 mock.module('../../../src/lib/validation', () => ({
-  applicationAttributeLabels: {
-    appliedDate: 'Applied date',
-    company: 'Company',
-    location: 'Location',
-    matchLevel: 'Match level',
-    notes: 'Notes',
-    priority: 'Priority',
-    source: 'Source',
-    status: 'Status',
-    targetDate: 'Target date',
-    title: 'Job title',
-  },
-  applicationAttributes: [
-    'company',
-    'title',
-    'location',
-    'priority',
-    'status',
-    'appliedDate',
-    'targetDate',
-    'source',
-    'matchLevel',
-    'notes',
-  ],
+  ...realValidation,
   applicationSchema: { safeParse: mockApplicationSafeParse },
-  baselineGenerationSchema: {
-    safeParse: () => ({
-      success: false,
-      error: { issues: [{ message: 'Direction is required' }] },
-    }),
-  },
-  companySchema: { safeParse: () => ({ success: false }) },
-  defaultAttributes: ['company', 'title', 'status', 'priority', 'location', 'appliedDate'],
-  managedContactSchema: { safeParse: () => ({ success: false }) },
-  parseCsvList: (value = '') =>
-    value
-      .split(',')
-      .map((item: string) => item.trim())
-      .filter(Boolean),
-  skillSchema: { safeParse: () => ({ success: false }) },
+  skillDecisionSchema: { safeParse: mockSkillDecisionSafeParse },
   statusSchema: { safeParse: mockStatusSafeParse },
-  statusesFromFilters: (filters: { statuses: string; today: string }) =>
-    filters.today === '1'
-      ? ['Apply Today']
-      : filters.statuses
-        ? filters.statuses.split(',')
-        : ['Saved', 'Apply Today', 'Applied', 'Follow Up', 'Interviewing'],
+}))
+
+mock.module('../../../src/db/skill-queries', () => ({
+  ...realSkillQueries,
+  getApplicationSkillRequirement: mockGetApplicationSkillRequirement,
+  hasPendingSkillDecisions: () => false,
+  listApplicationSkillRequirements: mockListApplicationSkillRequirements,
+  skipRemainingSkillDecisions: mockSkipRemainingSkillDecisions,
+  updateSkillDecision: mockUpdateSkillDecision,
+}))
+
+mock.module('../../../src/lib/career-data', () => ({
+  ...realCareerData,
+  careerSkillEvidenceMap: () => ({}),
 }))

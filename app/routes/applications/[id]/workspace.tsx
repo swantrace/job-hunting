@@ -1,5 +1,7 @@
 import { createRoute } from 'honox/factory'
 import { getActivity, getApplication } from '../../../../src/db/queries'
+import { listApplicationSkillRequirements } from '../../../../src/db/skill-queries'
+import { careerSkillEvidenceMap } from '../../../../src/lib/career-data'
 import { parseFilters, parseId, parseWorkspaceTab } from '../../../../src/lib/request'
 import { Workspace } from '../../../components/Workspace'
 
@@ -12,6 +14,8 @@ export default createRoute((c) => {
       job={job}
       filters={parseFilters(c)}
       activity={getActivity(id)}
+      requirements={listApplicationSkillRequirements(id)}
+      careerEvidence={careerSkillEvidenceMap()}
       activeTab={parseWorkspaceTab(c)}
     />,
   )

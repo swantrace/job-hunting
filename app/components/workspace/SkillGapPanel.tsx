@@ -1,0 +1,272 @@
+import type { Filters, JobCardData } from '../../../src/db/queries'
+import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
+import { type SkillCategory, skillCategoryLabels } from '../../../src/lib/skills/constants'
+import { calculateSkillScores } from '../../../src/lib/skills/score'
+import { query } from './helpers'
+
+const importanceOrder = { required: 0, preferred: 1, mentioned: 2 } as const
+const categoryOrder: SkillCategory[] = [
+  'languages-web',
+  'frontend',
+  'backend-apis',
+  'databases-caching',
+  'messaging-async',
+  'cloud-devops',
+  'testing-quality',
+  'security-identity',
+  'ai-ml',
+  'architecture-practices',
+  'domain-platforms',
+]
+
+function categoryLabel(category: SkillCategory | 'uncategorized' | null) {
+  return category && category !== 'uncategorized' ? skillCategoryLabels[category] : 'Uncategorized'
+}
+
+function groupRequirements(requirements: ApplicationSkillRequirement[]) {
+  const byCategory = new Map<string, ApplicationSkillRequirement[]>()
+  for (const requirement of requirements) {
+    const key = requirement.skillCategory ?? 'uncategorized'
+    const list = byCategory.get(key) ?? []
+    list.push(requirement)
+    byCategory.set(key, list)
+  }
+  return [...byCategory.entries()]
+    .sort(([a], [b]) => {
+      const aIndex = categoryOrder.indexOf(a as SkillCategory)
+      const bIndex = categoryOrder.indexOf(b as SkillCategory)
+      return (
+        (aIndex < 0 ? categoryOrder.length : aIndex) - (bIndex < 0 ? categoryOrder.length : bIndex)
+      )
+    })
+    .map(([category, items]) => ({
+      category: category as SkillCategory | 'uncategorized',
+      items: [...items].sort(
+        (a, b) => importanceOrder[a.importance] - importanceOrder[b.importance],
+      ),
+    }))
+}
+
+export function SkillGapPanel({
+  job,
+  filters,
+  requirements,
+  careerEvidence,
+  active = false,
+}: {
+  job: JobCardData
+  filters: Filters
+  requirements: ApplicationSkillRequirement[]
+  careerEvidence: Record<string, string[]>
+  active?: boolean
+}) {
+  const scores = calculateSkillScores(requirements)
+  const pendingCount = requirements.filter(
+    (item) => item.analysisResult === 'not-in-career-data' && item.userDecision === 'pending',
+  ).length
+  const groups = groupRequirements(requirements)
+
+  return (
+    <div
+      id="workspace-review-panel"
+      role="tabpanel"
+      aria-labelledby="workspace-tab-review"
+      data-workspace-panel
+      class={active ? '' : 'hidden'}
+    >
+      <div id="skill-review-panel">
+        <section class="mb-4 grid gap-3 sm:grid-cols-3">
+          <div id="skill-readiness" class="rounded-box border border-base-300 p-3">
+            <p class="text-sm font-medium">Readiness</p>
+            <p class="text-lg font-bold">
+              {pendingCount
+                ? `${pendingCount} decision${pendingCount === 1 ? '' : 's'} pending`
+                : 'Ready'}
+            </p>
+          </div>
+          <div id="canonical-score" class="rounded-box border border-base-300 p-3">
+            <p class="text-sm font-medium">Canonical match</p>
+            <p class="text-lg font-bold">
+              {scores.canonicalMatch.percentage === null
+                ? 'Not enough requirements'
+                : `${scores.canonicalMatch.percentage.toFixed(1)}%`}
+            </p>
+            <p class="text-xs text-base-content/60">
+              {scores.canonicalMatch.matchedWeight}/{scores.canonicalMatch.totalWeight} weighted
+            </p>
+          </div>
+          <div id="application-coverage" class="rounded-box border border-base-300 p-3">
+            <p class="text-sm font-medium">Application coverage</p>
+            <p class="text-lg font-bold">
+              {scores.applicationCoverage.percentage === null
+                ? 'Not enough requirements'
+                : `${scores.applicationCoverage.percentage.toFixed(1)}%`}
+            </p>
+            <p class="text-xs text-base-content/60">
+              {scores.applicationCoverage.matchedWeight}/{scores.applicationCoverage.totalWeight}{' '}
+              weighted
+            </p>
+          </div>
+        </section>
+
+        {requirements.length === 0 ? (
+          <p class="text-sm text-base-content/60">
+            No structured skills have been saved for this application.
+          </p>
+        ) : (
+          <>
+            {pendingCount > 0 && (
+              <form
+                class="mb-4 flex justify-end"
+                hx-post={`/applications/${job.id}/skill-decisions?${query(filters)}`}
+                hx-target="#skill-review-panel"
+                hx-swap="outerHTML"
+                hx-confirm="Skip every remaining pending skill?"
+              >
+                <input type="hidden" name="action" value="skip-remaining" />
+                <button class="btn btn-outline btn-sm">Skip remaining</button>
+              </form>
+            )}
+            <div class="space-y-5">
+              {groups.map((group) => (
+                <section>
+                  <h3 class="mb-2 font-semibold">{categoryLabel(group.category)}</h3>
+                  <ul class="space-y-2">
+                    {group.items.map((requirement) => (
+                      <li class="rounded-box border border-base-300 p-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p class="font-medium">{requirement.skillName}</p>
+                            <p class="text-xs text-base-content/60">
+                              Importance: {requirement.importance}
+                              {requirement.rawLabel &&
+                              requirement.rawLabel !== requirement.skillName
+                                ? ` · from “${requirement.rawLabel}”`
+                                : ''}
+                            </p>
+                            {requirement.sourceText && (
+                              <p class="mt-1 text-xs italic text-base-content/60">
+                                “{requirement.sourceText}”
+                              </p>
+                            )}
+                          </div>
+                          {requirement.analysisResult === 'proven-match' ? (
+                            <ProvenMatch
+                              careerSkillId={requirement.careerSkillId}
+                              evidence={
+                                requirement.careerSkillId
+                                  ? (careerEvidence[requirement.careerSkillId] ?? [])
+                                  : []
+                              }
+                            />
+                          ) : (
+                            <SkillDecisionForm
+                              job={job}
+                              filters={filters}
+                              requirement={requirement}
+                            />
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ProvenMatch({
+  careerSkillId,
+  evidence,
+}: {
+  careerSkillId: string | null
+  evidence: string[]
+}) {
+  return (
+    <div class="text-right">
+      <span class="badge badge-success">Proven match</span>
+      {careerSkillId && (
+        <p class="mt-1 text-xs text-base-content/60">Linked to career skill “{careerSkillId}”</p>
+      )}
+      {evidence.length > 0 && (
+        <p class="mt-1 max-w-xs text-xs text-base-content/60">Evidence: {evidence.join(', ')}</p>
+      )}
+    </div>
+  )
+}
+
+export function SkillDecisionForm({
+  job,
+  filters,
+  requirement,
+  error,
+}: {
+  job: JobCardData
+  filters: Filters
+  requirement: ApplicationSkillRequirement
+  error?: string
+}) {
+  const decided = requirement.userDecision === 'skip' || requirement.userDecision === 'include'
+  if (decided && !error) {
+    return (
+      <div id={`skill-decision-${requirement.skillId}`} class="text-right">
+        <span
+          class={`badge ${requirement.userDecision === 'include' ? 'badge-primary' : 'badge-neutral'}`}
+        >
+          {requirement.userDecision === 'include' ? 'Included' : 'Skipped'}
+        </span>
+        {requirement.decisionReason && (
+          <p class="mt-1 max-w-xs text-xs text-base-content/60">“{requirement.decisionReason}”</p>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <form
+      id={`skill-decision-${requirement.skillId}`}
+      hx-post={`/applications/${job.id}/skill-decisions?${query(filters)}`}
+      hx-target="#skill-review-panel"
+      hx-swap="outerHTML"
+      hx-disabled-elt="find button"
+      novalidate
+    >
+      <input type="hidden" name="skillId" value={requirement.skillId} />
+      <div class="flex flex-wrap items-center justify-end gap-2">
+        <button name="action" value="skip" class="btn btn-ghost btn-sm">
+          Skip
+        </button>
+        <details class="dropdown dropdown-end">
+          <summary class="btn btn-outline btn-sm">Include for this application</summary>
+          <div class="dropdown-content z-30 mt-2 w-80 rounded-box border border-base-300 bg-base-100 p-3 shadow-lg">
+            <label class="label" for={`include-reason-${requirement.skillId}`}>
+              <span>
+                Why can this skill be used? <span class="text-error">*</span>
+              </span>
+            </label>
+            <textarea
+              id={`include-reason-${requirement.skillId}`}
+              name="reason"
+              rows={3}
+              class="textarea textarea-sm w-full"
+              placeholder="e.g. Used this in a personal prototype with retry handling."
+            />
+            <button name="action" value="include" class="btn btn-primary btn-sm mt-2 w-full">
+              Include
+            </button>
+          </div>
+        </details>
+      </div>
+      {error && (
+        <p role="alert" class="mt-2 text-sm text-error">
+          {error}
+        </p>
+      )}
+    </form>
+  )
+}

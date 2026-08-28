@@ -213,7 +213,7 @@ export const statusesFromFilters = (filters: { statuses: string; today: string }
   return requested.length ? requested : ([...activeStatuses] as JobStatus[])
 }
 
-export const workspaceTabs = ['application', 'contacts', 'activity', 'documents'] as const
+export const workspaceTabs = ['application', 'contacts', 'activity', 'documents', 'review'] as const
 export type WorkspaceTab = (typeof workspaceTabs)[number]
 export const workspaceTabSchema = z.enum(workspaceTabs).catch('application')
 

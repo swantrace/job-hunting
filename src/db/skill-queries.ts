@@ -1,4 +1,4 @@
-import { and, eq, notInArray } from 'drizzle-orm'
+import { and, eq, inArray, notInArray } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
 import type {
   SkillCategory,
@@ -241,4 +241,104 @@ export function reconcileSkillNames(tx: DbExecutor, jobId: number, names: string
       .where(eq(jobApplicationsToSkills.jobApplicationId, jobId))
       .run()
   }
+}
+
+export type ApplicationSkillRequirement = typeof jobApplicationsToSkills.$inferSelect & {
+  skillName: string
+  skillKey: string
+  skillCategory: SkillCategory | null
+  careerSkillId: string | null
+  reviewStatus: SkillReviewStatus
+  aliases: string[]
+}
+
+export function listApplicationSkillRequirements(jobId: number): ApplicationSkillRequirement[] {
+  const relations = db
+    .select()
+    .from(jobApplicationsToSkills)
+    .where(eq(jobApplicationsToSkills.jobApplicationId, jobId))
+    .all()
+  if (!relations.length) return []
+  const skillIds = relations.map((relation) => relation.skillId)
+  const skillRows = db.select().from(skills).where(inArray(skills.id, skillIds)).all()
+  const aliasRows = db
+    .select()
+    .from(skillAliases)
+    .where(inArray(skillAliases.skillId, skillIds))
+    .all()
+  const skillById = new Map(skillRows.map((skill) => [skill.id, skill]))
+  const aliasesBySkill = new Map<number, string[]>()
+  for (const alias of aliasRows) {
+    const list = aliasesBySkill.get(alias.skillId) ?? []
+    list.push(alias.alias)
+    aliasesBySkill.set(alias.skillId, list)
+  }
+  return relations.map((relation) => {
+    const skill = skillById.get(relation.skillId)
+    return {
+      ...relation,
+      skillName: skill?.name ?? relation.rawLabel ?? '',
+      skillKey: skill?.key ?? '',
+      skillCategory: skill?.category ?? null,
+      careerSkillId: skill?.careerSkillId ?? null,
+      reviewStatus: skill?.reviewStatus ?? 'pending',
+      aliases: aliasesBySkill.get(relation.skillId) ?? [],
+    }
+  })
+}
+
+export function getApplicationSkillRequirement(
+  jobId: number,
+  skillId: number,
+): ApplicationSkillRequirement | undefined {
+  return listApplicationSkillRequirements(jobId).find((item) => item.skillId === skillId)
+}
+
+export function updateSkillDecision(
+  jobId: number,
+  skillId: number,
+  decision: 'skip' | 'include',
+  reason: string | null,
+) {
+  db.update(jobApplicationsToSkills)
+    .set({
+      userDecision: decision,
+      decisionReason: decision === 'include' ? reason : null,
+      updatedAt: todayISO(),
+    })
+    .where(
+      and(
+        eq(jobApplicationsToSkills.jobApplicationId, jobId),
+        eq(jobApplicationsToSkills.skillId, skillId),
+      ),
+    )
+    .run()
+}
+
+export function skipRemainingSkillDecisions(jobId: number) {
+  db.update(jobApplicationsToSkills)
+    .set({ userDecision: 'skip', decisionReason: null, updatedAt: todayISO() })
+    .where(
+      and(
+        eq(jobApplicationsToSkills.jobApplicationId, jobId),
+        eq(jobApplicationsToSkills.analysisResult, 'not-in-career-data'),
+        eq(jobApplicationsToSkills.userDecision, 'pending'),
+      ),
+    )
+    .run()
+}
+
+export function hasPendingSkillDecisions(jobId: number) {
+  return !!db
+    .select({ skillId: jobApplicationsToSkills.skillId })
+    .from(jobApplicationsToSkills)
+    .where(
+      and(
+        eq(jobApplicationsToSkills.jobApplicationId, jobId),
+        eq(jobApplicationsToSkills.analysisResult, 'not-in-career-data'),
+        eq(jobApplicationsToSkills.userDecision, 'pending'),
+      ),
+    )
+    .limit(1)
+    .get()
 }

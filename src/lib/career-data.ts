@@ -367,3 +367,17 @@ export function loadCareerData(): CanonicalCareerData {
   }
   return validateCareerData(parsed)
 }
+
+export function careerSkillEvidenceMap(): Record<string, string[]> {
+  try {
+    const data = loadCareerData()
+    return Object.fromEntries(
+      data.skills.skills.map((skill) => {
+        const evidence = (skill as Record<string, unknown>).evidence
+        return [skill.id, Array.isArray(evidence) ? evidence.map(String) : []]
+      }),
+    )
+  } catch {
+    return {}
+  }
+}

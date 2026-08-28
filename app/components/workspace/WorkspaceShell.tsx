@@ -4,12 +4,14 @@ import {
   listGenerationRuns,
 } from '../../../src/db/generation'
 import type { Filters, JobCardData } from '../../../src/db/queries'
+import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
 import type { FieldErrors, WorkspaceTab } from '../../../src/lib/validation'
 import { ActivityPanel } from './ActivityPanel'
 import { ApplicationPanel } from './ApplicationPanel'
 import { ContactsPanel } from './ContactsPanel'
 import { DocumentsPanel } from './DocumentsPanel'
 import { type WorkspaceErrorForm } from './helpers'
+import { SkillGapPanel } from './SkillGapPanel'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import { WorkspaceTabs } from './WorkspaceTabs'
 
@@ -17,6 +19,8 @@ export function WorkspaceShell({
   job,
   filters,
   activity,
+  requirements = [],
+  careerEvidence = {},
   activeTab = 'application',
   errors,
   errorForm,
@@ -24,6 +28,8 @@ export function WorkspaceShell({
   job: JobCardData
   filters: Filters
   activity: ReturnType<typeof import('../../../src/db/queries').getActivity>
+  requirements?: ApplicationSkillRequirement[]
+  careerEvidence?: Record<string, string[]>
   activeTab?: WorkspaceTab
   errors?: FieldErrors
   errorForm?: WorkspaceErrorForm
@@ -59,6 +65,13 @@ export function WorkspaceShell({
         evidenceSnapshot={latestEvidenceSnapshot?.snapshotJson ?? null}
         googleDriveConnected={googleDriveConnected}
         active={activeTab === 'documents'}
+      />
+      <SkillGapPanel
+        job={job}
+        filters={filters}
+        requirements={requirements}
+        careerEvidence={careerEvidence}
+        active={activeTab === 'review'}
       />
     </div>
   )

@@ -1,6 +1,8 @@
 import { and, eq } from 'drizzle-orm'
+import type { CanonicalCareerData } from '../lib/career-data'
 import { todayISO } from '../lib/date'
 import type { SkillCategory } from '../lib/skills/constants'
+import { determineMatchResult } from '../lib/skills/match-career-skills'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
 import { resolveSkillInput, type SkillResolver } from '../lib/skills/resolve'
 import { db } from './client'
@@ -241,5 +243,36 @@ export function mergeSkills(sourceId: number, targetId: number, executor: SkillD
       .where(eq(skills.id, sourceId))
       .run()
     return { sourceId: source.id, targetId: target.id }
+  })
+}
+
+/**
+ * Recomputes the two-state analysis result for every stored application skill
+ * requirement from current career-data truth. This runs after an explicit
+ * career sync or application reanalysis and never touches frozen generation
+ * snapshots.
+ */
+export function recomputeMatchResults(
+  executor: SkillDb = db,
+  careerData: Pick<CanonicalCareerData, 'skills'>,
+) {
+  const date = todayISO()
+  const relations = executor.select().from(jobApplicationsToSkills).all()
+  return executor.transaction((tx) => {
+    for (const relation of relations) {
+      const skill = tx.select().from(skills).where(eq(skills.id, relation.skillId)).get()
+      const result = determineMatchResult(skill?.careerSkillId ?? null, careerData)
+      if (relation.analysisResult !== result) {
+        tx.update(jobApplicationsToSkills)
+          .set({ analysisResult: result, updatedAt: date })
+          .where(
+            and(
+              eq(jobApplicationsToSkills.jobApplicationId, relation.jobApplicationId),
+              eq(jobApplicationsToSkills.skillId, relation.skillId),
+            ),
+          )
+          .run()
+      }
+    }
   })
 }
