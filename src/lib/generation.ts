@@ -13,10 +13,18 @@ import {
   tailoredResumeResponseSchema,
   tailoredResumeSchema,
 } from '../ai/schemas/application-generation'
-import { getGenerationEvidenceSnapshot, getGenerationSource } from '../db/generation'
+import {
+  getBaselineGenerationEvidenceSnapshot,
+  getBaselineGenerationRun,
+  getGenerationEvidenceSnapshot,
+  getGenerationSource,
+} from '../db/generation'
 import { getArtifactsRoot } from './artifact-storage'
 import { todayISO } from './date'
-import type { EvidenceSelectionSnapshot } from './evidence-selection'
+import type {
+  BaselineEvidenceSelectionSnapshot,
+  EvidenceSelectionSnapshot,
+} from './evidence-selection'
 import { resolveProjectAsset } from './profiles'
 
 type JsonSchema = Record<string, unknown>
@@ -171,9 +179,12 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
   const selectedProjects = resume.selectedProjectIds
     .map((id) => facts.projects.find((item: any) => item.id === id))
     .filter(Boolean)
-  const publications = facts.achievements
-    .filter((item: any) => item.authorName)
-    .map((item: any) => ({ citation: item.claim }))
+  const publications = (facts.publications ?? []).map((item: any) => ({
+    citation: item.citation,
+    contribution: item.contributions.length
+      ? `Contributions: ${item.contributions.join('; ')}`
+      : '',
+  }))
   const identity = facts.candidate.identity
   const resumeData = {
     candidateName: identity.fullName,
@@ -200,7 +211,10 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
     })),
     showPublications: publications.length > 0,
     publications,
-    education: facts.candidate.education.map((item: any) => ({ ...item, graduationYear: '' })),
+    education: facts.candidate.education.map((item: any) => ({
+      ...item,
+      graduationYear: item.graduationYear ?? '',
+    })),
   }
   const coverLetterData = {
     candidateName: identity.fullName,
@@ -263,4 +277,89 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     },
   ]
+}
+
+export async function generateBaselineResume(runId: number) {
+  const run = getBaselineGenerationRun(runId)
+  const saved = getBaselineGenerationEvidenceSnapshot(runId)
+  if (!run || !saved) throw new Error('Baseline evidence snapshot is missing.')
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.')
+  const snapshot = JSON.parse(saved.snapshotJson) as BaselineEvidenceSelectionSnapshot
+  const facts = snapshot.facts as any
+  const resume = await structuredOutput({
+    apiKey,
+    model: process.env.OPENAI_MODEL_RESUME ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5-mini',
+    name: 'baseline_resume',
+    system: `${resumeGenerationSystemPrompt}\n- This is a direction baseline, not a specific job application. Do not mention an employer, job posting, or requirements that were not supplied.`,
+    schema: tailoredResumeResponseSchema,
+    input: {
+      baseline: {
+        direction: run.direction,
+        targetTitle: run.targetTitle,
+        targetKeywords: snapshot.baseline.targetKeywords,
+      },
+      evidenceSnapshot: snapshot,
+    },
+    parse: (value) => tailoredResumeSchema.parse(value),
+  })
+  allowed(
+    'Resume experience',
+    resume.experienceBullets.map((item) => item.id),
+    snapshot.selection.experienceIds,
+  )
+  allowed('Resume project', resume.selectedProjectIds, snapshot.selection.projectIds)
+  const bullets = new Map(resume.experienceBullets.map((item) => [item.id, item.bullets]))
+  const identity = facts.candidate.identity
+  const resumeData = {
+    candidateName: identity.fullName,
+    location: `${facts.candidate.location.city}, ${facts.candidate.location.province}`,
+    phone: identity.phone,
+    email: identity.email,
+    linkedin: identity.linkedin,
+    github: identity.github,
+    portfolio: identity.portfolio,
+    targetTitle: resume.targetTitle || run.targetTitle,
+    summary: resume.summary,
+    skills: resume.skills,
+    experiences: facts.experiences.map((item: any) => ({
+      role: item.role,
+      company: item.company,
+      displayDates: item.displayDates,
+      bullets: (bullets.get(item.id) ?? []).map((text: string) => ({ text })),
+    })),
+    showSelectedProjects: resume.selectedProjectIds.length > 0,
+    selectedProjects: resume.selectedProjectIds
+      .map((id) => facts.projects.find((item: any) => item.id === id))
+      .filter(Boolean)
+      .map((item: any) => ({
+        name: item.name,
+        technologies: item.skills.join(', '),
+        description: item.safeClaims?.[0] ?? '',
+      })),
+    showPublications: (facts.publications ?? []).length > 0,
+    publications: (facts.publications ?? []).map((item: any) => ({
+      citation: item.citation,
+      contribution: item.contributions.length
+        ? `Contributions: ${item.contributions.join('; ')}`
+        : '',
+    })),
+    education: facts.candidate.education.map((item: any) => ({
+      ...item,
+      graduationYear: item.graduationYear ?? '',
+    })),
+  }
+  const root = getArtifactsRoot()
+  const relativeDirectory = `baseline-run-${runId}`
+  const fileName = `${filenamePart(run.direction)}-${filenamePart(run.targetTitle)}-baseline-resume.docx`
+  await mkdir(resolve(root, relativeDirectory), { recursive: true })
+  await writeFile(
+    resolve(root, relativeDirectory, fileName),
+    await renderDocx(resolveProjectAsset('templates/resume.template.docx'), resumeData),
+  )
+  return {
+    fileName,
+    filePath: `${relativeDirectory}/${fileName}`,
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  }
 }

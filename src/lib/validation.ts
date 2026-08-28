@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { matchLevels, priorities, statuses } from '../db/schema'
+import { type JobStatus, matchLevels, priorities, statuses } from '../db/schema'
 import { isISODate } from './date'
 import { hasProfile } from './profiles'
 
@@ -60,7 +60,9 @@ export const applicationSchema = z.object({
   skills: optionalText(1000),
 })
 
-export const statusSchema = z.object({ action: z.enum(['today', 'reject', 'archive', 'restore']) })
+export const statusSchema = z.object({
+  action: z.enum(['today', 'reject', 'archive', 'restore', 'applied']),
+})
 export const followUpSchema = z.object({ actionDate: isoDate, notes: optionalText(2000) })
 export const interviewSchema = z.object({
   interviewDate: isoDate,
@@ -83,6 +85,11 @@ export const companySchema = z.object({
 export const managedContactSchema = contactSchema.extend({
   companyId: z.coerce.number().int().positive(),
 })
+export const baselineGenerationSchema = z.object({
+  direction,
+  targetTitle: optionalText(200),
+  targetKeywords: optionalText(1000),
+})
 
 export const sortValues = [
   'updated_desc',
@@ -99,10 +106,70 @@ export const sortValues = [
 export const filterSchema = z.object({
   q: z.string().trim().max(200).catch(''),
   priority: z.enum(['', ...priorities]).catch(''),
-  view: z.enum(['active', 'Rejected', 'Archived']).catch('active'),
+  statuses: z.string().trim().max(200).catch(''),
+  view: z.enum(['list', 'board']).catch('list'),
   today: z.enum(['', '1']).catch(''),
+  attributes: z.string().trim().max(500).catch(''),
   sort: z.enum(sortValues).catch('updated_desc'),
 })
+
+export const applicationAttributes = [
+  'company',
+  'title',
+  'location',
+  'priority',
+  'status',
+  'appliedDate',
+  'targetDate',
+  'source',
+  'matchLevel',
+  'notes',
+] as const
+export type ApplicationAttribute = (typeof applicationAttributes)[number]
+export const applicationAttributeLabels: Record<ApplicationAttribute, string> = {
+  company: 'Company',
+  title: 'Job title',
+  location: 'Location',
+  priority: 'Priority',
+  status: 'Status',
+  appliedDate: 'Applied date',
+  targetDate: 'Target date',
+  source: 'Source',
+  matchLevel: 'Match level',
+  notes: 'Notes',
+}
+export const defaultAttributes = [
+  'company',
+  'title',
+  'status',
+  'priority',
+  'location',
+  'appliedDate',
+] as ApplicationAttribute[]
+
+export const parseCsvList = (value?: string) =>
+  (value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+export const activeStatuses = [
+  'Saved',
+  'Apply Today',
+  'Applied',
+  'Follow Up',
+  'Interviewing',
+] as const
+
+export const statusesFromFilters = (filters: { statuses: string; today: string }): JobStatus[] => {
+  if (filters.today === '1') return ['Apply Today']
+  const requested = parseCsvList(filters.statuses) as JobStatus[]
+  return requested.length ? requested : ([...activeStatuses] as JobStatus[])
+}
+
+export const workspaceTabs = ['application', 'contacts', 'activity', 'documents'] as const
+export type WorkspaceTab = (typeof workspaceTabs)[number]
+export const workspaceTabSchema = z.enum(workspaceTabs).catch('application')
 
 export type FieldErrors = Record<string, string[] | undefined>
 export const formObject = (form: FormData) => Object.fromEntries(form.entries())

@@ -1,37 +1,43 @@
 import type { ImportPreview as Preview } from '../../src/db/queries'
+import { AppShell } from './layout/AppShell'
+import { FileField } from './ui/FormField'
+import { Icon } from './ui/Icon'
 
 export function ImportPage() {
   return (
-    <main class="mx-auto min-h-screen max-w-3xl space-y-5 p-4 lg:p-7">
-      <a class="link text-sm" href="/">
-        ← Dashboard
-      </a>
-      <div>
-        <h1 class="text-3xl font-bold">Import JSON backup</h1>
-        <p class="text-base-content/60">
-          Preview changes first. Local-only records are never deleted.
+    <AppShell
+      title="Backup & restore"
+      currentPath="/import"
+      actions={
+        <a href="/export" class="btn btn-outline btn-sm" aria-label="Export JSON backup">
+          <Icon name="download" />
+          <span class="hidden sm:inline">Export backup</span>
+        </a>
+      }
+    >
+      <div class="mb-5 max-w-2xl">
+        <h2 class="text-2xl font-bold">Restore from a backup</h2>
+        <p class="mt-1 text-base-content/60">
+          Preview changes before merging a Job Tracker JSON backup into this database.
         </p>
       </div>
       <form
-        class="card bg-base-100 shadow-sm"
+        class="card max-w-2xl border border-base-300 bg-base-100"
         hx-post="/import"
         hx-target="#import-result"
         hx-swap="innerHTML"
         hx-encoding="multipart/form-data"
+        hx-disabled-elt="find button"
       >
         <div class="card-body gap-4">
-          <input
-            class="file-input file-input-bordered w-full"
-            type="file"
-            name="backup"
-            accept="application/json,.json"
-            required
-          />
-          <button class="btn btn-primary">Preview import</button>
+          <FileField name="backup" label="Backup file" accept="application/json,.json" required />
+          <button class="btn btn-primary">
+            <span class="loading loading-spinner loading-sm htmx-indicator" /> Preview import
+          </button>
         </div>
       </form>
       <div id="import-result" />
-    </main>
+    </AppShell>
   )
 }
 

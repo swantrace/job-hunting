@@ -1,14 +1,25 @@
 import type { Child } from 'hono/jsx'
 import { type Filters, type JobCardData, listManagementData } from '../../src/db/queries'
 import type { JobStatus } from '../../src/db/schema'
-import { todayISO } from '../../src/lib/date'
+import { formatDisplayDate, todayISO } from '../../src/lib/date'
 import { listProfiles } from '../../src/lib/profiles'
-import type { FieldErrors } from '../../src/lib/validation'
+import {
+  type ApplicationAttribute,
+  applicationAttributeLabels,
+  applicationAttributes,
+  defaultAttributes,
+  type FieldErrors,
+  parseCsvList,
+  statusesFromFilters,
+} from '../../src/lib/validation'
+import { EmptyState } from './ui/EmptyState'
+import { InputField, SelectField, TextareaField } from './ui/FormField'
+import { Icon } from './ui/Icon'
+import { StatusBadge } from './ui/StatusBadge'
 
 const activeStatuses: JobStatus[] = ['Saved', 'Apply Today', 'Applied', 'Follow Up', 'Interviewing']
 const enc = (filters: Filters) => new URLSearchParams(filters).toString()
 const error = (errors: FieldErrors | undefined, name: string) => errors?.[name]?.[0]
-
 export function Metrics({
   values,
   oob = false,
@@ -33,78 +44,148 @@ export function Metrics({
 }
 
 export function Filters({ filters }: { filters: Filters }) {
+  const statusOptions: JobStatus[] = [
+    'Saved',
+    'Apply Today',
+    'Applied',
+    'Follow Up',
+    'Interviewing',
+    'Rejected',
+    'Archived',
+  ]
+  const selectedStatuses = parseCsvList(filters.statuses).length
+    ? (parseCsvList(filters.statuses) as JobStatus[])
+    : ([...activeStatuses] as JobStatus[])
+  const attributes = parseAttributes(filters.attributes)
   return (
     <form
       id="filters"
-      class="card bg-base-100 shadow-sm"
+      class="card border border-base-300 bg-base-100"
       hx-get="/applications"
       hx-target="#board"
       hx-swap="outerHTML"
+      hx-push-url="true"
+      hx-sync="this:replace"
       hx-indicator="#loading"
-      hx-trigger="input changed delay:350ms from:input[name='q'], search from:input[name='q'], change from:select, change from:input[name='today']"
+      hx-trigger="input changed delay:350ms from:input[name='q'], search from:input[name='q'], change from:select, change from:input[name='statuses'], change from:input[name='attributes'], change from:input[name='today']"
     >
-      <div class="card-body grid gap-3 p-4 md:grid-cols-5">
-        <label class="form-control md:col-span-2">
-          <span class="label-text mb-1">Search</span>
-          <input
-            class="input input-bordered w-full"
-            type="search"
-            name="q"
-            value={filters.q}
-            placeholder="Title or company"
-          />
-        </label>
-        <label class="form-control">
-          <span class="label-text mb-1">Priority</span>
-          <select class="select select-bordered" name="priority">
-            <option value="">All priorities</option>
-            {['A', 'B', 'C'].map((p) => (
-              <option selected={filters.priority === p}>{p}</option>
-            ))}
-          </select>
-        </label>
-        <label class="form-control">
-          <span class="label-text mb-1">View</span>
-          <select class="select select-bordered" name="view">
-            <option value="active" selected={filters.view === 'active'}>
-              Active
-            </option>
-            <option selected={filters.view === 'Rejected'}>Rejected</option>
-            <option selected={filters.view === 'Archived'}>Archived</option>
-          </select>
-        </label>
-        <label class="form-control">
-          <span class="label-text mb-1">Sort</span>
-          <select class="select select-bordered" name="sort">
-            {[
-              ['updated_desc', 'Recently updated'],
-              ['posted_desc', 'Posted: newest'],
-              ['posted_asc', 'Posted: oldest'],
-              ['company_asc', 'Company: A-Z'],
-              ['company_desc', 'Company: Z-A'],
-              ['priority_asc', 'Priority: A-C'],
-              ['priority_desc', 'Priority: C-A'],
-              ['target_asc', 'Today target'],
-              ['applied_desc', 'Applied: newest'],
-              ['applied_asc', 'Applied: oldest'],
-            ].map(([v, l]) => (
-              <option value={v} selected={filters.sort === v}>
-                {l}
+      <div class="card-body gap-4 p-4 sm:p-5">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 class="font-semibold">Filter applications</h2>
+            <p class="text-sm text-base-content/60">Search and refine the applications below.</p>
+          </div>
+          <a class="btn btn-ghost btn-sm" href="/applications">
+            Clear all
+          </a>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-12">
+          <div class="sm:col-span-2 lg:col-span-4">
+            <InputField
+              name="q"
+              label="Search"
+              type="search"
+              value={filters.q}
+              placeholder="Title or company"
+            />
+          </div>
+          <div class="lg:col-span-2">
+            <SelectField name="view" label="View">
+              <option value="list" selected={filters.view === 'list'}>
+                List
               </option>
-            ))}
-          </select>
-        </label>
-        <label class="label cursor-pointer justify-start gap-3 md:col-span-5">
-          <input
-            class="toggle toggle-primary"
-            type="checkbox"
-            name="today"
-            value="1"
-            checked={filters.today === '1'}
-          />
-          <span class="label-text">Show only today’s tasks</span>
-          <span id="loading" class="loading loading-spinner loading-sm htmx-indicator" />
-        </label>
+              <option value="board" selected={filters.view === 'board'}>
+                Board
+              </option>
+            </SelectField>
+          </div>
+          <div class="lg:col-span-2">
+            <SelectField name="priority" label="Priority">
+              <option value="">All priorities</option>
+              {['A', 'B', 'C'].map((p) => (
+                <option selected={filters.priority === p}>{p}</option>
+              ))}
+            </SelectField>
+          </div>
+          <div class="lg:col-span-2">
+            <SelectField name="sort" label="Sort by">
+              {[
+                ['updated_desc', 'Recently updated'],
+                ['posted_desc', 'Posted: newest'],
+                ['posted_asc', 'Posted: oldest'],
+                ['company_asc', 'Company: A–Z'],
+                ['company_desc', 'Company: Z–A'],
+                ['priority_asc', 'Priority: A–C'],
+                ['priority_desc', 'Priority: C–A'],
+                ['target_asc', 'Today target'],
+                ['applied_desc', 'Applied: newest'],
+                ['applied_asc', 'Applied: oldest'],
+              ].map(([v, l]) => (
+                <option value={v} selected={filters.sort === v}>
+                  {l}
+                </option>
+              ))}
+            </SelectField>
+          </div>
+          <fieldset class="fieldset lg:col-span-2">
+            <legend class="fieldset-legend">Columns</legend>
+            <details class="dropdown dropdown-end w-full">
+              <summary class="btn w-full justify-between border-base-300 bg-base-100 font-normal">
+                <span>Choose columns</span>
+                <Icon name="chevronDown" />
+              </summary>
+              <div class="dropdown-content z-30 mt-2 w-72 rounded-box border border-base-300 bg-base-100 p-3 shadow-lg">
+                <p class="px-2 pb-2 text-sm font-semibold">Visible columns</p>
+                <div class="grid grid-cols-2 gap-1">
+                  {applicationAttributes.map((attr) => (
+                    <label class="label cursor-pointer justify-start gap-2 rounded-lg px-2 py-2 hover:bg-base-200">
+                      <input
+                        type="checkbox"
+                        class="checkbox checkbox-sm"
+                        name="attributes"
+                        value={attr}
+                        checked={attributes.includes(attr)}
+                      />
+                      <span class="text-sm">{applicationAttributeLabels[attr]}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </details>
+          </fieldset>
+          <div class="sm:col-span-2 lg:col-span-9">
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">Status</legend>
+              <div class="flex flex-wrap gap-x-4 gap-y-2">
+                {statusOptions.map((status) => (
+                  <label class="label cursor-pointer gap-2">
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm"
+                      name="statuses"
+                      value={status}
+                      checked={selectedStatuses.includes(status)}
+                    />
+                    <span class="text-sm">{status}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          </div>
+          <div class="flex items-end lg:col-span-3 lg:justify-end">
+            <label class="label min-h-12 cursor-pointer justify-start gap-3 lg:justify-end">
+              <input
+                class="toggle toggle-primary"
+                type="checkbox"
+                name="today"
+                value="1"
+                checked={filters.today === '1'}
+              />
+              <span>Due today only</span>
+              <span id="loading" class="loading loading-spinner loading-sm htmx-indicator" />
+            </label>
+          </div>
+        </div>
       </div>
     </form>
   )
@@ -133,6 +214,7 @@ export function QuickCollect({
       hx-post={`/applications?${query}`}
       hx-target={`#${formId}`}
       hx-swap="outerHTML"
+      hx-disabled-elt="find button"
       novalidate
       {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
     >
@@ -142,74 +224,68 @@ export function QuickCollect({
           Save the lead now. Complete the details when you apply.
         </p>
         <div class="grid gap-3 sm:grid-cols-2">
-          <Field
+          <InputField
             label="Job title"
             name="jobTitle"
             required
             value={values.jobTitle}
-            message={error(errors, 'jobTitle')}
+            error={error(errors, 'jobTitle')}
           />
-          <Field
+          <InputField
             label="Company"
             name="companyName"
             required
             value={values.companyName}
-            message={error(errors, 'companyName')}
+            error={error(errors, 'companyName')}
             list="company-options"
           />
-          <label class="form-control">
-            <span class="label-text mb-1">Direction</span>
-            <select
-              class={`select select-bordered w-full ${error(errors, 'direction') ? 'select-error' : ''}`}
-              name="direction"
-              required
-              aria-invalid={error(errors, 'direction') ? 'true' : undefined}
-            >
-              <option value="">Choose a direction</option>
-              {profiles.map((profile) => (
-                <option value={profile.id} selected={values.direction === profile.id}>
-                  {profile.label}
-                </option>
-              ))}
-            </select>
-            {error(errors, 'direction') && (
-              <span class="mt-1 text-xs text-error">{error(errors, 'direction')}</span>
-            )}
-          </label>
-          <Field
+          <SelectField
+            name="direction"
+            label="Direction"
+            required
+            error={error(errors, 'direction')}
+          >
+            <option value="">Choose a direction</option>
+            {profiles.map((profile) => (
+              <option value={profile.id} selected={values.direction === profile.id}>
+                {profile.label}
+              </option>
+            ))}
+          </SelectField>
+          <InputField
             label="Location"
             name="location"
             value={values.location}
-            message={error(errors, 'location')}
+            error={error(errors, 'location')}
           />
-          <Field
+          <InputField
             label="Job URL"
             name="url"
             type="url"
             value={values.url}
-            message={error(errors, 'url')}
+            error={error(errors, 'url')}
           />
-          <Field
+          <InputField
             label="Posted date"
             name="postedDate"
             type="date"
             required
             value={values.postedDate ?? todayISO()}
-            message={error(errors, 'postedDate')}
+            error={error(errors, 'postedDate')}
           />
-          <Field label="Salary" name="salary" value={values.salary} />
-          <Field
+          <InputField label="Salary" name="salary" value={values.salary} />
+          <InputField
             label="Application source"
             name="applicationSource"
             value={values.applicationSource}
           />
           <div class="sm:col-span-2">
-            <Field
+            <InputField
               label="Skills"
               name="skills"
               value={values.skills}
               placeholder="react, typescript, fhir"
-              message={error(errors, 'skills')}
+              error={error(errors, 'skills')}
               list="skill-options"
             />
           </div>
@@ -221,42 +297,42 @@ export function QuickCollect({
               Review and edit this AI draft. Use one item per line.
             </p>
             <div class="mt-4 grid gap-3 sm:grid-cols-2">
-              <AnalysisField
+              <TextareaField
                 label="Requirements"
                 name="analysisRequirements"
                 value={values.analysisRequirements}
               />
-              <AnalysisField
+              <TextareaField
                 label="Responsibilities"
                 name="analysisResponsibilities"
                 value={values.analysisResponsibilities}
               />
-              <AnalysisField
+              <TextareaField
                 label="Pain points"
                 name="analysisPainPoints"
                 value={values.analysisPainPoints}
               />
-              <AnalysisField
+              <TextareaField
                 label="Culture signals"
                 name="analysisCulture"
                 value={values.analysisCulture}
               />
-              <AnalysisField
+              <TextareaField
                 label="Red flags"
                 name="analysisRedFlags"
                 value={values.analysisRedFlags}
               />
-              <AnalysisField
+              <TextareaField
                 label="Success metrics"
                 name="analysisSuccessMetrics"
                 value={values.analysisSuccessMetrics}
               />
-              <AnalysisField
+              <TextareaField
                 label="Benefits"
                 name="analysisBenefits"
                 value={values.analysisBenefits}
               />
-              <AnalysisField
+              <TextareaField
                 label="Additional facts"
                 name="analysisNotes"
                 value={values.analysisNotes}
@@ -265,7 +341,9 @@ export function QuickCollect({
           </details>
         )}
         <div class="card-actions mt-2 justify-end">
-          <button class="btn btn-primary">Save opportunity</button>
+          <button class="btn btn-primary">
+            <span class="loading loading-spinner loading-sm htmx-indicator" /> Save opportunity
+          </button>
         </div>
       </div>
       {values.jobPostText && (
@@ -291,69 +369,6 @@ export function QuickCollect({
   )
 }
 
-function AnalysisField({ label, name, value }: { label: string; name: string; value?: string }) {
-  return (
-    <label class="form-control">
-      <span class="label-text mb-1">{label}</span>
-      <textarea class="textarea textarea-bordered min-h-28" name={name}>
-        {value ?? ''}
-      </textarea>
-    </label>
-  )
-}
-
-export function Field({
-  label,
-  name,
-  type = 'text',
-  value,
-  required,
-  placeholder,
-  list,
-  message,
-  externalUrl,
-}: {
-  label: string
-  name: string
-  type?: string
-  value?: string | null
-  required?: boolean
-  placeholder?: string
-  list?: string
-  message?: string
-  externalUrl?: string | null
-}) {
-  return (
-    <label class="form-control">
-      <span class="label-text mb-1">{label}</span>
-      <div class="relative w-full">
-        <input
-          class={`input input-bordered w-full ${externalUrl ? 'pr-11' : ''} ${message ? 'input-error' : ''}`}
-          name={name}
-          type={type}
-          value={value ?? ''}
-          required={required}
-          placeholder={placeholder}
-          list={list}
-          aria-invalid={message ? 'true' : undefined}
-        />
-        {externalUrl && (
-          <a
-            class="btn btn-ghost btn-sm absolute right-1 top-1/2 -translate-y-1/2 border-0 px-2 text-base-content hover:bg-base-200"
-            href={externalUrl}
-            target="_blank"
-            rel="noreferrer"
-            aria-label={`Open ${label}`}
-          >
-            ↗
-          </a>
-        )}
-      </div>
-      {message && <span class="mt-1 text-xs text-error">{message}</span>}
-    </label>
-  )
-}
-
 export function Board({
   jobs,
   filters,
@@ -363,21 +378,45 @@ export function Board({
   filters: Filters
   oob?: boolean
 }) {
-  const statuses =
-    filters.today === '1'
-      ? (['Apply Today'] as const)
-      : filters.view === 'active'
-        ? activeStatuses
-        : [filters.view as JobStatus]
   return (
-    <div
+    <section
       id="board"
-      class={`grid w-full gap-4 ${statuses.length > 1 ? 'xl:grid-cols-5 md:grid-cols-2' : ''}`}
+      class="mt-5"
       aria-live="polite"
       {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
     >
+      <div class="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
+        <p class="text-sm text-base-content/70">
+          <span class="font-semibold text-base-content">{jobs.length}</span> application
+          {jobs.length === 1 ? '' : 's'} found
+        </p>
+        <span class="badge badge-ghost badge-sm">
+          {filters.today === '1'
+            ? 'Due today'
+            : filters.view === 'board'
+              ? 'Board view'
+              : 'List view'}
+        </span>
+      </div>
+      {filters.view === 'board' ? (
+        <KanbanBoard jobs={jobs} filters={filters} />
+      ) : (
+        <ListBoard jobs={jobs} filters={filters} />
+      )}
+    </section>
+  )
+}
+
+function KanbanBoard({ jobs, filters }: { jobs: JobCardData[]; filters: Filters }) {
+  const statuses = statusesFromFilters(filters)
+  return (
+    <div class="flex w-full flex-row items-start gap-4 overflow-x-auto pb-2">
       {statuses.map((status) => (
-        <section class="board-column w-full rounded-box bg-base-300/60 p-3">
+        <section
+          class={`board-column rounded-box bg-base-300/60 p-3 ${
+            statuses.length === 1 ? 'w-full shrink-0' : 'w-[310px] min-w-[310px] shrink-0'
+          }`}
+        >
           <div class="mb-3 flex items-center justify-between">
             <h2 class="font-semibold">{status}</h2>
             <span class="badge badge-neutral">
@@ -393,9 +432,7 @@ export function Board({
                 .map((job) => (
                   <JobCard job={job} filters={filters} />
                 ))}
-              {!jobs.some((job) => job.status === status) && (
-                <p class="py-8 text-center text-sm text-base-content/50">No applications</p>
-              )}
+              {!jobs.some((job) => job.status === status) && <EmptyState title="No applications" />}
             </div>
           )}
         </section>
@@ -404,82 +441,267 @@ export function Board({
   )
 }
 
-function TodayTasksTable({ jobs, filters }: { jobs: JobCardData[]; filters: Filters }) {
-  if (!jobs.length)
-    return <p class="py-8 text-center text-sm text-base-content/50">No applications</p>
+const parseAttributes = (value?: string): ApplicationAttribute[] => {
+  const selected = parseCsvList(value).filter((item): item is ApplicationAttribute =>
+    (applicationAttributes as readonly string[]).includes(item),
+  )
+  return selected.length ? selected : [...defaultAttributes]
+}
+
+function ListBoard({ jobs, filters }: { jobs: JobCardData[]; filters: Filters }) {
+  const attributes = parseAttributes(filters.attributes)
+  const query = enc(filters)
   return (
-    <div class="overflow-x-auto rounded-box bg-base-100">
-      <table class="table table-zebra">
-        <thead>
-          <tr>
-            <th>Job title</th>
-            <th>Company</th>
-            <th>Location</th>
-            <th>Priority</th>
-            <th>Target date</th>
-            <th>Skills</th>
-            <th class="text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {jobs.map((job) => {
-            const overdue = !!job.applyTodayTargetDate && job.applyTodayTargetDate < todayISO()
-            const query = enc(filters)
-            return (
-              <tr>
-                <td class="font-medium">
-                  {job.jobTitle}
-                  {job.url && (
-                    <a
-                      class="ml-1 link"
-                      href={job.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`Open ${job.jobTitle} posting`}
+    <div class="overflow-hidden rounded-box border border-base-300 bg-base-100">
+      {jobs.length ? (
+        <>
+          <div class="hidden overflow-x-auto md:block">
+            <table class="table table-sm">
+              <caption class="sr-only">Job applications</caption>
+              <thead>
+                <tr>
+                  {attributes.map((attr) => (
+                    <th class={attr === 'title' ? 'min-w-48' : undefined}>
+                      {applicationAttributeLabels[attr]}
+                    </th>
+                  ))}
+                  <th class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.map((job) => (
+                  <tr class="border-base-200 hover:bg-base-200/50">
+                    {attributes.map((attr) => (
+                      <td>{renderCell(job, attr)}</td>
+                    ))}
+                    <td class="text-right">
+                      <button
+                        class="btn btn-ghost btn-sm"
+                        hx-get={`/applications/${job.id}/workspace?${query}`}
+                        hx-target="#drawer-content"
+                        hx-swap="innerHTML"
+                        data-open-workspace
+                        aria-label={`View ${job.jobTitle} at ${job.companyName}`}
+                      >
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div class="divide-y divide-base-200 md:hidden">
+            {jobs.map((job) => (
+              <MobileApplicationRow job={job} query={query} />
+            ))}
+          </div>
+        </>
+      ) : (
+        <EmptyState
+          title="No applications"
+          description="Adjust the filters or add a new application."
+        />
+      )}
+    </div>
+  )
+}
+
+function MobileApplicationRow({
+  job,
+  query,
+  showTargetDate = false,
+}: {
+  job: JobCardData
+  query: string
+  showTargetDate?: boolean
+}) {
+  const date = showTargetDate ? job.applyTodayTargetDate : job.appliedDate
+  const overdue =
+    showTargetDate && !!job.applyTodayTargetDate && job.applyTodayTargetDate < todayISO()
+  return (
+    <article class="p-4">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="truncate text-sm text-base-content/60">{job.companyName}</p>
+          <h3 class="mt-0.5 font-semibold">
+            <span>{job.jobTitle}</span>
+            {job.url ? (
+              <a
+                class="ms-1 inline-flex align-middle"
+                href={job.url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open ${job.jobTitle} posting`}
+              >
+                <Icon name="external" className="size-3.5" />
+              </a>
+            ) : null}
+          </h3>
+        </div>
+        <StatusBadge status={job.status} />
+      </div>
+      <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-base-content/70">
+        <PriorityBadge priority={job.priority} small />
+        {job.location ? (
+          <span class="inline-flex items-center gap-1">
+            <Icon name="location" className="size-3.5" /> {job.location}
+          </span>
+        ) : null}
+        {date ? (
+          <span class={overdue ? 'font-medium text-error' : undefined}>
+            {showTargetDate ? 'Target' : 'Applied'} · {formatDisplayDate(date)}
+          </span>
+        ) : null}
+      </div>
+      <div class="mt-3 flex justify-end">
+        <button
+          class="btn btn-ghost btn-sm"
+          hx-get={`/applications/${job.id}/workspace?${query}`}
+          hx-target="#drawer-content"
+          hx-swap="innerHTML"
+          data-open-workspace
+        >
+          View details
+        </button>
+      </div>
+    </article>
+  )
+}
+
+function PriorityBadge({
+  priority,
+  small = false,
+}: {
+  priority: JobCardData['priority']
+  small?: boolean
+}) {
+  return (
+    <span
+      class={`badge badge-outline min-w-20 shrink-0 justify-center whitespace-nowrap ${
+        small ? 'badge-sm' : ''
+      }`}
+    >
+      Priority {priority}
+    </span>
+  )
+}
+
+function renderCell(job: JobCardData, attr: ApplicationAttribute) {
+  switch (attr) {
+    case 'company':
+      return job.companyWebsite ? (
+        <a class="link font-medium" href={job.companyWebsite} target="_blank" rel="noreferrer">
+          {job.companyName}
+        </a>
+      ) : (
+        <span class="font-medium">{job.companyName}</span>
+      )
+    case 'title':
+      return (
+        <span class="inline-flex items-center gap-1">
+          <span class="font-medium">{job.jobTitle}</span>
+          {job.url && (
+            <a
+              class="link"
+              href={job.url}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Open ${job.jobTitle} posting`}
+            >
+              <Icon name="external" className="size-3.5" />
+            </a>
+          )}
+        </span>
+      )
+    case 'location':
+      return job.location || '—'
+    case 'priority':
+      return <PriorityBadge priority={job.priority} />
+    case 'status':
+      return <StatusBadge status={job.status} />
+    case 'appliedDate':
+      return job.appliedDate ? formatDisplayDate(job.appliedDate) : '—'
+    case 'targetDate':
+      return job.applyTodayTargetDate ? formatDisplayDate(job.applyTodayTargetDate) : '—'
+    case 'source':
+      return job.applicationSource || '—'
+    case 'matchLevel':
+      return job.matchLevel || '—'
+    case 'notes':
+      return <span class="block max-w-xs truncate">{job.notes || '—'}</span>
+  }
+}
+
+function TodayTasksTable({ jobs, filters }: { jobs: JobCardData[]; filters: Filters }) {
+  if (!jobs.length) return <EmptyState title="Nothing due today" />
+  const query = enc(filters)
+  return (
+    <div class="overflow-hidden rounded-box border border-base-300 bg-base-100">
+      <div class="hidden overflow-x-auto md:block">
+        <table class="table table-sm">
+          <caption class="sr-only">Applications due today</caption>
+          <thead>
+            <tr>
+              <th>Job title</th>
+              <th>Company</th>
+              <th>Location</th>
+              <th>Priority</th>
+              <th>Target date</th>
+              <th class="text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {jobs.map((job) => {
+              const overdue = !!job.applyTodayTargetDate && job.applyTodayTargetDate < todayISO()
+              return (
+                <tr class="border-base-200 hover:bg-base-200/50">
+                  <td class="font-medium">
+                    {job.jobTitle}
+                    {job.url && (
+                      <a
+                        class="ml-1 inline-flex align-middle"
+                        href={job.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`Open ${job.jobTitle} posting`}
+                      >
+                        <Icon name="external" className="size-3.5" />
+                      </a>
+                    )}
+                  </td>
+                  <td>{job.companyName}</td>
+                  <td>{job.location || '—'}</td>
+                  <td>
+                    <PriorityBadge priority={job.priority} />
+                  </td>
+                  <td>
+                    <span class={overdue ? 'badge badge-error badge-sm' : ''}>
+                      {job.applyTodayTargetDate ? formatDisplayDate(job.applyTodayTargetDate) : '—'}
+                    </span>
+                  </td>
+                  <td class="text-right">
+                    <button
+                      class="btn btn-ghost btn-sm"
+                      hx-get={`/applications/${job.id}/workspace?${query}`}
+                      hx-target="#drawer-content"
+                      hx-swap="innerHTML"
+                      data-open-workspace
                     >
-                      ↗
-                    </a>
-                  )}
-                </td>
-                <td>{job.companyName}</td>
-                <td>{job.location || '—'}</td>
-                <td>
-                  <span
-                    class={`badge ${job.priority === 'A' ? 'badge-error' : job.priority === 'B' ? 'badge-warning' : 'badge-ghost'}`}
-                  >
-                    {job.priority}
-                  </span>
-                </td>
-                <td>
-                  <span class={overdue ? 'badge badge-error badge-sm' : ''}>
-                    {job.applyTodayTargetDate || '—'}
-                  </span>
-                </td>
-                <td>
-                  <div class="flex min-w-32 flex-wrap gap-1">
-                    {job.skills.length
-                      ? job.skills.map((skill) => (
-                          <span class="badge badge-outline badge-sm">{skill}</span>
-                        ))
-                      : '—'}
-                  </div>
-                </td>
-                <td>
-                  <button
-                    class="btn btn-primary btn-sm"
-                    hx-get={`/applications/${job.id}/workspace?${query}`}
-                    hx-target="#drawer-content"
-                    hx-swap="innerHTML"
-                    data-open-workspace
-                  >
-                    Open
-                  </button>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                      View
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div class="divide-y divide-base-200 md:hidden">
+        {jobs.map((job) => (
+          <MobileApplicationRow job={job} query={query} showTargetDate />
+        ))}
+      </div>
     </div>
   )
 }
@@ -499,8 +721,8 @@ function JobCard({
     job.applyTodayTargetDate < todayISO()
   const query = enc(filters)
   return (
-    <article class={`card bg-base-100 ${compact ? 'rounded-none shadow-none' : 'shadow-sm'}`}>
-      <div class={`card-body gap-2 p-4 ${compact ? 'flex-col md:flex-row md:items-center' : ''}`}>
+    <article class="card border border-base-300/40 bg-base-100 p-4 shadow-sm">
+      <div class={`card-body gap-2 p-0 ${compact ? 'flex-col md:flex-row md:items-center' : ''}`}>
         <div class="flex items-start justify-between gap-2">
           <div>
             <div class="flex items-center gap-1">
@@ -513,27 +735,29 @@ function JobCard({
                   rel="noreferrer"
                   aria-label={`Open ${job.jobTitle} posting`}
                 >
-                  ↗
+                  <Icon name="external" className="size-3.5" />
                 </a>
               )}
             </div>
             <p class="text-sm text-base-content/70">{job.companyName}</p>
           </div>
-          <span
-            class={`badge ${job.priority === 'A' ? 'badge-error' : job.priority === 'B' ? 'badge-warning' : 'badge-ghost'}`}
-          >
-            {job.priority}
-          </span>
+          <PriorityBadge priority={job.priority} />
         </div>
         <div class="flex flex-1 flex-wrap items-center gap-2 text-xs">
-          {job.location && <span>📍 {job.location}</span>}
+          {job.location && (
+            <span class="inline-flex items-center gap-1">
+              <Icon name="location" className="size-3.5" /> {job.location}
+            </span>
+          )}
           {overdue && (
-            <span class="badge badge-error badge-sm">Overdue · {job.applyTodayTargetDate}</span>
+            <span class="badge badge-error badge-sm">
+              Overdue · {formatDisplayDate(job.applyTodayTargetDate!)}
+            </span>
           )}
         </div>
         <div class="card-actions mt-2 md:mt-0">
           <button
-            class="btn btn-primary btn-sm grow"
+            class="btn btn-sm grow"
             hx-get={`/applications/${job.id}/workspace?${query}`}
             hx-target="#drawer-content"
             hx-swap="innerHTML"
@@ -558,7 +782,7 @@ function JobCard({
   )
 }
 
-export function AppShell({ children, drawer }: { children: Child; drawer?: Child }) {
+export function WorkspaceDrawer({ children, drawer }: { children: Child; drawer?: Child }) {
   return (
     <div class="drawer drawer-end">
       <input id="workspace-toggle" type="checkbox" class="drawer-toggle" />

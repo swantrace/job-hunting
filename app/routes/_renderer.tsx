@@ -2,7 +2,7 @@ import { jsxRenderer } from 'hono/jsx-renderer'
 import { Link } from 'honox/server'
 
 export default jsxRenderer(({ children }) => (
-  <html lang="en" data-theme="corporate">
+  <html lang="en">
     <head>
       <meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -10,6 +10,18 @@ export default jsxRenderer(({ children }) => (
       <title>Job Application Tracker</title>
       <Link href="/app/style.css" rel="stylesheet" />
       <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `htmx.config.allowNestedOobSwaps = false;
+htmx.config.responseHandling = [
+  { code: '204', swap: false },
+  { code: '422', swap: true },
+  { code: '[23]..', swap: true },
+  { code: '[45]..', swap: false, error: true },
+  { code: '...' },
+];`,
+        }}
+      />
       <script src="https://cdn.jsdelivr.net/npm/formbouncerjs@1.4.6/dist/bouncer.polyfills.min.js"></script>
     </head>
     <body>
@@ -48,6 +60,13 @@ export default jsxRenderer(({ children }) => (
   });
   document.body.addEventListener('click', function (event) {
     const target = event.target instanceof Element ? event.target : null;
+    const openQuickCollect = target && target.closest('[data-open-quick-collect]');
+    const closeQuickCollect = target && target.closest('[data-close-quick-collect]');
+    if (openQuickCollect || closeQuickCollect) {
+      const quickCollectToggle = document.getElementById('quick-collect-toggle');
+      if (quickCollectToggle) quickCollectToggle.checked = Boolean(openQuickCollect);
+      return;
+    }
     const openWorkspace = target && target.closest('[data-open-workspace]');
     if (openWorkspace) {
       const drawerToggle = document.getElementById('workspace-toggle');
@@ -56,15 +75,25 @@ export default jsxRenderer(({ children }) => (
     }
     const tabButton = target && target.closest('[data-workspace-tab]');
     if (!tabButton) return;
+    const shell = document.getElementById('workspace-shell') || document;
     const tab = tabButton.dataset.workspaceTab;
-    document.querySelectorAll('[data-workspace-panel]').forEach(function (panel) {
+    shell.querySelectorAll('[data-workspace-panel]').forEach(function (panel) {
       panel.classList.toggle('hidden', panel.id !== 'workspace-' + tab + '-panel');
     });
-    document.querySelectorAll('[data-workspace-tab]').forEach(function (button) {
+    shell.querySelectorAll('[data-workspace-tab]').forEach(function (button) {
       const active = button === tabButton;
       button.classList.toggle('tab-active', active);
       button.setAttribute('aria-selected', active ? 'true' : 'false');
+      button.tabIndex = active ? 0 : -1;
     });
+  });
+  document.body.addEventListener('click', function (event) {
+    const target = event.target instanceof Element ? event.target : null;
+    const openAiModal = target && target.closest('[data-open-ai-modal]');
+    if (openAiModal) {
+      const dialog = document.getElementById('ai_parser_modal');
+      if (dialog && typeof dialog.showModal === 'function') dialog.showModal();
+    }
   });
   document.body.addEventListener('htmx:responseError', function () {
     document.getElementById('flash').innerHTML = '<div class="alert alert-error">The request could not be completed.</div>';

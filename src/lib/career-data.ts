@@ -36,8 +36,33 @@ const achievementsSchema = documentSchema.extend({
         experienceId: idSchema.nullable(),
         skills: referenceIdsSchema,
         directions: referenceIdsSchema,
+        publicationIds: referenceIdsSchema.optional(),
         safeToUse: z.boolean(),
         evidence: z.array(z.string()),
+      })
+      .passthrough(),
+  ),
+})
+const publicationsSchema = documentSchema.extend({
+  publications: z.array(
+    z
+      .object({
+        id: idSchema,
+        citation: z.string().trim().min(1),
+        title: z.string().trim().min(1),
+        year: z.number().int().min(1900).max(2100),
+        publicationType: z.enum(['journal-article', 'conference-paper', 'preprint', 'other']),
+        status: z.enum(['published', 'in-review', 'preprint', 'needs-verification']),
+        authors: z
+          .array(z.object({ name: z.string().trim().min(1), isCandidate: z.boolean() }))
+          .min(1),
+        authorListIsTruncated: z.boolean().optional(),
+        experienceId: idSchema.nullable(),
+        projectIds: referenceIdsSchema,
+        directions: referenceIdsSchema,
+        contributions: z.array(z.string().trim().min(1)).default([]),
+        sourceUrls: z.array(z.string().url()).default([]),
+        safeToUse: z.boolean(),
       })
       .passthrough(),
   ),
@@ -96,6 +121,7 @@ export const careerProfileSchema = documentSchema
     excludeUntilUpgraded: referenceIdsSchema,
     preferredAchievementIds: referenceIdsSchema,
     preferredProjectIds: referenceIdsSchema,
+    preferredPublicationIds: referenceIdsSchema.default([]),
     experienceSelection: z.object({
       requiredIds: referenceIdsSchema,
       priorityOrder: referenceIdsSchema,
@@ -109,6 +135,7 @@ export type CanonicalCareerData = {
   candidate: z.infer<typeof candidateSchema>
   experiences: z.infer<typeof experiencesSchema>
   achievements: z.infer<typeof achievementsSchema>
+  publications: z.infer<typeof publicationsSchema>
   projects: z.infer<typeof projectsSchema>
   skills: z.infer<typeof skillsSchema>
   stories: z.infer<typeof storiesSchema>
@@ -151,6 +178,7 @@ export function validateCareerData(data: CanonicalCareerData) {
   const directionIds = new Set(Object.keys(data.preferences.directionDefinitions))
   const experienceIds = new Set(data.experiences.experiences.map((item) => item.id))
   const achievementIds = new Set(data.achievements.achievements.map((item) => item.id))
+  const publicationIds = new Set(data.publications.publications.map((item) => item.id))
   const projectIds = new Set(data.projects.projects.map((item) => item.id))
   const skillIds = new Set(data.skills.skills.map((item) => item.id))
   const storyIds = new Set(data.stories.stories.map((item) => item.id))
@@ -166,6 +194,10 @@ export function validateCareerData(data: CanonicalCareerData) {
   assertUnique(
     'achievements',
     data.achievements.achievements.map((item) => item.id),
+  )
+  assertUnique(
+    'publications',
+    data.publications.publications.map((item) => item.id),
   )
   assertUnique(
     'projects',
@@ -188,6 +220,19 @@ export function validateCareerData(data: CanonicalCareerData) {
     if (item.experienceId)
       assertReferences(`achievement ${item.id}`, [item.experienceId], experienceIds)
     assertReferences(`achievement ${item.id} directions`, item.directions, directionIds)
+    assertReferences(
+      `achievement ${item.id} publications`,
+      item.publicationIds ?? [],
+      publicationIds,
+    )
+  }
+  for (const item of data.publications.publications) {
+    if (item.experienceId)
+      assertReferences(`publication ${item.id}`, [item.experienceId], experienceIds)
+    assertReferences(`publication ${item.id} projects`, item.projectIds, projectIds)
+    assertReferences(`publication ${item.id} directions`, item.directions, directionIds)
+    if (!item.authors.some((author) => author.isCandidate))
+      throw new Error(`Publication "${item.id}" must identify the candidate in authors.`)
   }
   for (const item of data.projects.projects) {
     assertReferences(`project ${item.id} directions`, item.directions, directionIds)
@@ -223,6 +268,11 @@ export function validateCareerData(data: CanonicalCareerData) {
     )
     assertReferences(`profile ${profile.id} projects`, profile.preferredProjectIds, projectIds)
     assertReferences(
+      `profile ${profile.id} publications`,
+      profile.preferredPublicationIds,
+      publicationIds,
+    )
+    assertReferences(
       `profile ${profile.id} experiences`,
       [
         ...profile.experienceSelection.requiredIds,
@@ -247,6 +297,11 @@ export function loadCareerData(): CanonicalCareerData {
     candidate: candidateSchema.parse(readJson(resolve(careerData, 'candidate.json'))),
     experiences: experiencesSchema.parse(readJson(resolve(careerData, 'experiences.json'))),
     achievements: achievementsSchema.parse(readJson(resolve(careerData, 'achievements.json'))),
+    publications: publicationsSchema.parse(
+      existsSync(resolve(careerData, 'publications.json'))
+        ? readJson(resolve(careerData, 'publications.json'))
+        : { schemaVersion: 1, lastUpdated: '1970-01-01', publications: [] },
+    ),
     projects: projectsSchema.parse(readJson(resolve(careerData, 'projects.json'))),
     skills: skillsSchema.parse(readJson(resolve(careerData, 'skills.json'))),
     stories: storiesSchema.parse(readJson(resolve(careerData, 'stories.json'))),

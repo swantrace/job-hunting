@@ -71,6 +71,13 @@
       "when": 1784581200000,
       "tag": "0009_generation_evidence_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1787281200000,
+      "tag": "0010_baseline_generation",
+      "breakpoints": true
     }
   ]
 }

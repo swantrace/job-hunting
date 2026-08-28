@@ -1,4 +1,7 @@
 import type { listManagementData } from '../../src/db/queries'
+import { AppShell } from './layout/AppShell'
+import { InputField, SelectField } from './ui/FormField'
+import { Icon } from './ui/Icon'
 
 type ManagementData = ReturnType<typeof listManagementData>
 export type ManagementKind = 'skills' | 'companies' | 'contacts'
@@ -17,25 +20,46 @@ const deleteButton = (kind: ManagementKind, id: number) => (
 
 export function ManagementPage({ data }: { data: ManagementData }) {
   return (
-    <main class="mx-auto min-h-screen max-w-7xl space-y-5 p-4 lg:p-7">
-      <header>
-        <a class="link text-sm" href="/">
-          ← Dashboard
-        </a>
-        <h1 class="mt-2 text-3xl font-bold">Manage data</h1>
-        <p class="text-base-content/60">Keep reusable skills, companies, and contacts organized.</p>
-      </header>
+    <AppShell title="Manage data" currentPath="/manage">
       <ManagementContent data={data} />
-    </main>
+    </AppShell>
   )
 }
 
-export function ManagementContent({ data }: { data: ManagementData }) {
+export function ManagementContent({
+  data,
+  error,
+  errorKind,
+  editId,
+}: {
+  data: ManagementData
+  error?: string
+  errorKind?: ManagementKind
+  editId?: number
+}) {
   return (
     <div id="management-content" class="grid gap-5 lg:grid-cols-3">
-      <ManagementCard kind="skills" title="Skills" data={data} />
-      <ManagementCard kind="companies" title="Companies" data={data} />
-      <ManagementCard kind="contacts" title="Contacts" data={data} />
+      <ManagementCard
+        kind="skills"
+        title="Skills"
+        data={data}
+        error={errorKind === 'skills' ? error : undefined}
+        editId={errorKind === 'skills' ? editId : undefined}
+      />
+      <ManagementCard
+        kind="companies"
+        title="Companies"
+        data={data}
+        error={errorKind === 'companies' ? error : undefined}
+        editId={errorKind === 'companies' ? editId : undefined}
+      />
+      <ManagementCard
+        kind="contacts"
+        title="Contacts"
+        data={data}
+        error={errorKind === 'contacts' ? error : undefined}
+        editId={errorKind === 'contacts' ? editId : undefined}
+      />
     </div>
   )
 }
@@ -44,16 +68,20 @@ function ManagementCard({
   kind,
   title,
   data,
+  error,
+  editId,
 }: {
   kind: ManagementKind
   title: string
   data: ManagementData
+  error?: string
+  editId?: number
 }) {
   return (
     <section class="card bg-base-100 shadow-sm">
       <div class="card-body">
         <h2 class="card-title">{title}</h2>
-        <ManagementForm kind={kind} data={data} />
+        <ManagementForm kind={kind} data={data} editId={editId} error={error} />
         <ul class="mt-3 divide-y divide-base-300">
           {kind === 'skills'
             ? data.skills.map((skill) => (
@@ -76,7 +104,7 @@ function ManagementCard({
                           target="_blank"
                           rel="noreferrer"
                         >
-                          {company.name} ↗
+                          {company.name} <Icon name="external" className="inline size-3" />
                         </a>
                       ) : (
                         <span class="font-medium">{company.name}</span>
@@ -123,10 +151,12 @@ export function ManagementForm({
   kind,
   data,
   editId,
+  error,
 }: {
   kind: ManagementKind
   data: ManagementData
   editId?: number
+  error?: string
 }) {
   const editing = !!editId
   const skill = editId ? data.skills.find((item) => item.id === editId) : undefined
@@ -148,82 +178,91 @@ export function ManagementForm({
         {...{ [method]: action }}
         hx-target="#management-content"
         hx-swap="outerHTML"
+        hx-disabled-elt="find button"
       >
         <p class="text-sm font-medium">{title}</p>
+        {error ? (
+          <div class="alert alert-error text-sm" role="alert">
+            {error}
+          </div>
+        ) : null}
         {kind === 'skills' ? (
-          <div class="join w-full">
-            <input
-              class="input input-bordered join-item w-full"
+          <>
+            <InputField
               name="name"
+              label="Skill name"
               value={skill?.name ?? ''}
               placeholder="e.g. backend"
               required
-              data-primary-input
+              dataPrimaryInput
             />
-            <button class="btn btn-primary join-item">{editing ? 'Save' : 'Add'}</button>
-            {editing && <CancelButton kind={kind} />}
-          </div>
+            <SubmitRow editing={editing} kind={kind} />
+          </>
         ) : kind === 'companies' ? (
           <>
-            <input
-              class="input input-bordered w-full"
+            <InputField
               name="name"
+              label="Company name"
               value={company?.name ?? ''}
               placeholder="Company name"
               required
-              data-primary-input
+              dataPrimaryInput
             />
-            <div class="join w-full">
-              <input
-                class="input input-bordered join-item w-full"
-                name="website"
-                type="url"
-                value={company?.website ?? ''}
-                placeholder="Website (optional)"
-              />
-              <button class="btn btn-primary join-item">{editing ? 'Save' : 'Add'}</button>
-              {editing && <CancelButton kind={kind} />}
-            </div>
+            <InputField
+              name="website"
+              label="Website"
+              type="url"
+              value={company?.website ?? ''}
+              placeholder="Website (optional)"
+            />
+            <SubmitRow editing={editing} kind={kind} />
           </>
         ) : (
           <>
-            <input
-              class="input input-bordered w-full"
+            <InputField
               name="name"
+              label="Contact name"
               value={contact?.name ?? ''}
               placeholder="Contact name"
               required
-              data-primary-input
+              dataPrimaryInput
             />
-            <select class="select select-bordered w-full" name="companyId" required>
+            <SelectField name="companyId" label="Company" required>
               <option value="">Select company</option>
               {data.companies.map((entry) => (
                 <option value={entry.id} selected={entry.id === contact?.companyId}>
                   {entry.name}
                 </option>
               ))}
-            </select>
-            <input
-              class="input input-bordered w-full"
+            </SelectField>
+            <InputField
               name="email"
+              label="Email"
               type="email"
               value={contact?.email ?? ''}
               placeholder="Email (optional)"
             />
-            <div class="join w-full">
-              <input
-                class="input input-bordered join-item w-full"
-                name="linkedinUrl"
-                type="url"
-                value={contact?.linkedinUrl ?? ''}
-                placeholder="LinkedIn URL (optional)"
-              />
-              <button class="btn btn-primary join-item">{editing ? 'Save' : 'Add'}</button>
-              {editing && <CancelButton kind={kind} />}
-            </div>
+            <InputField
+              name="linkedinUrl"
+              label="LinkedIn URL"
+              type="url"
+              value={contact?.linkedinUrl ?? ''}
+              placeholder="LinkedIn URL (optional)"
+            />
+            <SubmitRow editing={editing} kind={kind} />
           </>
         )}
       </form>
+    </div>
+  )
+}
+
+function SubmitRow({ editing, kind }: { editing: boolean; kind: ManagementKind }) {
+  return (
+    <div class="flex items-center gap-2">
+      <button class="btn btn-primary">{editing ? 'Save' : 'Add'}</button>
+      <span class="loading loading-spinner loading-sm htmx-indicator" />
+      {editing && <CancelButton kind={kind} />}
     </div>
   )
 }

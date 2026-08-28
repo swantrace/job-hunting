@@ -2,6 +2,10 @@ import { and, desc, eq, sql } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
 import { db } from './client'
 import {
+  type BaselineGenerationRun,
+  baselineGeneratedArtifacts,
+  baselineGenerationEvidenceSnapshots,
+  baselineGenerationRuns,
   companies,
   type GenerationRun,
   generatedArtifacts,
@@ -17,6 +21,10 @@ import {
 
 export type GenerationRunWithArtifacts = GenerationRun & {
   artifacts: (typeof generatedArtifacts.$inferSelect)[]
+}
+
+export type BaselineGenerationRunWithArtifacts = BaselineGenerationRun & {
+  artifacts: (typeof baselineGeneratedArtifacts.$inferSelect)[]
 }
 
 export type GenerationSource = {
@@ -47,6 +55,150 @@ export function createGenerationRun(jobApplicationId: number) {
     })
     .returning()
     .get()
+}
+
+export function createBaselineGenerationRun(input: {
+  direction: string
+  targetTitle: string
+  targetKeywords: string[]
+}) {
+  const date = todayISO()
+  return db
+    .insert(baselineGenerationRuns)
+    .values({
+      ...input,
+      targetKeywords: JSON.stringify(input.targetKeywords),
+      queueJobId: `baseline-generation-${crypto.randomUUID()}`,
+      status: 'Queued',
+      createdAt: date,
+      updatedAt: date,
+    })
+    .returning()
+    .get()
+}
+
+export function listBaselineGenerationRuns(): BaselineGenerationRunWithArtifacts[] {
+  const runs = db
+    .select()
+    .from(baselineGenerationRuns)
+    .orderBy(desc(baselineGenerationRuns.id))
+    .all()
+  if (!runs.length) return []
+  const artifacts = db
+    .select()
+    .from(baselineGeneratedArtifacts)
+    .where(
+      sql`${baselineGeneratedArtifacts.baselineGenerationRunId} in (${sql.join(
+        runs.map((run) => sql`${run.id}`),
+        sql`, `,
+      )})`,
+    )
+    .all()
+  return runs.map((run) => ({
+    ...run,
+    artifacts: artifacts.filter((artifact) => artifact.baselineGenerationRunId === run.id),
+  }))
+}
+
+export function getBaselineGenerationRun(runId: number) {
+  return (
+    db.select().from(baselineGenerationRuns).where(eq(baselineGenerationRuns.id, runId)).get() ??
+    null
+  )
+}
+
+export function listQueuedBaselineGenerationRuns() {
+  return db
+    .select()
+    .from(baselineGenerationRuns)
+    .where(eq(baselineGenerationRuns.status, 'Queued'))
+    .orderBy(baselineGenerationRuns.id)
+    .all()
+}
+
+export function saveBaselineGenerationEvidenceSnapshot(
+  runId: number,
+  snapshotJson: string,
+  filePath: string,
+) {
+  const date = todayISO()
+  return db
+    .insert(baselineGenerationEvidenceSnapshots)
+    .values({ baselineGenerationRunId: runId, snapshotJson, filePath, createdAt: date })
+    .onConflictDoUpdate({
+      target: baselineGenerationEvidenceSnapshots.baselineGenerationRunId,
+      set: { snapshotJson, filePath, createdAt: date },
+    })
+    .run()
+}
+
+export function getBaselineGenerationEvidenceSnapshot(runId: number) {
+  return (
+    db
+      .select()
+      .from(baselineGenerationEvidenceSnapshots)
+      .where(eq(baselineGenerationEvidenceSnapshots.baselineGenerationRunId, runId))
+      .get() ?? null
+  )
+}
+
+export function markBaselineGenerationRunProcessing(runId: number) {
+  const date = todayISO()
+  db.update(baselineGenerationRuns)
+    .set({
+      status: 'Processing',
+      attempts: sql`${baselineGenerationRuns.attempts} + 1`,
+      errorMessage: null,
+      startedAt: date,
+      updatedAt: date,
+    })
+    .where(eq(baselineGenerationRuns.id, runId))
+    .run()
+}
+
+export function completeBaselineGenerationRun(
+  runId: number,
+  artifact: { fileName: string; filePath: string; mimeType: string },
+) {
+  const date = todayISO()
+  return db.transaction((tx) => {
+    tx.update(baselineGenerationRuns)
+      .set({ status: 'Completed', errorMessage: null, completedAt: date, updatedAt: date })
+      .where(eq(baselineGenerationRuns.id, runId))
+      .run()
+    tx.insert(baselineGeneratedArtifacts)
+      .values({ ...artifact, baselineGenerationRunId: runId, type: 'resume', createdAt: date })
+      .onConflictDoUpdate({
+        target: [
+          baselineGeneratedArtifacts.baselineGenerationRunId,
+          baselineGeneratedArtifacts.type,
+        ],
+        set: { ...artifact, createdAt: date },
+      })
+      .run()
+  })
+}
+
+export function failBaselineGenerationRun(runId: number, error: unknown) {
+  const message = error instanceof Error ? error.message : 'Baseline resume generation failed.'
+  db.update(baselineGenerationRuns)
+    .set({ status: 'Failed', errorMessage: message.slice(0, 2000), updatedAt: todayISO() })
+    .where(eq(baselineGenerationRuns.id, runId))
+    .run()
+}
+
+export function getBaselineArtifact(id: number) {
+  return (
+    db
+      .select({ artifact: baselineGeneratedArtifacts, run: baselineGenerationRuns })
+      .from(baselineGeneratedArtifacts)
+      .innerJoin(
+        baselineGenerationRuns,
+        eq(baselineGeneratedArtifacts.baselineGenerationRunId, baselineGenerationRuns.id),
+      )
+      .where(eq(baselineGeneratedArtifacts.id, id))
+      .get() ?? null
+  )
 }
 
 export function listGenerationRuns(jobApplicationId: number): GenerationRunWithArtifacts[] {

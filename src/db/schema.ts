@@ -247,6 +247,75 @@ export const generationEvidenceSnapshots = sqliteTable(
   ],
 )
 
+// Baseline documents are deliberately independent of applications: they are
+// direction-specific resumes created without an employer or job post.
+export const baselineGenerationRuns = sqliteTable(
+  'baseline_generation_runs',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    direction: text('direction').notNull(),
+    targetTitle: text('target_title').notNull(),
+    targetKeywords: text('target_keywords').notNull().default('[]'),
+    status: text('status', { enum: generationStatuses }).notNull().default('Queued'),
+    queueJobId: text('queue_job_id').notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    errorMessage: text('error_message'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    startedAt: text('started_at'),
+    completedAt: text('completed_at'),
+  },
+  (table) => [
+    check(
+      'baseline_generation_runs_status_check',
+      sql`${table.status} in ('Queued', 'Processing', 'Completed', 'Failed')`,
+    ),
+    uniqueIndex('baseline_generation_runs_queue_job_unique_idx').on(table.queueJobId),
+    index('baseline_generation_runs_direction_created_idx').on(table.direction, table.createdAt),
+    index('baseline_generation_runs_status_idx').on(table.status),
+  ],
+)
+
+export const baselineGeneratedArtifacts = sqliteTable(
+  'baseline_generated_artifacts',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    baselineGenerationRunId: integer('baseline_generation_run_id')
+      .notNull()
+      .references(() => baselineGenerationRuns.id, { onDelete: 'cascade' }),
+    type: text('type', { enum: generatedArtifactTypes }).notNull(),
+    fileName: text('file_name').notNull(),
+    filePath: text('file_path').notNull(),
+    mimeType: text('mime_type').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    check('baseline_generated_artifacts_type_check', sql`${table.type} = 'resume'`),
+    uniqueIndex('baseline_generated_artifacts_run_type_unique_idx').on(
+      table.baselineGenerationRunId,
+      table.type,
+    ),
+  ],
+)
+
+export const baselineGenerationEvidenceSnapshots = sqliteTable(
+  'baseline_generation_evidence_snapshots',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    baselineGenerationRunId: integer('baseline_generation_run_id')
+      .notNull()
+      .references(() => baselineGenerationRuns.id, { onDelete: 'cascade' }),
+    snapshotJson: text('snapshot_json').notNull(),
+    filePath: text('file_path').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('baseline_generation_evidence_snapshots_run_unique_idx').on(
+      table.baselineGenerationRunId,
+    ),
+  ],
+)
+
 export const jobApplicationsToContacts = sqliteTable(
   'job_applications_to_contacts',
   {
@@ -296,3 +365,4 @@ export type Contact = typeof contacts.$inferSelect
 export type JobPosting = typeof jobPostings.$inferSelect
 export type JobPostingAnalysis = typeof jobPostingAnalyses.$inferSelect
 export type GenerationRun = typeof generationRuns.$inferSelect
+export type BaselineGenerationRun = typeof baselineGenerationRuns.$inferSelect

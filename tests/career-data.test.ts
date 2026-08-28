@@ -16,4 +16,10 @@ describe('canonical career data', () => {
     data.profiles[0].preferredSkillIds.push('missing-skill')
     expect(() => validateCareerData(data)).toThrow('unknown ID "missing-skill"')
   })
+
+  test('rejects a profile publication reference that does not exist', () => {
+    const data = loadCareerData()
+    data.profiles[0].preferredPublicationIds.push('missing-publication')
+    expect(() => validateCareerData(data)).toThrow('unknown ID "missing-publication"')
+  })
 })

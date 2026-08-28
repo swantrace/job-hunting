@@ -59,7 +59,7 @@ The SQLite database is created as `jobs.db`. Set `DB_FILE_NAME` to use a differe
 
 `career-data/` is the canonical, factual source used to generate documents. Keep stable IDs in those files: profiles refer to the IDs rather than copying experience or skill details.
 
-- `candidate.json`, `experiences.json`, `achievements.json`, `projects.json`, `skills.json`, and `stories.json` hold the reusable facts.
+- `candidate.json`, `experiences.json`, `achievements.json`, `publications.json`, `projects.json`, `skills.json`, and `stories.json` hold reusable facts. Publications keep a display-ready citation and structured authors, including an `isCandidate` marker.
 - `preferences.json` and `portfolio-content.json` remain canonical planning data.
 - `profiles/<direction>.profile.json` contains only direction-specific selection and ordering rules. Its `id` must match its filename.
 

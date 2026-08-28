@@ -9,9 +9,7 @@ export const POST = createRoute(async (c) => {
   const parsed = skillSchema.safeParse(form)
   if (!parsed.success)
     return c.html(
-      <div id="management-content" class="alert alert-error">
-        Invalid skill.
-      </div>,
+      <ManagementContent data={listManagementData()} error="Invalid skill." errorKind="skills" />,
       422,
     )
   const editId = Number(form.editId)

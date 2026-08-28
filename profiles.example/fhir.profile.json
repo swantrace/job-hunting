@@ -9,6 +9,7 @@
   "excludeUntilUpgraded": [],
   "preferredAchievementIds": [],
   "preferredProjectIds": [],
+  "preferredPublicationIds": [],
   "experienceSelection": {
     "requiredIds": ["example-company"],
     "priorityOrder": ["example-company"],

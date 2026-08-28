@@ -1,13 +1,19 @@
 import type { Queue, Worker } from 'bunqueue/client'
 import {
+  completeBaselineGenerationRun,
   completeGenerationRun,
+  createBaselineGenerationRun,
   createGenerationRun,
+  failBaselineGenerationRun,
   failGenerationRun,
+  getBaselineGenerationRun,
   getGenerationRun,
   getGenerationSource,
   listGenerationRuns,
+  listQueuedBaselineGenerationRuns,
   listQueuedGenerationRuns,
   markArtifactUploadFailed,
+  markBaselineGenerationRunProcessing,
   markGenerationRunProcessing,
 } from '../db/generation'
 
@@ -82,6 +88,21 @@ async function processGeneration(
   }
 }
 
+async function processBaselineGeneration(runId: number) {
+  const run = getBaselineGenerationRun(runId)
+  if (!run || run.status === 'Completed') return
+  markBaselineGenerationRunProcessing(runId)
+  try {
+    const { persistBaselineEvidenceSelectionSnapshot } = await import('./evidence-selection')
+    await persistBaselineEvidenceSelectionSnapshot(runId)
+    const { generateBaselineResume } = await import('./generation')
+    completeBaselineGenerationRun(runId, await generateBaselineResume(runId))
+  } catch (error) {
+    failBaselineGenerationRun(runId, error)
+    throw error
+  }
+}
+
 export async function startGenerationWorker() {
   if (worker || !usePersistentQueue()) return worker
   const bunQueue = await getBunQueue()
@@ -121,6 +142,20 @@ export async function enqueueGeneration(jobApplicationId: number) {
   return run
 }
 
+export async function enqueueBaselineGeneration(input: {
+  direction: string
+  targetTitle: string
+  targetKeywords: string[]
+}) {
+  const run = createBaselineGenerationRun(input)
+  // Baseline resumes are intentionally run in-process. They do not require a
+  // job-application queue record and still retain durable run/snapshot rows.
+  void processBaselineGeneration(run.id).catch((error) =>
+    console.error('Baseline resume generation failed', error),
+  )
+  return run
+}
+
 export async function recoverQueuedGenerationRuns() {
   const queued = listQueuedGenerationRuns()
   const persistentQueue = await getQueue()
@@ -135,6 +170,11 @@ export async function recoverQueuedGenerationRuns() {
       'generate-documents',
       { runId: run.id },
       { jobId: run.queueJobId, durable: true },
+    )
+  }
+  for (const run of listQueuedBaselineGenerationRuns()) {
+    void processBaselineGeneration(run.id).catch((error) =>
+      console.error('Baseline resume generation recovery failed', error),
     )
   }
 }
