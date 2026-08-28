@@ -1,29 +1,44 @@
 import { describe, expect, mock, test } from 'bun:test'
+import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { recordsFor } from './support/html-contract'
 
-const networkRouteModule = resolve(process.cwd(), 'app/routes/network/index.tsx')
+const plannedRoutes = [
+  { id: 'skills-page', name: 'Skills', path: 'app/routes/skills/index.tsx' },
+  { id: 'companies-page', name: 'Companies', path: 'app/routes/companies/index.tsx' },
+  { id: 'contacts-page', name: 'Contacts', path: 'app/routes/contacts/index.tsx' },
+] as const
 
-mock.module(networkRouteModule, () => ({
-  GET: () =>
-    new Response(
-      '<main id="app-shell"><section id="network-page">Network placeholder</section></main>',
-      { headers: { 'content-type': 'text/html; charset=UTF-8' } },
-    ),
-}))
-
-type NetworkRouteStub = {
-  GET: () => Response
+for (const route of plannedRoutes) {
+  const modulePath = resolve(process.cwd(), route.path)
+  if (!existsSync(modulePath)) {
+    mock.module(modulePath, () => ({
+      GET: () =>
+        new Response(
+          `<main id="app-shell"><section id="${route.id}">${route.name}</section></main>`,
+          {
+            headers: { 'content-type': 'text/html; charset=UTF-8' },
+          },
+        ),
+    }))
+  }
 }
 
-describe('planned modules remain testable before their files exist', () => {
-  test('Network route stub returns a complete page boundary', async () => {
-    const stub = (await import(networkRouteModule)) as NetworkRouteStub
-    const response = stub.GET()
-    const html = await response.text()
+type RouteStub = { GET: () => Response }
 
-    expect(response.status).toBe(200)
-    expect(recordsFor(html, 'app-shell')).toHaveLength(1)
-    expect(recordsFor(html, 'network-page')).toHaveLength(1)
-  })
+describe('planned resource modules remain testable before their files exist', () => {
+  for (const route of plannedRoutes) {
+    const modulePath = resolve(process.cwd(), route.path)
+    const virtualModuleTest = !existsSync(modulePath) ? test : test.todo
+
+    virtualModuleTest(`${route.name} route stub returns a complete page boundary`, async () => {
+      const stub = (await import(modulePath)) as RouteStub
+      const response = stub.GET()
+      const html = await response.text()
+
+      expect(response.status).toBe(200)
+      expect(recordsFor(html, 'app-shell')).toHaveLength(1)
+      expect(recordsFor(html, route.id)).toHaveLength(1)
+    })
+  }
 })

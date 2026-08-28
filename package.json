@@ -13,7 +13,8 @@
     "format:check": "biome check .",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "test:unit": "bun test tests/*.test.ts",
+    "test:unit": "bun test tests/*.test.ts tests/skills",
+    "test:skills": "bun test tests/skills",
     "test:ui-contracts": "bun test tests/ui"
   },
   "dependencies": {

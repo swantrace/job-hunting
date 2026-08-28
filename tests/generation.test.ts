@@ -64,4 +64,9 @@ describe('application generation', () => {
     expect(recipientName('Dear Hiring Team,')).toBe('Hiring Team')
     expect(recipientName('Hiring Manager')).toBe('Hiring Manager')
   })
+
+  test.todo('does not enqueue document generation when an AI-parsed opportunity is saved', () => {})
+  test.todo('blocks explicit generation while a missing-skill decision is pending', () => {})
+  test.todo('allows application-only skills to use only the user-authored reason', () => {})
+  test.todo('never sends skipped skills to resume or cover-letter prompts', () => {})
 })

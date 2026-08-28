@@ -29,4 +29,9 @@ describe('evidence selection snapshots', () => {
     expect(snapshot.sourceVersions.profile).toBeGreaterThan(0)
     expect(snapshot.profile.id).toBe('fullstack')
   })
+
+  test.todo('freezes every JD skill requirement with its match result and user decision', () => {})
+  test.todo('retains skipped skills as gaps while excluding them from document inputs', () => {})
+  test.todo('records the mandatory application-only reason as skill provenance', () => {})
+  test.todo('parses existing version 1 snapshots after the skill snapshot schema is upgraded', () => {})
 })

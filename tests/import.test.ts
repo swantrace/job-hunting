@@ -28,4 +28,8 @@ describe('JSON import format', () => {
     expect(parsed.skills).toEqual([{ id: 1, name: 'TypeScript' }])
     expect(parsed.applicationSkills[0]?.skillName).toBe('TypeScript')
   })
+
+  test.todo('round-trips aliases, taxonomy review state, requirements, and user decisions', () => {})
+  test.todo('previews ambiguous alias and decision conflicts instead of silently merging', () => {})
+  test.todo('imports schema version 1 backups after the taxonomy export version is introduced', () => {})
 })
