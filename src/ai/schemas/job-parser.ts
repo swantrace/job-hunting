@@ -1,4 +1,14 @@
 import { z } from 'zod'
+import { skillCategories, skillImportances } from '../../lib/skills/constants'
+
+export const skillRequirementItemSchema = z.object({
+  rawLabel: z.string().trim().min(1).max(120),
+  canonicalLabel: z.string().trim().min(1).max(120),
+  category: z.enum(skillCategories),
+  importance: z.enum(skillImportances),
+  sourceText: z.string().trim().min(1).max(1000),
+  confidence: z.number().min(0).max(1),
+})
 
 export const parsedJobSchema = z.object({
   jobTitle: z.string().trim().max(200),
@@ -8,7 +18,7 @@ export const parsedJobSchema = z.object({
     .trim()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable(),
-  skills: z.array(z.string().trim().max(80)).max(30),
+  skills: z.array(skillRequirementItemSchema).max(30),
   salary: z.string().trim().max(150).nullable(),
   requirements: z.array(z.string().trim().max(1000)).max(30),
   responsibilities: z.array(z.string().trim().max(1000)).max(30),
@@ -21,6 +31,42 @@ export const parsedJobSchema = z.object({
 })
 
 export type ParsedJob = z.infer<typeof parsedJobSchema>
+export type ParsedSkillRequirement = z.infer<typeof skillRequirementItemSchema>
+
+const skillItemSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    rawLabel: {
+      type: 'string',
+      description: 'The exact or tightly bounded skill wording used in the job posting.',
+    },
+    canonicalLabel: {
+      type: 'string',
+      description:
+        'A concise canonical name for the skill. Server-side alias resolution is authoritative.',
+    },
+    category: {
+      type: 'string',
+      enum: [...skillCategories],
+      description: 'One controlled taxonomy category for this skill.',
+    },
+    importance: {
+      type: 'string',
+      enum: [...skillImportances],
+      description: 'required, preferred, or merely mentioned.',
+    },
+    sourceText: {
+      type: 'string',
+      description: 'A short exact excerpt from the posting that supports this skill.',
+    },
+    confidence: {
+      type: 'number',
+      description: 'Parser confidence between 0 and 1.',
+    },
+  },
+  required: ['rawLabel', 'canonicalLabel', 'category', 'importance', 'sourceText', 'confidence'],
+}
 
 export const jobParserResponseSchema = {
   type: 'object',
@@ -40,9 +86,10 @@ export const jobParserResponseSchema = {
     },
     skills: {
       type: 'array',
-      items: { type: 'string' },
+      items: skillItemSchema,
       maxItems: 30,
-      description: 'Short, lowercase, deduplicated technical skills, domain knowledge, and tools.',
+      description:
+        'Up to 30 structured skill requirements, deduplicated by canonical label, with a source excerpt and controlled category/importance.',
     },
     salary: {
       type: ['string', 'null'],
@@ -112,4 +159,4 @@ export const jobParserResponseSchema = {
     'benefits',
     'notes',
   ],
-} as const
+}

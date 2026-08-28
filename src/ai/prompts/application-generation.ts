@@ -1,10 +1,12 @@
-export const applicationGenerationPromptVersion = '2.0.1'
+export const applicationGenerationPromptVersion = '2.1.0'
 
 const truthfulnessRules = `
 - Treat the supplied evidence snapshot as the complete factual boundary. Never use outside knowledge or add facts.
 - Preserve all employers, dates, project status, limitations, skill levels, metrics, and contribution boundaries exactly as supported. Do not add employment labels such as "Contract" to resume wording.
 - Do not turn a demo or personal project into production work, and do not imply people management.
 - Only use achievement evidence marked safeToUse. Do not create metrics, credentials, technologies, customers, or outcomes.
+- Use only the supplied skill provenance. A career-evidence skill may use only its canonical career evidence. An application-only skill may use only the user-authored reason, and must not be upgraded into production employment experience.
+- Never mention skipped or pending skills, and never invent a skill that is not listed in the supplied skill provenance.
 `
 
 export const resumeGenerationSystemPrompt = `You compose resume wording and layout selections from an immutable evidence snapshot and job context.

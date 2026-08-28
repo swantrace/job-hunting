@@ -1,0 +1,63 @@
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { db } from '../db/client'
+import { recomputeMatchResults } from '../db/skill-service'
+import { loadCareerData } from '../lib/career-data'
+import { syncCareerSkills } from '../lib/skills/sync-career-skills'
+
+/**
+ * One-way career-data -> SQLite taxonomy sync.
+ *
+ *   bun run skills:sync            # dry-run (default)
+ *   bun run skills:sync --apply    # write inside a transaction
+ *   bun run skills:sync --check    # non-zero exit on conflicts
+ *   bun run skills:sync --if-present  # skip silently when career-data is not mounted
+ */
+
+const args = process.argv.slice(2)
+const apply = args.includes('--apply')
+const check = args.includes('--check')
+const ifPresent = args.includes('--if-present')
+
+function canonicalCareerDataDir() {
+  const configured = process.env.CAREER_DATA_DIR?.trim()
+  const candidates = [
+    configured,
+    resolve(process.cwd(), 'career-data'),
+    resolve(process.cwd(), '..', 'career-data'),
+  ]
+  return candidates.filter((candidate): candidate is string => Boolean(candidate)).find(existsSync)
+}
+
+function main() {
+  if (!canonicalCareerDataDir()) {
+    if (ifPresent) {
+      console.log('career-data is not mounted; skipping career skill sync.')
+      return
+    }
+    console.error('career-data directory was not found. Mount it or set CAREER_DATA_DIR.')
+    process.exitCode = 1
+    return
+  }
+
+  const data = loadCareerData()
+  const report = syncCareerSkills(db, data, { apply })
+  if (apply) recomputeMatchResults(db, data)
+
+  const lines = [
+    `inserted: ${report.inserted}`,
+    `linked: ${report.linked}`,
+    `updated: ${report.updated}`,
+    `unchanged: ${report.unchanged}`,
+    `conflicted: ${report.conflicted}`,
+  ]
+  console.log(
+    apply ? 'Career skills synchronized.' : 'Career skill sync dry-run (no changes applied).',
+  )
+  console.log(lines.join('\n'))
+  for (const conflict of report.conflicts) console.log(`conflict: ${conflict}`)
+
+  if (check && report.conflicted > 0) process.exitCode = 1
+}
+
+main()

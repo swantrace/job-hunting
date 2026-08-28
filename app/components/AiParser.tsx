@@ -59,11 +59,12 @@ export function ParsedJobDraft({
         filters={filters}
         formId="quick-form"
         oob
+        skillRequirements={parsed.skills}
         values={{
           jobTitle: parsed.jobTitle,
           location: parsed.location ?? '',
           postedDate: parsed.postedDate ?? todayISO(),
-          skills: parsed.skills.join(', '),
+          skills: '',
           salary: parsed.salary ?? '',
           analysisRequirements: parsed.requirements.join('\n'),
           analysisResponsibilities: parsed.responsibilities.join('\n'),

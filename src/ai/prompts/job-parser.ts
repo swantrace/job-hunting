@@ -1,4 +1,4 @@
-export const jobParserPromptVersion = '2.1.0'
+export const jobParserPromptVersion = '2.2.0'
 
 export const jobParserSystemPrompt = `You extract factual fields from job postings into the provided JSON schema.
 
@@ -10,11 +10,20 @@ Global rules:
 - Use an empty array when an array field has no evidence in the posting.
 - Do not infer or return a company, a job URL, an application source, or a direction. Those fields are deliberately user-provided.
 
+Skill extraction rules:
+- skills is an array of structured objects, not plain strings.
+- Extract only recognizable skills, technologies, engineering practices, and domain platforms.
+- Do not classify location, remote/hybrid/onsite arrangements, benefits, personality adjectives, or general responsibilities as skills. Exclude working arrangements and perks entirely.
+- category must use one of the controlled category IDs from the schema. Never invent a category.
+- importance separates required, preferred, and merely mentioned skills.
+- rawLabel preserves the exact or tightly bounded wording from the posting; canonicalLabel is a concise canonical name. Server-side alias resolution is authoritative, so do not merge distinct technologies yourself.
+- sourceText is a short exact excerpt from the posting that supports the skill.
+- Deduplicate obvious repetitions without inventing equivalence, and return at most 30 skills.
+
 Field rules:
 - jobTitle: use the official position title; do not include a company name.
 - location: include city/region and remote, hybrid, or onsite wording when stated.
 - postedDate: use YYYY-MM-DD only when explicitly stated; never infer today's date.
-- skills: return at most 30 concise lowercase skills, technologies, and domain knowledge such as react, typescript, fhir, leadership, or aws; do not return sentences or duplicates.
 - salary: preserve the stated range and currency as plain text; use null when absent.
 - requirements: list explicit qualification, experience, or capability requirements.
 - responsibilities: list the role's main responsibilities and deliverables.

@@ -4,4 +4,13 @@ dist/
 jobs.db
 jobs.db-shm
 jobs.db-wal
+bunqueue.db
+bunqueue.db-shm
+bunqueue.db-wal
 coverage/
+career-data/
+profiles/
+artifacts/
+temp/
+.dsh/
+ui-template/

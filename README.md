@@ -49,11 +49,29 @@ For a deployed Fly instance, persist these directories on the mounted `/data` vo
 
 ```sh
 bun install
-bun run db:migrate
+bun run setup     # runs migrations, then synchronizes career-data skills
 bun run dev
 ```
 
+`bun run setup` is equivalent to `bun run db:migrate && bun run skills:sync --apply`. You can also run `bun run db:migrate` alone and skip the career skill sync until your `career-data/` is mounted.
+
 The SQLite database is created as `jobs.db`. Set `DB_FILE_NAME` to use a different file.
+
+## Career skill taxonomy and sync
+
+`career-data/skills.json` is the source of truth for the skills you actually possess. The SQLite `skills` table is an operational taxonomy that also stores skills discovered in job descriptions. Synchronization is one-way and idempotent; the application never writes back to career data.
+
+```sh
+bun run skills:audit        # read-only review of duplicates, aliases, and non-skills
+bun run skills:sync         # dry-run preview (default)
+bun run skills:sync --apply # write inside a transaction
+bun run skills:sync --check # non-zero exit when conflicts require manual review
+```
+
+- Each career skill must declare one of the eleven canonical `category` IDs and may list `aliases` (alternative spellings resolved deterministically, never fuzzy-matched).
+- Sync matches by `career_skill_id` first, then by a unique normalized id, label, or alias. It links unambiguous pending skills, creates new approved skills, and reports conflicts without performing semantic merges.
+- Evidence, levels, last-used dates, review notes, and directions are never copied into the taxonomy tables.
+- A missing optional `career-data/` directory can be skipped during startup with `bun run skills:sync --if-present`.
 
 ## Career data and document generation
 
@@ -78,6 +96,16 @@ Set `ARTIFACTS_DIR=/data/artifacts` and `QUEUE_FILE_NAME=/data/bunqueue.db` in F
 
 The production start command runs Drizzle migrations before starting the server. Keep one Fly machine for this SQLite deployment because Fly volumes are attached to a single machine.
 
+Fly production reads career data from its persistent volume through `CAREER_DATA_DIR=/data/career-data` (and `CAREER_PROFILES_DIR=/data/profiles`). Synchronize that mounted data into the taxonomy before or after migrations without copying it into the image or Git:
+
+```sh
+fly ssh console
+cd /app
+bun run skills:sync --apply
+```
+
+Use `bun run skills:sync --if-present` in startup scripts when career data may not be mounted yet; it exits cleanly instead of raising a runtime error, and startup never writes to the Git-tracked example data.
+
 ## How to use the tracker
 
 1. In **Applications**, paste a posting and use **Parse with AI**, or enter the known facts directly in Quick collect.
@@ -85,7 +113,7 @@ The production start command runs Drizzle migrations before starting the server.
 3. Move a role to **Apply Today** when it becomes a task. Complete the application workspace and select **Sent application** after applying.
 4. Record follow-ups and interviews in the workspace. These activities advance the visible pipeline without overwriting a more advanced status.
 5. Generate a resume and cover letter only after configuring OpenAI and career data. Review the evidence snapshot and generated files before using them.
-6. Manage reusable companies, contacts, and skills from the management area. Export JSON periodically as a backup.
+6. Manage reusable companies, contacts, and skills from their dedicated pages under Career and Network. Export JSON periodically as a backup.
 
 ### Configuration
 
@@ -98,6 +126,26 @@ The workflow in `.github/workflows/ci-cd.yml` runs formatting, typechecking, tes
 ### VS Code Remote / WSL
 
 The dev server listens on all interfaces at port `5173`. If `http://localhost:5173` is not reachable from your browser, open the VS Code **Ports** panel and forward port `5173`; VS Code will provide the correct localhost URL. You can also use the Network URL printed by Vite (for example, `http://172.17.x.x:5173/`).
+
+## Skill review, scores, and generation readiness
+
+- A parsed job post produces structured skill requirements, each with a canonical name, category, importance, source excerpt, and confidence.
+- Requirements resolve against the SQLite taxonomy: proven matches reuse career skills; unknown concepts become pending skills only when the opportunity is saved.
+- The application workspace has a **Review** tab. Every `not-in-career-data` skill must be skipped or included with a reason before document generation is enabled.
+- Dual scores are shown: **canonical match** (proven matches only) and **application coverage** (proven matches plus user-confirmed includes). Skipped and pending requirements count as uncovered.
+- An include is application-only: it never changes career data or the canonical score, and its mandatory reason is the only allowed claim in generated documents.
+
+## Resource pages
+
+Skills, Companies, and Contacts are separate bookmarkable pages under the Career and Network navigation sections. The old `/manage` URL redirects to `/skills`.
+
+- `/skills` — review, approve, reject, recategorize, alias, and merge skills.
+- `/companies` — search companies, open websites, and merge duplicates.
+- `/contacts` — manage contacts independently while they remain available in application workspaces.
+
+## Backup and migration
+
+Back up `jobs.db` before applying migrations or running `skills:sync --apply` in production. See `docs/migrations.md` for the migration, backup, and restore checklist. After restoring a backup, re-run `bun run skills:sync --apply` to re-link career mappings.
 
 ## Useful commands
 

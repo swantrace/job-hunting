@@ -1,13 +1,29 @@
 import { sql } from 'drizzle-orm'
 import {
+  type AnySQLiteColumn,
   check,
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
+import {
+  type SkillCategory,
+  type SkillDecision,
+  type SkillImportance,
+  type SkillMatchResult,
+  type SkillOrigin,
+  type SkillReviewStatus,
+  skillCategories,
+  skillDecisions,
+  skillImportances,
+  skillMatchResults,
+  skillOrigins,
+  skillReviewStatuses,
+} from '../lib/skills/constants'
 
 export const priorities = ['A', 'B', 'C'] as const
 export const matchLevels = ['A', 'B'] as const
@@ -38,9 +54,61 @@ export const skills = sqliteTable(
   'skills',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
+    key: text('key').notNull(),
     name: text('name').notNull(),
+    category: text('category', { enum: skillCategories }),
+    reviewStatus: text('review_status', { enum: skillReviewStatuses }).notNull().default('pending'),
+    origin: text('origin', { enum: skillOrigins }).notNull().default('manual'),
+    careerSkillId: text('career_skill_id'),
+    mergedIntoSkillId: integer('merged_into_skill_id').references(
+      (): AnySQLiteColumn => skills.id,
+      { onDelete: 'set null' },
+    ),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
   },
-  (table) => [uniqueIndex('skills_name_nocase_idx').on(sql`lower(${table.name})`)],
+  (table) => [
+    uniqueIndex('skills_key_unique_idx').on(table.key),
+    uniqueIndex('skills_career_skill_id_unique_idx').on(table.careerSkillId),
+    index('skills_review_status_idx').on(table.reviewStatus),
+    index('skills_category_idx').on(table.category),
+    index('skills_origin_idx').on(table.origin),
+    index('skills_merged_into_idx').on(table.mergedIntoSkillId),
+    check(
+      'skills_review_status_check',
+      sql`${table.reviewStatus} in ('pending', 'approved', 'rejected', 'merged')`,
+    ),
+    check(
+      'skills_origin_check',
+      sql`${table.origin} in ('career-data', 'job-parser', 'manual', 'import')`,
+    ),
+    check(
+      'skills_category_check',
+      sql`${table.category} is null or ${table.category} in ('languages-web', 'frontend', 'backend-apis', 'databases-caching', 'messaging-async', 'cloud-devops', 'testing-quality', 'security-identity', 'ai-ml', 'architecture-practices', 'domain-platforms')`,
+    ),
+    check(
+      'skills_merged_check',
+      sql`(${table.reviewStatus} = 'merged' and ${table.mergedIntoSkillId} is not null) or (${table.reviewStatus} != 'merged' and ${table.mergedIntoSkillId} is null)`,
+    ),
+  ],
+)
+
+export const skillAliases = sqliteTable(
+  'skill_aliases',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    skillId: integer('skill_id')
+      .notNull()
+      .references(() => skills.id, { onDelete: 'cascade' }),
+    alias: text('alias').notNull(),
+    normalizedAlias: text('normalized_alias').notNull(),
+    origin: text('origin', { enum: skillOrigins }).notNull().default('manual'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('skill_aliases_normalized_alias_unique_idx').on(table.normalizedAlias),
+    index('skill_aliases_skill_idx').on(table.skillId),
+  ],
 )
 
 // A contact belongs to one company. Applications connect to contacts through
@@ -166,8 +234,37 @@ export const jobApplicationsToSkills = sqliteTable(
     skillId: integer('skill_id')
       .notNull()
       .references(() => skills.id, { onDelete: 'cascade' }),
+    rawLabel: text('raw_label'),
+    sourceText: text('source_text'),
+    importance: text('importance', { enum: skillImportances }).notNull().default('mentioned'),
+    parserConfidence: real('parser_confidence'),
+    analysisResult: text('analysis_result', { enum: skillMatchResults })
+      .notNull()
+      .default('not-in-career-data'),
+    userDecision: text('user_decision', { enum: skillDecisions }).notNull().default('pending'),
+    decisionReason: text('decision_reason'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.jobApplicationId, table.skillId] })],
+  (table) => [
+    primaryKey({ columns: [table.jobApplicationId, table.skillId] }),
+    check(
+      'job_applications_to_skills_importance_check',
+      sql`${table.importance} in ('required', 'preferred', 'mentioned')`,
+    ),
+    check(
+      'job_applications_to_skills_analysis_check',
+      sql`${table.analysisResult} in ('proven-match', 'not-in-career-data')`,
+    ),
+    check(
+      'job_applications_to_skills_decision_check',
+      sql`${table.userDecision} in ('pending', 'skip', 'include')`,
+    ),
+    check(
+      'job_applications_to_skills_include_reason_check',
+      sql`${table.userDecision} != 'include' or (${table.decisionReason} is not null and trim(${table.decisionReason}) != '')`,
+    ),
+  ],
 )
 
 export const generationRuns = sqliteTable(
@@ -366,3 +463,15 @@ export type JobPosting = typeof jobPostings.$inferSelect
 export type JobPostingAnalysis = typeof jobPostingAnalyses.$inferSelect
 export type GenerationRun = typeof generationRuns.$inferSelect
 export type BaselineGenerationRun = typeof baselineGenerationRuns.$inferSelect
+export type Skill = typeof skills.$inferSelect
+export type SkillAlias = typeof skillAliases.$inferSelect
+export type JobApplicationSkill = typeof jobApplicationsToSkills.$inferSelect
+
+export type {
+  SkillCategory,
+  SkillDecision,
+  SkillImportance,
+  SkillMatchResult,
+  SkillOrigin,
+  SkillReviewStatus,
+}

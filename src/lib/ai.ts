@@ -120,13 +120,32 @@ export async function parseJobDescription(
   const cleanList = (values: string[]) => [
     ...new Set(values.map((value) => value.trim()).filter((value) => value && value !== 'null')),
   ]
+  const cleanSkills = (skills: typeof parsed.skills) => {
+    const seen = new Set<string>()
+    const result: typeof parsed.skills = []
+    for (const skill of skills) {
+      const rawLabel = skill.rawLabel.trim()
+      const canonicalLabel = skill.canonicalLabel.trim()
+      if (!rawLabel && !canonicalLabel) continue
+      const dedupeKey = (canonicalLabel || rawLabel).toLocaleLowerCase()
+      if (seen.has(dedupeKey)) continue
+      seen.add(dedupeKey)
+      result.push({
+        ...skill,
+        rawLabel: rawLabel || canonicalLabel,
+        canonicalLabel: canonicalLabel || rawLabel,
+        sourceText: skill.sourceText.trim(),
+      })
+    }
+    return result
+  }
   return {
     ...parsed,
     jobTitle: parsed.jobTitle.toLocaleLowerCase() === 'null' ? '' : parsed.jobTitle,
     location: nullString(parsed.location),
     postedDate: nullString(parsed.postedDate),
     salary: nullString(parsed.salary),
-    skills: cleanList(parsed.skills),
+    skills: cleanSkills(parsed.skills),
     requirements: cleanList(parsed.requirements),
     responsibilities: cleanList(parsed.responsibilities),
     painPoints: cleanList(parsed.painPoints),

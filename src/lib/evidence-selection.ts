@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { z } from 'zod'
+import { applicationGenerationPromptVersion } from '../ai/prompts/application-generation'
 import {
   type GenerationSource,
   getBaselineGenerationRun,
@@ -10,6 +11,25 @@ import {
 import { getArtifactsRoot } from './artifact-storage'
 import { loadCareerData } from './career-data'
 import { todayISO } from './date'
+import { generationEligibleRequirements } from './skills/generation-eligibility'
+import { calculateSkillScores } from './skills/score'
+
+export const snapshotSkillRequirementSchema = z.object({
+  skillName: z.string(),
+  category: z.string().nullable(),
+  importance: z.string(),
+  analysisResult: z.string(),
+  userDecision: z.string(),
+  decisionReason: z.string().nullable(),
+  rawLabel: z.string().nullable(),
+  sourceText: z.string().nullable(),
+})
+
+export const snapshotProvenanceSchema = z.object({
+  skillName: z.string(),
+  source: z.enum(['career-evidence', 'application-only']),
+  reason: z.string().nullable(),
+})
 
 export const evidenceSelectionSnapshotSchema = z.object({
   version: z.literal(1),
@@ -50,6 +70,28 @@ export const evidenceSelectionSnapshotSchema = z.object({
     skills: z.array(z.unknown()),
     stories: z.array(z.unknown()),
   }),
+  skillRequirements: z.array(snapshotSkillRequirementSchema).optional().default([]),
+  scores: z
+    .object({
+      canonicalMatch: z.object({
+        matchedWeight: z.number(),
+        totalWeight: z.number(),
+        percentage: z.number().nullable(),
+      }),
+      applicationCoverage: z.object({
+        matchedWeight: z.number(),
+        totalWeight: z.number(),
+        percentage: z.number().nullable(),
+      }),
+    })
+    .optional(),
+  versions: z
+    .object({
+      parserPrompt: z.string().nullable(),
+      generationPrompt: z.string(),
+    })
+    .optional(),
+  provenance: z.array(snapshotProvenanceSchema).optional().default([]),
 })
 
 export type EvidenceSelectionSnapshot = z.infer<typeof evidenceSelectionSnapshotSchema>
@@ -107,6 +149,23 @@ export function buildEvidenceSelectionSnapshot(
     .map((id) => data.stories.stories.find((item) => item.id === id))
     .filter((item): item is NonNullable<typeof item> => !!item)
 
+  const requirements = source.requirements ?? []
+  const scores = calculateSkillScores(
+    requirements.map((item) => ({
+      analysisResult: item.analysisResult,
+      importance: item.importance,
+      userDecision: item.userDecision,
+    })),
+  )
+  const provenance = generationEligibleRequirements(requirements).map((item) => ({
+    skillName: item.skillName,
+    source:
+      item.analysisResult === 'proven-match'
+        ? ('career-evidence' as const)
+        : ('application-only' as const),
+    reason: item.analysisResult === 'proven-match' ? null : (item.decisionReason ?? null),
+  }))
+
   return evidenceSelectionSnapshotSchema.parse({
     version: 1,
     generatedAt: todayISO(),
@@ -148,6 +207,22 @@ export function buildEvidenceSelectionSnapshot(
       skills: [...preferredSkills, ...matchedConditionalSkills],
       stories,
     },
+    skillRequirements: requirements.map((item) => ({
+      skillName: item.skillName,
+      category: item.skillCategory,
+      importance: item.importance,
+      analysisResult: item.analysisResult,
+      userDecision: item.userDecision,
+      decisionReason: item.decisionReason ?? null,
+      rawLabel: item.rawLabel ?? null,
+      sourceText: item.sourceText ?? null,
+    })),
+    scores,
+    versions: {
+      parserPrompt: source.jobPosting?.parserPromptVersion ?? null,
+      generationPrompt: applicationGenerationPromptVersion,
+    },
+    provenance,
   })
 }
 

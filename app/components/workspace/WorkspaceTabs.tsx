@@ -5,6 +5,7 @@ const tabs: { id: WorkspaceTab; label: string }[] = [
   { id: 'contacts', label: 'Contacts' },
   { id: 'activity', label: 'Activity' },
   { id: 'documents', label: 'Documents' },
+  { id: 'review', label: 'Review' },
 ]
 
 export function WorkspaceTabs({ activeTab }: { activeTab: WorkspaceTab }) {

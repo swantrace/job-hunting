@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "bunx --bun vite",
     "build": "vite build --mode client && vite build",
-    "start": "bun run db:migrate && cd dist && bun index.js",
+    "start": "bun run db:migrate && bun run skills:sync --if-present --apply && cd dist && bun index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
@@ -13,29 +13,33 @@
     "format:check": "biome check .",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "test:unit": "bun test tests/*.test.ts",
-    "test:ui-contracts": "bun test tests/ui"
+    "test:unit": "bun test tests/*.test.ts tests/skills",
+    "test:skills": "bun test tests/skills",
+    "test:ui-contracts": "bun test tests/ui",
+    "skills:audit": "bun run src/cli/audit-skills.ts",
+    "skills:sync": "bun run src/cli/sync-career-skills.ts",
+    "setup": "bun run db:migrate && bun run skills:sync --apply"
   },
   "dependencies": {
-    "bunqueue": "^2.8.32",
-    "docxtemplater": "^3.69.0",
-    "drizzle-orm": "^0.44.5",
-    "hono": "^4.9.8",
-    "honox": "^0.1.46",
+    "bunqueue": "^2.9.0",
+    "docxtemplater": "^3.69.3",
+    "drizzle-orm": "^0.44.7",
+    "hono": "^4.13.5",
+    "honox": "^0.1.61",
     "pizzip": "^3.2.0",
-    "zod": "^4.1.11"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.6",
+    "@biomejs/biome": "^2.5.11",
     "@flydotio/dockerfile": "^0.7.10",
-    "@hono/vite-build": "^1.7.0",
-    "@hono/vite-dev-server": "^0.25.1",
-    "@tailwindcss/vite": "^4.1.14",
+    "@hono/vite-build": "^1.11.1",
+    "@hono/vite-dev-server": "^0.25.3",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/bun": "latest",
-    "daisyui": "^5.1.28",
-    "drizzle-kit": "^0.31.4",
-    "tailwindcss": "^4.1.14",
+    "daisyui": "^5.7.22",
+    "drizzle-kit": "^0.31.10",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
-    "vite": "^7.1.9"
+    "vite": "^7.3.6"
   }
 }

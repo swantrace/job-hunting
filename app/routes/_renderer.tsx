@@ -44,6 +44,24 @@ htmx.config.responseHandling = [
       window.setTimeout(function () { flash.remove(); }, 300);
     }, 4000);
   }
+  window.updateSkillRequirements = function () {
+    const root = document.getElementById('skill-requirements');
+    if (!root) return;
+    const rows = root.querySelectorAll('[data-skill-row]');
+    const requirements = [];
+    rows.forEach(function (row) {
+      requirements.push({
+        rawLabel: row.querySelector('[data-skill-raw]').value,
+        canonicalLabel: row.querySelector('[data-skill-canonical]').value,
+        category: row.querySelector('[data-skill-category]').value,
+        importance: row.querySelector('[data-skill-importance]').value,
+        sourceText: row.querySelector('[data-skill-source]').value,
+        confidence: Number(row.querySelector('[data-skill-confidence]').value) || 0,
+      });
+    });
+    const target = root.querySelector('textarea[name="skillRequirements"]');
+    if (target) target.value = JSON.stringify(requirements);
+  };
   document.addEventListener('DOMContentLoaded', initBouncer);
   document.addEventListener('DOMContentLoaded', dismissFlash);
   document.body.addEventListener('htmx:afterSwap', function (event) {
