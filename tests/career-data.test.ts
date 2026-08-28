@@ -22,4 +22,16 @@ describe('canonical career data', () => {
     data.profiles[0].preferredPublicationIds.push('missing-publication')
     expect(() => validateCareerData(data)).toThrow('unknown ID "missing-publication"')
   })
+
+  test('keeps the current career skill shape: stable id, label, and directions', () => {
+    const data = loadCareerData()
+    expect(data.skills.skills.length).toBeGreaterThan(0)
+    for (const skill of data.skills.skills) {
+      expect(typeof skill.id).toBe('string')
+      expect(skill.id.length).toBeGreaterThan(0)
+      expect(typeof skill.label).toBe('string')
+      expect(skill.label.length).toBeGreaterThan(0)
+      expect(Array.isArray(skill.directions)).toBe(true)
+    }
+  })
 })
