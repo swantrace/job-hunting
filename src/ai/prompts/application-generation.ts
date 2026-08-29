@@ -16,6 +16,6 @@ ${truthfulnessRules}
 
 export const coverLetterGenerationSystemPrompt = `You compose a concise cover letter from an immutable evidence snapshot and job context.
 ${truthfulnessRules}
-- Use 1–3 evidence paragraphs drawn only from supplied facts.
+- Use 1-3 evidence paragraphs drawn only from supplied facts.
 - For salutation, return only the recipient name or role, such as "Hiring Team" or "Hiring Manager". Do not include "Dear" or punctuation.
 - Do not add a subject line, address block, signature, or placeholders. Keep the total letter under 450 words.`

@@ -49,26 +49,29 @@ For a deployed Fly instance, persist these directories on the mounted `/data` vo
 
 ```sh
 bun install
-bun run setup     # runs migrations, then synchronizes career-data skills
+bun run setup     # runs migrations, synchronizes the taxonomy, then career skills
 bun run dev
 ```
 
-`bun run setup` is equivalent to `bun run db:migrate && bun run skills:sync --apply`. You can also run `bun run db:migrate` alone and skip the career skill sync until your `career-data/` is mounted.
+`bun run setup` is equivalent to `bun run db:migrate && bun run taxonomy:sync --apply && bun run skills:sync --apply`. You can also run `bun run db:migrate` alone and skip the career skill sync until your `career-data/` is mounted.
 
 The SQLite database is created as `jobs.db`. Set `DB_FILE_NAME` to use a different file.
 
 ## Career skill taxonomy and sync
 
-`career-data/skills.json` is the source of truth for the skills you actually possess. The SQLite `skills` table is an operational taxonomy that also stores skills discovered in job descriptions. Synchronization is one-way and idempotent; the application never writes back to career data.
+`career-data/skills.json` is the source of truth for the skills you actually possess. `config/skill-taxonomy.json` is the source of truth for allowed category keys, labels, and display order. SQLite mirrors that taxonomy in `skill_categories` so operational skills can reference it safely. The application does not provide category-management UI in this stage.
 
 ```sh
 bun run skills:audit        # read-only review of duplicates, aliases, and non-skills
+bun run taxonomy:sync       # dry-run default taxonomy synchronization
+bun run taxonomy:sync --apply # upsert JSON-owned key, label, and sort order
 bun run skills:sync         # dry-run preview (default)
 bun run skills:sync --apply # write inside a transaction
 bun run skills:sync --check # non-zero exit when conflicts require manual review
 ```
 
-- Each career skill must declare one of the eleven canonical `category` IDs and may list `aliases` (alternative spellings resolved deterministically, never fuzzy-matched).
+- Each career skill must declare a `category` key from `config/skill-taxonomy.json` and may list `aliases` (alternative spellings resolved deterministically, never fuzzy-matched).
+- Taxonomy synchronization is idempotent. It upserts configured keys, labels, and sort order; categories no longer present in JSON are retained as orphaned database rows so historical skill records are not invalidated.
 - Sync matches by `career_skill_id` first, then by a unique normalized id, label, or alias. It links unambiguous pending skills, creates new approved skills, and reports conflicts without performing semantic merges.
 - Evidence, levels, last-used dates, review notes, and directions are never copied into the taxonomy tables.
 - A missing optional `career-data/` directory can be skipped during startup with `bun run skills:sync --if-present`.
@@ -104,7 +107,7 @@ cd /app
 bun run skills:sync --apply
 ```
 
-Use `bun run skills:sync --if-present` in startup scripts when career data may not be mounted yet; it exits cleanly instead of raising a runtime error, and startup never writes to the Git-tracked example data.
+Run `bun run taxonomy:sync --apply` before career skill sync whenever the JSON taxonomy changes. Use `bun run skills:sync --if-present` in startup scripts when career data may not be mounted yet; it exits cleanly instead of raising a runtime error, and startup never writes to the Git-tracked example data.
 
 ## How to use the tracker
 
@@ -117,7 +120,7 @@ Use `bun run skills:sync --if-present` in startup scripts when career data may n
 
 ### Configuration
 
-Copy `.env.example` to `.env` for local development. `OPENAI_API_KEY` is needed only for AI parsing and document generation. Google OAuth variables are needed only for optional Drive uploads. `CAREER_DATA_DIR` and `CAREER_PROFILES_DIR` optionally point to the runtime fact directories; local defaults are `career-data` and `profiles`.
+Copy `.env.example` to `.env` for local development. `OPENAI_API_KEY` is needed only for AI parsing and document generation. Google OAuth variables are needed only for optional Drive uploads. `CAREER_DATA_DIR` and `CAREER_PROFILES_DIR` optionally point to the runtime fact directories; local defaults are `career-data` and `profiles`. `SKILL_TAXONOMY_FILE` optionally points to the JSON category configuration; it defaults to `config/skill-taxonomy.json`.
 
 ### GitHub Actions deployment
 
@@ -145,7 +148,7 @@ Skills, Companies, and Contacts are separate bookmarkable pages under the Career
 
 ## Backup and migration
 
-Back up `jobs.db` before applying migrations or running `skills:sync --apply` in production. See `docs/migrations.md` for the migration, backup, and restore checklist. After restoring a backup, re-run `bun run skills:sync --apply` to re-link career mappings.
+Back up `jobs.db` before applying migrations or running synchronization commands in production. See `docs/migrations.md` for the migration, backup, and restore checklist. After restoring a backup, run `bun run taxonomy:sync --apply` and then `bun run skills:sync --apply` to re-link category and career mappings.
 
 ## Useful commands
 

@@ -1,9 +1,6 @@
 import type { SkillOverview } from '../../../src/db/resource-queries'
-import {
-  skillCategories,
-  skillCategoryLabels,
-  skillReviewStatuses,
-} from '../../../src/lib/skills/constants'
+import { skillReviewStatuses } from '../../../src/lib/skills/constants'
+import { skillCategoryDefinitions, skillCategoryLabel } from '../../../src/lib/skills/taxonomy'
 import type { SkillFilters } from './SkillsPage'
 
 export function SkillsTable({
@@ -13,6 +10,7 @@ export function SkillsTable({
   skills: SkillOverview[]
   filters: SkillFilters
 }) {
+  const categories = skillCategoryDefinitions()
   return (
     <section id="skills-results">
       <form
@@ -33,9 +31,9 @@ export function SkillsTable({
             />
             <select name="category" class="select w-full">
               <option value="">All categories</option>
-              {skillCategories.map((category) => (
-                <option value={category} selected={filters.category === category}>
-                  {skillCategoryLabels[category]}
+              {categories.map((category) => (
+                <option value={category.key} selected={filters.category === category.key}>
+                  {category.label}
                 </option>
               ))}
             </select>
@@ -72,7 +70,9 @@ export function SkillsTable({
             {skills.map((skill) => (
               <tr class="border-base-200 hover:bg-base-200/50">
                 <td class="font-medium">{skill.name}</td>
-                <td>{skill.category ? skillCategoryLabels[skill.category] : '—'}</td>
+                <td>
+                  {skill.category ? (skillCategoryLabel(skill.category) ?? skill.category) : '—'}
+                </td>
                 <td>
                   <span class="badge badge-outline badge-sm">{skill.reviewStatus}</span>
                 </td>

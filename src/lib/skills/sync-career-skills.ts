@@ -3,8 +3,9 @@ import { type Skill, skillAliases, skills } from '../../db/schema'
 import type { DbExecutor } from '../../db/skill-queries'
 import type { SkillDb } from '../../db/skill-service'
 import { todayISO } from '../date'
-import type { SkillCategory, SkillOrigin } from './constants'
+import type { SkillOrigin } from './constants'
 import { normalizeSkillAlias } from './normalize'
+import type { SkillCategory } from './taxonomy'
 
 export type CareerSkillInput = {
   id: string

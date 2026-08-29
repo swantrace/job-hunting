@@ -1,8 +1,5 @@
-import {
-  skillCategories,
-  skillCategoryLabels,
-  skillImportances,
-} from '../../src/lib/skills/constants'
+import { skillImportances } from '../../src/lib/skills/constants'
+import { skillCategoryDefinitions } from '../../src/lib/skills/taxonomy'
 import type { SkillRequirementDraft } from '../../src/lib/validation'
 
 /**
@@ -17,6 +14,7 @@ export function SkillRequirementsEditor({
 }: {
   requirements: SkillRequirementDraft[]
 }) {
+  const categories = skillCategoryDefinitions()
   return (
     <div id="skill-requirements" class="sm:col-span-2">
       <fieldset class="fieldset rounded-box border border-base-300 bg-base-100 p-3">
@@ -56,12 +54,12 @@ export function SkillRequirementsEditor({
                   data-skill-category
                   onchange="updateSkillRequirements()"
                 >
-                  {skillCategories.map((category) => (
+                  {categories.map((category) => (
                     <option
-                      value={category}
-                      selected={(requirement.category ?? skillCategories[0]) === category}
+                      value={category.key}
+                      selected={(requirement.category ?? categories[0]?.key) === category.key}
                     >
-                      {skillCategoryLabels[category]}
+                      {category.label}
                     </option>
                   ))}
                 </select>

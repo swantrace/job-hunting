@@ -51,7 +51,7 @@ describe('application generation', () => {
           role: 'Developer',
           company: 'Example',
           employmentLabel: 'Contract',
-          displayDates: '2024 – 2025',
+          displayDates: '2024 - 2025',
           bullets: [{ text: 'Built a feature.' }],
         },
       ],

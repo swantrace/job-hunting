@@ -1,10 +1,13 @@
 import { z } from 'zod'
-import { skillCategories, skillImportances } from '../../lib/skills/constants'
+import { skillImportances } from '../../lib/skills/constants'
+import { hasSkillCategory, skillCategoryKeys } from '../../lib/skills/taxonomy'
+
+const categories = skillCategoryKeys()
 
 export const skillRequirementItemSchema = z.object({
   rawLabel: z.string().trim().min(1).max(120),
   canonicalLabel: z.string().trim().min(1).max(120),
-  category: z.enum(skillCategories),
+  category: z.string().trim().min(1).refine(hasSkillCategory),
   importance: z.enum(skillImportances),
   sourceText: z.string().trim().min(1).max(1000),
   confidence: z.number().min(0).max(1),
@@ -48,7 +51,7 @@ const skillItemSchema = {
     },
     category: {
       type: 'string',
-      enum: [...skillCategories],
+      enum: categories,
       description: 'One controlled taxonomy category for this skill.',
     },
     importance: {

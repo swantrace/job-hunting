@@ -13,8 +13,9 @@ import {
   skillKey,
   textValue,
 } from '../lib/import'
-import type { SkillCategory, SkillOrigin, SkillReviewStatus } from '../lib/skills/constants'
+import type { SkillOrigin, SkillReviewStatus } from '../lib/skills/constants'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
+import { hasSkillCategory, type SkillCategory } from '../lib/skills/taxonomy'
 import { advanceStatus } from '../lib/transitions'
 import {
   type applicationSchema,
@@ -518,23 +519,10 @@ export function mergeImport(payload: ImportPayload) {
       skillRows.filter((item) => item.careerSkillId).map((item) => [item.careerSkillId, item]),
     )
     const skillsByName = new Map(skillRows.map((item) => [normalizeSkillAlias(item.name), item]))
-    const categoryValues = new Set<string>([
-      'languages-web',
-      'frontend',
-      'backend-apis',
-      'databases-caching',
-      'messaging-async',
-      'cloud-devops',
-      'testing-quality',
-      'security-identity',
-      'ai-ml',
-      'architecture-practices',
-      'domain-platforms',
-    ])
     const reviewValues = new Set<string>(['pending', 'approved', 'rejected', 'merged'])
     const originValues = new Set<string>(['career-data', 'job-parser', 'manual', 'import'])
     const category = (value: unknown) =>
-      typeof value === 'string' && categoryValues.has(value) ? (value as SkillCategory) : null
+      typeof value === 'string' && hasSkillCategory(value) ? (value as SkillCategory) : null
     const reviewStatus = (value: unknown) =>
       typeof value === 'string' && reviewValues.has(value)
         ? (value as SkillReviewStatus)

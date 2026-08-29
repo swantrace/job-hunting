@@ -4,7 +4,7 @@ The skill intelligence work replaced the two-column `skills` table with a
 canonical taxonomy (`skills` + `skill_aliases`) and enriched the
 application-to-skill relationship with analysis results and user decisions.
 Existing numeric skill IDs and application relationships are preserved through
-migration `0011_canonical_skills.sql`.
+migrations `0011_canonical_skills.sql` and `0012_skill_categories.sql`.
 
 ## Before migrating production
 
@@ -34,13 +34,18 @@ bun run db:migrate
 
 Migration `0011` rebuilds `skills` and `job_applications_to_skills`, backfills
 legacy names as `legacy-<id>` keys and first aliases, and leaves foreign keys
-enabled. It performs no semantic merges.
+enabled. Migration `0012` adds the `skill_categories` mirror of
+`config/skill-taxonomy.json`, preserves existing skill IDs and relationships,
+and changes `skills.category` into a foreign key to a category key. Neither
+migration performs semantic merges.
 
 ## After migrating
 
-1. Synchronize career data into the new taxonomy (idempotent):
+1. Synchronize the JSON category configuration, then career data (both are
+   idempotent):
 
    ```sh
+   bun run taxonomy:sync --apply
    bun run skills:sync --apply
    ```
 
@@ -59,6 +64,7 @@ enabled. It performs no semantic merges.
 1. Stop the application.
 2. Restore the backup files (database plus `-wal`/`-shm` if present).
 3. Start the application; Drizzle re-applies any pending migrations.
-4. Run `bun run skills:sync --apply` to re-link career mappings.
+4. Run `bun run taxonomy:sync --apply`, then `bun run skills:sync --apply` to
+   re-link category and career mappings.
 5. Re-run `bun run skills:audit` and spot-check a few applications to confirm
    their skill decisions and generation snapshots remain intact.

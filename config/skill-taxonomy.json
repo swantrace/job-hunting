@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    { "key": "languages-web", "label": "Languages & Web Fundamentals", "sortOrder": 10 },
+    { "key": "frontend", "label": "Frontend", "sortOrder": 20 },
+    { "key": "backend-apis", "label": "Backend & APIs", "sortOrder": 30 },
+    { "key": "databases-caching", "label": "Databases & Caching", "sortOrder": 40 },
+    { "key": "messaging-async", "label": "Messaging & Async Processing", "sortOrder": 50 },
+    { "key": "cloud-devops", "label": "Cloud & DevOps", "sortOrder": 60 },
+    { "key": "testing-quality", "label": "Testing & Quality", "sortOrder": 70 },
+    { "key": "security-identity", "label": "Security & Identity", "sortOrder": 80 },
+    { "key": "ai-ml", "label": "AI & ML", "sortOrder": 90 },
+    {
+      "key": "architecture-practices",
+      "label": "Architecture & Engineering Practices",
+      "sortOrder": 100
+    },
+    { "key": "domain-platforms", "label": "Domain & Platforms", "sortOrder": 110 }
+  ]
+}

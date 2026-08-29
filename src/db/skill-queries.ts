@@ -1,12 +1,8 @@
 import { and, eq, inArray, notInArray } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
-import type {
-  SkillCategory,
-  SkillImportance,
-  SkillOrigin,
-  SkillReviewStatus,
-} from '../lib/skills/constants'
+import type { SkillImportance, SkillOrigin, SkillReviewStatus } from '../lib/skills/constants'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
+import type { SkillCategory } from '../lib/skills/taxonomy'
 import { db } from './client'
 import { jobApplicationsToSkills, type Skill, skillAliases, skills } from './schema'
 
