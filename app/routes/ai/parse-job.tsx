@@ -5,7 +5,8 @@ import {
   parseJobDescription,
 } from '../../../src/lib/ai'
 import { parseFilters } from '../../../src/lib/request'
-import { AiParser, ParsedJobDraft } from '../../components/AiParser'
+import { AiParser } from '../../components/AiParser'
+import { ParsedJobDraft } from '../../components/ParsedJobDraft'
 
 export const POST = createRoute(async (c) => {
   const form = await c.req.formData()

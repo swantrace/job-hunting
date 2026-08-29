@@ -1,7 +1,8 @@
 import { createRoute } from 'honox/factory'
 import { previewImport } from '../../src/db/queries'
 import { importPayloadSchema } from '../../src/lib/import'
-import { ImportPage, ImportPreview } from '../components/Import'
+import { ImportPage } from '../components/Import'
+import { ImportPreview } from '../components/ImportPreview'
 
 export const POST = createRoute(async (c) => {
   const form = await c.req.formData()

@@ -1,4 +1,3 @@
-import type { Child } from 'hono/jsx'
 import { type Filters, type JobCardData, listManagementData } from '../../src/db/queries'
 import type { JobStatus } from '../../src/db/schema'
 import { formatDisplayDate, todayISO } from '../../src/lib/date'
@@ -22,29 +21,6 @@ import { StatusBadge } from './ui/StatusBadge'
 const activeStatuses: JobStatus[] = ['Saved', 'Apply Today', 'Applied', 'Follow Up', 'Interviewing']
 const enc = (filters: Filters) => new URLSearchParams(filters).toString()
 const error = (errors: FieldErrors | undefined, name: string) => errors?.[name]?.[0]
-export function Metrics({
-  values,
-  oob = false,
-}: {
-  values: Partial<Record<JobStatus, number>>
-  oob?: boolean
-}) {
-  return (
-    <div
-      id="metrics"
-      class="stats stats-horizontal w-full overflow-x-auto bg-base-100 shadow-sm"
-      {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
-    >
-      {activeStatuses.map((status) => (
-        <div class="stat px-4 py-3">
-          <div class="stat-title text-xs">{status}</div>
-          <div class="stat-value text-2xl">{values[status] ?? 0}</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 export function Filters({ filters }: { filters: Filters }) {
   const statusOptions: JobStatus[] = [
     'Saved',
@@ -790,19 +766,5 @@ function JobCard({
   )
 }
 
-export function WorkspaceDrawer({ children, drawer }: { children: Child; drawer?: Child }) {
-  return (
-    <div class="drawer drawer-end">
-      <input id="workspace-toggle" type="checkbox" class="drawer-toggle" />
-      <div class="drawer-content">{children}</div>
-      <div class="drawer-side z-40">
-        <label for="workspace-toggle" aria-label="Close workspace" class="drawer-overlay"></label>
-        <aside class="min-h-full w-full bg-base-100 p-5 sm:w-2xl">
-          <div id="drawer-content">
-            {drawer ?? <p class="text-base-content/60">Select an application.</p>}
-          </div>
-        </aside>
-      </div>
-    </div>
-  )
-}
+export { Metrics } from './dashboard/Metrics'
+export { WorkspaceDrawer } from './dashboard/WorkspaceDrawer'

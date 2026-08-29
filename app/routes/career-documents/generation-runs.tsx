@@ -4,7 +4,7 @@ import { enqueueBaselineGeneration } from '../../../src/lib/generation-queue'
 import { listProfiles } from '../../../src/lib/profiles'
 import { parseForm } from '../../../src/lib/request'
 import { baselineGenerationSchema } from '../../../src/lib/validation'
-import { BaselineGenerationPanel } from '../../components/CareerDocuments'
+import { BaselineGenerationPanel } from '../../components/BaselineGenerationPanel'
 
 export default createRoute((c) =>
   c.html(<BaselineGenerationPanel runs={listBaselineGenerationRuns()} />),
