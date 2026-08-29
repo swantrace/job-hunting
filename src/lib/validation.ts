@@ -152,6 +152,15 @@ export const skillDecisionSchema = z
         path: ['reason'],
       })
   })
+export const profileSelectionSchema = z.object({
+  runId: z.coerce.number().int().positive(),
+  profileId: z
+    .string()
+    .trim()
+    .min(1, 'Choose a valid profile')
+    .max(80)
+    .refine(hasProfile, 'Choose a valid profile'),
+})
 export const companySchema = z.object({
   name: z.string().trim().min(1).max(200),
   website: optionalUrl,

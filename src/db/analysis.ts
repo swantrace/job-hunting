@@ -1,7 +1,7 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
 import { db } from './client'
-import { type ApplicationAnalysisRun, applicationAnalysisRuns } from './schema'
+import { type ApplicationAnalysisRun, applicationAnalysisRuns, jobApplications } from './schema'
 
 export type { ApplicationAnalysisRun }
 
@@ -133,10 +133,23 @@ export function failAnalysisRun(runId: number, error: unknown) {
 
 export function confirmProfileSelection(runId: number, profileId: string) {
   const date = todayISO()
-  db.update(applicationAnalysisRuns)
-    .set({ confirmedProfileId: profileId, profileConfirmedAt: date, updatedAt: date })
-    .where(eq(applicationAnalysisRuns.id, runId))
-    .run()
+  return db.transaction((tx) => {
+    const run = tx
+      .select()
+      .from(applicationAnalysisRuns)
+      .where(eq(applicationAnalysisRuns.id, runId))
+      .get()
+    if (!run) return false
+    tx.update(applicationAnalysisRuns)
+      .set({ confirmedProfileId: profileId, profileConfirmedAt: date, updatedAt: date })
+      .where(eq(applicationAnalysisRuns.id, runId))
+      .run()
+    tx.update(jobApplications)
+      .set({ direction: profileId, updatedAt: date })
+      .where(eq(jobApplications.id, run.jobApplicationId))
+      .run()
+    return true
+  })
 }
 
 export function analysisRunBelongsToApplication(runId: number, jobApplicationId: number) {

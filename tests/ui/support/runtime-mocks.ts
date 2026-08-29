@@ -121,13 +121,22 @@ export const mockEnqueueCandidateAnalysis = mock(
     }) as const,
 )
 export const mockListAnalysisRuns = mock((): any => [])
+export const mockGetAnalysisRun = mock((): any => null)
+export const mockConfirmProfileSelection = mock(() => true)
+export const mockCurrentCandidateAnalysisHash = mock(() => 'current-hash')
 
 mock.module('../../../src/lib/analysis-queue', () => ({
   enqueueCandidateAnalysis: mockEnqueueCandidateAnalysis,
 }))
 
 mock.module('../../../src/db/analysis', () => ({
+  confirmProfileSelection: mockConfirmProfileSelection,
+  getAnalysisRun: mockGetAnalysisRun,
   listAnalysisRuns: mockListAnalysisRuns,
+}))
+
+mock.module('../../../src/lib/candidate-analysis', () => ({
+  currentCandidateAnalysisHash: mockCurrentCandidateAnalysisHash,
 }))
 
 mock.module('../../../src/lib/profiles', () => ({
