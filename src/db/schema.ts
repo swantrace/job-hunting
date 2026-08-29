@@ -473,6 +473,22 @@ export const generationEvidenceSnapshots = sqliteTable(
   ],
 )
 
+export const generationRunResults = sqliteTable(
+  'generation_run_results',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    generationRunId: integer('generation_run_id')
+      .notNull()
+      .references(() => generationRuns.id, { onDelete: 'cascade' }),
+    resumeJson: text('resume_json'),
+    coverLetterJson: text('cover_letter_json'),
+    atsAuditJson: text('ats_audit_json'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [uniqueIndex('generation_run_results_run_unique_idx').on(table.generationRunId)],
+)
+
 // Baseline documents are deliberately independent of applications: they are
 // direction-specific resumes created without an employer or job post.
 export const baselineGenerationRuns = sqliteTable(
@@ -592,6 +608,7 @@ export type JobPosting = typeof jobPostings.$inferSelect
 export type JobPostingAnalysis = typeof jobPostingAnalyses.$inferSelect
 export type JobRequirement = typeof jobRequirements.$inferSelect
 export type GenerationRun = typeof generationRuns.$inferSelect
+export type GenerationRunResult = typeof generationRunResults.$inferSelect
 export type BaselineGenerationRun = typeof baselineGenerationRuns.$inferSelect
 export type ApplicationAnalysisRun = typeof applicationAnalysisRuns.$inferSelect
 export type Skill = typeof skills.$inferSelect

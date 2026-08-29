@@ -18,6 +18,7 @@ import {
   getBaselineGenerationRun,
   getGenerationEvidenceSnapshot,
   getGenerationSource,
+  saveGenerationRunResults,
 } from '../db/generation'
 import { getArtifactsRoot } from './artifact-storage'
 import { todayISO } from './date'
@@ -202,6 +203,13 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
       assertGenerationEvidenceReferences(bullet.evidenceRefs, evidenceAllowlist)
   for (const paragraph of coverLetter.evidenceParagraphs)
     assertGenerationEvidenceReferences(paragraph.evidenceRefs, evidenceAllowlist)
+  // Persist the reviewable structured results before rendering so a DOCX
+  // write/upload failure cannot leave a falsely completed run.
+  saveGenerationRunResults(runId, {
+    resumeJson: JSON.stringify(resume),
+    coverLetterJson: JSON.stringify(coverLetter),
+    atsAuditJson: null,
+  })
   const bullets = new Map(resume.experienceBullets.map((item) => [item.id, item.bullets]))
   const selectedProjects = resume.selectedProjectIds
     .map((id) => facts.projects.find((item: any) => item.id === id))

@@ -244,4 +244,31 @@ describe('structured job requirements migration', () => {
       sqlite.close()
     }
   })
+
+  test('creates generation run results with a unique run id and text dates', () => {
+    const sqlite = migratedDatabase()
+    try {
+      const tables = sqlite
+        .query("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .all()
+        .map((row) => String((row as { name: string }).name))
+      expect(tables).toContain('generation_run_results')
+
+      const columns = sqlite.query("PRAGMA table_info('generation_run_results')").all() as Array<{
+        name: string
+        type: string
+      }>
+      for (const column of columns) {
+        if (column.name.endsWith('_at')) expect(column.type.toUpperCase()).toBe('TEXT')
+      }
+
+      const indexes = sqlite.query("PRAGMA index_list('generation_run_results')").all() as Array<{
+        name: string
+        unique: number
+      }>
+      expect(indexes.some((index) => index.unique === 1)).toBe(true)
+    } finally {
+      sqlite.close()
+    }
+  })
 })

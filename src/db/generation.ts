@@ -12,6 +12,7 @@ import {
   type GenerationRun,
   generatedArtifacts,
   generationEvidenceSnapshots,
+  generationRunResults,
   generationRuns,
   googleDriveConnections,
   jobApplications,
@@ -265,6 +266,35 @@ export function getGenerationEvidenceSnapshot(runId: number) {
       .select()
       .from(generationEvidenceSnapshots)
       .where(eq(generationEvidenceSnapshots.generationRunId, runId))
+      .get() ?? null
+  )
+}
+
+export function saveGenerationRunResults(
+  runId: number,
+  results: {
+    resumeJson: string | null
+    coverLetterJson: string | null
+    atsAuditJson: string | null
+  },
+) {
+  const date = todayISO()
+  return db
+    .insert(generationRunResults)
+    .values({ generationRunId: runId, ...results, createdAt: date, updatedAt: date })
+    .onConflictDoUpdate({
+      target: generationRunResults.generationRunId,
+      set: { ...results, updatedAt: date },
+    })
+    .run()
+}
+
+export function getGenerationRunResults(runId: number) {
+  return (
+    db
+      .select()
+      .from(generationRunResults)
+      .where(eq(generationRunResults.generationRunId, runId))
       .get() ?? null
   )
 }
