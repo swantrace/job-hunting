@@ -10,7 +10,8 @@ import {
 import { careerSkillEvidenceMap } from '../../../../src/lib/career-data'
 import { parseFilters, parseForm, parseId } from '../../../../src/lib/request'
 import { skillDecisionSchema } from '../../../../src/lib/validation'
-import { SkillDecisionForm, SkillGapPanel } from '../../../components/workspace/SkillGapPanel'
+import { SkillDecisionForm } from '../../../components/workspace/SkillDecisionForm'
+import { SkillGapPanel } from '../../../components/workspace/SkillGapPanel'
 
 function reviewPanel(job: JobCardData, filters: Filters, id: number) {
   return (
