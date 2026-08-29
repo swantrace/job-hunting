@@ -1,6 +1,8 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
+import { listAnalysisRuns } from './analysis'
 import { db } from './client'
+import { listJobRequirements } from './job-analysis'
 import {
   type BaselineGenerationRun,
   baselineGeneratedArtifacts,
@@ -34,6 +36,9 @@ export type GenerationSource = {
   requirements: ReturnType<typeof listApplicationSkillRequirements>
   jobPosting: typeof jobPostings.$inferSelect | undefined
   analysis: typeof jobPostingAnalyses.$inferSelect | undefined
+  jobRequirements: ReturnType<typeof listJobRequirements>
+  analysisRun: ReturnType<typeof listAnalysisRuns>[number] | null
+  companyInterestNote: string | null
 }
 
 export function createGenerationRun(jobApplicationId: number) {
@@ -287,6 +292,11 @@ export function getGenerationSource(runId: number): GenerationSource | null {
         .get()
     : undefined
   const requirements = listApplicationSkillRequirements(row.application.id)
+  const jobRequirements = analysis ? listJobRequirements(analysis.id) : []
+  const analysisRun =
+    listAnalysisRuns(row.application.id).find(
+      (run) => run.status === 'Completed' && !!run.confirmedProfileId,
+    ) ?? null
   return {
     run,
     application: row.application,
@@ -295,6 +305,9 @@ export function getGenerationSource(runId: number): GenerationSource | null {
     requirements,
     jobPosting,
     analysis,
+    jobRequirements,
+    analysisRun,
+    companyInterestNote: null,
   }
 }
 
