@@ -1,6 +1,8 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
+import { listAnalysisRuns } from './analysis'
 import { db } from './client'
+import { listJobRequirements } from './job-analysis'
 import {
   type BaselineGenerationRun,
   baselineGeneratedArtifacts,
@@ -10,6 +12,7 @@ import {
   type GenerationRun,
   generatedArtifacts,
   generationEvidenceSnapshots,
+  generationRunResults,
   generationRuns,
   googleDriveConnections,
   jobApplications,
@@ -34,6 +37,9 @@ export type GenerationSource = {
   requirements: ReturnType<typeof listApplicationSkillRequirements>
   jobPosting: typeof jobPostings.$inferSelect | undefined
   analysis: typeof jobPostingAnalyses.$inferSelect | undefined
+  jobRequirements: ReturnType<typeof listJobRequirements>
+  analysisRun: ReturnType<typeof listAnalysisRuns>[number] | null
+  companyInterestNote: string | null
 }
 
 export function createGenerationRun(jobApplicationId: number) {
@@ -264,6 +270,35 @@ export function getGenerationEvidenceSnapshot(runId: number) {
   )
 }
 
+export function saveGenerationRunResults(
+  runId: number,
+  results: {
+    resumeJson: string | null
+    coverLetterJson: string | null
+    atsAuditJson: string | null
+  },
+) {
+  const date = todayISO()
+  return db
+    .insert(generationRunResults)
+    .values({ generationRunId: runId, ...results, createdAt: date, updatedAt: date })
+    .onConflictDoUpdate({
+      target: generationRunResults.generationRunId,
+      set: { ...results, updatedAt: date },
+    })
+    .run()
+}
+
+export function getGenerationRunResults(runId: number) {
+  return (
+    db
+      .select()
+      .from(generationRunResults)
+      .where(eq(generationRunResults.generationRunId, runId))
+      .get() ?? null
+  )
+}
+
 export function getGenerationSource(runId: number): GenerationSource | null {
   const run = getGenerationRun(runId)
   if (!run) return null
@@ -287,6 +322,11 @@ export function getGenerationSource(runId: number): GenerationSource | null {
         .get()
     : undefined
   const requirements = listApplicationSkillRequirements(row.application.id)
+  const jobRequirements = analysis ? listJobRequirements(analysis.id) : []
+  const analysisRun =
+    listAnalysisRuns(row.application.id).find(
+      (run) => run.status === 'Completed' && !!run.confirmedProfileId,
+    ) ?? null
   return {
     run,
     application: row.application,
@@ -295,6 +335,9 @@ export function getGenerationSource(runId: number): GenerationSource | null {
     requirements,
     jobPosting,
     analysis,
+    jobRequirements,
+    analysisRun,
+    companyInterestNote: null,
   }
 }
 

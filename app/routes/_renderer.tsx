@@ -62,6 +62,60 @@ htmx.config.responseHandling = [
     const target = root.querySelector('textarea[name="skillRequirements"]');
     if (target) target.value = JSON.stringify(requirements);
   };
+  window.updateJobAnalysis = function () {
+    const root = document.getElementById('job-analysis-draft');
+    if (!root) return;
+    const value = function (selector) {
+      const element = root.querySelector(selector);
+      return element ? element.value : '';
+    };
+    const number = function (selector) {
+      const parsed = Number(value(selector));
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const summary = {
+      rolePurpose: value('[data-ja-role-purpose]'),
+      idealCandidate: value('[data-ja-ideal-candidate]'),
+    };
+    const classification = {
+      roleType: value('[data-ja-role-type]'),
+      advertisedSeniority: value('[data-ja-advertised]'),
+      practicalSeniority: value('[data-ja-practical]'),
+      rationale: value('[data-ja-rationale]'),
+      functionalEmphasis: {
+        frontend: number('[data-ja-fe="frontend"]'),
+        backend: number('[data-ja-fe="backend"]'),
+        testingQuality: number('[data-ja-fe="testingQuality"]'),
+        devopsInfrastructure: number('[data-ja-fe="devopsInfrastructure"]'),
+        collaborationOwnership: number('[data-ja-fe="collaborationOwnership"]'),
+      },
+    };
+    const requirements = [];
+    root.querySelectorAll('[data-ja-requirement]').forEach(function (row) {
+      requirements.push({
+        type: row.querySelector('[data-ja-type]').value,
+        importance: row.querySelector('[data-ja-importance]').value,
+        basis: row.querySelector('[data-ja-basis]').value,
+        statement: row.querySelector('[data-ja-statement]').value,
+        sourceText: row.querySelector('[data-ja-source]').value,
+        inferenceRationale: row.querySelector('[data-ja-inference]')
+          ? row.querySelector('[data-ja-inference]').value.trim() || null
+          : null,
+      });
+    });
+    const interviewQuestions = [];
+    root.querySelectorAll('[data-ja-interview]').forEach(function (element) {
+      const text = element.value.trim();
+      if (text) interviewQuestions.push(text);
+    });
+    const target = root.querySelector('textarea[name="jobAnalysis"]');
+    if (target) target.value = JSON.stringify({ summary, classification, requirements, interviewQuestions });
+    const totalElement = root.querySelector('[data-ja-fe-total]');
+    if (totalElement) {
+      const total = Object.values(classification.functionalEmphasis).reduce(function (sum, part) { return sum + part; }, 0);
+      totalElement.textContent = 'Total: ' + total + (total === 100 ? '' : ' (must be 100)');
+    }
+  };
   document.addEventListener('DOMContentLoaded', initBouncer);
   document.addEventListener('DOMContentLoaded', dismissFlash);
   document.body.addEventListener('htmx:afterSwap', function (event) {

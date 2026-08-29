@@ -1,10 +1,19 @@
+import { jobAnalysisPromptVersion, jobAnalysisSystemPrompt } from '../ai/prompts/job-analysis'
 import { jobParserPromptVersion, jobParserSystemPrompt } from '../ai/prompts/job-parser'
-import { jobParserResponseSchema, type ParsedJob, parsedJobSchema } from '../ai/schemas/job-parser'
+import type { JobAnalysis } from '../ai/schemas/job-analysis'
+import {
+  jobAnalysisCombinedResponseSchema,
+  type ParsedJob,
+  type ParsedJobWithAnalysis,
+  parsedJobSchema,
+  parsedJobWithAnalysisSchema,
+} from '../ai/schemas/job-parser'
 
-export { type ParsedJob, parsedJobSchema }
-export type ParsedJobResult = ParsedJob & {
+export { type JobAnalysis, type ParsedJob, type ParsedJobWithAnalysis, parsedJobSchema }
+export type ParsedJobResult = ParsedJobWithAnalysis & {
   parserModel: string
   parserPromptVersion: string
+  analysisPromptVersion: string
 }
 
 export class OpenAIRequestError extends Error {
@@ -33,11 +42,28 @@ const parserArrayLimits = {
   benefits: 20,
 } as const
 
+const analysisArrayLimits = {
+  requirements: 40,
+  interviewQuestions: 20,
+} as const
+
+function limitAnalysisArrays(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value
+  const parsed = value as Record<string, unknown>
+  return Object.fromEntries(
+    Object.entries(parsed).map(([key, field]) => {
+      const limit = analysisArrayLimits[key as keyof typeof analysisArrayLimits]
+      return [key, limit && Array.isArray(field) ? field.slice(0, limit) : field]
+    }),
+  )
+}
+
 function limitParserArrays(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value
   const parsed = value as Record<string, unknown>
   return Object.fromEntries(
     Object.entries(parsed).map(([key, field]) => {
+      if (key === 'analysis') return [key, limitAnalysisArrays(field)]
       const limit = parserArrayLimits[key as keyof typeof parserArrayLimits]
       return [key, limit && Array.isArray(field) ? field.slice(0, limit) : field]
     }),
@@ -73,7 +99,7 @@ export async function parseJobDescription(
         input: [
           {
             role: 'system',
-            content: `${jobParserSystemPrompt}\nPrompt version: ${jobParserPromptVersion}`,
+            content: `${jobParserSystemPrompt}\n\n${jobAnalysisSystemPrompt}\nPrompt version: ${jobAnalysisPromptVersion}`,
           },
           { role: 'user', content: description },
         ],
@@ -82,7 +108,7 @@ export async function parseJobDescription(
             type: 'json_schema',
             name: 'job_posting',
             strict: true,
-            schema: jobParserResponseSchema,
+            schema: jobAnalysisCombinedResponseSchema,
           },
         },
       }),
@@ -114,7 +140,7 @@ export async function parseJobDescription(
     body.output_text ??
     body.output?.flatMap((item) => item.content ?? []).find((part) => part.text)?.text
   if (!output) throw new Error('OpenAI returned no structured result')
-  const parsed = parsedJobSchema.parse(limitParserArrays(JSON.parse(output)))
+  const parsed = parsedJobWithAnalysisSchema.parse(limitParserArrays(JSON.parse(output)))
   const nullString = (value: string | null) =>
     value?.trim().toLocaleLowerCase() === 'null' ? null : value
   const cleanList = (values: string[]) => [
@@ -156,5 +182,6 @@ export async function parseJobDescription(
     notes: nullString(parsed.notes),
     parserModel: model,
     parserPromptVersion: jobParserPromptVersion,
+    analysisPromptVersion: jobAnalysisPromptVersion,
   }
 }

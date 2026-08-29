@@ -10,6 +10,8 @@ export const mockStatusSafeParse = mock(() => ({
   success: true,
 }))
 
+export const mockGetApplication = mock((): JobCardData => mockJob)
+
 export const mockApplicationSafeParse = mock(() => ({
   error: {
     flatten: () => ({ fieldErrors: { jobTitle: ['Job title is required.'] } }),
@@ -82,7 +84,7 @@ mock.module('../../../src/db/queries', () => ({
   createSkill: () => true,
   deleteManagedItem: () => true,
   getActivity: () => ({ followUps: [], interviews: [] }),
-  getApplication: () => mockJob,
+  getApplication: mockGetApplication,
   listApplications: () => [mockJob],
   listManagementData: () => ({ companies: [], contacts: [], skills: [] }),
   metrics: () => ({
@@ -98,6 +100,7 @@ mock.module('../../../src/db/queries', () => ({
 
 mock.module('../../../src/db/generation', () => ({
   getGenerationEvidenceSnapshot: () => null,
+  getGenerationRunResults: () => null,
   getGoogleDriveConnection: () => null,
   listBaselineGenerationRuns: () => [],
   listGenerationRuns: () => [],
@@ -109,6 +112,62 @@ export const mockEnqueueBaselineGeneration = mock(async () => ({ id: 1 }))
 mock.module('../../../src/lib/generation-queue', () => ({
   enqueueBaselineGeneration: mockEnqueueBaselineGeneration,
   enqueueGeneration: mockEnqueueGeneration,
+}))
+
+export const mockEnqueueCandidateAnalysis = mock(
+  async () =>
+    ({
+      run: { id: 1, status: 'Queued', attempts: 0, errorMessage: null, model: null },
+      reused: false,
+    }) as const,
+)
+export const mockListAnalysisRuns = mock((): any => [])
+export const mockGetAnalysisRun = mock((): any => null)
+export const mockConfirmProfileSelection = mock(() => true)
+export const mockCurrentCandidateAnalysisHash = mock(() => 'current-hash')
+
+mock.module('../../../src/lib/analysis-queue', () => ({
+  enqueueCandidateAnalysis: mockEnqueueCandidateAnalysis,
+}))
+
+mock.module('../../../src/db/analysis', () => ({
+  confirmProfileSelection: mockConfirmProfileSelection,
+  getAnalysisRun: mockGetAnalysisRun,
+  listAnalysisRuns: mockListAnalysisRuns,
+}))
+
+export const mockLoadReviewData = mock((): any => ({
+  job: mockJob,
+  run: null,
+  requirements: [],
+  profiles: [],
+}))
+
+mock.module('../../../src/db/review-data', () => ({
+  loadReviewData: mockLoadReviewData,
+}))
+
+export const mockGetApplicationReadiness = mock((): any => ({ ready: true, reasons: [] }))
+
+mock.module('../../../src/lib/application-readiness', () => ({
+  getApplicationReadiness: mockGetApplicationReadiness,
+}))
+
+export const mockListDocumentReviews = mock((): any => [])
+export const mockEnqueueDocumentReview = mock(
+  async () => ({ review: { id: 1, status: 'Queued' } }) as const,
+)
+
+mock.module('../../../src/db/document-review', () => ({
+  listDocumentReviews: mockListDocumentReviews,
+}))
+
+mock.module('../../../src/lib/document-review-queue', () => ({
+  enqueueDocumentReview: mockEnqueueDocumentReview,
+}))
+
+mock.module('../../../src/lib/candidate-analysis', () => ({
+  currentCandidateAnalysisHash: mockCurrentCandidateAnalysisHash,
 }))
 
 mock.module('../../../src/lib/profiles', () => ({

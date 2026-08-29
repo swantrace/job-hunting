@@ -36,6 +36,16 @@ export const statuses = [
 ] as const
 export const generationStatuses = ['Queued', 'Processing', 'Completed', 'Failed'] as const
 export const generatedArtifactTypes = ['job_context', 'resume', 'cover_letter'] as const
+export const analysisRunStatuses = ['Queued', 'Processing', 'Completed', 'Failed'] as const
+export const requirementTypes = [
+  'skill',
+  'experience',
+  'responsibility',
+  'education',
+  'soft-skill',
+  'domain',
+] as const
+export const requirementBases = ['explicit', 'inferred', 'legacy'] as const
 
 export const companies = sqliteTable(
   'companies',
@@ -229,10 +239,118 @@ export const jobPostingAnalyses = sqliteTable(
     generatedAt: text('generated_at').notNull(),
     model: text('model'),
     promptVersion: text('prompt_version'),
+    summary: text('summary'),
+    roleType: text('role_type'),
+    advertisedSeniority: text('advertised_seniority'),
+    practicalSeniority: text('practical_seniority'),
+    classificationRationale: text('classification_rationale'),
+    functionalEmphasisJson: text('functional_emphasis_json'),
+    interviewQuestionsJson: text('interview_questions_json'),
+    schemaVersion: text('schema_version'),
   },
   (table) => [
     uniqueIndex('job_posting_analyses_posting_unique_idx').on(table.jobPostingId),
     index('job_posting_analyses_generated_idx').on(table.generatedAt),
+  ],
+)
+
+export const jobRequirements = sqliteTable(
+  'job_requirements',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    jobPostingAnalysisId: integer('job_posting_analysis_id')
+      .notNull()
+      .references(() => jobPostingAnalyses.id, { onDelete: 'cascade' }),
+    sequence: integer('sequence').notNull(),
+    requirementType: text('requirement_type', { enum: requirementTypes }).notNull(),
+    importance: text('importance', { enum: skillImportances }).notNull(),
+    basis: text('basis', { enum: requirementBases }).notNull(),
+    statement: text('statement').notNull(),
+    sourceText: text('source_text'),
+    inferenceRationale: text('inference_rationale'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('job_requirements_analysis_sequence_unique_idx').on(
+      table.jobPostingAnalysisId,
+      table.sequence,
+    ),
+    index('job_requirements_analysis_idx').on(table.jobPostingAnalysisId),
+    index('job_requirements_type_idx').on(table.requirementType),
+    index('job_requirements_importance_idx').on(table.importance),
+    check(
+      'job_requirements_type_check',
+      sql`${table.requirementType} in ('skill', 'experience', 'responsibility', 'education', 'soft-skill', 'domain')`,
+    ),
+    check(
+      'job_requirements_importance_check',
+      sql`${table.importance} in ('required', 'preferred', 'mentioned')`,
+    ),
+    check(
+      'job_requirements_basis_check',
+      sql`${table.basis} in ('explicit', 'inferred', 'legacy')`,
+    ),
+    check(
+      'job_requirements_inferred_rationale_check',
+      sql`${table.basis} != 'inferred' or (${table.inferenceRationale} is not null and trim(${table.inferenceRationale}) != '')`,
+    ),
+    check(
+      'job_requirements_source_text_check',
+      sql`${table.basis} = 'legacy' or (${table.sourceText} is not null and trim(${table.sourceText}) != '')`,
+    ),
+  ],
+)
+
+export const jobRequirementsToSkills = sqliteTable(
+  'job_requirements_to_skills',
+  {
+    jobRequirementId: integer('job_requirement_id')
+      .notNull()
+      .references(() => jobRequirements.id, { onDelete: 'cascade' }),
+    skillId: integer('skill_id')
+      .notNull()
+      .references(() => skills.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.jobRequirementId, table.skillId] })],
+)
+
+export const applicationAnalysisRuns = sqliteTable(
+  'application_analysis_runs',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    jobApplicationId: integer('job_application_id')
+      .notNull()
+      .references(() => jobApplications.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: analysisRunStatuses }).notNull().default('Queued'),
+    queueJobId: text('queue_job_id').notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    inputHash: text('input_hash'),
+    inputSnapshotJson: text('input_snapshot_json'),
+    resultJson: text('result_json'),
+    model: text('model'),
+    promptVersion: text('prompt_version'),
+    schemaVersion: text('schema_version'),
+    errorMessage: text('error_message'),
+    recommendedProfileId: text('recommended_profile_id'),
+    confirmedProfileId: text('confirmed_profile_id'),
+    profileConfirmedAt: text('profile_confirmed_at'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    startedAt: text('started_at'),
+    completedAt: text('completed_at'),
+  },
+  (table) => [
+    check(
+      'application_analysis_runs_status_check',
+      sql`${table.status} in ('Queued', 'Processing', 'Completed', 'Failed')`,
+    ),
+    uniqueIndex('application_analysis_runs_queue_job_unique_idx').on(table.queueJobId),
+    index('application_analysis_runs_application_created_idx').on(
+      table.jobApplicationId,
+      table.createdAt,
+    ),
+    index('application_analysis_runs_status_idx').on(table.status),
   ],
 )
 
@@ -355,6 +473,54 @@ export const generationEvidenceSnapshots = sqliteTable(
   ],
 )
 
+export const generationRunResults = sqliteTable(
+  'generation_run_results',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    generationRunId: integer('generation_run_id')
+      .notNull()
+      .references(() => generationRuns.id, { onDelete: 'cascade' }),
+    resumeJson: text('resume_json'),
+    coverLetterJson: text('cover_letter_json'),
+    atsAuditJson: text('ats_audit_json'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [uniqueIndex('generation_run_results_run_unique_idx').on(table.generationRunId)],
+)
+
+export const documentReviews = sqliteTable(
+  'document_reviews',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    generationRunId: integer('generation_run_id')
+      .notNull()
+      .references(() => generationRuns.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: generationStatuses }).notNull().default('Queued'),
+    queueJobId: text('queue_job_id').notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    inputHash: text('input_hash'),
+    resultJson: text('result_json'),
+    model: text('model'),
+    promptVersion: text('prompt_version'),
+    schemaVersion: text('schema_version'),
+    errorMessage: text('error_message'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    startedAt: text('started_at'),
+    completedAt: text('completed_at'),
+  },
+  (table) => [
+    check(
+      'document_reviews_status_check',
+      sql`${table.status} in ('Queued', 'Processing', 'Completed', 'Failed')`,
+    ),
+    uniqueIndex('document_reviews_queue_job_unique_idx').on(table.queueJobId),
+    index('document_reviews_run_created_idx').on(table.generationRunId, table.createdAt),
+    index('document_reviews_status_idx').on(table.status),
+  ],
+)
+
 // Baseline documents are deliberately independent of applications: they are
 // direction-specific resumes created without an employer or job post.
 export const baselineGenerationRuns = sqliteTable(
@@ -472,8 +638,12 @@ export type JobApplication = typeof jobApplications.$inferSelect
 export type Contact = typeof contacts.$inferSelect
 export type JobPosting = typeof jobPostings.$inferSelect
 export type JobPostingAnalysis = typeof jobPostingAnalyses.$inferSelect
+export type JobRequirement = typeof jobRequirements.$inferSelect
 export type GenerationRun = typeof generationRuns.$inferSelect
+export type GenerationRunResult = typeof generationRunResults.$inferSelect
+export type DocumentReview = typeof documentReviews.$inferSelect
 export type BaselineGenerationRun = typeof baselineGenerationRuns.$inferSelect
+export type ApplicationAnalysisRun = typeof applicationAnalysisRuns.$inferSelect
 export type Skill = typeof skills.$inferSelect
 export type SkillAlias = typeof skillAliases.$inferSelect
 export type JobApplicationSkill = typeof jobApplicationsToSkills.$inferSelect

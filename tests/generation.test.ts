@@ -3,6 +3,7 @@ import {
   tailoredCoverLetterSchema,
   tailoredResumeSchema,
 } from '../src/ai/schemas/application-generation'
+import { baselineEvidenceSelectionSnapshotSchema } from '../src/lib/evidence-selection'
 import { recipientName, renderDocx } from '../src/lib/generation'
 import { resolveProjectAsset } from '../src/lib/profiles'
 import {
@@ -15,9 +16,22 @@ describe('application generation', () => {
     expect(
       tailoredResumeSchema.safeParse({
         targetTitle: 'Full-Stack Developer',
-        summary: 'Relevant experience.',
+        summary: {
+          text: 'Relevant experience.',
+          evidenceRefs: [{ sourceType: 'experience', sourceId: 'shift' }],
+        },
         skills: [{ label: 'Frontend', items: 'React, TypeScript' }],
-        experienceBullets: [{ id: 'shift', bullets: ['Built production systems.'] }],
+        experienceBullets: [
+          {
+            id: 'shift',
+            bullets: [
+              {
+                text: 'Built production systems.',
+                evidenceRefs: [{ sourceType: 'achievement', sourceId: 'shift-ci' }],
+              },
+            ],
+          },
+        ],
         selectedProjectIds: [],
       }).success,
     ).toBe(true)
@@ -25,8 +39,14 @@ describe('application generation', () => {
       tailoredCoverLetterSchema.safeParse({
         salutation: 'Hiring Manager',
         openingParagraph: 'I am applying for this role.',
-        evidenceParagraphs: [{ text: 'My experience is relevant.' }],
+        evidenceParagraphs: [
+          {
+            text: 'My experience is relevant.',
+            evidenceRefs: [{ sourceType: 'achievement', sourceId: 'shift-ci' }],
+          },
+        ],
         companyInterestParagraph: 'The work is compelling.',
+        companyInterestSource: 'job-posting',
         includeAuthorization: false,
         authorizationParagraph: '',
         closingParagraph: 'Thank you for your consideration.',
@@ -113,5 +133,48 @@ describe('application generation', () => {
       { analysisResult: 'not-in-career-data', userDecision: 'include', skillName: 'Kubernetes' },
     ])
     expect(eligible.map((item) => item.skillName)).toEqual(['TypeScript', 'Kubernetes'])
+  })
+
+  test('baseline direction-only generation never depends on a job analysis run', () => {
+    const parsed = baselineEvidenceSelectionSnapshotSchema.safeParse({
+      version: 1,
+      generatedAt: '2026-08-28',
+      baselineGenerationRunId: 1,
+      baseline: { direction: 'fullstack', targetTitle: 'Engineer', targetKeywords: [] },
+      sourceVersions: {
+        candidate: 1,
+        experiences: 1,
+        achievements: 1,
+        publications: 1,
+        projects: 1,
+        skills: 1,
+        stories: 1,
+        profile: 1,
+      },
+      profile: { id: 'fullstack', lastUpdated: '2026-01-01' },
+      selection: {
+        experienceIds: [],
+        achievementIds: [],
+        publicationIds: [],
+        projectIds: [],
+        preferredSkillIds: [],
+        matchedConditionalSkillIds: [],
+        storyIds: [],
+        excludedUnsafeAchievementIds: [],
+      },
+      facts: {
+        candidate: {},
+        experiences: [],
+        achievements: [],
+        publications: [],
+        projects: [],
+        skills: [],
+        stories: [],
+      },
+    })
+    expect(parsed.success).toBe(true)
+    expect(parsed.data).not.toHaveProperty('analysisRunId')
+    expect(parsed.data).not.toHaveProperty('jobPosting')
+    expect(parsed.data).not.toHaveProperty('application')
   })
 })

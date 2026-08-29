@@ -4,7 +4,7 @@ import {
   getGoogleDriveConnection,
   listGenerationRuns,
 } from '../../../../src/db/generation'
-import { hasPendingSkillDecisions } from '../../../../src/db/skill-queries'
+import { getApplicationReadiness } from '../../../../src/lib/application-readiness'
 import { enqueueGeneration } from '../../../../src/lib/generation-queue'
 import { parseFilters, parseId } from '../../../../src/lib/request'
 import { GenerationPanel } from '../../../components/Workspace'
@@ -12,7 +12,8 @@ import { GenerationPanel } from '../../../components/Workspace'
 export const POST = createRoute(async (c) => {
   const id = parseId(c.req.param('id'))
   if (!id) return c.html(<div class="alert alert-error">Application not found.</div>, 404)
-  if (hasPendingSkillDecisions(id))
+  const readiness = getApplicationReadiness(id)
+  if (!readiness.ready)
     return c.html(
       <GenerationPanel
         jobId={id}
@@ -20,7 +21,7 @@ export const POST = createRoute(async (c) => {
         runs={listGenerationRuns(id)}
         evidenceSnapshot={null}
         googleDriveConnected={!!getGoogleDriveConnection()}
-        generationReady={false}
+        readiness={readiness}
       />,
       422,
     )
@@ -40,7 +41,7 @@ export const POST = createRoute(async (c) => {
         runs[0] ? (getGenerationEvidenceSnapshot(runs[0].id)?.snapshotJson ?? null) : null
       }
       googleDriveConnected={!!getGoogleDriveConnection()}
-      generationReady
+      readiness={readiness}
     />,
   )
 })
@@ -58,6 +59,7 @@ export const GET = createRoute((c) => {
         runs[0] ? (getGenerationEvidenceSnapshot(runs[0].id)?.snapshotJson ?? null) : null
       }
       googleDriveConnected={!!getGoogleDriveConnection()}
+      readiness={getApplicationReadiness(id)}
     />,
   )
 })

@@ -23,6 +23,7 @@ export function ParsedJobDraft({
         formId="quick-form"
         oob
         skillRequirements={parsed.skills}
+        jobAnalysis={parsed.analysis}
         values={{
           jobTitle: parsed.jobTitle,
           location: parsed.location ?? '',
@@ -39,6 +40,8 @@ export function ParsedJobDraft({
           analysisNotes: parsed.notes ?? '',
           parserModel: parsed.parserModel,
           parserPromptVersion: parsed.parserPromptVersion,
+          analysisSchemaVersion: parsed.analysisPromptVersion,
+          analysisPromptVersion: parsed.analysisPromptVersion,
           jobPostText,
         }}
       />

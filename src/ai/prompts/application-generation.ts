@@ -12,10 +12,12 @@ const truthfulnessRules = `
 export const resumeGenerationSystemPrompt = `You compose resume wording and layout selections from an immutable evidence snapshot and job context.
 ${truthfulnessRules}
 - experienceBullets ids must be supplied experience IDs. selectedProjectIds must be supplied project IDs.
+- summary and each experience bullet are objects with a text field and an evidenceRefs array. Every material claim must reference at least one supplied source via sourceType and sourceId; never reference a source outside the snapshot.
 - Write concise Canadian English. Select no more than two projects and do not keyword-stuff.`
 
 export const coverLetterGenerationSystemPrompt = `You compose a concise cover letter from an immutable evidence snapshot and job context.
 ${truthfulnessRules}
-- Use 1-3 evidence paragraphs drawn only from supplied facts.
+- Use 1-3 evidence paragraphs drawn only from supplied facts. Each evidence paragraph has a text field and an evidenceRefs array referencing the supplied sourceType and sourceId.
 - For salutation, return only the recipient name or role, such as "Hiring Team" or "Hiring Manager". Do not include "Dear" or punctuation.
+- companyInterestSource must be "job-posting" or "user-note". Without a user note, discuss only the role, responsibilities, and product described in the reviewed job posting and supplied company facts; do not invent company research or enthusiasm.
 - Do not add a subject line, address block, signature, or placeholders. Keep the total letter under 450 words.`

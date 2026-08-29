@@ -1,9 +1,9 @@
 # UI refactor contract tests
 
-`npm test` runs the complete `bun:test` suite. During the refactor, failed expectations are
-intentional when they describe a roadmap feature that has not landed yet.
+`bun test` runs the complete test suite. Planned modules use conditional todo contracts so the
+suite remains executable before their implementation files exist.
 
-Expected red tests currently cover:
+Established contracts cover:
 
 - the shared daisyUI 5 `FormField` module and accessible field markup;
 - stable workspace shell, tab, panel, board, metrics, and OOB response boundaries;
@@ -13,6 +13,6 @@ Expected red tests currently cover:
 Failures such as `Cannot find module`, `SyntaxError`, `ReferenceError`, or a TypeScript compilation
 error are not valid TDD failures and must be fixed before continuing the refactor.
 
-The Documents panel and Network page use `mock.module()` virtual implementations because those
-modules do not exist yet. When their real modules are added, replace the virtual contracts with
-imports of the production components/routes while keeping the same stable DOM boundary assertions.
+The LLM review workflow contract activates when its planned components and route exist. Once
+active, it protects the nested Review-tab fragments, queued-state accessibility, daisyUI 5 table
+markup, and OOB response boundaries.

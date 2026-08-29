@@ -217,4 +217,55 @@ describe('existing skill storage migration baseline', () => {
       rmSync(canonicalSkillFolder, { force: true, recursive: true })
     }
   })
+
+  test('preserves merged skill relationships while replacing the legacy skills table', () => {
+    const canonicalSkillFolder = createBaselineMigrationFolder(11)
+    const sqlite = database(canonicalSkillFolder)
+    try {
+      const target = sqlite
+        .query(
+          `INSERT INTO skills (
+            key, name, category, review_status, origin, career_skill_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+        )
+        .get(
+          'react',
+          'React',
+          'frontend',
+          'approved',
+          'career-data',
+          'react',
+          '2026-08-28',
+          '2026-08-28',
+        ) as { id: number }
+      const merged = sqlite
+        .query(
+          `INSERT INTO skills (
+            key, name, category, review_status, origin, merged_into_skill_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+        )
+        .get(
+          'reactjs',
+          'React.js',
+          'frontend',
+          'merged',
+          'job-parser',
+          target.id,
+          '2026-08-28',
+          '2026-08-28',
+        ) as { id: number }
+
+      migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
+
+      expect(
+        sqlite
+          .query('SELECT review_status, merged_into_skill_id FROM skills WHERE id = ?')
+          .get(merged.id),
+      ).toEqual({ review_status: 'merged', merged_into_skill_id: target.id })
+      expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
+    } finally {
+      sqlite.close()
+      rmSync(canonicalSkillFolder, { force: true, recursive: true })
+    }
+  })
 })

@@ -4,17 +4,16 @@ import {
   listGenerationRuns,
 } from '../../../src/db/generation'
 import type { Filters, JobCardData } from '../../../src/db/queries'
-import {
-  type ApplicationSkillRequirement,
-  hasPendingSkillDecisions,
-} from '../../../src/db/skill-queries'
+import { loadReviewData } from '../../../src/db/review-data'
+import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
+import { getApplicationReadiness } from '../../../src/lib/application-readiness'
 import type { FieldErrors, WorkspaceTab } from '../../../src/lib/validation'
 import { ActivityPanel } from './ActivityPanel'
 import { ApplicationPanel } from './ApplicationPanel'
 import { ContactsPanel } from './ContactsPanel'
 import { DocumentsPanel } from './DocumentsPanel'
 import { type WorkspaceErrorForm } from './helpers'
-import { SkillGapPanel } from './SkillGapPanel'
+import { ReviewPanel } from './ReviewPanel'
 import { WorkspaceHeader } from './WorkspaceHeader'
 import { WorkspaceTabs } from './WorkspaceTabs'
 
@@ -42,6 +41,8 @@ export function WorkspaceShell({
     ? getGenerationEvidenceSnapshot(generationRuns[0].id)
     : null
   const googleDriveConnected = !!getGoogleDriveConnection()
+  const review = loadReviewData(job.id)
+  const readiness = getApplicationReadiness(job.id)
   return (
     <div id="workspace-shell">
       <WorkspaceHeader job={job} />
@@ -67,16 +68,26 @@ export function WorkspaceShell({
         runs={generationRuns}
         evidenceSnapshot={latestEvidenceSnapshot?.snapshotJson ?? null}
         googleDriveConnected={googleDriveConnected}
-        generationReady={!hasPendingSkillDecisions(job.id)}
+        readiness={readiness}
         active={activeTab === 'documents'}
       />
-      <SkillGapPanel
-        job={job}
-        filters={filters}
-        requirements={requirements}
-        careerEvidence={careerEvidence}
-        active={activeTab === 'review'}
-      />
+      <div
+        id="workspace-review-panel"
+        role="tabpanel"
+        aria-labelledby="workspace-tab-review"
+        data-workspace-panel
+        class={activeTab === 'review' ? '' : 'hidden'}
+      >
+        <ReviewPanel
+          job={job}
+          filters={filters}
+          requirements={requirements}
+          careerEvidence={careerEvidence}
+          analysisRun={review.run}
+          jobRequirements={review.requirements}
+          profiles={review.profiles}
+        />
+      </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { skillImportances } from '../../lib/skills/constants'
 import { hasSkillCategory, skillCategoryKeys } from '../../lib/skills/taxonomy'
+import { type JobAnalysis, jobAnalysisResponseSchema, jobAnalysisSchema } from './job-analysis'
 
 const categories = skillCategoryKeys()
 
@@ -35,6 +36,17 @@ export const parsedJobSchema = z.object({
 
 export type ParsedJob = z.infer<typeof parsedJobSchema>
 export type ParsedSkillRequirement = z.infer<typeof skillRequirementItemSchema>
+
+/**
+ * The combined prompts 14 + 15 result. The factual parser fields remain the
+ * same line-based representation for backward compatibility while the nested
+ * `analysis` object carries the structured, candidate-independent contract.
+ */
+export const parsedJobWithAnalysisSchema = parsedJobSchema.extend({
+  analysis: jobAnalysisSchema,
+})
+export type ParsedJobWithAnalysis = z.infer<typeof parsedJobWithAnalysisSchema>
+export type { JobAnalysis }
 
 const skillItemSchema = {
   type: 'object',
@@ -163,3 +175,19 @@ export const jobParserResponseSchema = {
     'notes',
   ],
 }
+
+/**
+ * Provider JSON schema for the single combined job-analysis call. It reuses the
+ * parser field definitions and nests the structured analysis contract so the
+ * OpenAI JSON schema and the Zod schema describe the same required fields and
+ * enums.
+ */
+export const jobAnalysisCombinedResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    ...jobParserResponseSchema.properties,
+    analysis: jobAnalysisResponseSchema,
+  },
+  required: [...jobParserResponseSchema.required, 'analysis'],
+} as const

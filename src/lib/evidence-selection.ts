@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { z } from 'zod'
 import { applicationGenerationPromptVersion } from '../ai/prompts/application-generation'
+import { candidateFitSchema } from '../ai/schemas/candidate-fit'
 import {
   type GenerationSource,
   getBaselineGenerationRun,
@@ -11,6 +12,7 @@ import {
 import { getArtifactsRoot } from './artifact-storage'
 import { loadCareerData } from './career-data'
 import { todayISO } from './date'
+import { calculateRequirementCoverage } from './requirements/score'
 import { generationEligibleRequirements } from './skills/generation-eligibility'
 import { calculateSkillScores } from './skills/score'
 
@@ -31,8 +33,13 @@ export const snapshotProvenanceSchema = z.object({
   reason: z.string().nullable(),
 })
 
-export const evidenceSelectionSnapshotSchema = z.object({
-  version: z.literal(1),
+const coveragePartSchema = z.object({
+  matchedWeight: z.number(),
+  totalWeight: z.number(),
+  percentage: z.number().nullable(),
+})
+
+const evidenceSelectionSnapshotBaseSchema = z.object({
   generatedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   generationRunId: z.number().int().positive(),
   application: z.object({
@@ -73,16 +80,8 @@ export const evidenceSelectionSnapshotSchema = z.object({
   skillRequirements: z.array(snapshotSkillRequirementSchema).optional().default([]),
   scores: z
     .object({
-      canonicalMatch: z.object({
-        matchedWeight: z.number(),
-        totalWeight: z.number(),
-        percentage: z.number().nullable(),
-      }),
-      applicationCoverage: z.object({
-        matchedWeight: z.number(),
-        totalWeight: z.number(),
-        percentage: z.number().nullable(),
-      }),
+      canonicalMatch: coveragePartSchema,
+      applicationCoverage: coveragePartSchema,
     })
     .optional(),
   versions: z
@@ -94,9 +93,36 @@ export const evidenceSelectionSnapshotSchema = z.object({
   provenance: z.array(snapshotProvenanceSchema).optional().default([]),
 })
 
-export type EvidenceSelectionSnapshot = z.infer<typeof evidenceSelectionSnapshotSchema>
+export const evidenceSelectionSnapshotV1Schema = evidenceSelectionSnapshotBaseSchema.extend({
+  version: z.literal(1),
+})
 
-export const baselineEvidenceSelectionSnapshotSchema = evidenceSelectionSnapshotSchema
+export const evidenceSelectionSnapshotV2Schema = evidenceSelectionSnapshotBaseSchema.extend({
+  version: z.literal(2),
+  analysisRunId: z.number().int().positive(),
+  analysisInputHash: z.string(),
+  jobAnalysisSchemaVersion: z.string().nullable(),
+  candidateFitPromptVersion: z.string(),
+  confirmedProfileId: z.string().nullable(),
+  fitRecommendation: z.string().nullable(),
+  requirementAssessments: z.array(z.unknown()),
+  requirementCoverage: z.object({
+    directCoverage: coveragePartSchema,
+    supportedCoverage: coveragePartSchema,
+  }),
+  selectedEvidenceByRequirement: z.record(z.string(), z.array(z.string())),
+  companyInterestNote: z.string().nullable(),
+})
+
+export const evidenceSelectionSnapshotSchema = z.union([
+  evidenceSelectionSnapshotV1Schema,
+  evidenceSelectionSnapshotV2Schema,
+])
+
+export type EvidenceSelectionSnapshot = z.infer<typeof evidenceSelectionSnapshotSchema>
+export type EvidenceSelectionSnapshotV2 = z.infer<typeof evidenceSelectionSnapshotV2Schema>
+
+export const baselineEvidenceSelectionSnapshotSchema = evidenceSelectionSnapshotV1Schema
   .omit({ generationRunId: true, application: true })
   .extend({
     baselineGenerationRunId: z.number().int().positive(),
@@ -166,8 +192,7 @@ export function buildEvidenceSelectionSnapshot(
     reason: item.analysisResult === 'proven-match' ? null : (item.decisionReason ?? null),
   }))
 
-  return evidenceSelectionSnapshotSchema.parse({
-    version: 1,
+  const base = {
     generatedAt: todayISO(),
     generationRunId: source.run.id,
     application: {
@@ -223,6 +248,45 @@ export function buildEvidenceSelectionSnapshot(
       generationPrompt: applicationGenerationPromptVersion,
     },
     provenance,
+  }
+
+  const analysisRun = source.analysisRun
+  if (!analysisRun?.resultJson)
+    return evidenceSelectionSnapshotV1Schema.parse({ ...base, version: 1 })
+
+  const fit = candidateFitSchema.safeParse(JSON.parse(analysisRun.resultJson))
+  if (!fit.success) return evidenceSelectionSnapshotV1Schema.parse({ ...base, version: 1 })
+
+  const assessments = fit.data.requirementAssessments
+  const importanceById = new Map(source.jobRequirements.map((item) => [item.id, item.importance]))
+  return evidenceSelectionSnapshotV2Schema.parse({
+    ...base,
+    version: 2,
+    analysisRunId: analysisRun.id,
+    analysisInputHash: analysisRun.inputHash ?? '',
+    jobAnalysisSchemaVersion: source.analysis?.schemaVersion ?? null,
+    candidateFitPromptVersion: analysisRun.promptVersion ?? '',
+    confirmedProfileId: analysisRun.confirmedProfileId,
+    fitRecommendation: fit.data.fitRecommendation,
+    requirementAssessments: assessments,
+    requirementCoverage: calculateRequirementCoverage(
+      assessments.map((assessment) => ({
+        evidenceStatus: assessment.evidenceStatus,
+        importance:
+          (importanceById.get(assessment.jobRequirementId) as
+            | 'required'
+            | 'preferred'
+            | 'mentioned'
+            | undefined) ?? 'mentioned',
+      })),
+    ),
+    selectedEvidenceByRequirement: Object.fromEntries(
+      assessments.map((assessment) => [
+        String(assessment.jobRequirementId),
+        assessment.evidenceRefs.map((ref) => `${ref.sourceType}:${ref.sourceId}`),
+      ]),
+    ),
+    companyInterestNote: source.companyInterestNote,
   })
 }
 

@@ -184,4 +184,77 @@ describe('evidence selection snapshots', () => {
     expect(parsed.provenance).toEqual([])
     expect(parsed.scores).toBeUndefined()
   })
+
+  test('writes version 2 snapshots with requirement coverage and claim selection', () => {
+    const snapshot = buildEvidenceSelectionSnapshot({
+      run: { id: 99 },
+      application: { id: 7, direction: 'fullstack', jobTitle: 'Full-Stack Developer' },
+      skills: ['TypeScript'],
+      requirements: [
+        requirement({
+          skillId: 1,
+          skillName: 'TypeScript',
+          analysisResult: 'proven-match',
+          userDecision: 'pending',
+        }),
+      ],
+      jobPosting: undefined,
+      analysis: { requirements: '' },
+      jobRequirements: [
+        {
+          id: 101,
+          sequence: 1,
+          requirementType: 'skill',
+          importance: 'required',
+          basis: 'explicit',
+          statement: 'TypeScript experience',
+          sourceText: 'TypeScript experience',
+          inferenceRationale: null,
+          createdAt: '2026-08-28',
+          updatedAt: '2026-08-28',
+        },
+      ],
+      analysisRun: {
+        id: 42,
+        status: 'Completed',
+        inputHash: 'input-hash',
+        promptVersion: '1.0.0',
+        confirmedProfileId: 'fullstack',
+        resultJson: JSON.stringify({
+          fitRecommendation: 'apply',
+          recommendationRationale: 'Strong match.',
+          profileRecommendation: {
+            recommendedProfileId: 'fullstack',
+            rationale: 'Balanced.',
+            alternatives: [],
+          },
+          requirementAssessments: [
+            {
+              jobRequirementId: 101,
+              evidenceStatus: 'direct',
+              evidenceRefs: [
+                { sourceType: 'achievement', sourceId: 'example-delivery', relevance: 'direct' },
+              ],
+              explanation: 'Direct evidence.',
+              confidence: 0.95,
+            },
+          ],
+          strengths: [],
+          concerns: [],
+          interviewPreparation: [],
+          careerDataSuggestions: [],
+        }),
+      },
+      companyInterestNote: null,
+    } as unknown as GenerationSource)
+
+    expect(snapshot.version).toBe(2)
+    if (snapshot.version !== 2) return
+    expect(snapshot.analysisRunId).toBe(42)
+    expect(snapshot.analysisInputHash).toBe('input-hash')
+    expect(snapshot.confirmedProfileId).toBe('fullstack')
+    expect(snapshot.fitRecommendation).toBe('apply')
+    expect(snapshot.requirementCoverage.directCoverage.matchedWeight).toBe(3)
+    expect(snapshot.selectedEvidenceByRequirement['101']).toEqual(['achievement:example-delivery'])
+  })
 })

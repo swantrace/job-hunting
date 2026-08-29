@@ -66,6 +66,19 @@ describe('workspace HTMX response boundaries', () => {
     expect(documentsTab).toContain('aria-selected="true"')
     expect(documentsTab).toContain('aria-controls="workspace-documents-panel"')
   })
+
+  test('preserves the Review panel and skill-review boundaries alongside new analysis fragments', async () => {
+    const response = await (await createRouteHarness()).request(
+      '/applications/7/workspace?workspaceTab=review',
+    )
+    const html = await response.text()
+
+    expect(response.status).toBe(200)
+    expect(recordsFor(html, 'workspace-review-panel')).toHaveLength(1)
+    expect(recordsFor(html, 'skill-review-panel')).toHaveLength(1)
+    expect(recordsFor(html, 'workspace-tabs')).toHaveLength(1)
+    expect(html).not.toMatch(/<AppShell|<html|<body/)
+  })
 })
 
 describe('status mutation HTMX response boundaries', () => {
