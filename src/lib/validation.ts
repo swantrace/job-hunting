@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { type JobStatus, matchLevels, priorities, statuses } from '../db/schema'
 import { isISODate } from './date'
 import { hasProfile } from './profiles'
-import { skillImportances } from './skills/constants'
+import { skillImportances, skillReviewStatuses } from './skills/constants'
 import { hasSkillCategory } from './skills/taxonomy'
 
 const emptyToNull = (value: unknown) =>
@@ -112,6 +112,13 @@ export const contactSchema = z.object({
   linkedinUrl: z.preprocess(emptyToNull, z.string().trim().url().max(2048).nullable().optional()),
 })
 export const skillSchema = z.object({ name: z.string().trim().min(1).max(80) })
+export const managedSkillSchema = skillSchema.extend({
+  category: z.preprocess(
+    emptyToNull,
+    z.string().trim().min(1).refine(hasSkillCategory).nullable().optional(),
+  ),
+  reviewStatus: z.enum(skillReviewStatuses),
+})
 export const skillDecisionSchema = z
   .object({
     action: z.enum(['skip', 'include']),

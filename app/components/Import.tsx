@@ -1,7 +1,7 @@
+import { ImportPreview } from './ImportPreview'
 import { AppShell } from './layout/AppShell'
 import { FileField } from './ui/FormField'
 import { Icon } from './ui/Icon'
-import { ImportPreview } from './ImportPreview'
 
 export function ImportPage() {
   return (

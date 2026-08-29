@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { filterSchema, quickCollectSchema } from '../src/lib/validation'
+import { filterSchema, managedSkillSchema, quickCollectSchema } from '../src/lib/validation'
 
 describe('request validation', () => {
   test('accepts a valid quick collect payload', () => {
@@ -46,5 +46,22 @@ describe('request validation', () => {
       attributes: '',
       sort: 'updated_desc',
     })
+  })
+
+  test('allows editable skills to use only configured categories and valid review states', () => {
+    expect(
+      managedSkillSchema.safeParse({
+        name: 'TypeScript',
+        category: 'languages-web',
+        reviewStatus: 'approved',
+      }).success,
+    ).toBe(true)
+    expect(
+      managedSkillSchema.safeParse({
+        name: 'TypeScript',
+        category: 'unknown',
+        reviewStatus: 'approved',
+      }).success,
+    ).toBe(false)
   })
 })

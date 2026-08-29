@@ -895,6 +895,22 @@ export function updateManagedItem(
     .run()
 }
 
+export function updateSkillDetails(
+  id: number,
+  input: { name: string; category?: string | null; reviewStatus: SkillReviewStatus },
+) {
+  db.update(skills)
+    .set({
+      name: input.name,
+      key: normalizeSkillAlias(input.name),
+      category: input.category ?? null,
+      reviewStatus: input.reviewStatus,
+      updatedAt: todayISO(),
+    })
+    .where(eq(skills.id, id))
+    .run()
+}
+
 export function deleteManagedItem(kind: 'skills' | 'companies' | 'contacts', id: number) {
   try {
     if (kind === 'skills') db.delete(skills).where(eq(skills.id, id)).run()

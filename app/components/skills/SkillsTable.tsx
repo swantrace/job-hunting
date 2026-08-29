@@ -6,13 +6,16 @@ import type { SkillFilters } from './SkillsPage'
 export function SkillsTable({
   skills,
   filters,
+  oob = false,
 }: {
   skills: SkillOverview[]
   filters: SkillFilters
+  oob?: boolean
 }) {
   const categories = skillCategoryDefinitions()
+  const query = new URLSearchParams(filters).toString()
   return (
-    <section id="skills-results">
+    <section id="skills-results" {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}>
       <form
         class="card border border-base-300 bg-base-100"
         hx-get="/skills"
@@ -64,6 +67,7 @@ export function SkillsTable({
               <th>Career mapping</th>
               <th>Aliases</th>
               <th>Applications</th>
+              <th class="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -80,6 +84,17 @@ export function SkillsTable({
                 <td>{skill.careerSkillId ?? '—'}</td>
                 <td>{skill.aliasCount}</td>
                 <td>{skill.applicationCount}</td>
+                <td class="text-right">
+                  <button
+                    class="btn btn-ghost btn-sm"
+                    hx-get={`/skills/${skill.id}?${query}`}
+                    hx-target="#skill-workspace-panel"
+                    hx-swap="innerHTML"
+                    data-open-drawer="skill-workspace-toggle"
+                  >
+                    Edit
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
