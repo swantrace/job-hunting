@@ -1,6 +1,8 @@
+import { listDocumentReviews } from '../../../src/db/document-review'
 import type { GenerationRunWithArtifacts } from '../../../src/db/generation'
 import type { Filters } from '../../../src/db/queries'
 import type { ApplicationReadiness } from '../../../src/lib/application-readiness'
+import { DocumentReviewPanel } from './DocumentReview'
 import { GenerationPanel } from './GenerationPanel'
 
 export function DocumentsPanel({
@@ -20,6 +22,7 @@ export function DocumentsPanel({
   readiness?: ApplicationReadiness
   active?: boolean
 }) {
+  const latestRun = runs[0] ?? null
   return (
     <div
       id="workspace-documents-panel"
@@ -36,6 +39,17 @@ export function DocumentsPanel({
         googleDriveConnected={googleDriveConnected}
         readiness={readiness}
       />
+      {latestRun?.status === 'Completed' ? (
+        <div class="mt-4">
+          <DocumentReviewPanel
+            jobId={jobId}
+            runId={latestRun.id}
+            filters={filters}
+            review={listDocumentReviews(latestRun.id)[0] ?? null}
+            canReview
+          />
+        </div>
+      ) : null}
     </div>
   )
 }

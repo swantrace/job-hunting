@@ -100,6 +100,7 @@ mock.module('../../../src/db/queries', () => ({
 
 mock.module('../../../src/db/generation', () => ({
   getGenerationEvidenceSnapshot: () => null,
+  getGenerationRunResults: () => null,
   getGoogleDriveConnection: () => null,
   listBaselineGenerationRuns: () => [],
   listGenerationRuns: () => [],
@@ -150,6 +151,19 @@ export const mockGetApplicationReadiness = mock((): any => ({ ready: true, reaso
 
 mock.module('../../../src/lib/application-readiness', () => ({
   getApplicationReadiness: mockGetApplicationReadiness,
+}))
+
+export const mockListDocumentReviews = mock((): any => [])
+export const mockEnqueueDocumentReview = mock(
+  async () => ({ review: { id: 1, status: 'Queued' } }) as const,
+)
+
+mock.module('../../../src/db/document-review', () => ({
+  listDocumentReviews: mockListDocumentReviews,
+}))
+
+mock.module('../../../src/lib/document-review-queue', () => ({
+  enqueueDocumentReview: mockEnqueueDocumentReview,
 }))
 
 mock.module('../../../src/lib/candidate-analysis', () => ({

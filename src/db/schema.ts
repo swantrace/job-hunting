@@ -489,6 +489,38 @@ export const generationRunResults = sqliteTable(
   (table) => [uniqueIndex('generation_run_results_run_unique_idx').on(table.generationRunId)],
 )
 
+export const documentReviews = sqliteTable(
+  'document_reviews',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    generationRunId: integer('generation_run_id')
+      .notNull()
+      .references(() => generationRuns.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: generationStatuses }).notNull().default('Queued'),
+    queueJobId: text('queue_job_id').notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    inputHash: text('input_hash'),
+    resultJson: text('result_json'),
+    model: text('model'),
+    promptVersion: text('prompt_version'),
+    schemaVersion: text('schema_version'),
+    errorMessage: text('error_message'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    startedAt: text('started_at'),
+    completedAt: text('completed_at'),
+  },
+  (table) => [
+    check(
+      'document_reviews_status_check',
+      sql`${table.status} in ('Queued', 'Processing', 'Completed', 'Failed')`,
+    ),
+    uniqueIndex('document_reviews_queue_job_unique_idx').on(table.queueJobId),
+    index('document_reviews_run_created_idx').on(table.generationRunId, table.createdAt),
+    index('document_reviews_status_idx').on(table.status),
+  ],
+)
+
 // Baseline documents are deliberately independent of applications: they are
 // direction-specific resumes created without an employer or job post.
 export const baselineGenerationRuns = sqliteTable(
@@ -609,6 +641,7 @@ export type JobPostingAnalysis = typeof jobPostingAnalyses.$inferSelect
 export type JobRequirement = typeof jobRequirements.$inferSelect
 export type GenerationRun = typeof generationRuns.$inferSelect
 export type GenerationRunResult = typeof generationRunResults.$inferSelect
+export type DocumentReview = typeof documentReviews.$inferSelect
 export type BaselineGenerationRun = typeof baselineGenerationRuns.$inferSelect
 export type ApplicationAnalysisRun = typeof applicationAnalysisRuns.$inferSelect
 export type Skill = typeof skills.$inferSelect
