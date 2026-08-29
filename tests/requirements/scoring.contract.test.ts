@@ -36,4 +36,21 @@ describe('deterministic requirement evidence coverage', () => {
     expect(result.directCoverage.percentage).toBeNull()
     expect(result.supportedCoverage.percentage).toBeNull()
   })
+
+  contractTest(
+    'keeps direct and transferable evidence deterministic without double counting',
+    async () => {
+      const { calculateRequirementCoverage } = await import(scorePath)
+      const result = calculateRequirementCoverage([
+        { evidenceStatus: 'transferable', importance: 'required' },
+        { evidenceStatus: 'transferable', importance: 'preferred' },
+        { evidenceStatus: 'missing', importance: 'required' },
+      ])
+
+      expect(result.directCoverage.matchedWeight).toBe(0)
+      expect(result.supportedCoverage.matchedWeight).toBe(4)
+      expect(result.supportedCoverage.totalWeight).toBe(7)
+      expect(calculateRequirementCoverage([]).directCoverage.percentage).toBeNull()
+    },
+  )
 })
