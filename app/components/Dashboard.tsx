@@ -1,3 +1,4 @@
+import type { JobAnalysis } from '../../src/ai/schemas/job-analysis'
 import { type Filters, type JobCardData, listManagementData } from '../../src/db/queries'
 import type { JobStatus } from '../../src/db/schema'
 import { formatDisplayDate, todayISO } from '../../src/lib/date'
@@ -12,6 +13,7 @@ import {
   type SkillRequirementDraft,
   statusesFromFilters,
 } from '../../src/lib/validation'
+import { JobAnalysisDraft } from './JobAnalysisDraft'
 import { SkillRequirementsEditor } from './SkillRequirementsEditor'
 import { EmptyState } from './ui/EmptyState'
 import { InputField, SelectField, TextareaField } from './ui/FormField'
@@ -176,6 +178,7 @@ export function QuickCollect({
   formId = 'quick-form',
   oob = false,
   skillRequirements,
+  jobAnalysis,
 }: {
   filters: Filters
   errors?: FieldErrors
@@ -183,6 +186,7 @@ export function QuickCollect({
   formId?: string
   oob?: boolean
   skillRequirements?: SkillRequirementDraft[]
+  jobAnalysis?: JobAnalysis
 }) {
   const query = enc(filters)
   const { companies, skills } = listManagementData()
@@ -274,7 +278,9 @@ export function QuickCollect({
             </div>
           )}
         </div>
-        {values.parserPromptVersion && (
+        {jobAnalysis ? (
+          <JobAnalysisDraft analysis={jobAnalysis} />
+        ) : values.parserPromptVersion ? (
           <details class="mt-5 rounded-box border border-base-300 bg-base-200/40 p-4" open>
             <summary class="cursor-pointer font-semibold">AI job-post analysis</summary>
             <p class="mt-1 text-sm text-base-content/60">
@@ -323,7 +329,7 @@ export function QuickCollect({
               />
             </div>
           </details>
-        )}
+        ) : null}
         <div class="card-actions mt-2 justify-end">
           <button class="btn btn-primary">
             <span class="loading loading-spinner loading-sm htmx-indicator" /> Save opportunity
@@ -338,6 +344,32 @@ export function QuickCollect({
       {values.parserModel && <input type="hidden" name="parserModel" value={values.parserModel} />}
       {values.parserPromptVersion && (
         <input type="hidden" name="parserPromptVersion" value={values.parserPromptVersion} />
+      )}
+      {jobAnalysis && (
+        <>
+          <input type="hidden" name="analysisRequirements" value={values.analysisRequirements} />
+          <input
+            type="hidden"
+            name="analysisResponsibilities"
+            value={values.analysisResponsibilities}
+          />
+          <input type="hidden" name="analysisPainPoints" value={values.analysisPainPoints} />
+          <input type="hidden" name="analysisCulture" value={values.analysisCulture} />
+          <input type="hidden" name="analysisRedFlags" value={values.analysisRedFlags} />
+          <input
+            type="hidden"
+            name="analysisSuccessMetrics"
+            value={values.analysisSuccessMetrics}
+          />
+          <input type="hidden" name="analysisBenefits" value={values.analysisBenefits} />
+          <input type="hidden" name="analysisNotes" value={values.analysisNotes} />
+        </>
+      )}
+      {values.analysisSchemaVersion && (
+        <input type="hidden" name="analysisSchemaVersion" value={values.analysisSchemaVersion} />
+      )}
+      {values.analysisPromptVersion && (
+        <input type="hidden" name="analysisPromptVersion" value={values.analysisPromptVersion} />
       )}
       <datalist id="company-options">
         {companies.map((company) => (

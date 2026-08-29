@@ -60,6 +60,13 @@ export function parseSkillRequirementsValue(value: unknown): SkillRequirementDra
   return parsed.success ? parsed.data : undefined
 }
 
+export function parseJobAnalysisValue(value: unknown) {
+  const prepared = parseJsonField(value)
+  if (prepared === undefined) return undefined
+  const parsed = jobAnalysisSchema.safeParse(prepared)
+  return parsed.success ? parsed.data : undefined
+}
+
 export const quickCollectSchema = z.object({
   jobTitle: z.string().trim().min(1, 'Job title is required').max(200),
   companyName: z.string().trim().min(1, 'Company is required').max(200),
