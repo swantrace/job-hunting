@@ -21,6 +21,7 @@ import {
   saveGenerationRunResults,
 } from '../db/generation'
 import { getArtifactsRoot } from './artifact-storage'
+import { auditResumeKeywords } from './ats-audit'
 import { todayISO } from './date'
 import type {
   BaselineEvidenceSelectionSnapshot,
@@ -31,7 +32,10 @@ import {
   buildGenerationEvidenceAllowlist,
 } from './generation-provenance'
 import { resolveProjectAsset } from './profiles'
-import { generationEligibleRequirements } from './skills/generation-eligibility'
+import {
+  generationEligibleRequirements,
+  isGenerationEligible,
+} from './skills/generation-eligibility'
 
 type JsonSchema = Record<string, unknown>
 type ArtifactOutput = {
@@ -205,10 +209,23 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
     assertGenerationEvidenceReferences(paragraph.evidenceRefs, evidenceAllowlist)
   // Persist the reviewable structured results before rendering so a DOCX
   // write/upload failure cannot leave a falsely completed run.
+  const resumeText = [
+    resume.summary.text,
+    ...resume.experienceBullets.flatMap((item) => item.bullets.map((bullet) => bullet.text)),
+  ].join('\n')
+  const audit = auditResumeKeywords({
+    requiredTerms: source.requirements.map((item) => ({
+      canonical: item.skillName,
+      aliases: item.aliases ?? [],
+      evidenceEligible: isGenerationEligible(item),
+      importance: item.importance,
+    })),
+    resumeText,
+  })
   saveGenerationRunResults(runId, {
     resumeJson: JSON.stringify(resume),
     coverLetterJson: JSON.stringify(coverLetter),
-    atsAuditJson: null,
+    atsAuditJson: JSON.stringify(audit),
   })
   const bullets = new Map(resume.experienceBullets.map((item) => [item.id, item.bullets]))
   const selectedProjects = resume.selectedProjectIds

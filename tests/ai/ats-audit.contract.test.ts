@@ -43,4 +43,26 @@ describe('deterministic ATS and keyword audit', () => {
       expect(result.unsupportedTerms).toHaveLength(1)
     },
   )
+
+  contractTest('matches punctuation-sensitive terms without confusing C, C++, and C#', async () => {
+    const { auditResumeKeywords } = await import(auditPath)
+    const result = auditResumeKeywords({
+      requiredTerms: [
+        { canonical: '.NET', aliases: [], evidenceEligible: true },
+        { canonical: 'C', aliases: [], evidenceEligible: true },
+        { canonical: 'C++', aliases: [], evidenceEligible: true },
+        { canonical: 'C#', aliases: [], evidenceEligible: true },
+      ],
+      resumeText: 'Built services in C# and C++ on .NET, plus a CLI in C.',
+    })
+
+    expect(result.exactMatches.map((item: { canonical: string }) => item.canonical)).toContain(
+      '.NET',
+    )
+    expect(result.exactMatches.map((item: { canonical: string }) => item.canonical)).toContain('C')
+    expect(result.exactMatches.map((item: { canonical: string }) => item.canonical)).toContain(
+      'C++',
+    )
+    expect(result.exactMatches.map((item: { canonical: string }) => item.canonical)).toContain('C#')
+  })
 })
