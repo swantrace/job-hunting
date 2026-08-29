@@ -5,10 +5,8 @@ import {
 } from '../../../src/db/generation'
 import type { Filters, JobCardData } from '../../../src/db/queries'
 import { loadReviewData } from '../../../src/db/review-data'
-import {
-  type ApplicationSkillRequirement,
-  hasPendingSkillDecisions,
-} from '../../../src/db/skill-queries'
+import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
+import { getApplicationReadiness } from '../../../src/lib/application-readiness'
 import type { FieldErrors, WorkspaceTab } from '../../../src/lib/validation'
 import { ActivityPanel } from './ActivityPanel'
 import { ApplicationPanel } from './ApplicationPanel'
@@ -44,6 +42,7 @@ export function WorkspaceShell({
     : null
   const googleDriveConnected = !!getGoogleDriveConnection()
   const review = loadReviewData(job.id)
+  const readiness = getApplicationReadiness(job.id)
   return (
     <div id="workspace-shell">
       <WorkspaceHeader job={job} />
@@ -69,7 +68,7 @@ export function WorkspaceShell({
         runs={generationRuns}
         evidenceSnapshot={latestEvidenceSnapshot?.snapshotJson ?? null}
         googleDriveConnected={googleDriveConnected}
-        generationReady={!hasPendingSkillDecisions(job.id)}
+        readiness={readiness}
         active={activeTab === 'documents'}
       />
       <div

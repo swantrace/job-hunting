@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { Hono } from 'hono'
-import { mockEnqueueGeneration, mockHasPendingSkillDecisions } from './support/runtime-mocks'
+import { mockEnqueueGeneration, mockGetApplicationReadiness } from './support/runtime-mocks'
 
 async function applicationsHarness() {
   const { POST } = (await import('../../app/routes/applications/index')) as Record<string, unknown>
@@ -37,8 +37,11 @@ describe('generation readiness gate', () => {
     expect(mockEnqueueGeneration).not.toHaveBeenCalled()
   })
 
-  test('blocks explicit generation while a missing-skill decision is pending', async () => {
-    mockHasPendingSkillDecisions.mockReturnValue(true)
+  test('blocks explicit generation when the readiness service reports blockers', async () => {
+    mockGetApplicationReadiness.mockReturnValue({
+      ready: false,
+      reasons: ['Resolve every missing-skill decision before generating documents.'],
+    })
     const response = await (await generationRunsHarness()).request(
       '/applications/7/generation-runs',
       { method: 'POST' },
@@ -46,6 +49,6 @@ describe('generation readiness gate', () => {
 
     expect(response.status).toBe(422)
     expect(mockEnqueueGeneration).not.toHaveBeenCalled()
-    mockHasPendingSkillDecisions.mockReturnValue(false)
+    mockGetApplicationReadiness.mockReturnValue({ ready: true, reasons: [] })
   })
 })

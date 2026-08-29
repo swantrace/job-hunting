@@ -1,6 +1,7 @@
 import { applicationGenerationPromptVersion } from '../../../src/ai/prompts/application-generation'
 import type { GenerationRunWithArtifacts } from '../../../src/db/generation'
 import type { Filters } from '../../../src/db/queries'
+import type { ApplicationReadiness } from '../../../src/lib/application-readiness'
 import {
   type EvidenceSelectionSnapshot,
   evidenceSelectionSnapshotSchema,
@@ -14,14 +15,14 @@ export function GenerationPanel({
   runs,
   evidenceSnapshot,
   googleDriveConnected,
-  generationReady = true,
+  readiness = { ready: true, reasons: [] },
 }: {
   jobId: number
   filters: Filters
   runs: GenerationRunWithArtifacts[]
   evidenceSnapshot: string | null
   googleDriveConnected: boolean
-  generationReady?: boolean
+  readiness?: ApplicationReadiness
 }) {
   const latest = runs[0]
   const statusClass =
@@ -59,18 +60,19 @@ export function GenerationPanel({
           hx-swap="outerHTML"
           hx-disabled-elt="find button"
         >
-          <button class="btn btn-secondary btn-sm" disabled={!generationReady}>
+          <button class="btn btn-secondary btn-sm" disabled={!readiness.ready}>
             <span class="loading loading-spinner loading-xs htmx-indicator" />
             {latest?.status === 'Failed' ? 'Retry generation' : 'Generate documents'}
           </button>
         </form>
       </div>
-      {!generationReady ? (
+      {!readiness.ready ? (
         <div class="alert alert-warning mt-4 text-sm" role="alert">
-          <span>
-            Generation is disabled until every “not in career data” skill is skipped or included.
-            Review skills first.
-          </span>
+          <ul class="list-inside list-disc space-y-1">
+            {readiness.reasons.map((reason) => (
+              <li>{reason}</li>
+            ))}
+          </ul>
         </div>
       ) : null}
       {!googleDriveConnected ? (

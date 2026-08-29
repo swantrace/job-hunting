@@ -146,6 +146,12 @@ mock.module('../../../src/db/review-data', () => ({
   loadReviewData: mockLoadReviewData,
 }))
 
+export const mockGetApplicationReadiness = mock((): any => ({ ready: true, reasons: [] }))
+
+mock.module('../../../src/lib/application-readiness', () => ({
+  getApplicationReadiness: mockGetApplicationReadiness,
+}))
+
 mock.module('../../../src/lib/candidate-analysis', () => ({
   currentCandidateAnalysisHash: mockCurrentCandidateAnalysisHash,
 }))

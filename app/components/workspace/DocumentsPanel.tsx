@@ -1,5 +1,6 @@
 import type { GenerationRunWithArtifacts } from '../../../src/db/generation'
 import type { Filters } from '../../../src/db/queries'
+import type { ApplicationReadiness } from '../../../src/lib/application-readiness'
 import { GenerationPanel } from './GenerationPanel'
 
 export function DocumentsPanel({
@@ -8,7 +9,7 @@ export function DocumentsPanel({
   runs,
   evidenceSnapshot,
   googleDriveConnected,
-  generationReady = true,
+  readiness = { ready: true, reasons: [] },
   active = false,
 }: {
   jobId: number
@@ -16,7 +17,7 @@ export function DocumentsPanel({
   runs: GenerationRunWithArtifacts[]
   evidenceSnapshot: string | null
   googleDriveConnected: boolean
-  generationReady?: boolean
+  readiness?: ApplicationReadiness
   active?: boolean
 }) {
   return (
@@ -33,7 +34,7 @@ export function DocumentsPanel({
         runs={runs}
         evidenceSnapshot={evidenceSnapshot}
         googleDriveConnected={googleDriveConnected}
-        generationReady={generationReady}
+        readiness={readiness}
       />
     </div>
   )
