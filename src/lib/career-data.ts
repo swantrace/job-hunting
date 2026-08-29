@@ -384,3 +384,23 @@ export function careerSkillEvidenceMap(): Record<string, string[]> {
     return {}
   }
 }
+
+/**
+ * Reusable catalog of canonical source IDs. Achievements and publications are
+ * included only when safeToUse; every other catalog is included in full so the
+ * candidate-fit service can reject references to unsafe or ineligible sources.
+ */
+export function careerEvidenceIds(data: CanonicalCareerData) {
+  return {
+    experience: new Set(data.experiences.experiences.map((item) => item.id)),
+    achievement: new Set(
+      data.achievements.achievements.filter((item) => item.safeToUse).map((item) => item.id),
+    ),
+    project: new Set(data.projects.projects.map((item) => item.id)),
+    publication: new Set(
+      data.publications.publications.filter((item) => item.safeToUse).map((item) => item.id),
+    ),
+    skill: new Set(data.skills.skills.map((item) => item.id)),
+    story: new Set(data.stories.stories.map((item) => item.id)),
+  }
+}
