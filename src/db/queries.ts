@@ -13,6 +13,7 @@ import {
   nullableText,
   skillKey,
   textValue,
+  validateImportSnapshots,
 } from '../lib/import'
 import type { SkillOrigin, SkillReviewStatus } from '../lib/skills/constants'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
@@ -27,9 +28,13 @@ import {
 import { db } from './client'
 import { persistJobRequirements } from './job-analysis'
 import {
+  applicationAnalysisRuns,
   companies,
   contacts,
+  documentReviews,
   followUps,
+  generationRunResults,
+  generationRuns,
   interviews,
   type JobApplication,
   type JobStatus,
@@ -38,6 +43,8 @@ import {
   jobApplicationsToSkills,
   jobPostingAnalyses,
   jobPostings,
+  jobRequirements,
+  jobRequirementsToSkills,
   skillAliases,
   skills,
   statuses,
@@ -381,8 +388,15 @@ export function exportData() {
   const postingApplicationById = new Map(
     postingRows.map((posting) => [posting.id, posting.jobApplicationId]),
   )
+  const analysisRows = db.select().from(jobPostingAnalyses).all()
+  const analysisApplicationById = new Map(
+    analysisRows.map((analysis) => [
+      analysis.id,
+      postingApplicationById.get(analysis.jobPostingId),
+    ]),
+  )
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     exportedAt: new Date().toISOString(),
     companies: companyRows,
     skills: skillRows,
@@ -414,14 +428,23 @@ export function exportData() {
     followUps: db.select().from(followUps).all(),
     interviews: db.select().from(interviews).all(),
     jobPostings: postingRows,
-    jobPostingAnalyses: db
+    jobPostingAnalyses: analysisRows.map((analysis) => ({
+      ...analysis,
+      jobApplicationId: postingApplicationById.get(analysis.jobPostingId),
+    })),
+    jobRequirements: db
       .select()
-      .from(jobPostingAnalyses)
+      .from(jobRequirements)
       .all()
-      .map((analysis) => ({
-        ...analysis,
-        jobApplicationId: postingApplicationById.get(analysis.jobPostingId),
+      .map((requirement) => ({
+        ...requirement,
+        jobApplicationId: analysisApplicationById.get(requirement.jobPostingAnalysisId),
       })),
+    jobRequirementsToSkills: db.select().from(jobRequirementsToSkills).all(),
+    applicationAnalysisRuns: db.select().from(applicationAnalysisRuns).all(),
+    generationRuns: db.select().from(generationRuns).all(),
+    generationRunResults: db.select().from(generationRunResults).all(),
+    documentReviews: db.select().from(documentReviews).all(),
   }
 }
 
@@ -502,7 +525,11 @@ export function previewImport(payload: ImportPayload): ImportPreview {
       followUps: { created: payload.followUps.length, updated: 0, unchanged: 0, conflicts: 0 },
       interviews: { created: payload.interviews.length, updated: 0, unchanged: 0, conflicts: 0 },
     },
-    conflicts: [...conflicts, ...detectImportConflicts(payload)],
+    conflicts: [
+      ...conflicts,
+      ...detectImportConflicts(payload),
+      ...validateImportSnapshots(payload),
+    ],
   }
 }
 
@@ -512,6 +539,8 @@ export function mergeImport(payload: ImportPayload) {
     const skillIds = new Map<number, number>()
     const contactIds = new Map<number, number>()
     const applicationIds = new Map<number, number>()
+    const analysisIds = new Map<number, number>()
+    const generationRunIds = new Map<number, number>()
     const companiesByKey = new Map(
       tx
         .select()
@@ -850,12 +879,184 @@ export function mergeImport(payload: ImportPayload) {
         .from(jobPostingAnalyses)
         .where(eq(jobPostingAnalyses.jobPostingId, posting.id))
         .get()
-      if (existing)
+      if (existing) {
         tx.update(jobPostingAnalyses)
           .set(values)
           .where(eq(jobPostingAnalyses.id, existing.id))
           .run()
-      else tx.insert(jobPostingAnalyses).values(values).run()
+        analysisIds.set(Number(incoming.id), existing.id)
+      } else {
+        const created = tx
+          .insert(jobPostingAnalyses)
+          .values(values)
+          .returning({ id: jobPostingAnalyses.id })
+          .get()
+        analysisIds.set(Number(incoming.id), created.id)
+      }
+    }
+    for (const incoming of payload.jobRequirements) {
+      const analysisId = analysisIds.get(Number(incoming.jobPostingAnalysisId))
+      if (!analysisId || !textValue(incoming.statement)) continue
+      const existing = tx
+        .select()
+        .from(jobRequirements)
+        .where(
+          and(
+            eq(jobRequirements.jobPostingAnalysisId, analysisId),
+            eq(jobRequirements.sequence, Number(incoming.sequence)),
+          ),
+        )
+        .get()
+      const values = {
+        jobPostingAnalysisId: analysisId,
+        sequence: Number(incoming.sequence) || 1,
+        requirementType: ([
+          'skill',
+          'experience',
+          'responsibility',
+          'education',
+          'soft-skill',
+          'domain',
+        ].includes(textValue(incoming.requirementType))
+          ? textValue(incoming.requirementType)
+          : 'experience') as
+          | 'skill'
+          | 'experience'
+          | 'responsibility'
+          | 'education'
+          | 'soft-skill'
+          | 'domain',
+        importance: (['required', 'preferred', 'mentioned'].includes(textValue(incoming.importance))
+          ? textValue(incoming.importance)
+          : 'mentioned') as 'required' | 'preferred' | 'mentioned',
+        basis: (['explicit', 'inferred', 'legacy'].includes(textValue(incoming.basis))
+          ? textValue(incoming.basis)
+          : 'legacy') as 'explicit' | 'inferred' | 'legacy',
+        statement: textValue(incoming.statement),
+        sourceText: nullableText(incoming.sourceText),
+        inferenceRationale: nullableText(incoming.inferenceRationale),
+        createdAt: textValue(incoming.createdAt) || todayISO(),
+        updatedAt: textValue(incoming.updatedAt) || todayISO(),
+      }
+      if (existing)
+        tx.update(jobRequirements).set(values).where(eq(jobRequirements.id, existing.id)).run()
+      else tx.insert(jobRequirements).values(values).run()
+    }
+    for (const incoming of payload.jobRequirementsToSkills) {
+      const requirementId = Number(incoming.jobRequirementId)
+      const skillId = skillIds.get(Number(incoming.skillId))
+      if (!requirementId || !skillId) continue
+      tx.insert(jobRequirementsToSkills)
+        .values({ jobRequirementId: requirementId, skillId })
+        .onConflictDoNothing()
+        .run()
+    }
+    for (const incoming of payload.applicationAnalysisRuns) {
+      const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
+      if (!applicationId) continue
+      const values = {
+        jobApplicationId: applicationId,
+        status: (['Queued', 'Processing', 'Completed', 'Failed'].includes(
+          textValue(incoming.status),
+        )
+          ? textValue(incoming.status)
+          : 'Completed') as 'Queued' | 'Processing' | 'Completed' | 'Failed',
+        queueJobId: textValue(incoming.queueJobId) || `analysis-import-${incoming.id}`,
+        attempts: Number(incoming.attempts) || 0,
+        inputHash: nullableText(incoming.inputHash),
+        inputSnapshotJson: nullableText(incoming.inputSnapshotJson),
+        resultJson: nullableText(incoming.resultJson),
+        model: nullableText(incoming.model),
+        promptVersion: nullableText(incoming.promptVersion),
+        schemaVersion: nullableText(incoming.schemaVersion),
+        errorMessage: nullableText(incoming.errorMessage),
+        recommendedProfileId: nullableText(incoming.recommendedProfileId),
+        confirmedProfileId: nullableText(incoming.confirmedProfileId),
+        profileConfirmedAt: nullableText(incoming.profileConfirmedAt),
+        createdAt: textValue(incoming.createdAt) || todayISO(),
+        updatedAt: textValue(incoming.updatedAt) || todayISO(),
+        startedAt: nullableText(incoming.startedAt),
+        completedAt: nullableText(incoming.completedAt),
+      }
+      tx.insert(applicationAnalysisRuns).values(values).onConflictDoNothing().run()
+    }
+    for (const incoming of payload.generationRuns) {
+      const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
+      if (!applicationId) continue
+      const queueJobId = textValue(incoming.queueJobId) || `generation-import-${incoming.id}`
+      const existing = tx
+        .select()
+        .from(generationRuns)
+        .where(eq(generationRuns.queueJobId, queueJobId))
+        .get()
+      const values = {
+        jobApplicationId: applicationId,
+        status: (['Queued', 'Processing', 'Completed', 'Failed'].includes(
+          textValue(incoming.status),
+        )
+          ? textValue(incoming.status)
+          : 'Completed') as 'Queued' | 'Processing' | 'Completed' | 'Failed',
+        queueJobId,
+        attempts: Number(incoming.attempts) || 0,
+        errorMessage: nullableText(incoming.errorMessage),
+        createdAt: textValue(incoming.createdAt) || todayISO(),
+        updatedAt: textValue(incoming.updatedAt) || todayISO(),
+        startedAt: nullableText(incoming.startedAt),
+        completedAt: nullableText(incoming.completedAt),
+      }
+      if (existing) {
+        tx.update(generationRuns).set(values).where(eq(generationRuns.id, existing.id)).run()
+        generationRunIds.set(Number(incoming.id), existing.id)
+      } else {
+        const created = tx
+          .insert(generationRuns)
+          .values(values)
+          .returning({ id: generationRuns.id })
+          .get()
+        generationRunIds.set(Number(incoming.id), created.id)
+      }
+    }
+    for (const incoming of payload.generationRunResults) {
+      const runId = generationRunIds.get(Number(incoming.generationRunId))
+      if (!runId) continue
+      tx.insert(generationRunResults)
+        .values({
+          generationRunId: runId,
+          resumeJson: nullableText(incoming.resumeJson),
+          coverLetterJson: nullableText(incoming.coverLetterJson),
+          atsAuditJson: nullableText(incoming.atsAuditJson),
+          createdAt: textValue(incoming.createdAt) || todayISO(),
+          updatedAt: textValue(incoming.updatedAt) || todayISO(),
+        })
+        .onConflictDoNothing()
+        .run()
+    }
+    for (const incoming of payload.documentReviews) {
+      const runId = generationRunIds.get(Number(incoming.generationRunId))
+      if (!runId) continue
+      tx.insert(documentReviews)
+        .values({
+          generationRunId: runId,
+          status: (['Queued', 'Processing', 'Completed', 'Failed'].includes(
+            textValue(incoming.status),
+          )
+            ? textValue(incoming.status)
+            : 'Completed') as 'Queued' | 'Processing' | 'Completed' | 'Failed',
+          queueJobId: textValue(incoming.queueJobId) || `document-review-import-${incoming.id}`,
+          attempts: Number(incoming.attempts) || 0,
+          inputHash: nullableText(incoming.inputHash),
+          resultJson: nullableText(incoming.resultJson),
+          model: nullableText(incoming.model),
+          promptVersion: nullableText(incoming.promptVersion),
+          schemaVersion: nullableText(incoming.schemaVersion),
+          errorMessage: nullableText(incoming.errorMessage),
+          createdAt: textValue(incoming.createdAt) || todayISO(),
+          updatedAt: textValue(incoming.updatedAt) || todayISO(),
+          startedAt: nullableText(incoming.startedAt),
+          completedAt: nullableText(incoming.completedAt),
+        })
+        .onConflictDoNothing()
+        .run()
     }
   })
 }

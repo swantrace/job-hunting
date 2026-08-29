@@ -5,6 +5,7 @@ import {
   contactKey,
   detectImportConflicts,
   importPayloadSchema,
+  validateImportSnapshots,
 } from '../src/lib/import'
 
 describe('JSON import format', () => {
@@ -113,5 +114,68 @@ describe('JSON import format', () => {
       requirements: 'Node.js experience\nTypeScript experience',
       promptVersion: '2.2.0',
     })
+  })
+
+  test('accepts version 2 payloads with analysis and generation provenance collections', () => {
+    const parsed = importPayloadSchema.parse({
+      schemaVersion: 2,
+      jobRequirements: [
+        {
+          jobPostingAnalysisId: 1,
+          sequence: 1,
+          requirementType: 'skill',
+          importance: 'required',
+          basis: 'explicit',
+          statement: 'TypeScript',
+        },
+      ],
+      jobRequirementsToSkills: [{ jobRequirementId: 1, skillId: 1 }],
+      applicationAnalysisRuns: [
+        {
+          id: 1,
+          jobApplicationId: 1,
+          status: 'Completed',
+          queueJobId: 'analysis-1',
+          resultJson: '{}',
+        },
+      ],
+      generationRuns: [
+        { id: 1, jobApplicationId: 1, status: 'Completed', queueJobId: 'generation-1' },
+      ],
+      generationRunResults: [
+        { generationRunId: 1, resumeJson: null, coverLetterJson: null, atsAuditJson: null },
+      ],
+      documentReviews: [{ id: 1, generationRunId: 1, status: 'Completed', queueJobId: 'review-1' }],
+    })
+    expect(parsed.jobRequirements).toHaveLength(1)
+    expect(parsed.applicationAnalysisRuns).toHaveLength(1)
+    expect(parsed.generationRunResults).toHaveLength(1)
+    expect(parsed.documentReviews).toHaveLength(1)
+  })
+
+  test('reports malformed embedded snapshots as preview errors', () => {
+    const parsed = importPayloadSchema.parse({
+      schemaVersion: 2,
+      applicationAnalysisRuns: [
+        {
+          id: 1,
+          jobApplicationId: 1,
+          status: 'Completed',
+          queueJobId: 'analysis-1',
+          result_json: '{"overallFitScore": 9}',
+        },
+      ],
+      generationRunResults: [
+        {
+          generation_run_id: 1,
+          resume_json: 'not-json',
+          cover_letter_json: null,
+          ats_audit_json: null,
+        },
+      ],
+    })
+    const errors = validateImportSnapshots(parsed)
+    expect(errors.some((error) => /analysis run 1/.test(error))).toBe(true)
+    expect(errors.some((error) => /Generation run 1/.test(error))).toBe(true)
   })
 })
