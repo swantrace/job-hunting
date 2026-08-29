@@ -14,5 +14,6 @@ bunqueue.db-wal
 coverage/
 temp/
 /interview-prep.md
+/NIGHT_SHIFT_SUMMARY.md
 ui-template/
 .dsh/
