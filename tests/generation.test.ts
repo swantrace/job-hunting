@@ -16,9 +16,22 @@ describe('application generation', () => {
     expect(
       tailoredResumeSchema.safeParse({
         targetTitle: 'Full-Stack Developer',
-        summary: 'Relevant experience.',
+        summary: {
+          text: 'Relevant experience.',
+          evidenceRefs: [{ sourceType: 'experience', sourceId: 'shift' }],
+        },
         skills: [{ label: 'Frontend', items: 'React, TypeScript' }],
-        experienceBullets: [{ id: 'shift', bullets: ['Built production systems.'] }],
+        experienceBullets: [
+          {
+            id: 'shift',
+            bullets: [
+              {
+                text: 'Built production systems.',
+                evidenceRefs: [{ sourceType: 'achievement', sourceId: 'shift-ci' }],
+              },
+            ],
+          },
+        ],
         selectedProjectIds: [],
       }).success,
     ).toBe(true)
@@ -26,8 +39,14 @@ describe('application generation', () => {
       tailoredCoverLetterSchema.safeParse({
         salutation: 'Hiring Manager',
         openingParagraph: 'I am applying for this role.',
-        evidenceParagraphs: [{ text: 'My experience is relevant.' }],
+        evidenceParagraphs: [
+          {
+            text: 'My experience is relevant.',
+            evidenceRefs: [{ sourceType: 'achievement', sourceId: 'shift-ci' }],
+          },
+        ],
         companyInterestParagraph: 'The work is compelling.',
+        companyInterestSource: 'job-posting',
         includeAuthorization: false,
         authorizationParagraph: '',
         closingParagraph: 'Thank you for your consideration.',

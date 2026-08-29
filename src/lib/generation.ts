@@ -25,6 +25,10 @@ import type {
   BaselineEvidenceSelectionSnapshot,
   EvidenceSelectionSnapshot,
 } from './evidence-selection'
+import {
+  assertGenerationEvidenceReferences,
+  buildGenerationEvidenceAllowlist,
+} from './generation-provenance'
 import { resolveProjectAsset } from './profiles'
 import { generationEligibleRequirements } from './skills/generation-eligibility'
 
@@ -106,6 +110,13 @@ function allowed(label: string, ids: string[], allowedIds: string[]) {
       throw new Error(`${label} selected an unsupported evidence ID "${id}".`)
 }
 
+function skillGroups(skills: Array<{ label: string; items: string | string[] }>) {
+  return skills.map((skill) => ({
+    label: skill.label,
+    items: Array.isArray(skill.items) ? skill.items.join(', ') : skill.items,
+  }))
+}
+
 export function recipientName(salutation: string) {
   return (
     salutation
@@ -184,6 +195,13 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
     snapshot.selection.experienceIds,
   )
   allowed('Resume project', resume.selectedProjectIds, snapshot.selection.projectIds)
+  const evidenceAllowlist = buildGenerationEvidenceAllowlist(snapshot)
+  assertGenerationEvidenceReferences(resume.summary.evidenceRefs, evidenceAllowlist)
+  for (const item of resume.experienceBullets)
+    for (const bullet of item.bullets)
+      assertGenerationEvidenceReferences(bullet.evidenceRefs, evidenceAllowlist)
+  for (const paragraph of coverLetter.evidenceParagraphs)
+    assertGenerationEvidenceReferences(paragraph.evidenceRefs, evidenceAllowlist)
   const bullets = new Map(resume.experienceBullets.map((item) => [item.id, item.bullets]))
   const selectedProjects = resume.selectedProjectIds
     .map((id) => facts.projects.find((item: any) => item.id === id))
@@ -204,13 +222,13 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
     github: identity.github,
     portfolio: identity.portfolio,
     targetTitle: resume.targetTitle,
-    summary: resume.summary,
-    skills: resume.skills,
+    summary: resume.summary.text,
+    skills: skillGroups(resume.skills),
     experiences: facts.experiences.map((item: any) => ({
       role: item.role,
       company: item.company,
       displayDates: item.displayDates,
-      bullets: (bullets.get(item.id) ?? []).map((text: string) => ({ text })),
+      bullets: (bullets.get(item.id) ?? []).map((bullet) => ({ text: bullet.text })),
     })),
     showSelectedProjects: selectedProjects.length > 0,
     selectedProjects: selectedProjects.map((item: any) => ({
@@ -243,7 +261,9 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
     jobPostingReference: source.application.jobTitle,
     salutation: recipientName(coverLetter.salutation),
     openingParagraph: coverLetter.openingParagraph,
-    evidenceParagraphs: coverLetter.evidenceParagraphs,
+    evidenceParagraphs: coverLetter.evidenceParagraphs.map((paragraph) => ({
+      text: paragraph.text,
+    })),
     companyInterestParagraph: coverLetter.companyInterestParagraph,
     includeAuthorization: coverLetter.includeAuthorization,
     authorizationParagraph: coverLetter.authorizationParagraph,
@@ -318,6 +338,11 @@ export async function generateBaselineResume(runId: number) {
     snapshot.selection.experienceIds,
   )
   allowed('Resume project', resume.selectedProjectIds, snapshot.selection.projectIds)
+  const evidenceAllowlist = buildGenerationEvidenceAllowlist(snapshot)
+  assertGenerationEvidenceReferences(resume.summary.evidenceRefs, evidenceAllowlist)
+  for (const item of resume.experienceBullets)
+    for (const bullet of item.bullets)
+      assertGenerationEvidenceReferences(bullet.evidenceRefs, evidenceAllowlist)
   const bullets = new Map(resume.experienceBullets.map((item) => [item.id, item.bullets]))
   const identity = facts.candidate.identity
   const resumeData = {
@@ -329,13 +354,13 @@ export async function generateBaselineResume(runId: number) {
     github: identity.github,
     portfolio: identity.portfolio,
     targetTitle: resume.targetTitle || run.targetTitle,
-    summary: resume.summary,
-    skills: resume.skills,
+    summary: resume.summary.text,
+    skills: skillGroups(resume.skills),
     experiences: facts.experiences.map((item: any) => ({
       role: item.role,
       company: item.company,
       displayDates: item.displayDates,
-      bullets: (bullets.get(item.id) ?? []).map((text: string) => ({ text })),
+      bullets: (bullets.get(item.id) ?? []).map((bullet) => ({ text: bullet.text })),
     })),
     showSelectedProjects: resume.selectedProjectIds.length > 0,
     selectedProjects: resume.selectedProjectIds
