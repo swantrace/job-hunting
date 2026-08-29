@@ -99,6 +99,11 @@ DROP TABLE `job_applications_to_skills_legacy_taxonomy`;
 --> statement-breakpoint
 DROP TABLE `skill_aliases_legacy_taxonomy`;
 --> statement-breakpoint
+UPDATE `skills_legacy_taxonomy`
+SET
+  `review_status` = 'pending',
+  `merged_into_skill_id` = NULL;
+--> statement-breakpoint
 DROP TABLE `skills_legacy_taxonomy`;
 --> statement-breakpoint
 CREATE UNIQUE INDEX `skills_key_unique_idx` ON `skills` (`key`);
