@@ -10,6 +10,8 @@ export const mockStatusSafeParse = mock(() => ({
   success: true,
 }))
 
+export const mockGetApplication = mock((): JobCardData => mockJob)
+
 export const mockApplicationSafeParse = mock(() => ({
   error: {
     flatten: () => ({ fieldErrors: { jobTitle: ['Job title is required.'] } }),
@@ -82,7 +84,7 @@ mock.module('../../../src/db/queries', () => ({
   createSkill: () => true,
   deleteManagedItem: () => true,
   getActivity: () => ({ followUps: [], interviews: [] }),
-  getApplication: () => mockJob,
+  getApplication: mockGetApplication,
   listApplications: () => [mockJob],
   listManagementData: () => ({ companies: [], contacts: [], skills: [] }),
   metrics: () => ({
@@ -109,6 +111,23 @@ export const mockEnqueueBaselineGeneration = mock(async () => ({ id: 1 }))
 mock.module('../../../src/lib/generation-queue', () => ({
   enqueueBaselineGeneration: mockEnqueueBaselineGeneration,
   enqueueGeneration: mockEnqueueGeneration,
+}))
+
+export const mockEnqueueCandidateAnalysis = mock(
+  async () =>
+    ({
+      run: { id: 1, status: 'Queued', attempts: 0, errorMessage: null, model: null },
+      reused: false,
+    }) as const,
+)
+export const mockListAnalysisRuns = mock((): any => [])
+
+mock.module('../../../src/lib/analysis-queue', () => ({
+  enqueueCandidateAnalysis: mockEnqueueCandidateAnalysis,
+}))
+
+mock.module('../../../src/db/analysis', () => ({
+  listAnalysisRuns: mockListAnalysisRuns,
 }))
 
 mock.module('../../../src/lib/profiles', () => ({

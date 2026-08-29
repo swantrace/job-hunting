@@ -213,4 +213,35 @@ describe('structured job requirements migration', () => {
       sqlite.close()
     }
   })
+
+  test('creates application analysis runs with text dates and a unique queue job id', () => {
+    const sqlite = migratedDatabase()
+    try {
+      const tables = sqlite
+        .query("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .all()
+        .map((row) => String((row as { name: string }).name))
+      expect(tables).toContain('application_analysis_runs')
+
+      const columns = sqlite
+        .query("PRAGMA table_info('application_analysis_runs')")
+        .all() as Array<{
+        name: string
+        type: string
+      }>
+      for (const column of columns) {
+        if (column.name.endsWith('_at')) expect(column.type.toUpperCase()).toBe('TEXT')
+      }
+
+      const indexes = sqlite
+        .query("PRAGMA index_list('application_analysis_runs')")
+        .all() as Array<{
+        name: string
+        unique: number
+      }>
+      expect(indexes.some((index) => index.unique === 1)).toBe(true)
+    } finally {
+      sqlite.close()
+    }
+  })
 })

@@ -315,6 +315,45 @@ export const jobRequirementsToSkills = sqliteTable(
   (table) => [primaryKey({ columns: [table.jobRequirementId, table.skillId] })],
 )
 
+export const applicationAnalysisRuns = sqliteTable(
+  'application_analysis_runs',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    jobApplicationId: integer('job_application_id')
+      .notNull()
+      .references(() => jobApplications.id, { onDelete: 'cascade' }),
+    status: text('status', { enum: analysisRunStatuses }).notNull().default('Queued'),
+    queueJobId: text('queue_job_id').notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    inputHash: text('input_hash'),
+    inputSnapshotJson: text('input_snapshot_json'),
+    resultJson: text('result_json'),
+    model: text('model'),
+    promptVersion: text('prompt_version'),
+    schemaVersion: text('schema_version'),
+    errorMessage: text('error_message'),
+    recommendedProfileId: text('recommended_profile_id'),
+    confirmedProfileId: text('confirmed_profile_id'),
+    profileConfirmedAt: text('profile_confirmed_at'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    startedAt: text('started_at'),
+    completedAt: text('completed_at'),
+  },
+  (table) => [
+    check(
+      'application_analysis_runs_status_check',
+      sql`${table.status} in ('Queued', 'Processing', 'Completed', 'Failed')`,
+    ),
+    uniqueIndex('application_analysis_runs_queue_job_unique_idx').on(table.queueJobId),
+    index('application_analysis_runs_application_created_idx').on(
+      table.jobApplicationId,
+      table.createdAt,
+    ),
+    index('application_analysis_runs_status_idx').on(table.status),
+  ],
+)
+
 export const jobApplicationsToSkills = sqliteTable(
   'job_applications_to_skills',
   {
@@ -554,6 +593,7 @@ export type JobPostingAnalysis = typeof jobPostingAnalyses.$inferSelect
 export type JobRequirement = typeof jobRequirements.$inferSelect
 export type GenerationRun = typeof generationRuns.$inferSelect
 export type BaselineGenerationRun = typeof baselineGenerationRuns.$inferSelect
+export type ApplicationAnalysisRun = typeof applicationAnalysisRuns.$inferSelect
 export type Skill = typeof skills.$inferSelect
 export type SkillAlias = typeof skillAliases.$inferSelect
 export type JobApplicationSkill = typeof jobApplicationsToSkills.$inferSelect
