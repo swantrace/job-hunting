@@ -68,6 +68,17 @@ describe('planned resource page UI contracts', () => {
     })
   }
 
+  for (const resource of resources) {
+    resourcePageTest(`${resource.label} opens an editable resource workspace`, () => {
+      const source = readTsxTree(resource.componentDirectory)
+      expect(source).toContain('Edit')
+      expect(source).toContain('data-open-drawer')
+      expect(source).toContain('hx-put=')
+      expect(source).toContain('Save changes')
+      expect(source).toContain('Cancel')
+    })
+  }
+
   resourcePageTest(
     'keeps Skills independent and groups Companies and Contacts under Network',
     async () => {
@@ -83,6 +94,22 @@ describe('planned resource page UI contracts', () => {
       expect(contactsIndex).toBeGreaterThan(companiesIndex)
     },
   )
+
+  resourcePageTest('links a company contact count to a scoped Contacts view', () => {
+    const companySource = readTsxTree('app/components/companies')
+    const contactSource = readTsxTree('app/components/contacts')
+    const contactsRoute = readFileSync(
+      resolve(process.cwd(), 'app/routes/contacts/index.tsx'),
+      'utf8',
+    )
+
+    expect(companySource).toContain('/contacts?company=${company.id}')
+    expect(contactSource).toContain('Clear company filter')
+    expect(contactSource).toContain('<select name="company"')
+    expect(contactSource).toContain("change from:select[name='company']")
+    expect(contactsRoute).toContain('contact.companyId === Number(filters.company)')
+    expect(contactsRoute).toContain("c.req.header('HX-Request') === 'true'")
+  })
 
   test('merges companies transactionally without losing applications or contacts', () => {
     const sqlite = migratedDatabase()

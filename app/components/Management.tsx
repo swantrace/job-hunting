@@ -1,6 +1,6 @@
 import type { listManagementData } from '../../src/db/queries'
-import { Icon } from './ui/Icon'
 import { ManagementForm } from './ManagementForm'
+import { Icon } from './ui/Icon'
 
 type ManagementData = ReturnType<typeof listManagementData>
 export type ManagementKind = 'skills' | 'companies' | 'contacts'

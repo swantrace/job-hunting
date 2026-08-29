@@ -5,12 +5,15 @@ import type { CompanyFilters } from './CompaniesPage'
 export function CompaniesTable({
   companies,
   filters,
+  oob = false,
 }: {
   companies: CompanyOverview[]
   filters: CompanyFilters
+  oob?: boolean
 }) {
+  const query = new URLSearchParams(filters).toString()
   return (
-    <section id="companies-results">
+    <section id="companies-results" {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}>
       <form
         class="card border border-base-300 bg-base-100"
         hx-get="/companies"
@@ -39,6 +42,7 @@ export function CompaniesTable({
               <th>Applications</th>
               <th>Contacts</th>
               <th>Last activity</th>
+              <th class="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -60,8 +64,27 @@ export function CompaniesTable({
                   )}
                 </td>
                 <td>{company.applicationCount}</td>
-                <td>{company.contactCount}</td>
+                <td>
+                  <a
+                    class="link link-hover"
+                    href={`/contacts?company=${company.id}`}
+                    aria-label={`View contacts at ${company.name}`}
+                  >
+                    {company.contactCount}
+                  </a>
+                </td>
                 <td>{company.lastActivity ?? '—'}</td>
+                <td class="text-right">
+                  <button
+                    class="btn btn-ghost btn-sm"
+                    hx-get={`/companies/${company.id}?${query}`}
+                    hx-target="#company-workspace-panel"
+                    hx-swap="innerHTML"
+                    data-open-drawer="company-workspace-toggle"
+                  >
+                    Edit
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

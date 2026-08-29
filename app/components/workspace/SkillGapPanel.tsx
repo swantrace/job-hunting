@@ -2,8 +2,8 @@ import type { Filters, JobCardData } from '../../../src/db/queries'
 import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
 import { calculateSkillScores } from '../../../src/lib/skills/score'
 import { skillCategoryDefinitions, skillCategoryLabel } from '../../../src/lib/skills/taxonomy'
-import { SkillDecisionForm } from './SkillDecisionForm'
 import { query } from './helpers'
+import { SkillDecisionForm } from './SkillDecisionForm'
 
 const importanceOrder = { required: 0, preferred: 1, mentioned: 2 } as const
 function categoryLabel(category: string | 'uncategorized' | null) {

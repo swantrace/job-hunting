@@ -91,6 +91,12 @@ htmx.config.responseHandling = [
       if (drawerToggle) drawerToggle.checked = true;
       return;
     }
+    const openDrawer = target && target.closest('[data-open-drawer]');
+    if (openDrawer) {
+      const drawerToggle = document.getElementById(openDrawer.dataset.openDrawer);
+      if (drawerToggle) drawerToggle.checked = true;
+      return;
+    }
     const tabButton = target && target.closest('[data-workspace-tab]');
     if (!tabButton) return;
     const shell = document.getElementById('workspace-shell') || document;
