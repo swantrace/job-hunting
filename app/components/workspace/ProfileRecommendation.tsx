@@ -18,11 +18,13 @@ export function ProfileRecommendation({
   filters,
   run,
   profiles,
+  oob = false,
 }: {
   jobId: number
   filters: Filters
   run: ApplicationAnalysisRun | null
   profiles: ProfileOption[]
+  oob?: boolean
 }) {
   const result = parseResult(run)
   const recommendation = result?.profileRecommendation ?? null
@@ -30,7 +32,11 @@ export function ProfileRecommendation({
   const label = (id: string) => profiles.find((profile) => profile.id === id)?.label ?? id
 
   return (
-    <section id="profile-recommendation" class="rounded-box border border-base-300 p-4">
+    <section
+      id="profile-recommendation"
+      class="rounded-box border border-base-300 p-4"
+      {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
+    >
       <h3 class="font-semibold">Generation profile</h3>
       {confirmedProfileId ? (
         <div class="mt-3">

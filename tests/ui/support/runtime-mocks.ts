@@ -135,6 +135,17 @@ mock.module('../../../src/db/analysis', () => ({
   listAnalysisRuns: mockListAnalysisRuns,
 }))
 
+export const mockLoadReviewData = mock((): any => ({
+  job: mockJob,
+  run: null,
+  requirements: [],
+  profiles: [],
+}))
+
+mock.module('../../../src/db/review-data', () => ({
+  loadReviewData: mockLoadReviewData,
+}))
+
 mock.module('../../../src/lib/candidate-analysis', () => ({
   currentCandidateAnalysisHash: mockCurrentCandidateAnalysisHash,
 }))
