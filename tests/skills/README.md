@@ -1,6 +1,6 @@
 # Skill intelligence test strategy
 
-These tests are the executable companion to `.dsh/plan.md`.
+These tests preserve the completed skill-intelligence foundation used by the current LLM workflow plan. New LLM workflow contracts live under `tests/ai/`, `tests/requirements/`, and the corresponding UI contract file.
 
 ## Test states
 
