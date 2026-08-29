@@ -95,4 +95,23 @@ describe('JSON import format', () => {
     expect(parsed.applicationSkills[0]).toMatchObject({ skillName: 'Kafka' })
     expect(parsed.skillAliases).toEqual([])
   })
+
+  test('accepts legacy line-based job analyses before structured analysis fields exist', () => {
+    const parsed = importPayloadSchema.parse({
+      schemaVersion: 1,
+      jobPostingAnalyses: [
+        {
+          jobApplicationId: 1,
+          requirements: 'Node.js experience\nTypeScript experience',
+          responsibilities: 'Build production APIs',
+          model: 'gpt-5-mini',
+          promptVersion: '2.2.0',
+        },
+      ],
+    })
+    expect(parsed.jobPostingAnalyses[0]).toMatchObject({
+      requirements: 'Node.js experience\nTypeScript experience',
+      promptVersion: '2.2.0',
+    })
+  })
 })
