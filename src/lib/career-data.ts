@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { z } from 'zod'
-import { skillCategories } from './skills/constants'
 import { normalizeSkillAlias } from './skills/normalize'
+import { hasSkillCategory } from './skills/taxonomy'
 
 const idSchema = z
   .string()
@@ -87,7 +87,11 @@ const skillsSchema = documentSchema.extend({
       .object({
         id: idSchema,
         label: z.string().min(1),
-        category: z.enum(skillCategories),
+        category: z
+          .string()
+          .trim()
+          .min(1)
+          .refine(hasSkillCategory, 'Choose a category from config/skill-taxonomy.json.'),
         aliases: z.array(z.string().trim().min(1).max(120)).default([]),
         directions: referenceIdsSchema,
       })
@@ -215,11 +219,10 @@ export function validateCareerData(data: CanonicalCareerData) {
     'skills',
     data.skills.skills.map((item) => item.id),
   )
-  const skillCategorySet = new Set<string>(skillCategories)
   const normalizedSkillIds = new Map<string, string>()
   const normalizedSkillLabels = new Map<string, string>()
   for (const skill of data.skills.skills) {
-    if (!skillCategorySet.has(skill.category))
+    if (!hasSkillCategory(skill.category))
       throw new Error(`Skill "${skill.id}" has an invalid category "${skill.category}".`)
     const normalizedId = normalizeSkillAlias(skill.id)
     const idOwner = normalizedSkillIds.get(normalizedId)

@@ -1,4 +1,5 @@
-import { describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { resolve } from 'node:path'
 import type { GenerationSource } from '../src/db/generation'
 import { loadCareerData } from '../src/lib/career-data'
 import {
@@ -42,6 +43,23 @@ function sourceWithRequirements(requirements: ReturnType<typeof requirement>[]) 
 }
 
 describe('evidence selection snapshots', () => {
+  const exampleCareerData = resolve(process.cwd(), 'career-data.example')
+  const exampleProfiles = resolve(process.cwd(), 'profiles.example')
+  const previousCareerData = process.env.CAREER_DATA_DIR
+  const previousProfiles = process.env.CAREER_PROFILES_DIR
+
+  beforeEach(() => {
+    process.env.CAREER_DATA_DIR = exampleCareerData
+    process.env.CAREER_PROFILES_DIR = exampleProfiles
+  })
+
+  afterEach(() => {
+    if (previousCareerData === undefined) delete process.env.CAREER_DATA_DIR
+    else process.env.CAREER_DATA_DIR = previousCareerData
+    if (previousProfiles === undefined) delete process.env.CAREER_PROFILES_DIR
+    else process.env.CAREER_PROFILES_DIR = previousProfiles
+  })
+
   test('selects only profile-approved, safe canonical evidence', () => {
     const data = loadCareerData()
     const profile = data.profiles.find((item) => item.id === 'fullstack')

@@ -11,13 +11,11 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
 import {
-  type SkillCategory,
   type SkillDecision,
   type SkillImportance,
   type SkillMatchResult,
   type SkillOrigin,
   type SkillReviewStatus,
-  skillCategories,
   skillDecisions,
   skillImportances,
   skillMatchResults,
@@ -50,13 +48,30 @@ export const companies = sqliteTable(
   (table) => [uniqueIndex('companies_name_nocase_idx').on(sql`lower(${table.name})`)],
 )
 
+/**
+ * A database mirror of config/skill-taxonomy.json. The JSON configuration owns
+ * these rows; SQLite preserves referential integrity for operational skills.
+ */
+export const skillCategories = sqliteTable(
+  'skill_categories',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    key: text('key').notNull(),
+    label: text('label').notNull(),
+    sortOrder: integer('sort_order').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [uniqueIndex('skill_categories_key_unique_idx').on(table.key)],
+)
+
 export const skills = sqliteTable(
   'skills',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     key: text('key').notNull(),
     name: text('name').notNull(),
-    category: text('category', { enum: skillCategories }),
+    category: text('category').references(() => skillCategories.key, { onDelete: 'restrict' }),
     reviewStatus: text('review_status', { enum: skillReviewStatuses }).notNull().default('pending'),
     origin: text('origin', { enum: skillOrigins }).notNull().default('manual'),
     careerSkillId: text('career_skill_id'),
@@ -81,10 +96,6 @@ export const skills = sqliteTable(
     check(
       'skills_origin_check',
       sql`${table.origin} in ('career-data', 'job-parser', 'manual', 'import')`,
-    ),
-    check(
-      'skills_category_check',
-      sql`${table.category} is null or ${table.category} in ('languages-web', 'frontend', 'backend-apis', 'databases-caching', 'messaging-async', 'cloud-devops', 'testing-quality', 'security-identity', 'ai-ml', 'architecture-practices', 'domain-platforms')`,
     ),
     check(
       'skills_merged_check',
@@ -467,11 +478,4 @@ export type Skill = typeof skills.$inferSelect
 export type SkillAlias = typeof skillAliases.$inferSelect
 export type JobApplicationSkill = typeof jobApplicationsToSkills.$inferSelect
 
-export type {
-  SkillCategory,
-  SkillDecision,
-  SkillImportance,
-  SkillMatchResult,
-  SkillOrigin,
-  SkillReviewStatus,
-}
+export type { SkillDecision, SkillImportance, SkillMatchResult, SkillOrigin, SkillReviewStatus }

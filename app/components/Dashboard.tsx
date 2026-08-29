@@ -115,10 +115,10 @@ export function Filters({ filters }: { filters: Filters }) {
                 ['updated_desc', 'Recently updated'],
                 ['posted_desc', 'Posted: newest'],
                 ['posted_asc', 'Posted: oldest'],
-                ['company_asc', 'Company: A–Z'],
-                ['company_desc', 'Company: Z–A'],
-                ['priority_asc', 'Priority: A–C'],
-                ['priority_desc', 'Priority: C–A'],
+                ['company_asc', 'Company: A-Z'],
+                ['company_desc', 'Company: Z-A'],
+                ['priority_asc', 'Priority: A-C'],
+                ['priority_desc', 'Priority: C-A'],
                 ['target_asc', 'Today target'],
                 ['applied_desc', 'Applied: newest'],
                 ['applied_asc', 'Applied: oldest'],
@@ -422,7 +422,7 @@ function KanbanBoard({ jobs, filters }: { jobs: JobCardData[]; filters: Filters 
       {statuses.map((status) => (
         <section
           class={`board-column rounded-box bg-base-300/60 p-3 ${
-            statuses.length === 1 ? 'w-full shrink-0' : 'w-[310px] min-w-[310px] shrink-0'
+            statuses.length === 1 ? 'w-full shrink-0' : 'w-77.5 min-w-77.5 shrink-0'
           }`}
         >
           <div class="mb-3 flex items-center justify-between">

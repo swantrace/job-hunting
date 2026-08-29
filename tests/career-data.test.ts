@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { validateCareerData } from '../src/lib/career-data'
-import { skillCategories } from '../src/lib/skills/constants'
+import { hasSkillCategory } from '../src/lib/skills/taxonomy'
 import { loadExampleCareerData } from './support/career-data'
 
 describe('canonical career data', () => {
@@ -40,7 +40,7 @@ describe('canonical career data', () => {
   test('loads every career skill with a controlled canonical category', () => {
     const data = loadExampleCareerData()
     for (const skill of data.skills.skills) {
-      expect(skillCategories).toContain(skill.category)
+      expect(hasSkillCategory(skill.category)).toBe(true)
     }
   })
 

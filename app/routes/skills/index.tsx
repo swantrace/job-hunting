@@ -1,6 +1,7 @@
 import { createRoute } from 'honox/factory'
 import { listSkillsOverview } from '../../../src/db/resource-queries'
-import { skillCategories, skillReviewStatuses } from '../../../src/lib/skills/constants'
+import { skillReviewStatuses } from '../../../src/lib/skills/constants'
+import { hasSkillCategory } from '../../../src/lib/skills/taxonomy'
 import { type SkillFilters, SkillsPage } from '../../components/skills/SkillsPage'
 
 export default createRoute((c) => {
@@ -9,7 +10,7 @@ export default createRoute((c) => {
   const status = c.req.query('status') ?? ''
   const filters: SkillFilters = {
     q,
-    category: (skillCategories as readonly string[]).includes(category) ? category : '',
+    category: hasSkillCategory(category) ? category : '',
     status: (skillReviewStatuses as readonly string[]).includes(status) ? status : '',
   }
   const skills = listSkillsOverview().filter((skill) => {

@@ -1,30 +1,21 @@
 import type { Filters, JobCardData } from '../../../src/db/queries'
 import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
-import { type SkillCategory, skillCategoryLabels } from '../../../src/lib/skills/constants'
 import { calculateSkillScores } from '../../../src/lib/skills/score'
+import { skillCategoryDefinitions, skillCategoryLabel } from '../../../src/lib/skills/taxonomy'
 import { query } from './helpers'
 
 const importanceOrder = { required: 0, preferred: 1, mentioned: 2 } as const
-const categoryOrder: SkillCategory[] = [
-  'languages-web',
-  'frontend',
-  'backend-apis',
-  'databases-caching',
-  'messaging-async',
-  'cloud-devops',
-  'testing-quality',
-  'security-identity',
-  'ai-ml',
-  'architecture-practices',
-  'domain-platforms',
-]
-
-function categoryLabel(category: SkillCategory | 'uncategorized' | null) {
-  return category && category !== 'uncategorized' ? skillCategoryLabels[category] : 'Uncategorized'
+function categoryLabel(category: string | 'uncategorized' | null) {
+  return category && category !== 'uncategorized'
+    ? (skillCategoryLabel(category) ?? category)
+    : 'Uncategorized'
 }
 
 function groupRequirements(requirements: ApplicationSkillRequirement[]) {
   const byCategory = new Map<string, ApplicationSkillRequirement[]>()
+  const categoryOrder = new Map(
+    skillCategoryDefinitions().map((item) => [item.key, item.sortOrder]),
+  )
   for (const requirement of requirements) {
     const key = requirement.skillCategory ?? 'uncategorized'
     const list = byCategory.get(key) ?? []
@@ -33,14 +24,13 @@ function groupRequirements(requirements: ApplicationSkillRequirement[]) {
   }
   return [...byCategory.entries()]
     .sort(([a], [b]) => {
-      const aIndex = categoryOrder.indexOf(a as SkillCategory)
-      const bIndex = categoryOrder.indexOf(b as SkillCategory)
       return (
-        (aIndex < 0 ? categoryOrder.length : aIndex) - (bIndex < 0 ? categoryOrder.length : bIndex)
+        (categoryOrder.get(a) ?? Number.MAX_SAFE_INTEGER) -
+        (categoryOrder.get(b) ?? Number.MAX_SAFE_INTEGER)
       )
     })
     .map(([category, items]) => ({
-      category: category as SkillCategory | 'uncategorized',
+      category: category as string | 'uncategorized',
       items: [...items].sort(
         (a, b) => importanceOrder[a.importance] - importanceOrder[b.importance],
       ),

@@ -2,9 +2,9 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-const constantsModule = resolve(process.cwd(), 'src/lib/skills/constants.ts')
+const taxonomyModule = resolve(process.cwd(), 'src/lib/skills/taxonomy.ts')
 const normalizationModule = resolve(process.cwd(), 'src/lib/skills/normalize.ts')
-const taxonomyImplemented = existsSync(constantsModule) && existsSync(normalizationModule)
+const taxonomyImplemented = existsSync(taxonomyModule) && existsSync(normalizationModule)
 const taxonomyTest = taxonomyImplemented ? test : test.todo
 
 const expectedCategories = [
@@ -21,12 +21,15 @@ const expectedCategories = [
   'domain-platforms',
 ]
 
-type ConstantsModule = {
-  skillCategories: readonly string[]
+type WorkflowConstantsModule = {
   skillDecisions: readonly string[]
   skillMatchResults: readonly string[]
   skillOrigins: readonly string[]
   skillReviewStatuses: readonly string[]
+}
+
+type TaxonomyModule = {
+  skillCategoryDefinitions: () => Array<{ key: string; label: string; sortOrder: number }>
 }
 
 type NormalizationModule = {
@@ -35,15 +38,21 @@ type NormalizationModule = {
 
 async function loadContracts() {
   return {
-    constants: (await import(constantsModule)) as ConstantsModule,
+    constants: (await import(
+      resolve(process.cwd(), 'src/lib/skills/constants.ts')
+    )) as WorkflowConstantsModule,
+    taxonomy: (await import(taxonomyModule)) as TaxonomyModule,
     normalization: (await import(normalizationModule)) as NormalizationModule,
   }
 }
 
 describe('planned canonical skill taxonomy contract', () => {
   taxonomyTest('uses one predictable category vocabulary', async () => {
-    const { constants } = await loadContracts()
-    expect([...constants.skillCategories]).toEqual(expectedCategories)
+    const { taxonomy } = await loadContracts()
+    const categories = taxonomy.skillCategoryDefinitions()
+    expect(categories.map((category) => category.key)).toEqual(expectedCategories)
+    expect(new Set(categories.map((category) => category.label)).size).toBe(categories.length)
+    expect(new Set(categories.map((category) => category.sortOrder)).size).toBe(categories.length)
   })
 
   taxonomyTest('keeps analysis states separate from user decisions', async () => {

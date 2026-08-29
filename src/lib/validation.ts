@@ -2,7 +2,8 @@ import { z } from 'zod'
 import { type JobStatus, matchLevels, priorities, statuses } from '../db/schema'
 import { isISODate } from './date'
 import { hasProfile } from './profiles'
-import { skillCategories, skillImportances } from './skills/constants'
+import { skillImportances } from './skills/constants'
+import { hasSkillCategory } from './skills/taxonomy'
 
 const emptyToNull = (value: unknown) =>
   typeof value === 'string' && value.trim() === '' ? null : value
@@ -24,7 +25,7 @@ const analysisText = optionalText(12000)
 export const skillRequirementSchema = z.object({
   rawLabel: z.string().trim().min(1).max(120),
   canonicalLabel: z.string().trim().min(1).max(120),
-  category: z.enum(skillCategories).nullable(),
+  category: z.string().trim().min(1).refine(hasSkillCategory).nullable(),
   importance: z.enum(skillImportances),
   sourceText: z.string().trim().max(1000).nullable().optional(),
   confidence: z.number().min(0).max(1).nullable().optional(),
