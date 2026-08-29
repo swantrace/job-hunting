@@ -36,6 +36,16 @@ export const statuses = [
 ] as const
 export const generationStatuses = ['Queued', 'Processing', 'Completed', 'Failed'] as const
 export const generatedArtifactTypes = ['job_context', 'resume', 'cover_letter'] as const
+export const analysisRunStatuses = ['Queued', 'Processing', 'Completed', 'Failed'] as const
+export const requirementTypes = [
+  'skill',
+  'experience',
+  'responsibility',
+  'education',
+  'soft-skill',
+  'domain',
+] as const
+export const requirementBases = ['explicit', 'inferred', 'legacy'] as const
 
 export const companies = sqliteTable(
   'companies',
@@ -229,11 +239,80 @@ export const jobPostingAnalyses = sqliteTable(
     generatedAt: text('generated_at').notNull(),
     model: text('model'),
     promptVersion: text('prompt_version'),
+    summary: text('summary'),
+    roleType: text('role_type'),
+    advertisedSeniority: text('advertised_seniority'),
+    practicalSeniority: text('practical_seniority'),
+    classificationRationale: text('classification_rationale'),
+    functionalEmphasisJson: text('functional_emphasis_json'),
+    interviewQuestionsJson: text('interview_questions_json'),
+    schemaVersion: text('schema_version'),
   },
   (table) => [
     uniqueIndex('job_posting_analyses_posting_unique_idx').on(table.jobPostingId),
     index('job_posting_analyses_generated_idx').on(table.generatedAt),
   ],
+)
+
+export const jobRequirements = sqliteTable(
+  'job_requirements',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    jobPostingAnalysisId: integer('job_posting_analysis_id')
+      .notNull()
+      .references(() => jobPostingAnalyses.id, { onDelete: 'cascade' }),
+    sequence: integer('sequence').notNull(),
+    requirementType: text('requirement_type', { enum: requirementTypes }).notNull(),
+    importance: text('importance', { enum: skillImportances }).notNull(),
+    basis: text('basis', { enum: requirementBases }).notNull(),
+    statement: text('statement').notNull(),
+    sourceText: text('source_text'),
+    inferenceRationale: text('inference_rationale'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('job_requirements_analysis_sequence_unique_idx').on(
+      table.jobPostingAnalysisId,
+      table.sequence,
+    ),
+    index('job_requirements_analysis_idx').on(table.jobPostingAnalysisId),
+    index('job_requirements_type_idx').on(table.requirementType),
+    index('job_requirements_importance_idx').on(table.importance),
+    check(
+      'job_requirements_type_check',
+      sql`${table.requirementType} in ('skill', 'experience', 'responsibility', 'education', 'soft-skill', 'domain')`,
+    ),
+    check(
+      'job_requirements_importance_check',
+      sql`${table.importance} in ('required', 'preferred', 'mentioned')`,
+    ),
+    check(
+      'job_requirements_basis_check',
+      sql`${table.basis} in ('explicit', 'inferred', 'legacy')`,
+    ),
+    check(
+      'job_requirements_inferred_rationale_check',
+      sql`${table.basis} != 'inferred' or (${table.inferenceRationale} is not null and trim(${table.inferenceRationale}) != '')`,
+    ),
+    check(
+      'job_requirements_source_text_check',
+      sql`${table.basis} = 'legacy' or (${table.sourceText} is not null and trim(${table.sourceText}) != '')`,
+    ),
+  ],
+)
+
+export const jobRequirementsToSkills = sqliteTable(
+  'job_requirements_to_skills',
+  {
+    jobRequirementId: integer('job_requirement_id')
+      .notNull()
+      .references(() => jobRequirements.id, { onDelete: 'cascade' }),
+    skillId: integer('skill_id')
+      .notNull()
+      .references(() => skills.id, { onDelete: 'cascade' }),
+  },
+  (table) => [primaryKey({ columns: [table.jobRequirementId, table.skillId] })],
 )
 
 export const jobApplicationsToSkills = sqliteTable(
@@ -472,6 +551,7 @@ export type JobApplication = typeof jobApplications.$inferSelect
 export type Contact = typeof contacts.$inferSelect
 export type JobPosting = typeof jobPostings.$inferSelect
 export type JobPostingAnalysis = typeof jobPostingAnalyses.$inferSelect
+export type JobRequirement = typeof jobRequirements.$inferSelect
 export type GenerationRun = typeof generationRuns.$inferSelect
 export type BaselineGenerationRun = typeof baselineGenerationRuns.$inferSelect
 export type Skill = typeof skills.$inferSelect

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { jobAnalysisSchema } from '../ai/schemas/job-analysis'
 import { type JobStatus, matchLevels, priorities, statuses } from '../db/schema'
 import { isISODate } from './date'
 import { hasProfile } from './profiles'
@@ -43,6 +44,15 @@ function parseSkillRequirementsField(value: unknown) {
   }
 }
 
+function parseJsonField(value: unknown) {
+  if (typeof value !== 'string' || value.trim() === '') return undefined
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
+}
+
 export function parseSkillRequirementsValue(value: unknown): SkillRequirementDraft[] | undefined {
   const prepared = parseSkillRequirementsField(value)
   if (prepared === undefined) return undefined
@@ -75,6 +85,9 @@ export const quickCollectSchema = z.object({
   analysisNotes: optionalText(5000),
   parserModel: optionalText(100),
   parserPromptVersion: optionalText(50),
+  jobAnalysis: z.preprocess(parseJsonField, jobAnalysisSchema.optional()),
+  analysisSchemaVersion: optionalText(50),
+  analysisPromptVersion: optionalText(50),
 })
 
 export const applicationSchema = z.object({

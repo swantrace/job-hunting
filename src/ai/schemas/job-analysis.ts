@@ -115,6 +115,8 @@ export const jobAnalysisSchema = z
 export type JobAnalysis = z.infer<typeof jobAnalysisSchema>
 export type JobAnalysisRequirement = z.infer<typeof jobRequirementSchema>
 
+export const jobAnalysisSchemaVersion = '3.0.0'
+
 const stringSchema = { type: 'string' } as const
 const nullableStringSchema = { type: ['string', 'null'] } as const
 

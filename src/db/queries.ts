@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { and, eq, inArray, like, or, sql } from 'drizzle-orm'
 import type { z } from 'zod'
+import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
 import { todayISO } from '../lib/date'
 import {
   applicationKey,
@@ -24,6 +25,7 @@ import {
   statusesFromFilters,
 } from '../lib/validation'
 import { db } from './client'
+import { persistJobRequirements } from './job-analysis'
 import {
   companies,
   contacts,
@@ -125,14 +127,16 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
           rawText,
           capturedAt: date,
           contentHash: createHash('sha256').update(rawText).digest('hex'),
-          parsedAt: input.analysisRequirements ? date : null,
+          parsedAt: input.analysisRequirements || input.jobAnalysis ? date : null,
           parserModel: input.parserModel,
           parserPromptVersion: input.parserPromptVersion,
         })
         .returning({ id: jobPostings.id })
         .get()
-      if (input.parserPromptVersion)
-        tx.insert(jobPostingAnalyses)
+      if (input.parserPromptVersion || input.jobAnalysis) {
+        const analysis = input.jobAnalysis
+        const saved = tx
+          .insert(jobPostingAnalyses)
           .values({
             jobPostingId: posting.id,
             requirements: input.analysisRequirements,
@@ -146,8 +150,35 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
             generatedAt: date,
             model: input.parserModel,
             promptVersion: input.parserPromptVersion,
+            summary: analysis ? JSON.stringify(analysis.summary) : null,
+            roleType: analysis?.classification.roleType ?? null,
+            advertisedSeniority: analysis?.classification.advertisedSeniority ?? null,
+            practicalSeniority: analysis?.classification.practicalSeniority ?? null,
+            classificationRationale: analysis?.classification.rationale ?? null,
+            functionalEmphasisJson: analysis
+              ? JSON.stringify(analysis.classification.functionalEmphasis)
+              : null,
+            interviewQuestionsJson: analysis ? JSON.stringify(analysis.interviewQuestions) : null,
+            schemaVersion: analysis ? jobAnalysisSchemaVersion : null,
           })
-          .run()
+          .returning({ id: jobPostingAnalyses.id })
+          .get()
+        if (analysis?.requirements.length) {
+          persistJobRequirements(
+            tx,
+            saved.id,
+            analysis.requirements.map((requirement) => ({
+              type: requirement.type,
+              importance: requirement.importance,
+              basis: requirement.basis,
+              statement: requirement.statement,
+              sourceText: requirement.sourceText,
+              inferenceRationale: requirement.inferenceRationale,
+            })),
+            date,
+          )
+        }
+      }
     }
     return result.id
   })
