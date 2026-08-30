@@ -197,7 +197,7 @@ describe('job analysis run-state queries', () => {
           jobPostingId: applicationId,
           status: 'Completed',
           inputHash: 'current-hash',
-          schemaVersion: '3.0.0',
+          schemaVersion: '4.0.0',
           generatedAt: '2026-08-02',
           createdAt: '2026-08-02',
           updatedAt: '2026-08-02',
@@ -220,7 +220,7 @@ describe('job analysis run-state queries', () => {
           jobPostingId: applicationId,
           status: 'Failed',
           inputHash: 'current-hash',
-          schemaVersion: '3.0.0',
+          schemaVersion: '4.0.0',
           errorMessage: 'boom',
           generatedAt: '2026-08-03',
           createdAt: '2026-08-03',
@@ -263,7 +263,7 @@ describe('job analysis completion transaction', () => {
           .where(eq(schema.jobPostingAnalyses.id, run.id))
           .get()
         expect(completed?.status).toBe('Completed')
-        expect(completed?.schemaVersion).toBe('3.0.0')
+        expect(completed?.schemaVersion).toBe('4.0.0')
         expect(completed?.completedAt).toBeTruthy()
         expect(completed?.summary).toContain('Build software.')
 
@@ -299,15 +299,6 @@ function minimalParsedResult() {
     location: null,
     postedDate: null,
     salary: null,
-    skills: [],
-    requirements: ['Senior engineering experience'],
-    responsibilities: [],
-    painPoints: [],
-    culture: [],
-    redFlags: [],
-    successMetrics: [],
-    benefits: [],
-    notes: null,
     analysis: {
       summary: { rolePurpose: 'Build software.', idealCandidate: 'An experienced engineer.' },
       classification: {
@@ -331,13 +322,20 @@ function minimalParsedResult() {
           statement: 'Senior engineering experience.',
           sourceText: 'Senior engineering experience.',
           inferenceRationale: null,
+          skillReferences: [],
         },
       ],
+      painPoints: [],
+      culture: [],
+      redFlags: [],
+      successMetrics: [],
+      benefits: [],
+      notes: null,
       interviewQuestions: [],
     },
     parserModel: 'gpt-test',
-    parserPromptVersion: '2.2.0',
-    analysisPromptVersion: '3.0.0',
+    parserPromptVersion: '3.0.0',
+    analysisPromptVersion: '4.0.0',
   }
 }
 

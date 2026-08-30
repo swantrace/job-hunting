@@ -44,24 +44,6 @@ htmx.config.responseHandling = [
       window.setTimeout(function () { flash.remove(); }, 300);
     }, 4000);
   }
-  window.updateSkillRequirements = function () {
-    const root = document.getElementById('skill-requirements');
-    if (!root) return;
-    const rows = root.querySelectorAll('[data-skill-row]');
-    const requirements = [];
-    rows.forEach(function (row) {
-      requirements.push({
-        rawLabel: row.querySelector('[data-skill-raw]').value,
-        canonicalLabel: row.querySelector('[data-skill-canonical]').value,
-        category: row.querySelector('[data-skill-category]').value,
-        importance: row.querySelector('[data-skill-importance]').value,
-        sourceText: row.querySelector('[data-skill-source]').value,
-        confidence: Number(row.querySelector('[data-skill-confidence]').value) || 0,
-      });
-    });
-    const target = root.querySelector('textarea[name="skillRequirements"]');
-    if (target) target.value = JSON.stringify(requirements);
-  };
   window.updateJobAnalysis = function () {
     const root = document.getElementById('job-analysis-draft');
     if (!root) return;
@@ -72,6 +54,14 @@ htmx.config.responseHandling = [
     const number = function (selector) {
       const parsed = Number(value(selector));
       return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const list = function (selector) {
+      const values = [];
+      root.querySelectorAll(selector).forEach(function (element) {
+        const text = element.value.trim();
+        if (text) values.push(text);
+      });
+      return values;
     };
     const summary = {
       rolePurpose: value('[data-ja-role-purpose]'),
@@ -92,6 +82,15 @@ htmx.config.responseHandling = [
     };
     const requirements = [];
     root.querySelectorAll('[data-ja-requirement]').forEach(function (row) {
+      const skillReferences = [];
+      row.querySelectorAll('[data-ja-skill-ref]').forEach(function (reference) {
+        skillReferences.push({
+          rawLabel: reference.querySelector('[data-ja-skill-raw]').value,
+          canonicalLabel: reference.querySelector('[data-ja-skill-canonical]').value,
+          category: reference.querySelector('[data-ja-skill-category]').value,
+          confidence: Number(reference.querySelector('[data-ja-skill-confidence]').value) || 0,
+        });
+      });
       requirements.push({
         type: row.querySelector('[data-ja-type]').value,
         importance: row.querySelector('[data-ja-importance]').value,
@@ -101,15 +100,24 @@ htmx.config.responseHandling = [
         inferenceRationale: row.querySelector('[data-ja-inference]')
           ? row.querySelector('[data-ja-inference]').value.trim() || null
           : null,
+        skillReferences: skillReferences,
       });
     });
-    const interviewQuestions = [];
-    root.querySelectorAll('[data-ja-interview]').forEach(function (element) {
-      const text = element.value.trim();
-      if (text) interviewQuestions.push(text);
-    });
+    const notes = value('[data-ja-notes]').trim();
     const target = root.querySelector('textarea[name="jobAnalysis"]');
-    if (target) target.value = JSON.stringify({ summary, classification, requirements, interviewQuestions });
+    if (target)
+      target.value = JSON.stringify({
+        summary: summary,
+        classification: classification,
+        requirements: requirements,
+        painPoints: list('[data-ja-pain]'),
+        culture: list('[data-ja-culture]'),
+        redFlags: list('[data-ja-red-flag]'),
+        successMetrics: list('[data-ja-success]'),
+        benefits: list('[data-ja-benefit]'),
+        notes: notes || null,
+        interviewQuestions: list('[data-ja-interview]'),
+      });
     const totalElement = root.querySelector('[data-ja-fe-total]');
     if (totalElement) {
       const total = Object.values(classification.functionalEmphasis).reduce(function (sum, part) { return sum + part; }, 0);

@@ -71,7 +71,6 @@ import {
   type DbExecutor,
   getOrCreateSkill,
   insertSkill,
-  persistSkillRequirements,
   reconcileSkillNames,
 } from './skill-queries'
 
@@ -149,11 +148,7 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
       })
       .returning({ id: jobApplications.id })
       .get()
-    if (input.skillRequirements?.length) {
-      persistSkillRequirements(tx, result.id, input.skillRequirements)
-    } else {
-      replaceSkills(tx, result.id, cleanSkills(input.skills))
-    }
+    replaceSkills(tx, result.id, cleanSkills(input.skills))
     const rawText = input.jobPostText?.trim()
     if (rawText) {
       const contentHash = createHash('sha256').update(rawText).digest('hex')
@@ -164,14 +159,13 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
           rawText,
           capturedAt: date,
           contentHash,
-          parsedAt: input.analysisRequirements || input.jobAnalysis ? date : null,
+          parsedAt: input.jobAnalysis ? date : null,
           parserModel: input.parserModel,
           parserPromptVersion: input.parserPromptVersion,
         })
         .returning({ id: jobPostings.id })
         .get()
-      if (input.parserPromptVersion || input.jobAnalysis) {
-        const analysis = input.jobAnalysis
+      if (input.jobAnalysis) {
         const inputIdentity = jobAnalysisInputFromContent(contentHash)
         persistCompletedJobAnalysis(tx, {
           jobPostingId: posting.id,
@@ -179,34 +173,8 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
           frozenInputJson: JSON.stringify(inputIdentity.snapshot),
           model: input.parserModel,
           promptVersion: input.parserPromptVersion,
-          requirements: input.analysisRequirements,
-          responsibilities: input.analysisResponsibilities,
-          painPoints: input.analysisPainPoints,
-          culture: input.analysisCulture,
-          redFlags: input.analysisRedFlags,
-          successMetrics: input.analysisSuccessMetrics,
-          benefits: input.analysisBenefits,
-          notes: input.analysisNotes,
-          summary: analysis ? JSON.stringify(analysis.summary) : null,
-          roleType: analysis?.classification.roleType ?? null,
-          advertisedSeniority: analysis?.classification.advertisedSeniority ?? null,
-          practicalSeniority: analysis?.classification.practicalSeniority ?? null,
-          classificationRationale: analysis?.classification.rationale ?? null,
-          functionalEmphasisJson: analysis
-            ? JSON.stringify(analysis.classification.functionalEmphasis)
-            : null,
-          interviewQuestionsJson: analysis ? JSON.stringify(analysis.interviewQuestions) : null,
-          schemaVersion: analysis ? jobAnalysisSchemaVersion : null,
-          requirementsRows: analysis
-            ? analysis.requirements.map((requirement) => ({
-                type: requirement.type,
-                importance: requirement.importance,
-                basis: requirement.basis,
-                statement: requirement.statement,
-                sourceText: requirement.sourceText,
-                inferenceRationale: requirement.inferenceRationale,
-              }))
-            : [],
+          analysis: input.jobAnalysis,
+          schemaVersion: jobAnalysisSchemaVersion,
           date,
         })
       }

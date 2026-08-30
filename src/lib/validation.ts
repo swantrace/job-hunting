@@ -10,7 +10,7 @@ import {
 } from './applications/constants'
 import { isISODate, isISOTimestamp } from './date'
 import { hasProfile } from './profiles'
-import { skillImportances, skillReviewStatuses } from './skills/constants'
+import { skillReviewStatuses } from './skills/constants'
 import { hasSkillCategory } from './skills/taxonomy'
 import { workspaceTabs } from './workspace/constants'
 
@@ -32,28 +32,6 @@ const direction = z
   .min(1, 'Direction is required')
   .max(80)
   .refine(hasProfile, 'Choose a valid direction')
-const analysisText = optionalText(12000)
-
-export const skillRequirementSchema = z.object({
-  rawLabel: z.string().trim().min(1).max(120),
-  canonicalLabel: z.string().trim().min(1).max(120),
-  category: z.string().trim().min(1).refine(hasSkillCategory).nullable(),
-  importance: z.enum(skillImportances),
-  sourceText: z.string().trim().max(1000).nullable().optional(),
-  confidence: z.number().min(0).max(1).nullable().optional(),
-})
-
-export const skillRequirementListSchema = z.array(skillRequirementSchema).max(30)
-export type SkillRequirementDraft = z.infer<typeof skillRequirementSchema>
-
-function parseSkillRequirementsField(value: unknown) {
-  if (typeof value !== 'string' || value.trim() === '') return undefined
-  try {
-    return JSON.parse(value)
-  } catch {
-    return value
-  }
-}
 
 function parseJsonField(value: unknown) {
   if (typeof value !== 'string' || value.trim() === '') return undefined
@@ -62,13 +40,6 @@ function parseJsonField(value: unknown) {
   } catch {
     return value
   }
-}
-
-export function parseSkillRequirementsValue(value: unknown): SkillRequirementDraft[] | undefined {
-  const prepared = parseSkillRequirementsField(value)
-  if (prepared === undefined) return undefined
-  const parsed = skillRequirementListSchema.safeParse(prepared)
-  return parsed.success ? parsed.data : undefined
 }
 
 export function parseJobAnalysisValue(value: unknown) {
@@ -88,19 +59,7 @@ export const quickCollectSchema = z.object({
   salary: optionalText(150),
   applicationSource: optionalText(150),
   skills: optionalText(1000),
-  skillRequirements: z.preprocess(
-    parseSkillRequirementsField,
-    skillRequirementListSchema.optional(),
-  ),
   jobPostText: optionalText(100000),
-  analysisRequirements: analysisText,
-  analysisResponsibilities: analysisText,
-  analysisPainPoints: analysisText,
-  analysisCulture: analysisText,
-  analysisRedFlags: analysisText,
-  analysisSuccessMetrics: analysisText,
-  analysisBenefits: analysisText,
-  analysisNotes: optionalText(5000),
   parserModel: optionalText(100),
   parserPromptVersion: optionalText(50),
   jobAnalysis: z.preprocess(parseJsonField, jobAnalysisSchema.optional()),

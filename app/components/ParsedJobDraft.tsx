@@ -22,7 +22,6 @@ export function ParsedJobDraft({
         filters={filters}
         formId="quick-form"
         oob
-        skillRequirements={parsed.skills}
         jobAnalysis={parsed.analysis}
         values={{
           jobTitle: parsed.jobTitle,
@@ -30,14 +29,6 @@ export function ParsedJobDraft({
           postedDate: parsed.postedDate ?? todayISO(),
           skills: '',
           salary: parsed.salary ?? '',
-          analysisRequirements: parsed.requirements.join('\n'),
-          analysisResponsibilities: parsed.responsibilities.join('\n'),
-          analysisPainPoints: parsed.painPoints.join('\n'),
-          analysisCulture: parsed.culture.join('\n'),
-          analysisRedFlags: parsed.redFlags.join('\n'),
-          analysisSuccessMetrics: parsed.successMetrics.join('\n'),
-          analysisBenefits: parsed.benefits.join('\n'),
-          analysisNotes: parsed.notes ?? '',
           parserModel: parsed.parserModel,
           parserPromptVersion: parsed.parserPromptVersion,
           analysisSchemaVersion: parsed.analysisPromptVersion,

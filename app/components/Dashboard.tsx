@@ -19,13 +19,11 @@ import {
   defaultAttributes,
   type FieldErrors,
   parseCsvList,
-  type SkillRequirementDraft,
   statusesFromFilters,
 } from '../../src/lib/validation'
 import { JobAnalysisDraft } from './JobAnalysisDraft'
-import { SkillRequirementsEditor } from './SkillRequirementsEditor'
 import { EmptyState } from './ui/EmptyState'
-import { InputField, SelectField, TextareaField } from './ui/FormField'
+import { InputField, SelectField } from './ui/FormField'
 import { Icon } from './ui/Icon'
 import { StatusBadge } from './ui/StatusBadge'
 
@@ -164,7 +162,6 @@ export function QuickCollect({
   values = {},
   formId = 'quick-form',
   oob = false,
-  skillRequirements,
   jobAnalysis,
 }: {
   filters: Filters
@@ -172,7 +169,6 @@ export function QuickCollect({
   values?: Record<string, string>
   formId?: string
   oob?: boolean
-  skillRequirements?: SkillRequirementDraft[]
   jobAnalysis?: JobAnalysis
 }) {
   const query = enc(filters)
@@ -250,73 +246,18 @@ export function QuickCollect({
             name="applicationSource"
             value={values.applicationSource}
           />
-          {skillRequirements ? (
-            <SkillRequirementsEditor requirements={skillRequirements} />
-          ) : (
-            <div class="sm:col-span-2">
-              <InputField
-                label="Skills"
-                name="skills"
-                value={values.skills}
-                placeholder="react, typescript, fhir"
-                error={error(errors, 'skills')}
-                list="skill-options"
-              />
-            </div>
-          )}
+          <div class="sm:col-span-2">
+            <InputField
+              label="Skills"
+              name="skills"
+              value={values.skills}
+              placeholder="react, typescript, fhir"
+              error={error(errors, 'skills')}
+              list="skill-options"
+            />
+          </div>
         </div>
-        {jobAnalysis ? (
-          <JobAnalysisDraft analysis={jobAnalysis} />
-        ) : values.parserPromptVersion ? (
-          <details class="mt-5 rounded-box border border-base-300 bg-base-200/40 p-4" open>
-            <summary class="cursor-pointer font-semibold">AI job-post analysis</summary>
-            <p class="mt-1 text-sm text-base-content/60">
-              Review and edit this AI draft. Use one item per line.
-            </p>
-            <div class="mt-4 grid gap-3 sm:grid-cols-2">
-              <TextareaField
-                label="Requirements"
-                name="analysisRequirements"
-                value={values.analysisRequirements}
-              />
-              <TextareaField
-                label="Responsibilities"
-                name="analysisResponsibilities"
-                value={values.analysisResponsibilities}
-              />
-              <TextareaField
-                label="Pain points"
-                name="analysisPainPoints"
-                value={values.analysisPainPoints}
-              />
-              <TextareaField
-                label="Culture signals"
-                name="analysisCulture"
-                value={values.analysisCulture}
-              />
-              <TextareaField
-                label="Red flags"
-                name="analysisRedFlags"
-                value={values.analysisRedFlags}
-              />
-              <TextareaField
-                label="Success metrics"
-                name="analysisSuccessMetrics"
-                value={values.analysisSuccessMetrics}
-              />
-              <TextareaField
-                label="Benefits"
-                name="analysisBenefits"
-                value={values.analysisBenefits}
-              />
-              <TextareaField
-                label="Additional facts"
-                name="analysisNotes"
-                value={values.analysisNotes}
-              />
-            </div>
-          </details>
-        ) : null}
+        {jobAnalysis ? <JobAnalysisDraft analysis={jobAnalysis} /> : null}
         <div class="card-actions mt-2 justify-end">
           <button class="btn btn-primary">
             <span class="loading loading-spinner loading-sm htmx-indicator" /> Save opportunity
@@ -331,26 +272,6 @@ export function QuickCollect({
       {values.parserModel && <input type="hidden" name="parserModel" value={values.parserModel} />}
       {values.parserPromptVersion && (
         <input type="hidden" name="parserPromptVersion" value={values.parserPromptVersion} />
-      )}
-      {jobAnalysis && (
-        <>
-          <input type="hidden" name="analysisRequirements" value={values.analysisRequirements} />
-          <input
-            type="hidden"
-            name="analysisResponsibilities"
-            value={values.analysisResponsibilities}
-          />
-          <input type="hidden" name="analysisPainPoints" value={values.analysisPainPoints} />
-          <input type="hidden" name="analysisCulture" value={values.analysisCulture} />
-          <input type="hidden" name="analysisRedFlags" value={values.analysisRedFlags} />
-          <input
-            type="hidden"
-            name="analysisSuccessMetrics"
-            value={values.analysisSuccessMetrics}
-          />
-          <input type="hidden" name="analysisBenefits" value={values.analysisBenefits} />
-          <input type="hidden" name="analysisNotes" value={values.analysisNotes} />
-        </>
       )}
       {values.analysisSchemaVersion && (
         <input type="hidden" name="analysisSchemaVersion" value={values.analysisSchemaVersion} />
