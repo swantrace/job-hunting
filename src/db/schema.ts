@@ -49,7 +49,7 @@ export const companies = sqliteTable(
 )
 
 /**
- * A database mirror of config/skill-taxonomy.json. The JSON configuration owns
+ * A database mirror of career-data/skill-taxonomy.json. The career-data bundle owns
  * these rows; SQLite preserves referential integrity for operational skills.
  */
 export const skillCategories = sqliteTable(

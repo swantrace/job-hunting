@@ -35,7 +35,7 @@ export const POST = createRoute(async (c) => {
   }
 
   const run = getAnalysisRun(parsed.data.runId)
-  if (!run || run.jobApplicationId !== id) {
+  if (!run || run.jobApplicationId !== id || run.status !== 'Completed') {
     c.header('HX-Retarget', '#profile-recommendation')
     return c.html(recommendationFor(id, filters), 422)
   }

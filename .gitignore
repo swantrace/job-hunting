@@ -11,6 +11,7 @@ bunqueue.db
 bunqueue.db-shm
 bunqueue.db-wal
 /artifacts/
+/backups/
 coverage/
 temp/
 /interview-prep.md

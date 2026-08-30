@@ -91,7 +91,7 @@ const skillsSchema = documentSchema.extend({
           .string()
           .trim()
           .min(1)
-          .refine(hasSkillCategory, 'Choose a category from config/skill-taxonomy.json.'),
+          .refine(hasSkillCategory, 'Choose a category from career-data/skill-taxonomy.json.'),
         aliases: z.array(z.string().trim().min(1).max(120)).default([]),
         directions: referenceIdsSchema,
       })

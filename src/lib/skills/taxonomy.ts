@@ -57,16 +57,33 @@ export type SkillTaxonomy = z.infer<typeof taxonomySchema>
 export type SkillCategory = string
 
 function taxonomyPath() {
-  const configured = process.env.SKILL_TAXONOMY_FILE?.trim()
+  const configuredDirectory = process.env.CAREER_DATA_DIR?.trim()
+  if (configuredDirectory) {
+    const configuredDirectories = [
+      resolve(process.cwd(), configuredDirectory),
+      resolve(process.cwd(), '..', configuredDirectory),
+    ]
+    const existingDirectory = configuredDirectories.find(existsSync)
+    if (existingDirectory) {
+      const configuredPath = resolve(existingDirectory, 'skill-taxonomy.json')
+      if (existsSync(configuredPath)) return configuredPath
+      throw new Error(
+        `Skill taxonomy was not found in CAREER_DATA_DIR "${configuredDirectory}". Add skill-taxonomy.json to that directory.`,
+      )
+    }
+  }
+
   const candidates = [
-    configured,
-    resolve(process.cwd(), 'config', 'skill-taxonomy.json'),
-    resolve(process.cwd(), '..', 'config', 'skill-taxonomy.json'),
+    resolve(process.cwd(), 'career-data', 'skill-taxonomy.json'),
+    resolve(process.cwd(), '..', 'career-data', 'skill-taxonomy.json'),
+    resolve(process.cwd(), 'career-data.example', 'skill-taxonomy.json'),
+    resolve(process.cwd(), '..', 'career-data.example', 'skill-taxonomy.json'),
   ]
-  const path = candidates
-    .filter((candidate): candidate is string => Boolean(candidate))
-    .find(existsSync)
-  if (!path) throw new Error('Skill taxonomy configuration was not found.')
+  const path = candidates.find(existsSync)
+  if (!path)
+    throw new Error(
+      'Skill taxonomy was not found. Add skill-taxonomy.json to the career-data directory or set CAREER_DATA_DIR.',
+    )
   return path
 }
 

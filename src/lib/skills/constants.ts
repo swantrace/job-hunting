@@ -1,6 +1,6 @@
 /**
  * Fixed workflow states. Skill category definitions intentionally live in
- * config/skill-taxonomy.json rather than this source file so the application
+ * career-data/skill-taxonomy.json rather than this source file so the application
  * can support a domain-specific taxonomy without a code change.
  */
 
