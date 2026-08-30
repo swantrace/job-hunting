@@ -218,6 +218,15 @@ export const jobPostingAnalyses = sqliteTable(
     jobPostingId: integer('job_posting_id')
       .notNull()
       .references(() => jobPostings.id, { onDelete: 'cascade' }),
+    // Run lifecycle. Existing rows backfill to Completed; new runs start Queued.
+    // Staleness is always derived from input_hash/schema_version, never stored.
+    status: text('status', { enum: runStatuses }).notNull().default('Completed'),
+    queueJobId: text('queue_job_id'),
+    attempts: integer('attempts').notNull().default(0),
+    inputHash: text('input_hash'),
+    frozenInputJson: text('frozen_input_json'),
+    errorMessage: text('error_message'),
+    // Result columns kept for backward compatibility with the pre-run schema.
     requirements: text('requirements'),
     responsibilities: text('responsibilities'),
     painPoints: text('pain_points'),
@@ -237,9 +246,15 @@ export const jobPostingAnalyses = sqliteTable(
     functionalEmphasisJson: text('functional_emphasis_json'),
     interviewQuestionsJson: text('interview_questions_json'),
     schemaVersion: text('schema_version'),
+    createdAt: text('created_at').notNull().default(''),
+    updatedAt: text('updated_at').notNull().default(''),
+    startedAt: text('started_at'),
+    completedAt: text('completed_at'),
   },
   (table) => [
-    uniqueIndex('job_posting_analyses_posting_unique_idx').on(table.jobPostingId),
+    uniqueIndex('job_posting_analyses_queue_job_unique_idx').on(table.queueJobId),
+    index('job_posting_analyses_posting_id_idx').on(table.jobPostingId, table.id),
+    index('job_posting_analyses_status_idx').on(table.status),
     index('job_posting_analyses_generated_idx').on(table.generatedAt),
   ],
 )
