@@ -1,11 +1,11 @@
 import { z } from 'zod'
 import { jobAnalysisSchema } from '../ai/schemas/job-analysis'
+import { followUpActionTypes, interviewRoundTypes } from './activities/constants'
 import {
   activeStatuses,
   applicationSortValues,
   applicationViews,
   type JobStatus,
-  matchLevels,
   priorities,
 } from './applications/constants'
 import { isISODate, isISOTimestamp } from './date'
@@ -58,7 +58,6 @@ export const quickCollectSchema = z.object({
   postedDate: isoDate,
   salary: optionalText(150),
   applicationSource: optionalText(150),
-  skills: optionalText(1000),
   jobPostText: optionalText(100000),
   parserModel: optionalText(100),
   parserPromptVersion: optionalText(50),
@@ -76,21 +75,23 @@ export const applicationSchema = z.object({
   postedDate: isoDate,
   priority: z.enum(priorities),
   appliedDate: z.preprocess(emptyToNull, isoDate.nullable()),
-  resumeVersion: optionalText(100),
-  matchLevel: z.preprocess(emptyToNull, z.enum(matchLevels).nullable()),
   applicationSource: optionalText(150),
   salary: optionalText(150),
   notes: optionalText(5000),
-  skills: optionalText(1000),
 })
 
 export const statusSchema = z.object({
   action: z.enum(['today', 'reject', 'archive', 'restore', 'applied']),
 })
-export const followUpSchema = z.object({ actionDate: isoDate, notes: optionalText(2000) })
+export const followUpSchema = z.object({
+  actionDate: isoDate,
+  actionType: z.enum(followUpActionTypes),
+  notes: optionalText(2000),
+})
 export const interviewSchema = z.object({
   interviewDate: isoDate,
   roundName: z.string().trim().min(1).max(150),
+  roundType: z.enum(interviewRoundTypes),
   notes: optionalText(2000),
 })
 export const contactSchema = z.object({
@@ -164,7 +165,6 @@ export const applicationAttributes = [
   'appliedDate',
   'targetDate',
   'source',
-  'matchLevel',
   'notes',
 ] as const
 export type ApplicationAttribute = (typeof applicationAttributes)[number]
@@ -177,7 +177,6 @@ export const applicationAttributeLabels: Record<ApplicationAttribute, string> = 
   appliedDate: 'Applied date',
   targetDate: 'Target date',
   source: 'Source',
-  matchLevel: 'Match level',
   notes: 'Notes',
 }
 export const defaultAttributes = [

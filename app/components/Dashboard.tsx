@@ -172,7 +172,7 @@ export function QuickCollect({
   jobAnalysis?: JobAnalysis
 }) {
   const query = enc(filters)
-  const { companies, skills } = listManagementData()
+  const { companies } = listManagementData()
   const profiles = listProfiles()
   return (
     <form
@@ -246,16 +246,6 @@ export function QuickCollect({
             name="applicationSource"
             value={values.applicationSource}
           />
-          <div class="sm:col-span-2">
-            <InputField
-              label="Skills"
-              name="skills"
-              value={values.skills}
-              placeholder="react, typescript, fhir"
-              error={error(errors, 'skills')}
-              list="skill-options"
-            />
-          </div>
         </div>
         {jobAnalysis ? <JobAnalysisDraft analysis={jobAnalysis} /> : null}
         <div class="card-actions mt-2 justify-end">
@@ -282,11 +272,6 @@ export function QuickCollect({
       <datalist id="company-options">
         {companies.map((company) => (
           <option value={company.name} />
-        ))}
-      </datalist>
-      <datalist id="skill-options">
-        {skills.map((skill) => (
-          <option value={skill.name} />
         ))}
       </datalist>
     </form>
@@ -550,8 +535,6 @@ function renderCell(job: JobCardData, attr: ApplicationAttribute) {
       return job.applyTodayTargetDate ? formatDisplayDate(job.applyTodayTargetDate) : '—'
     case 'source':
       return job.applicationSource || '—'
-    case 'matchLevel':
-      return job.matchLevel || '—'
     case 'notes':
       return <span class="block max-w-xs truncate">{job.notes || '—'}</span>
   }

@@ -1,4 +1,5 @@
 import type { Filters, JobCardData } from '../../../src/db/queries'
+import { followUpActionTypes, interviewRoundTypes } from '../../../src/lib/activities/constants'
 import { formatDisplayDate, todayISO } from '../../../src/lib/date'
 import type { FieldErrors } from '../../../src/lib/validation'
 import { InputField, TextareaField } from '../ui/FormField'
@@ -125,6 +126,14 @@ function ActivityForm({
         {interview && (
           <InputField label="Round" name="roundName" required error={errors?.roundName?.[0]} />
         )}
+        <label class="fieldset">
+          <legend class="fieldset-legend">{interview ? 'Round type' : 'Action type'}</legend>
+          <select class="select w-full" name={interview ? 'roundType' : 'actionType'}>
+            {(interview ? interviewRoundTypes : followUpActionTypes).map((type) => (
+              <option value={type}>{type}</option>
+            ))}
+          </select>
+        </label>
         <InputField
           label="Date"
           name={interview ? 'interviewDate' : 'actionDate'}

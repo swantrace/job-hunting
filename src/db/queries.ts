@@ -8,7 +8,7 @@ import {
   priorities,
   statuses,
 } from '../lib/applications/constants'
-import { todayISO } from '../lib/date'
+import { nowISO, todayISO } from '../lib/date'
 import { runStatuses } from '../lib/generation/constants'
 import {
   applicationKey,
@@ -67,12 +67,7 @@ import {
   skillAliases,
   skills,
 } from './schema'
-import {
-  type DbExecutor,
-  getOrCreateSkill,
-  insertSkill,
-  reconcileSkillNames,
-} from './skill-queries'
+import { type DbExecutor, getOrCreateSkill, insertSkill } from './skill-queries'
 
 export type Filters = z.infer<typeof filterSchema>
 export type JobCardData = JobApplication & {
@@ -83,15 +78,6 @@ export type JobCardData = JobApplication & {
   jobPosting?: typeof jobPostings.$inferSelect
   jobPostingAnalysis?: typeof jobPostingAnalyses.$inferSelect
 }
-
-const cleanSkills = (value?: string | null) => [
-  ...new Set(
-    (value ?? '')
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean),
-  ),
-]
 
 function controlledValue<const Values extends readonly string[], const Fallback>(
   values: Values,
@@ -122,10 +108,6 @@ function getOrCreateCompany(tx: DbExecutor, name: string, date: string) {
   return company
 }
 
-function replaceSkills(tx: DbExecutor, jobId: number, names: string[]) {
-  reconcileSkillNames(tx, jobId, names)
-}
-
 export function createApplication(input: z.infer<typeof quickCollectSchema>) {
   const date = todayISO()
   return db.transaction((tx) => {
@@ -148,7 +130,6 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
       })
       .returning({ id: jobApplications.id })
       .get()
-    replaceSkills(tx, result.id, cleanSkills(input.skills))
     const rawText = input.jobPostText?.trim()
     if (rawText) {
       const contentHash = createHash('sha256').update(rawText).digest('hex')
@@ -199,8 +180,6 @@ export function updateApplication(id: number, input: z.infer<typeof applicationS
         postedDate: input.postedDate,
         priority: input.priority,
         appliedDate: input.appliedDate ?? date,
-        resumeVersion: input.resumeVersion,
-        matchLevel: input.matchLevel,
         applicationSource: input.applicationSource,
         salary: input.salary,
         notes: input.notes,
@@ -209,7 +188,6 @@ export function updateApplication(id: number, input: z.infer<typeof applicationS
       })
       .where(eq(jobApplications.id, id))
       .run()
-    replaceSkills(tx, id, cleanSkills(input.skills))
     return true
   })
 }
@@ -1228,15 +1206,26 @@ export function changeStatus(
   return true
 }
 
-export function addFollowUp(id: number, input: { actionDate: string; notes?: string | null }) {
+export function addFollowUp(
+  id: number,
+  input: { actionDate: string; actionType?: string; notes?: string | null },
+) {
+  const date = nowISO()
   return db.transaction((tx) => {
     const job = tx.select().from(jobApplications).where(eq(jobApplications.id, id)).get()
     if (!job) return false
     tx.insert(followUps)
-      .values({ jobApplicationId: id, actionDate: input.actionDate, notes: input.notes })
+      .values({
+        jobApplicationId: id,
+        actionDate: input.actionDate,
+        actionType: input.actionType ?? 'other',
+        notes: input.notes,
+        createdAt: date,
+        updatedAt: date,
+      })
       .run()
     tx.update(jobApplications)
-      .set({ status: advanceStatus(job.status, 'Follow Up'), updatedAt: todayISO() })
+      .set({ status: advanceStatus(job.status, 'Follow Up'), updatedAt: date })
       .where(eq(jobApplications.id, id))
       .run()
     return true
@@ -1245,8 +1234,9 @@ export function addFollowUp(id: number, input: { actionDate: string; notes?: str
 
 export function addInterview(
   id: number,
-  input: { interviewDate: string; roundName: string; notes?: string | null },
+  input: { interviewDate: string; roundName: string; roundType?: string; notes?: string | null },
 ) {
+  const date = nowISO()
   return db.transaction((tx) => {
     const job = tx.select().from(jobApplications).where(eq(jobApplications.id, id)).get()
     if (!job) return false
@@ -1255,11 +1245,14 @@ export function addInterview(
         jobApplicationId: id,
         interviewDate: input.interviewDate,
         roundName: input.roundName,
+        roundType: input.roundType ?? 'other',
         notes: input.notes,
+        createdAt: date,
+        updatedAt: date,
       })
       .run()
     tx.update(jobApplications)
-      .set({ status: advanceStatus(job.status, 'Interviewing'), updatedAt: todayISO() })
+      .set({ status: advanceStatus(job.status, 'Interviewing'), updatedAt: date })
       .where(eq(jobApplications.id, id))
       .run()
     return true
