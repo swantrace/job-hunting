@@ -82,7 +82,7 @@ export async function parseJobDescription(
 ): Promise<ParsedJobResult> {
   const apiKey = env.OPENAI_API_KEY
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured')
-  const model = env.OPENAI_MODEL_JOB_PARSER ?? env.OPENAI_MODEL_DEFAULT ?? 'gpt-5-mini'
+  const model = env.OPENAI_MODEL_JOB_PARSER ?? env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
   const timeoutMs = parserTimeoutMs(env)
   let response: Response
   try {

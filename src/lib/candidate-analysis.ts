@@ -256,7 +256,7 @@ export async function runCandidateAnalysis(runId: number) {
   const result = await structuredCandidateFit({
     apiKey,
     model:
-      process.env.OPENAI_MODEL_CANDIDATE_FIT ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5-mini',
+      process.env.OPENAI_MODEL_CANDIDATE_FIT ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra',
     input: snapshot,
   })
   return validateCandidateAnalysisResult(result, snapshot)

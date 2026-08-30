@@ -55,7 +55,7 @@ export async function runDocumentReview(reviewId: number): Promise<DocumentRevie
       model:
         process.env.OPENAI_MODEL_DOCUMENT_REVIEW ??
         process.env.OPENAI_MODEL_DEFAULT ??
-        'gpt-5-mini',
+        'gpt-5.6-terra',
       input: [
         {
           role: 'system',

@@ -108,7 +108,7 @@ export async function enqueueCandidateAnalysis(
   if (reusable) return { run: reusable, reused: true }
 
   const model =
-    process.env.OPENAI_MODEL_CANDIDATE_FIT ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5-mini'
+    process.env.OPENAI_MODEL_CANDIDATE_FIT ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
   const run = createAnalysisRun({
     jobApplicationId,
     inputHash: built.inputHash,
