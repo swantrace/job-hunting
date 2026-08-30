@@ -168,7 +168,7 @@ export function confirmProfileSelection(runId: number, profileId: string) {
       .from(applicationAnalysisRuns)
       .where(eq(applicationAnalysisRuns.id, runId))
       .get()
-    if (!run) return false
+    if (!run || run.status !== 'Completed') return false
     tx.update(applicationAnalysisRuns)
       .set({ confirmedProfileId: profileId, profileConfirmedAt: date, updatedAt: date })
       .where(eq(applicationAnalysisRuns.id, runId))

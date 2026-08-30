@@ -44,6 +44,14 @@ describe('profile selection confirmation boundaries', () => {
       inputHash: 'current-hash',
     })
     mockCurrentCandidateAnalysisHash.mockReturnValue('current-hash')
+    mockGetCandidateAnalysisState.mockReturnValue({
+      state: 'current',
+      latest: { id: 1, status: 'Processing' },
+      latestCompleted: null,
+      currentCompleted: { id: 1, status: 'Processing' },
+      staleCompleted: null,
+      reasons: [],
+    })
     mockConfirmProfileSelection.mockClear()
 
     const response = await (await profileSelectionHarness()).request(
@@ -58,6 +66,14 @@ describe('profile selection confirmation boundaries', () => {
     expect(response.status).toBe(422)
     expect(mockConfirmProfileSelection).not.toHaveBeenCalled()
     mockGetAnalysisRun.mockReturnValue(null)
+    mockGetCandidateAnalysisState.mockReturnValue({
+      state: 'never-run',
+      latest: null,
+      latestCompleted: null,
+      currentCompleted: null,
+      staleCompleted: null,
+      reasons: [],
+    })
   })
 
   test('confirms a completed, non-stale run and updates the application direction', async () => {
