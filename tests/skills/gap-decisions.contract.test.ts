@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { drizzle } from 'drizzle-orm/bun-sqlite'
+import * as schema from '../../src/db/schema'
 import * as validation from '../../src/lib/validation'
+import { migratedDatabase } from '../support/sqlite'
 
 type SafeParseSchema = {
   safeParse: (value: unknown) => { success: boolean }
@@ -94,4 +97,58 @@ describe('planned explainable skill score contract', () => {
     expect(result.canonicalMatch.percentage).toBeNull()
     expect(result.applicationCoverage.percentage).toBeNull()
   })
+})
+
+const analysisDecisionsPath = resolve(process.cwd(), 'src/db/analysis-decisions.ts')
+const runDecisionTest = existsSync(analysisDecisionsPath) ? test : test.todo
+
+describe('planned run-scoped skill decision contract', () => {
+  runDecisionTest(
+    'validates pending, skip, and include with a mandatory include reason',
+    async () => {
+      const { runDecisionSchema } = await import(analysisDecisionsPath)
+      expect(runDecisionSchema.safeParse({ decision: 'pending', reason: null }).success).toBe(true)
+      expect(runDecisionSchema.safeParse({ decision: 'skip', reason: null }).success).toBe(true)
+      expect(runDecisionSchema.safeParse({ decision: 'include', reason: '' }).success).toBe(false)
+      expect(
+        runDecisionSchema.safeParse({
+          decision: 'include',
+          reason: 'Used Kafka in a personal event-processing prototype.',
+        }).success,
+      ).toBe(true)
+      expect(runDecisionSchema.safeParse({ decision: 'exclude' }).success).toBe(false)
+    },
+  )
+
+  runDecisionTest(
+    'scopes decisions to a candidate analysis run without auto-accepting',
+    async () => {
+      const sqlite = migratedDatabase()
+      try {
+        const db = drizzle({ client: sqlite, schema })
+        const { listRunDecisions, seedPendingRunDecisions, upsertRunDecision } = await import(
+          analysisDecisionsPath
+        )
+        const runA = 1
+        const runB = 2
+        const skillId = 1
+
+        seedPendingRunDecisions(db, runA, [skillId])
+        expect(
+          listRunDecisions(db, runA).map((item: { decision: string }) => item.decision),
+        ).toEqual(['pending'])
+        expect(listRunDecisions(db, runB)).toEqual([])
+
+        upsertRunDecision(db, { runId: runA, skillId, decision: 'skip', reason: null })
+        // A later run starts pending; the prior decision is a suggestion, not an
+        // inherited state.
+        seedPendingRunDecisions(db, runB, [skillId])
+        expect(
+          listRunDecisions(db, runB).map((item: { decision: string }) => item.decision),
+        ).toEqual(['pending'])
+      } finally {
+        sqlite.close()
+      }
+    },
+  )
 })

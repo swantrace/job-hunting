@@ -30,6 +30,32 @@ describe('application generation readiness', () => {
     expect(result.reasons.some((reason) => /stale/.test(reason))).toBe(true)
   })
 
+  test('blocks generation while a candidate analysis is still queued or processing', () => {
+    for (const analysisStatus of ['queued', 'processing'] as const) {
+      const result = assessApplicationReadiness({
+        hasReviewedAnalysis: true,
+        analysisStatus,
+        profileConfirmed: true,
+        hasPendingSkillDecisions: false,
+      })
+
+      expect(result.ready).toBe(false)
+      expect(result.reasons).toContain('Run candidate analysis to completion first.')
+    }
+  })
+
+  test('blocks generation after a failed candidate analysis instead of hiding it', () => {
+    const result = assessApplicationReadiness({
+      hasReviewedAnalysis: true,
+      analysisStatus: 'failed',
+      profileConfirmed: true,
+      hasPendingSkillDecisions: false,
+    })
+
+    expect(result.ready).toBe(false)
+    expect(result.reasons).toContain('Run candidate analysis to completion first.')
+  })
+
   test('is ready only when every condition is satisfied', () => {
     const result = assessApplicationReadiness({
       hasReviewedAnalysis: true,

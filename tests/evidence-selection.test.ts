@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { GenerationSource } from '../src/db/generation'
 import { loadCareerData } from '../src/lib/career-data'
@@ -256,5 +257,40 @@ describe('evidence selection snapshots', () => {
     expect(snapshot.fitRecommendation).toBe('apply')
     expect(snapshot.requirementCoverage.directCoverage.matchedWeight).toBe(3)
     expect(snapshot.selectedEvidenceByRequirement['101']).toEqual(['achievement:example-delivery'])
+  })
+})
+
+const generationInputPath = resolve(process.cwd(), 'src/lib/generation-input.ts')
+const generationInputTest = existsSync(generationInputPath) ? test : test.todo
+
+describe('documents freshness from frozen evidence', () => {
+  generationInputTest(
+    'changes the documents input hash when a frozen decision flips inside the snapshot',
+    async () => {
+      const { canonicalGenerationInputHash } = await import(generationInputPath)
+      const base = {
+        candidateAnalysisRunId: 1,
+        candidateAnalysisInputHash: 'candidate-hash',
+        confirmedProfileId: 'fullstack',
+        decisions: [{ skillId: 2, decision: 'skip' }],
+        reasons: [],
+        evidenceHash: 'evidence-hash',
+        generationPromptVersion: '2.1.0',
+        generationSchemaVersion: '2.1.0',
+        resumeModel: 'gpt-5.6-sol',
+        coverLetterModel: 'gpt-5.6-terra',
+      }
+      const included = canonicalGenerationInputHash({
+        ...base,
+        decisions: [{ skillId: 2, decision: 'include' }],
+        reasons: [{ skillId: 2, reason: 'Used in a personal prototype.' }],
+      })
+      expect(included).not.toBe(canonicalGenerationInputHash(base))
+    },
+  )
+
+  generationInputTest('keeps the full evidence snapshot as the provenance artifact', async () => {
+    const { currentGenerationInputHash } = await import(generationInputPath)
+    expect(typeof currentGenerationInputHash).toBe('function')
   })
 })
