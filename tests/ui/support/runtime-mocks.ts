@@ -139,6 +139,14 @@ mock.module('../../../src/db/analysis', () => ({
 export const mockLoadReviewData = mock((): any => ({
   job: mockJob,
   run: null,
+  state: {
+    state: 'never-run',
+    latest: null,
+    latestCompleted: null,
+    currentCompleted: null,
+    staleCompleted: null,
+    reasons: [],
+  },
   requirements: [],
   profiles: [],
 }))
@@ -189,6 +197,14 @@ export const mockGetCandidateAnalysisState = mock((): any => ({
 mock.module('../../../src/lib/candidate-analysis', () => ({
   currentCandidateAnalysisHash: mockCurrentCandidateAnalysisHash,
   getCandidateAnalysisState: mockGetCandidateAnalysisState,
+}))
+
+export const mockSkipRemainingRunDecisions = mock((): any => {})
+export const mockDecideRunSkill = mock((): any => {})
+
+mock.module('../../../src/db/analysis-decision-service', () => ({
+  skipRemainingRunDecisions: mockSkipRemainingRunDecisions,
+  decideRunSkill: mockDecideRunSkill,
 }))
 
 mock.module('../../../src/lib/profiles', () => ({

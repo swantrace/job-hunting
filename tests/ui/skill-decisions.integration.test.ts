@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { recordsFor } from './support/html-contract'
 import {
   mockGetApplicationSkillRequirement,
+  mockGetCandidateAnalysisState,
   mockListApplicationSkillRequirements,
 } from './support/runtime-mocks'
 
@@ -51,6 +52,14 @@ describe('skill decision HTMX response boundaries', () => {
   test('returns the review panel and score fragments on a valid decision', async () => {
     mockListApplicationSkillRequirements.mockReturnValue([requirement])
     mockGetApplicationSkillRequirement.mockReturnValue(requirement)
+    mockGetCandidateAnalysisState.mockReturnValue({
+      state: 'current',
+      latest: { id: 1, status: 'Completed' },
+      latestCompleted: { id: 1, status: 'Completed' },
+      currentCompleted: { id: 1, status: 'Completed' },
+      staleCompleted: null,
+      reasons: [],
+    })
 
     const response = await submit('skip')
     const html = await response.text()
@@ -64,6 +73,14 @@ describe('skill decision HTMX response boundaries', () => {
 
   test('returns only the decision form on a 422 and retargets the swap', async () => {
     mockGetApplicationSkillRequirement.mockReturnValue(requirement)
+    mockGetCandidateAnalysisState.mockReturnValue({
+      state: 'current',
+      latest: { id: 1, status: 'Completed' },
+      latestCompleted: { id: 1, status: 'Completed' },
+      currentCompleted: { id: 1, status: 'Completed' },
+      staleCompleted: null,
+      reasons: [],
+    })
 
     const response = await submit('include', { reason: '' })
     const html = await response.text()

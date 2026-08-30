@@ -87,7 +87,7 @@ export function WorkspaceShell({
           filters={filters}
           requirements={requirements}
           careerEvidence={careerEvidence}
-          analysisRun={review.run}
+          state={review.state}
           jobRequirements={review.requirements}
           profiles={review.profiles}
         />

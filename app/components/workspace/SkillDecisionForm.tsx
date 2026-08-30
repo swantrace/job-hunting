@@ -7,11 +7,13 @@ export function SkillDecisionForm({
   filters,
   requirement,
   error,
+  canDecide = true,
 }: {
   job: JobCardData
   filters: Filters
   requirement: ApplicationSkillRequirement
   error?: string
+  canDecide?: boolean
 }) {
   const decided = requirement.userDecision === 'skip' || requirement.userDecision === 'include'
   if (decided && !error) {
@@ -39,11 +41,13 @@ export function SkillDecisionForm({
     >
       <input type="hidden" name="skillId" value={requirement.skillId} />
       <div class="flex flex-wrap items-center justify-end gap-2">
-        <button name="action" value="skip" class="btn btn-ghost btn-sm">
+        <button name="action" value="skip" class="btn btn-ghost btn-sm" disabled={!canDecide}>
           Skip
         </button>
         <details class="dropdown dropdown-end">
-          <summary class="btn btn-outline btn-sm">Include for this application</summary>
+          <summary class="btn btn-outline btn-sm" tabindex={canDecide ? 0 : -1}>
+            Include for this application
+          </summary>
           <div class="dropdown-content z-30 mt-2 w-80 rounded-box border border-base-300 bg-base-100 p-3 shadow-lg">
             <label class="label" for={`include-reason-${requirement.skillId}`}>
               <span>
@@ -57,12 +61,22 @@ export function SkillDecisionForm({
               class="textarea textarea-sm w-full"
               placeholder="e.g. Used this in a personal prototype with retry handling."
             />
-            <button name="action" value="include" class="btn btn-primary btn-sm mt-2 w-full">
+            <button
+              name="action"
+              value="include"
+              class="btn btn-primary btn-sm mt-2 w-full"
+              disabled={!canDecide}
+            >
               Include
             </button>
           </div>
         </details>
       </div>
+      {!canDecide ? (
+        <p class="mt-1 text-xs text-base-content/60">
+          Re-run candidate analysis to update decisions.
+        </p>
+      ) : null}
       {error ? (
         <p role="alert" class="mt-2 text-sm text-error">
           {error}

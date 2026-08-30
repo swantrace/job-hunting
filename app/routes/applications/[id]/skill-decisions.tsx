@@ -1,6 +1,8 @@
 import { createRoute } from 'honox/factory'
-import { listRunDecisions, upsertRunDecision } from '../../../../src/db/analysis-decisions'
-import { db } from '../../../../src/db/client'
+import {
+  decideRunSkill,
+  skipRemainingRunDecisions,
+} from '../../../../src/db/analysis-decision-service'
 import type { Filters } from '../../../../src/db/queries'
 import { getApplication, type JobCardData } from '../../../../src/db/queries'
 import {
@@ -39,20 +41,13 @@ export const POST = createRoute(async (c) => {
 
   const raw = await parseForm(c)
   const runId = currentRunId(id)
+  if (!runId) {
+    c.header('HX-Retarget', '#skill-review-panel')
+    return c.html(reviewPanel(job, filters, id), 422)
+  }
   if (raw.action === 'skip-remaining') {
     skipRemainingSkillDecisions(id)
-    if (runId) {
-      for (const decision of listRunDecisions(db, runId)) {
-        if (decision.decision === 'pending') {
-          upsertRunDecision(db, {
-            runId,
-            skillId: decision.skillId,
-            decision: 'skip',
-            reason: null,
-          })
-        }
-      }
-    }
+    if (runId) skipRemainingRunDecisions(runId)
     return c.html(reviewPanel(job, filters, id))
   }
 
@@ -78,6 +73,6 @@ export const POST = createRoute(async (c) => {
   const decision = parsed.data.action
   const reason = parsed.data.reason.trim() || null
   updateSkillDecision(id, skillId, decision, reason)
-  if (runId) upsertRunDecision(db, { runId, skillId, decision, reason })
+  if (runId) decideRunSkill({ runId, skillId, decision, reason })
   return c.html(reviewPanel(job, filters, id))
 })
