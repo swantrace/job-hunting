@@ -30,6 +30,7 @@ export const importPayloadSchema = z
     jobRequirements: z.array(record).default([]),
     jobRequirementsToSkills: z.array(record).default([]),
     applicationAnalysisRuns: z.array(record).default([]),
+    analysisRunDecisions: z.array(record).default([]),
     generationRuns: z.array(record).default([]),
     generationRunResults: z.array(record).default([]),
     documentReviews: z.array(record).default([]),
