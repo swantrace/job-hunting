@@ -44,6 +44,9 @@ export const companies = sqliteTable(
     name: text('name').notNull(),
     website: text('website'),
     createdAt: text('created_at').notNull(),
+    // Added during the canonical expand step; backfilled and made NOT NULL in
+    // the destructive contract migration.
+    updatedAt: text('updated_at'),
   },
   (table) => [uniqueIndex('companies_name_nocase_idx').on(sql`lower(${table.name})`)],
 )
@@ -135,6 +138,8 @@ export const contacts = sqliteTable(
     name: text('name').notNull(),
     email: text('email'),
     linkedinUrl: text('linkedin_url'),
+    createdAt: text('created_at'),
+    updatedAt: text('updated_at'),
   },
   (table) => [
     index('contacts_company_idx').on(table.companyId),
@@ -198,6 +203,9 @@ export const jobPostings = sqliteTable(
     jobApplicationId: integer('job_application_id')
       .notNull()
       .references(() => jobApplications.id, { onDelete: 'cascade' }),
+    // Immutable content version, unique within each application. Legacy rows
+    // backfill to version 1 in the expand migration.
+    version: integer('version').notNull().default(1),
     rawText: text('raw_text').notNull(),
     capturedAt: text('captured_at').notNull(),
     contentHash: text('content_hash').notNull(),
@@ -206,7 +214,11 @@ export const jobPostings = sqliteTable(
     parserPromptVersion: text('parser_prompt_version'),
   },
   (table) => [
-    uniqueIndex('job_postings_application_unique_idx').on(table.jobApplicationId),
+    uniqueIndex('job_postings_application_version_unique_idx').on(
+      table.jobApplicationId,
+      table.version,
+    ),
+    index('job_postings_application_hash_idx').on(table.jobApplicationId, table.contentHash),
     index('job_postings_content_hash_idx').on(table.contentHash),
   ],
 )
@@ -246,6 +258,9 @@ export const jobPostingAnalyses = sqliteTable(
     functionalEmphasisJson: text('functional_emphasis_json'),
     interviewQuestionsJson: text('interview_questions_json'),
     schemaVersion: text('schema_version'),
+    // Validated JSON of the full combined Job Analysis result. Populated by the
+    // canonical persistence path; legacy column stores remain during expand.
+    resultJson: text('result_json'),
     createdAt: text('created_at').notNull().default(''),
     updatedAt: text('updated_at').notNull().default(''),
     startedAt: text('started_at'),
@@ -256,6 +271,9 @@ export const jobPostingAnalyses = sqliteTable(
     index('job_posting_analyses_posting_id_idx').on(table.jobPostingId, table.id),
     index('job_posting_analyses_status_idx').on(table.status),
     index('job_posting_analyses_generated_idx').on(table.generatedAt),
+    uniqueIndex('job_posting_analyses_inflight_unique_idx')
+      .on(table.jobPostingId, table.inputHash)
+      .where(sql`${table.status} in ('Queued', 'Processing')`),
   ],
 )
 
@@ -316,8 +334,17 @@ export const jobRequirementsToSkills = sqliteTable(
     skillId: integer('skill_id')
       .notNull()
       .references(() => skills.id, { onDelete: 'cascade' }),
+    // Exact label and parser confidence for this requirement-skill mapping.
+    rawLabel: text('raw_label'),
+    confidence: real('confidence'),
   },
-  (table) => [primaryKey({ columns: [table.jobRequirementId, table.skillId] })],
+  (table) => [
+    primaryKey({ columns: [table.jobRequirementId, table.skillId] }),
+    check(
+      'job_requirements_to_skills_confidence_check',
+      sql`${table.confidence} is null or (${table.confidence} >= 0 and ${table.confidence} <= 1)`,
+    ),
+  ],
 )
 
 export const applicationAnalysisRuns = sqliteTable(
@@ -327,6 +354,12 @@ export const applicationAnalysisRuns = sqliteTable(
     jobApplicationId: integer('job_application_id')
       .notNull()
       .references(() => jobApplications.id, { onDelete: 'cascade' }),
+    // Exact Job Analysis run this Candidate run consumes. Nullable during the
+    // expand step; made required after the destructive reset.
+    jobPostingAnalysisId: integer('job_posting_analysis_id').references(
+      () => jobPostingAnalyses.id,
+      { onDelete: 'cascade' },
+    ),
     status: text('status', { enum: runStatuses }).notNull().default('Queued'),
     queueJobId: text('queue_job_id').notNull(),
     attempts: integer('attempts').notNull().default(0),
@@ -356,6 +389,7 @@ export const applicationAnalysisRuns = sqliteTable(
       table.createdAt,
     ),
     index('application_analysis_runs_status_idx').on(table.status),
+    index('application_analysis_runs_job_posting_analysis_idx').on(table.jobPostingAnalysisId),
   ],
 )
 
@@ -450,6 +484,12 @@ export const generationRuns = sqliteTable(
     jobApplicationId: integer('job_application_id')
       .notNull()
       .references(() => jobApplications.id, { onDelete: 'cascade' }),
+    // Exact Candidate Analysis run this generation consumes. Nullable during
+    // the expand step; made required after the destructive reset.
+    applicationAnalysisRunId: integer('application_analysis_run_id').references(
+      () => applicationAnalysisRuns.id,
+      { onDelete: 'cascade' },
+    ),
     status: text('status', { enum: runStatuses }).notNull().default('Queued'),
     queueJobId: text('queue_job_id').notNull(),
     attempts: integer('attempts').notNull().default(0),
@@ -475,6 +515,12 @@ export const generationRuns = sqliteTable(
     uniqueIndex('generation_runs_queue_job_unique_idx').on(table.queueJobId),
     index('generation_runs_application_created_idx').on(table.jobApplicationId, table.createdAt),
     index('generation_runs_status_idx').on(table.status),
+    index('generation_runs_application_analysis_run_idx').on(table.applicationAnalysisRunId),
+    uniqueIndex('generation_runs_inflight_unique_idx')
+      .on(table.applicationAnalysisRunId, table.inputHash)
+      .where(
+        sql`${table.status} in ('Queued', 'Processing') and ${table.applicationAnalysisRunId} is not null`,
+      ),
   ],
 )
 
@@ -654,10 +700,17 @@ export const jobApplicationsToContacts = sqliteTable(
     contactId: integer('contact_id')
       .notNull()
       .references(() => contacts.id, { onDelete: 'cascade' }),
+    relationshipType: text('relationship_type'),
+    isPrimary: integer('is_primary', { mode: 'boolean' }),
+    notes: text('notes'),
+    createdAt: text('created_at'),
   },
   (table) => [
     primaryKey({ columns: [table.jobApplicationId, table.contactId] }),
     index('job_applications_to_contacts_contact_idx').on(table.contactId),
+    uniqueIndex('job_applications_to_contacts_primary_unique_idx')
+      .on(table.jobApplicationId)
+      .where(sql`${table.isPrimary} = 1`),
   ],
 )
 
@@ -669,7 +722,10 @@ export const followUps = sqliteTable(
       .notNull()
       .references(() => jobApplications.id, { onDelete: 'cascade' }),
     actionDate: text('action_date').notNull(),
+    actionType: text('action_type'),
     notes: text('notes'),
+    createdAt: text('created_at'),
+    updatedAt: text('updated_at'),
   },
   (table) => [index('follow_ups_job_date_idx').on(table.jobApplicationId, table.actionDate)],
 )
@@ -683,7 +739,10 @@ export const interviews = sqliteTable(
       .references(() => jobApplications.id, { onDelete: 'cascade' }),
     interviewDate: text('interview_date').notNull(),
     roundName: text('round_name').notNull(),
+    roundType: text('round_type'),
     notes: text('notes'),
+    createdAt: text('created_at'),
+    updatedAt: text('updated_at'),
   },
   (table) => [index('interviews_job_date_idx').on(table.jobApplicationId, table.interviewDate)],
 )
