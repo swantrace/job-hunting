@@ -1,6 +1,9 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
+import { applicationGenerationSchemaVersion } from '../ai/schemas/application-generation'
+import { type AnalysisRunState, classifyAnalysisRunState } from '../lib/analysis-run-state'
 import { todayISO } from '../lib/date'
 import type { GeneratedArtifactType } from '../lib/generation/constants'
+import { buildGenerationInput, generationStalenessReasons } from '../lib/generation-input'
 import { listAnalysisRuns } from './analysis'
 import { db } from './client'
 import { listJobRequirements } from './job-analysis'
@@ -43,25 +46,97 @@ export type GenerationSource = {
   companyInterestNote: string | null
 }
 
-export function createGenerationRun(jobApplicationId: number) {
+export type CreateGenerationRunInput = {
+  jobApplicationId: number
+  inputHash: string
+  frozenInputJson: string
+  resumeModel: string
+  coverLetterModel: string
+  promptVersion: string
+  schemaVersion: string
+}
+
+export function createGenerationRun(input: CreateGenerationRunInput) {
   const application = db
     .select({ id: jobApplications.id })
     .from(jobApplications)
-    .where(eq(jobApplications.id, jobApplicationId))
+    .where(eq(jobApplications.id, input.jobApplicationId))
     .get()
   if (!application) return null
   const date = todayISO()
   return db
     .insert(generationRuns)
     .values({
-      jobApplicationId,
+      jobApplicationId: input.jobApplicationId,
       queueJobId: `generation-${crypto.randomUUID()}`,
       status: 'Queued',
+      inputHash: input.inputHash,
+      frozenInputJson: input.frozenInputJson,
+      resumeModel: input.resumeModel,
+      coverLetterModel: input.coverLetterModel,
+      promptVersion: input.promptVersion,
+      schemaVersion: input.schemaVersion,
       createdAt: date,
       updatedAt: date,
     })
     .returning()
     .get()
+}
+
+export type GenerationState = {
+  state: AnalysisRunState
+  latest: GenerationRun | null
+  latestCompleted: GenerationRun | null
+  currentCompleted: GenerationRun | null
+  staleCompleted: GenerationRun | null
+  reasons: string[]
+}
+
+function parseSnapshot(json: string | null): unknown {
+  if (!json) return null
+  try {
+    return JSON.parse(json)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Classifies one application's document-generation history against current
+ * inputs. A failed latest attempt never hides an older completed generation,
+ * and stale generations carry controlled reason codes.
+ */
+export function getGenerationState(jobApplicationId: number): GenerationState {
+  const runs = listGenerationRuns(jobApplicationId)
+  const currentInput = buildGenerationInput(jobApplicationId)
+  const result = classifyAnalysisRunState(
+    runs.map((run) => ({
+      id: run.id,
+      status: run.status,
+      inputHash: run.inputHash,
+      schemaVersion: run.schemaVersion,
+    })),
+    currentInput?.inputHash ?? null,
+    applicationGenerationSchemaVersion,
+  )
+  const byId = new Map(runs.map((run) => [run.id, run]))
+  const resolve = (id: number | null | undefined) => (id == null ? null : (byId.get(id) ?? null))
+  const staleCompleted = resolve(result.staleCompleted?.id)
+  let reasons: string[] = []
+  if (result.state === 'stale' && staleCompleted && currentInput) {
+    reasons = generationStalenessReasons(
+      currentInput.snapshot,
+      parseSnapshot(staleCompleted.frozenInputJson),
+    )
+  }
+  return {
+    state: result.state,
+    latest: resolve(result.latest?.id),
+    latestCompleted: resolve(result.latestCompleted?.id),
+    currentCompleted: resolve(result.currentCompleted?.id),
+    staleCompleted,
+    reasons,
+  }
 }
 
 export function createBaselineGenerationRun(input: {

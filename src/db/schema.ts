@@ -453,6 +453,14 @@ export const generationRuns = sqliteTable(
     status: text('status', { enum: runStatuses }).notNull().default('Queued'),
     queueJobId: text('queue_job_id').notNull(),
     attempts: integer('attempts').notNull().default(0),
+    // Generation input identity, frozen before queueing. Existing rows without
+    // identity remain viewable legacy records.
+    inputHash: text('input_hash'),
+    frozenInputJson: text('frozen_input_json'),
+    resumeModel: text('resume_model'),
+    coverLetterModel: text('cover_letter_model'),
+    promptVersion: text('prompt_version'),
+    schemaVersion: text('schema_version'),
     errorMessage: text('error_message'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),

@@ -16,6 +16,7 @@ import {
   markBaselineGenerationRunProcessing,
   markGenerationRunProcessing,
 } from '../db/generation'
+import { buildGenerationInput } from './generation-input'
 
 type GenerationQueueJob = { runId: number }
 
@@ -125,7 +126,17 @@ export async function startGenerationWorker() {
 }
 
 export async function enqueueGeneration(jobApplicationId: number) {
-  const run = createGenerationRun(jobApplicationId)
+  const built = buildGenerationInput(jobApplicationId)
+  if (!built) return null
+  const run = createGenerationRun({
+    jobApplicationId,
+    inputHash: built.inputHash,
+    frozenInputJson: JSON.stringify(built.snapshot),
+    resumeModel: built.snapshot.resumeModel,
+    coverLetterModel: built.snapshot.coverLetterModel,
+    promptVersion: built.snapshot.generationPromptVersion,
+    schemaVersion: built.snapshot.generationSchemaVersion,
+  })
   if (!run) return null
   const persistentQueue = await getQueue()
   if (!persistentQueue) {

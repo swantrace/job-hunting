@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { evidenceSourceTypes } from '../../lib/evidence/constants'
 
+export const applicationGenerationSchemaVersion = '2.1.0'
+
 const text = z.string().trim().min(1).max(2200)
 const companyInterestSources = ['job-posting', 'user-note'] as const
 
