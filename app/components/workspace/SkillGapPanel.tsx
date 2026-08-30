@@ -1,5 +1,5 @@
 import type { Filters, JobCardData } from '../../../src/db/queries'
-import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
+import type { RunSkillReview } from '../../../src/db/skill-queries'
 import { calculateSkillScores } from '../../../src/lib/skills/score'
 import { skillCategoryDefinitions, skillCategoryLabel } from '../../../src/lib/skills/taxonomy'
 import { query } from './helpers'
@@ -12,13 +12,13 @@ function categoryLabel(category: string | 'uncategorized' | null) {
     : 'Uncategorized'
 }
 
-function groupRequirements(requirements: ApplicationSkillRequirement[]) {
-  const byCategory = new Map<string, ApplicationSkillRequirement[]>()
+function groupRequirements(requirements: RunSkillReview[]) {
+  const byCategory = new Map<string, RunSkillReview[]>()
   const categoryOrder = new Map(
     skillCategoryDefinitions().map((item) => [item.key, item.sortOrder]),
   )
   for (const requirement of requirements) {
-    const key = requirement.skillCategory ?? 'uncategorized'
+    const key = requirement.category ?? 'uncategorized'
     const list = byCategory.get(key) ?? []
     list.push(requirement)
     byCategory.set(key, list)
@@ -47,13 +47,19 @@ export function SkillGapPanel({
 }: {
   job: JobCardData
   filters: Filters
-  requirements: ApplicationSkillRequirement[]
+  requirements: RunSkillReview[]
   careerEvidence: Record<string, string[]>
   canDecide?: boolean
 }) {
-  const scores = calculateSkillScores(requirements)
+  const scores = calculateSkillScores(
+    requirements.map((item) => ({
+      analysisResult: item.analysisResult,
+      importance: item.importance,
+      userDecision: item.decision,
+    })),
+  )
   const pendingCount = requirements.filter(
-    (item) => item.analysisResult === 'not-in-career-data' && item.userDecision === 'pending',
+    (item) => item.analysisResult === 'not-in-career-data' && item.decision === 'pending',
   ).length
   const groups = groupRequirements(requirements)
 
@@ -129,11 +135,9 @@ export function SkillGapPanel({
                               ? ` · from “${requirement.rawLabel}”`
                               : ''}
                           </p>
-                          {requirement.sourceText && (
-                            <p class="mt-1 text-xs italic text-base-content/60">
-                              “{requirement.sourceText}”
-                            </p>
-                          )}
+                          <p class="mt-1 text-xs italic text-base-content/60">
+                            {requirement.requirementStatement}
+                          </p>
                         </div>
                         {requirement.analysisResult === 'proven-match' ? (
                           <ProvenMatch

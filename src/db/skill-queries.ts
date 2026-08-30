@@ -1,10 +1,17 @@
 import { and, asc, desc, eq, inArray, notInArray } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
-import type { SkillImportance, SkillOrigin, SkillReviewStatus } from '../lib/skills/constants'
+import type {
+  SkillDecision,
+  SkillImportance,
+  SkillMatchResult,
+  SkillOrigin,
+  SkillReviewStatus,
+} from '../lib/skills/constants'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
 import type { SkillCategory } from '../lib/skills/taxonomy'
 import { db } from './client'
 import {
+  analysisRunDecisions,
   jobApplicationsToSkills,
   jobPostingAnalyses,
   jobPostings,
@@ -297,62 +304,6 @@ export function listApplicationSkillRequirements(jobId: number): ApplicationSkil
   })
 }
 
-export function getApplicationSkillRequirement(
-  jobId: number,
-  skillId: number,
-): ApplicationSkillRequirement | undefined {
-  return listApplicationSkillRequirements(jobId).find((item) => item.skillId === skillId)
-}
-
-export function updateSkillDecision(
-  jobId: number,
-  skillId: number,
-  decision: 'skip' | 'include',
-  reason: string | null,
-) {
-  db.update(jobApplicationsToSkills)
-    .set({
-      userDecision: decision,
-      decisionReason: decision === 'include' ? reason : null,
-      updatedAt: todayISO(),
-    })
-    .where(
-      and(
-        eq(jobApplicationsToSkills.jobApplicationId, jobId),
-        eq(jobApplicationsToSkills.skillId, skillId),
-      ),
-    )
-    .run()
-}
-
-export function skipRemainingSkillDecisions(jobId: number) {
-  db.update(jobApplicationsToSkills)
-    .set({ userDecision: 'skip', decisionReason: null, updatedAt: todayISO() })
-    .where(
-      and(
-        eq(jobApplicationsToSkills.jobApplicationId, jobId),
-        eq(jobApplicationsToSkills.analysisResult, 'not-in-career-data'),
-        eq(jobApplicationsToSkills.userDecision, 'pending'),
-      ),
-    )
-    .run()
-}
-
-export function hasPendingSkillDecisions(jobId: number) {
-  return !!db
-    .select({ skillId: jobApplicationsToSkills.skillId })
-    .from(jobApplicationsToSkills)
-    .where(
-      and(
-        eq(jobApplicationsToSkills.jobApplicationId, jobId),
-        eq(jobApplicationsToSkills.analysisResult, 'not-in-career-data'),
-        eq(jobApplicationsToSkills.userDecision, 'pending'),
-      ),
-    )
-    .limit(1)
-    .get()
-}
-
 export type RequirementSkillMapping = {
   skillId: number
   skillName: string
@@ -429,4 +380,41 @@ export function listApplicationSkills(
     .get()
   if (!analysis) return []
   return listRequirementSkillMappings(analysis.id, executor)
+}
+
+export type RunSkillReview = RequirementSkillMapping & {
+  analysisResult: SkillMatchResult
+  decision: SkillDecision
+  decisionReason: string | null
+}
+
+/**
+ * Run-scoped skill review projection for the Review workspace. Combines the
+ * exact Job Analysis run's requirement-skill mappings with that run's pending
+ * Skip/Include decisions. "Proven" is derived from the canonical skill's
+ * career-skill link; decisions belong only to the referenced run.
+ */
+export function listRunSkillReviews(runId: number, executor: DbExecutor = db): RunSkillReview[] {
+  const run = executor
+    .select({ jobPostingAnalysisId: jobPostingAnalyses.id })
+    .from(jobPostingAnalyses)
+    .where(eq(jobPostingAnalyses.id, runId))
+    .get()
+  if (!run) return []
+  const mappings = listRequirementSkillMappings(run.jobPostingAnalysisId, executor)
+  const decisions = executor
+    .select()
+    .from(analysisRunDecisions)
+    .where(eq(analysisRunDecisions.applicationAnalysisRunId, runId))
+    .all()
+  const decisionBySkill = new Map(decisions.map((decision) => [decision.skillId, decision]))
+  return mappings.map((mapping) => {
+    const decision = decisionBySkill.get(mapping.skillId)
+    return {
+      ...mapping,
+      analysisResult: mapping.careerSkillId ? 'proven-match' : 'not-in-career-data',
+      decision: decision?.decision ?? 'pending',
+      decisionReason: decision?.reason ?? null,
+    }
+  })
 }

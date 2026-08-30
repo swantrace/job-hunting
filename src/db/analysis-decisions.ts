@@ -2,7 +2,13 @@ import { and, desc, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { todayISO } from '../lib/date'
 import type { db } from './client'
-import { type AnalysisRunDecision, analysisRunDecisions } from './schema'
+import {
+  type AnalysisRunDecision,
+  analysisRunDecisions,
+  applicationAnalysisRuns,
+  jobPostingAnalyses,
+  jobPostings,
+} from './schema'
 
 export type DecisionDb = Pick<typeof db, 'select' | 'insert' | 'delete' | 'update'>
 
@@ -50,14 +56,48 @@ export function getRunDecision(
   )
 }
 
-/** Latest prior decision for a skill, matched by canonical skill ID only. */
+/**
+ * Latest prior decision for a skill, matched by canonical skill ID and
+ * restricted to the same application lineage (Job Analysis -> Job Post ->
+ * application), never across unrelated applications.
+ */
 export function findPriorDecision(db: DecisionDb, runId: number, skillId: number) {
+  const lineage = db
+    .select({ jobApplicationId: jobPostings.jobApplicationId })
+    .from(applicationAnalysisRuns)
+    .innerJoin(
+      jobPostingAnalyses,
+      eq(applicationAnalysisRuns.jobPostingAnalysisId, jobPostingAnalyses.id),
+    )
+    .innerJoin(jobPostings, eq(jobPostingAnalyses.jobPostingId, jobPostings.id))
+    .where(eq(applicationAnalysisRuns.id, runId))
+    .get()
+  if (!lineage) return null
   return (
     db
-      .select()
+      .select({
+        id: analysisRunDecisions.id,
+        applicationAnalysisRunId: analysisRunDecisions.applicationAnalysisRunId,
+        skillId: analysisRunDecisions.skillId,
+        decision: analysisRunDecisions.decision,
+        reason: analysisRunDecisions.reason,
+        previousDecisionId: analysisRunDecisions.previousDecisionId,
+        createdAt: analysisRunDecisions.createdAt,
+        updatedAt: analysisRunDecisions.updatedAt,
+      })
       .from(analysisRunDecisions)
+      .innerJoin(
+        applicationAnalysisRuns,
+        eq(analysisRunDecisions.applicationAnalysisRunId, applicationAnalysisRuns.id),
+      )
+      .innerJoin(
+        jobPostingAnalyses,
+        eq(applicationAnalysisRuns.jobPostingAnalysisId, jobPostingAnalyses.id),
+      )
+      .innerJoin(jobPostings, eq(jobPostingAnalyses.jobPostingId, jobPostings.id))
       .where(
         and(
+          eq(jobPostings.jobApplicationId, lineage.jobApplicationId),
           eq(analysisRunDecisions.skillId, skillId),
           sql`${analysisRunDecisions.applicationAnalysisRunId} < ${runId}`,
         ),

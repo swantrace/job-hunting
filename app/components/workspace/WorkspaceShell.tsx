@@ -6,7 +6,6 @@ import {
 } from '../../../src/db/generation'
 import type { Filters, JobCardData } from '../../../src/db/queries'
 import { loadReviewData } from '../../../src/db/review-data'
-import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
 import { getApplicationReadiness } from '../../../src/lib/application-readiness'
 import type { FieldErrors } from '../../../src/lib/validation'
 import type { WorkspaceTab } from '../../../src/lib/workspace/constants'
@@ -24,7 +23,6 @@ export function WorkspaceShell({
   job,
   filters,
   activity,
-  requirements = [],
   careerEvidence = {},
   activeTab = 'application',
   availability,
@@ -34,7 +32,6 @@ export function WorkspaceShell({
   job: JobCardData
   filters: Filters
   activity: ReturnType<typeof import('../../../src/db/queries').getActivity>
-  requirements?: ApplicationSkillRequirement[]
   careerEvidence?: Record<string, string[]>
   activeTab?: WorkspaceTab
   availability: TabAvailability[]
@@ -88,7 +85,7 @@ export function WorkspaceShell({
         <ReviewPanel
           job={job}
           filters={filters}
-          requirements={requirements}
+          requirements={review.requirementSkills}
           careerEvidence={careerEvidence}
           state={review.state}
           jobRequirements={review.requirements}

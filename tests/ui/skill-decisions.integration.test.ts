@@ -1,30 +1,24 @@
 import { describe, expect, test } from 'bun:test'
 import { Hono } from 'hono'
 import { recordsFor } from './support/html-contract'
-import {
-  mockGetApplicationSkillRequirement,
-  mockGetCandidateAnalysisState,
-  mockListApplicationSkillRequirements,
-} from './support/runtime-mocks'
+import { mockGetCandidateAnalysisState, mockListRunSkillReviews } from './support/runtime-mocks'
 
 const requirement = {
-  jobApplicationId: 7,
   skillId: 12,
-  rawLabel: 'Apache Kafka',
-  sourceText: 'Experience building event-driven systems with Kafka',
-  importance: 'required',
-  parserConfidence: 0.96,
-  analysisResult: 'not-in-career-data',
-  userDecision: 'pending',
-  decisionReason: null,
-  createdAt: '2026-08-28',
-  updatedAt: '2026-08-28',
   skillName: 'Kafka',
   skillKey: 'kafka',
-  skillCategory: 'messaging-async',
+  category: 'messaging-async',
   careerSkillId: null,
   reviewStatus: 'pending',
-  aliases: [],
+  requirementId: 3,
+  requirementSequence: 1,
+  requirementStatement: 'Experience building event-driven systems with Kafka',
+  importance: 'required',
+  rawLabel: 'Apache Kafka',
+  confidence: 0.96,
+  analysisResult: 'not-in-career-data',
+  decision: 'pending',
+  decisionReason: null,
 } as const
 
 async function createRouteHarness() {
@@ -50,8 +44,7 @@ function submit(action: string, extra: Record<string, string> = {}) {
 
 describe('skill decision HTMX response boundaries', () => {
   test('returns the review panel and score fragments on a valid decision', async () => {
-    mockListApplicationSkillRequirements.mockReturnValue([requirement])
-    mockGetApplicationSkillRequirement.mockReturnValue(requirement)
+    mockListRunSkillReviews.mockReturnValue([requirement])
     mockGetCandidateAnalysisState.mockReturnValue({
       state: 'current',
       latest: { id: 1, status: 'Completed' },
@@ -72,7 +65,7 @@ describe('skill decision HTMX response boundaries', () => {
   })
 
   test('returns only the decision form on a 422 and retargets the swap', async () => {
-    mockGetApplicationSkillRequirement.mockReturnValue(requirement)
+    mockListRunSkillReviews.mockReturnValue([requirement])
     mockGetCandidateAnalysisState.mockReturnValue({
       state: 'current',
       latest: { id: 1, status: 'Completed' },

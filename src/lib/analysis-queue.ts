@@ -111,6 +111,7 @@ export async function enqueueCandidateAnalysis(
     process.env.OPENAI_MODEL_CANDIDATE_FIT ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
   const run = createAnalysisRun({
     jobApplicationId,
+    jobPostingAnalysisId: built.snapshot.jobAnalysis.runId,
     inputHash: built.inputHash,
     inputSnapshotJson: JSON.stringify(built.snapshot),
     model,

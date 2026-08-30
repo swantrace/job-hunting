@@ -11,7 +11,7 @@ import { db } from '../db/client'
 import { listJobRequirements } from '../db/job-analysis'
 import { getJobAnalysisState } from '../db/job-analysis-runs'
 import { getApplication } from '../db/queries'
-import { listApplicationSkillRequirements } from '../db/skill-queries'
+import { listRequirementSkillMappings } from '../db/skill-queries'
 import { type AnalysisRunState, classifyAnalysisRunState } from './analysis-run-state'
 import { canonicalHash } from './canonical-hash'
 import { careerEvidenceIds, loadCareerData } from './career-data'
@@ -57,11 +57,15 @@ export const candidateAnalysisInputSchema = z.object({
   // user review state scoped to a run, never candidate-fit input.
   skillRequirements: z.array(
     z.object({
+      requirementId: z.number().int().positive(),
+      requirementStatement: z.string(),
       skillId: z.number(),
       skillName: z.string(),
       category: z.string().nullable(),
       importance: z.string(),
-      analysisResult: z.string(),
+      rawLabel: z.string().nullable(),
+      confidence: z.number().nullable(),
+      missing: z.boolean(),
     }),
   ),
   profiles: z.array(z.unknown()),
@@ -123,9 +127,7 @@ export function buildCandidateAnalysisInput(
 
   const data = loadCareerData()
   const requirements = listJobRequirements(currentJobAnalysis.id)
-  const skillRequirements = [...listApplicationSkillRequirements(jobApplicationId)].sort(
-    (left, right) => left.skillId - right.skillId,
-  )
+  const requirementSkills = listRequirementSkillMappings(currentJobAnalysis.id)
   const profiles = listProfiles().map((profile) => {
     const canonical = data.profiles.find((item) => item.id === profile.id)
     return { ...profile, ...(canonical ?? {}) }
@@ -187,12 +189,16 @@ export function buildCandidateAnalysisInput(
         sourceText: requirement.sourceText,
       })),
     },
-    skillRequirements: skillRequirements.map((item) => ({
+    skillRequirements: requirementSkills.map((item) => ({
+      requirementId: item.requirementId,
+      requirementStatement: item.requirementStatement,
       skillId: item.skillId,
       skillName: item.skillName,
-      category: item.skillCategory,
+      category: item.category,
       importance: item.importance,
-      analysisResult: item.analysisResult,
+      rawLabel: item.rawLabel,
+      confidence: item.confidence,
+      missing: item.careerSkillId === null,
     })),
     profiles,
     careerData,

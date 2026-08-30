@@ -1,5 +1,5 @@
 import type { Filters, JobCardData } from '../../../src/db/queries'
-import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
+import type { RunSkillReview } from '../../../src/db/skill-queries'
 import { query } from './helpers'
 
 export function SkillDecisionForm({
@@ -11,18 +11,18 @@ export function SkillDecisionForm({
 }: {
   job: JobCardData
   filters: Filters
-  requirement: ApplicationSkillRequirement
+  requirement: RunSkillReview
   error?: string
   canDecide?: boolean
 }) {
-  const decided = requirement.userDecision === 'skip' || requirement.userDecision === 'include'
+  const decided = requirement.decision === 'skip' || requirement.decision === 'include'
   if (decided && !error) {
     return (
       <div id={`skill-decision-${requirement.skillId}`} class="text-right">
         <span
-          class={`badge ${requirement.userDecision === 'include' ? 'badge-primary' : 'badge-neutral'}`}
+          class={`badge ${requirement.decision === 'include' ? 'badge-primary' : 'badge-neutral'}`}
         >
-          {requirement.userDecision === 'include' ? 'Included' : 'Skipped'}
+          {requirement.decision === 'include' ? 'Included' : 'Skipped'}
         </span>
         {requirement.decisionReason ? (
           <p class="mt-1 max-w-xs text-xs text-base-content/60">“{requirement.decisionReason}”</p>

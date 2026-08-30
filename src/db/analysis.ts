@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
 import { seedPendingRunDecisions } from './analysis-decisions'
 import { db } from './client'
@@ -6,13 +6,16 @@ import {
   type ApplicationAnalysisRun,
   applicationAnalysisRuns,
   jobApplications,
-  jobApplicationsToSkills,
+  jobRequirements,
+  jobRequirementsToSkills,
+  skills,
 } from './schema'
 
 export type { ApplicationAnalysisRun }
 
 export function createAnalysisRun(input: {
   jobApplicationId: number
+  jobPostingAnalysisId: number
   inputHash: string
   inputSnapshotJson: string
   model: string
@@ -24,6 +27,7 @@ export function createAnalysisRun(input: {
     .insert(applicationAnalysisRuns)
     .values({
       jobApplicationId: input.jobApplicationId,
+      jobPostingAnalysisId: input.jobPostingAnalysisId,
       queueJobId: `analysis-${crypto.randomUUID()}`,
       status: 'Queued',
       inputHash: input.inputHash,
@@ -135,20 +139,35 @@ export function completeAnalysisRun(
       .where(eq(applicationAnalysisRuns.id, runId))
       .run()
 
-    // A new run starts pending for every current missing skill; prior decisions
-    // remain suggestions only and must be explicitly reconfirmed.
-    const missingSkillIds = tx
-      .select({ skillId: jobApplicationsToSkills.skillId })
-      .from(jobApplicationsToSkills)
-      .where(
-        and(
-          eq(jobApplicationsToSkills.jobApplicationId, run.jobApplicationId),
-          eq(jobApplicationsToSkills.analysisResult, 'not-in-career-data'),
+    // A new run starts pending for every current missing canonical skill. The
+    // missing set derives from the exact Job Analysis run's requirement-skill
+    // mappings where the skill is not in career data; prior decisions remain
+    // suggestions only and must be explicitly reconfirmed. Legacy runs without
+    // explicit lineage seed no decisions.
+    const jobPostingAnalysisId = run.jobPostingAnalysisId
+    if (jobPostingAnalysisId !== null) {
+      const missingSkillIds = [
+        ...new Set(
+          tx
+            .select({ skillId: jobRequirementsToSkills.skillId })
+            .from(jobRequirementsToSkills)
+            .innerJoin(
+              jobRequirements,
+              eq(jobRequirements.id, jobRequirementsToSkills.jobRequirementId),
+            )
+            .innerJoin(skills, eq(skills.id, jobRequirementsToSkills.skillId))
+            .where(
+              and(
+                eq(jobRequirements.jobPostingAnalysisId, jobPostingAnalysisId),
+                isNull(skills.careerSkillId),
+              ),
+            )
+            .all()
+            .map((row) => row.skillId),
         ),
-      )
-      .all()
-      .map((row) => row.skillId)
-    seedPendingRunDecisions(tx, runId, missingSkillIds)
+      ]
+      seedPendingRunDecisions(tx, runId, missingSkillIds)
+    }
   })
 }
 

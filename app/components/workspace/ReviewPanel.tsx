@@ -1,7 +1,7 @@
 import type { ApplicationAnalysisRun } from '../../../src/db/analysis'
 import type { JobRequirement } from '../../../src/db/job-analysis'
 import type { Filters, JobCardData } from '../../../src/db/queries'
-import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
+import type { RunSkillReview } from '../../../src/db/skill-queries'
 import type { CandidateAnalysisState } from '../../../src/lib/candidate-analysis'
 import type { ProfileOption } from '../../../src/lib/profiles'
 import { reviewGateCopy } from '../../../src/lib/workspace/state'
@@ -24,7 +24,7 @@ export function ReviewPanel({
 }: {
   job: JobCardData
   filters: Filters
-  requirements: ApplicationSkillRequirement[]
+  requirements: RunSkillReview[]
   careerEvidence: Record<string, string[]>
   state: CandidateAnalysisState
   jobRequirements: JobRequirement[]
@@ -34,7 +34,7 @@ export function ReviewPanel({
   const displayRun = state.latestCompleted
   const canAct = state.state === 'current' && !!state.currentCompleted
   const pendingCount = requirements.filter(
-    (item) => item.analysisResult === 'not-in-career-data' && item.userDecision === 'pending',
+    (item) => item.analysisResult === 'not-in-career-data' && item.decision === 'pending',
   ).length
 
   return (
