@@ -1,5 +1,5 @@
-import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
+import { resolve } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import * as schema from '../../src/db/schema'
 import { syncSkillTaxonomy } from '../../src/lib/skills/sync-taxonomy'
@@ -13,14 +13,21 @@ function database() {
 
 describe('skill taxonomy configuration synchronization', () => {
   test('loads one ordered, unique JSON category vocabulary', () => {
-    const taxonomy = loadSkillTaxonomy()
-    expect(taxonomy.categories.length).toBeGreaterThan(0)
-    expect(new Set(taxonomy.categories.map((category) => category.key)).size).toBe(
-      taxonomy.categories.length,
-    )
-    expect(new Set(taxonomy.categories.map((category) => category.sortOrder)).size).toBe(
-      taxonomy.categories.length,
-    )
+    const previous = process.env.CAREER_DATA_DIR
+    process.env.CAREER_DATA_DIR = resolve(process.cwd(), 'career-data.example')
+    try {
+      const taxonomy = loadSkillTaxonomy()
+      expect(taxonomy.categories.length).toBeGreaterThan(0)
+      expect(new Set(taxonomy.categories.map((category) => category.key)).size).toBe(
+        taxonomy.categories.length,
+      )
+      expect(new Set(taxonomy.categories.map((category) => category.sortOrder)).size).toBe(
+        taxonomy.categories.length,
+      )
+    } finally {
+      if (previous === undefined) delete process.env.CAREER_DATA_DIR
+      else process.env.CAREER_DATA_DIR = previous
+    }
   })
 
   test('upserts JSON-owned label and sort order without deleting orphaned rows', () => {
