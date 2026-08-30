@@ -16,7 +16,6 @@ import {
   nullableText,
   skillKey,
   textValue,
-  validateImportSnapshots,
 } from '../lib/import'
 import { jobAnalysisInputFromContent } from '../lib/job-analysis-input'
 import {
@@ -335,27 +334,16 @@ export function listManagementData() {
 export function exportData() {
   const companyRows = db.select().from(companies).all()
   const companyById = new Map(companyRows.map((company) => [company.id, company.name]))
-  const skillRows = db.select().from(skills).all()
-  const skillById = new Map(skillRows.map((skill) => [skill.id, skill.name]))
   const contactRows = db.select().from(contacts).all()
   const contactById = new Map(contactRows.map((contact) => [contact.id, contact]))
   const applicationRows = db.select().from(jobApplications).all()
-  const postingRows = db.select().from(jobPostings).all()
-  const postingApplicationById = new Map(
-    postingRows.map((posting) => [posting.id, posting.jobApplicationId]),
-  )
-  const analysisRows = db.select().from(jobPostingAnalyses).all()
-  const analysisApplicationById = new Map(
-    analysisRows.map((analysis) => [
-      analysis.id,
-      postingApplicationById.get(analysis.jobPostingId),
-    ]),
-  )
   return {
-    schemaVersion: 3,
+    // Portable core-data format (v4). Derived AI history, generated artifacts,
+    // baseline history, and OAuth connections are deliberately omitted.
+    schemaVersion: 4,
     exportedAt: new Date().toISOString(),
     companies: companyRows,
-    skills: skillRows,
+    skills: db.select().from(skills).all(),
     skillAliases: db.select().from(skillAliases).all(),
     contacts: contactRows.map((contact) => ({
       ...contact,
@@ -375,25 +363,7 @@ export function exportData() {
       })),
     followUps: db.select().from(followUps).all(),
     interviews: db.select().from(interviews).all(),
-    jobPostings: postingRows,
-    jobPostingAnalyses: analysisRows.map((analysis) => ({
-      ...analysis,
-      jobApplicationId: postingApplicationById.get(analysis.jobPostingId),
-    })),
-    jobRequirements: db
-      .select()
-      .from(jobRequirements)
-      .all()
-      .map((requirement) => ({
-        ...requirement,
-        jobApplicationId: analysisApplicationById.get(requirement.jobPostingAnalysisId),
-      })),
-    jobRequirementsToSkills: db.select().from(jobRequirementsToSkills).all(),
-    applicationAnalysisRuns: db.select().from(applicationAnalysisRuns).all(),
-    analysisRunDecisions: db.select().from(analysisRunDecisions).all(),
-    generationRuns: db.select().from(generationRuns).all(),
-    generationRunResults: db.select().from(generationRunResults).all(),
-    documentReviews: db.select().from(documentReviews).all(),
+    jobPostings: db.select().from(jobPostings).all(),
   }
 }
 
@@ -477,7 +447,9 @@ export function previewImport(payload: ImportPayload): ImportPreview {
     conflicts: [
       ...conflicts,
       ...detectImportConflicts(payload),
-      ...validateImportSnapshots(payload),
+      payload.schemaVersion < 4
+        ? 'Legacy AI history and application-skill rows are ignored; derived history is reset.'
+        : 'Derived AI history is not part of portable exports and is reset after import.',
     ],
   }
 }
@@ -488,9 +460,6 @@ export function mergeImport(payload: ImportPayload) {
     const skillIds = new Map<number, number>()
     const contactIds = new Map<number, number>()
     const applicationIds = new Map<number, number>()
-    const analysisIds = new Map<number, number>()
-    const applicationAnalysisRunIds = new Map<number, number>()
-    const generationRunIds = new Map<number, number>()
     const companiesByKey = new Map(
       tx
         .select()
@@ -755,222 +724,6 @@ export function mergeImport(payload: ImportPayload) {
         .get()
       if (existing) tx.update(jobPostings).set(values).where(eq(jobPostings.id, existing.id)).run()
       else tx.insert(jobPostings).values(values).run()
-    }
-    for (const incoming of payload.jobPostingAnalyses) {
-      const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
-      if (!applicationId) continue
-      const posting = tx
-        .select()
-        .from(jobPostings)
-        .where(eq(jobPostings.jobApplicationId, applicationId))
-        .get()
-      if (!posting) continue
-      const queueJobId = nullableText(incoming.queueJobId)
-      const existing = queueJobId
-        ? tx
-            .select()
-            .from(jobPostingAnalyses)
-            .where(eq(jobPostingAnalyses.queueJobId, queueJobId))
-            .get()
-        : undefined
-      const values = {
-        jobPostingId: posting.id,
-        status: controlledValue(runStatuses, incoming.status, 'Completed'),
-        queueJobId,
-        attempts: Number(incoming.attempts) || 0,
-        inputHash: nullableText(incoming.inputHash),
-        frozenInputJson: nullableText(incoming.frozenInputJson),
-        errorMessage: nullableText(incoming.errorMessage),
-        resultJson: nullableText(incoming.resultJson),
-        model: nullableText(incoming.model),
-        promptVersion: nullableText(incoming.promptVersion),
-        schemaVersion: nullableText(incoming.schemaVersion),
-        createdAt: textValue(incoming.createdAt) || todayISO(),
-        updatedAt: textValue(incoming.updatedAt) || todayISO(),
-        startedAt: nullableText(incoming.startedAt),
-        completedAt: nullableText(incoming.completedAt),
-      }
-      if (existing) analysisIds.set(Number(incoming.id), existing.id)
-      else {
-        const created = tx
-          .insert(jobPostingAnalyses)
-          .values(values)
-          .returning({ id: jobPostingAnalyses.id })
-          .get()
-        analysisIds.set(Number(incoming.id), created.id)
-      }
-    }
-    for (const incoming of payload.jobRequirements) {
-      const analysisId = analysisIds.get(Number(incoming.jobPostingAnalysisId))
-      if (!analysisId || !textValue(incoming.statement)) continue
-      const existing = tx
-        .select()
-        .from(jobRequirements)
-        .where(
-          and(
-            eq(jobRequirements.jobPostingAnalysisId, analysisId),
-            eq(jobRequirements.sequence, Number(incoming.sequence)),
-          ),
-        )
-        .get()
-      const values = {
-        jobPostingAnalysisId: analysisId,
-        sequence: Number(incoming.sequence) || 1,
-        requirementType: controlledValue(requirementTypes, incoming.requirementType, 'experience'),
-        importance: controlledValue(requirementImportances, incoming.importance, 'mentioned'),
-        basis: controlledValue(persistedRequirementBases, incoming.basis, 'legacy'),
-        statement: textValue(incoming.statement),
-        sourceText: nullableText(incoming.sourceText),
-        inferenceRationale: nullableText(incoming.inferenceRationale),
-        createdAt: textValue(incoming.createdAt) || todayISO(),
-        updatedAt: textValue(incoming.updatedAt) || todayISO(),
-      }
-      if (existing)
-        tx.update(jobRequirements).set(values).where(eq(jobRequirements.id, existing.id)).run()
-      else tx.insert(jobRequirements).values(values).run()
-    }
-    for (const incoming of payload.jobRequirementsToSkills) {
-      const requirementId = Number(incoming.jobRequirementId)
-      const skillId = skillIds.get(Number(incoming.skillId))
-      if (!requirementId || !skillId) continue
-      tx.insert(jobRequirementsToSkills)
-        .values({ jobRequirementId: requirementId, skillId })
-        .onConflictDoNothing()
-        .run()
-    }
-    for (const incoming of payload.applicationAnalysisRuns) {
-      const jobPostingAnalysisId = analysisIds.get(Number(incoming.jobPostingAnalysisId))
-      if (!jobPostingAnalysisId) continue
-      const queueJobId = textValue(incoming.queueJobId) || `analysis-import-${incoming.id}`
-      const existing = tx
-        .select()
-        .from(applicationAnalysisRuns)
-        .where(eq(applicationAnalysisRuns.queueJobId, queueJobId))
-        .get()
-      const values = {
-        jobPostingAnalysisId,
-        status: controlledValue(runStatuses, incoming.status, 'Completed'),
-        queueJobId,
-        attempts: Number(incoming.attempts) || 0,
-        inputHash: nullableText(incoming.inputHash),
-        inputSnapshotJson: nullableText(incoming.inputSnapshotJson),
-        resultJson: nullableText(incoming.resultJson),
-        model: nullableText(incoming.model),
-        promptVersion: nullableText(incoming.promptVersion),
-        schemaVersion: nullableText(incoming.schemaVersion),
-        errorMessage: nullableText(incoming.errorMessage),
-        recommendedProfileId: nullableText(incoming.recommendedProfileId),
-        confirmedProfileId: nullableText(incoming.confirmedProfileId),
-        profileConfirmedAt: nullableText(incoming.profileConfirmedAt),
-        createdAt: textValue(incoming.createdAt) || todayISO(),
-        updatedAt: textValue(incoming.updatedAt) || todayISO(),
-        startedAt: nullableText(incoming.startedAt),
-        completedAt: nullableText(incoming.completedAt),
-      }
-      if (existing) applicationAnalysisRunIds.set(Number(incoming.id), existing.id)
-      else {
-        const created = tx
-          .insert(applicationAnalysisRuns)
-          .values(values)
-          .returning({ id: applicationAnalysisRuns.id })
-          .get()
-        applicationAnalysisRunIds.set(Number(incoming.id), created.id)
-      }
-    }
-    for (const incoming of payload.analysisRunDecisions) {
-      const runId = applicationAnalysisRunIds.get(Number(incoming.applicationAnalysisRunId))
-      const skillId = skillIds.get(Number(incoming.skillId))
-      if (!runId || !skillId) continue
-      const date = todayISO()
-      tx.insert(analysisRunDecisions)
-        .values({
-          applicationAnalysisRunId: runId,
-          skillId,
-          decision: controlledValue(skillDecisions, incoming.decision, 'pending'),
-          reason: nullableText(incoming.reason),
-          createdAt: textValue(incoming.createdAt) || date,
-          updatedAt: textValue(incoming.updatedAt) || date,
-        })
-        .onConflictDoNothing()
-        .run()
-    }
-    for (const incoming of payload.generationRuns) {
-      const applicationAnalysisRunId = applicationAnalysisRunIds.get(
-        Number(incoming.applicationAnalysisRunId),
-      )
-      if (!applicationAnalysisRunId) continue
-      const queueJobId = textValue(incoming.queueJobId) || `generation-import-${incoming.id}`
-      const existing = tx
-        .select()
-        .from(generationRuns)
-        .where(eq(generationRuns.queueJobId, queueJobId))
-        .get()
-      const values = {
-        applicationAnalysisRunId,
-        status: controlledValue(runStatuses, incoming.status, 'Completed'),
-        queueJobId,
-        attempts: Number(incoming.attempts) || 0,
-        inputHash: nullableText(incoming.inputHash),
-        frozenInputJson: nullableText(incoming.frozenInputJson),
-        resumeModel: nullableText(incoming.resumeModel),
-        coverLetterModel: nullableText(incoming.coverLetterModel),
-        promptVersion: nullableText(incoming.promptVersion),
-        schemaVersion: nullableText(incoming.schemaVersion),
-        errorMessage: nullableText(incoming.errorMessage),
-        createdAt: textValue(incoming.createdAt) || todayISO(),
-        updatedAt: textValue(incoming.updatedAt) || todayISO(),
-        startedAt: nullableText(incoming.startedAt),
-        completedAt: nullableText(incoming.completedAt),
-      }
-      if (existing) {
-        tx.update(generationRuns).set(values).where(eq(generationRuns.id, existing.id)).run()
-        generationRunIds.set(Number(incoming.id), existing.id)
-      } else {
-        const created = tx
-          .insert(generationRuns)
-          .values(values)
-          .returning({ id: generationRuns.id })
-          .get()
-        generationRunIds.set(Number(incoming.id), created.id)
-      }
-    }
-    for (const incoming of payload.generationRunResults) {
-      const runId = generationRunIds.get(Number(incoming.generationRunId))
-      if (!runId) continue
-      tx.insert(generationRunResults)
-        .values({
-          generationRunId: runId,
-          resumeJson: nullableText(incoming.resumeJson),
-          coverLetterJson: nullableText(incoming.coverLetterJson),
-          atsAuditJson: nullableText(incoming.atsAuditJson),
-          createdAt: textValue(incoming.createdAt) || todayISO(),
-          updatedAt: textValue(incoming.updatedAt) || todayISO(),
-        })
-        .onConflictDoNothing()
-        .run()
-    }
-    for (const incoming of payload.documentReviews) {
-      const runId = generationRunIds.get(Number(incoming.generationRunId))
-      if (!runId) continue
-      tx.insert(documentReviews)
-        .values({
-          generationRunId: runId,
-          status: controlledValue(runStatuses, incoming.status, 'Completed'),
-          queueJobId: textValue(incoming.queueJobId) || `document-review-import-${incoming.id}`,
-          attempts: Number(incoming.attempts) || 0,
-          inputHash: nullableText(incoming.inputHash),
-          resultJson: nullableText(incoming.resultJson),
-          model: nullableText(incoming.model),
-          promptVersion: nullableText(incoming.promptVersion),
-          schemaVersion: nullableText(incoming.schemaVersion),
-          errorMessage: nullableText(incoming.errorMessage),
-          createdAt: textValue(incoming.createdAt) || todayISO(),
-          updatedAt: textValue(incoming.updatedAt) || todayISO(),
-          startedAt: nullableText(incoming.startedAt),
-          completedAt: nullableText(incoming.completedAt),
-        })
-        .onConflictDoNothing()
-        .run()
     }
   })
 }

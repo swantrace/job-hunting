@@ -9,16 +9,19 @@ export function ImportPage() {
       title="Backup & restore"
       currentPath="/import"
       actions={
-        <a href="/export" class="btn btn-outline btn-sm" aria-label="Export JSON backup">
+        <a href="/export" class="btn btn-outline btn-sm" aria-label="Export portable data">
           <Icon name="download" />
-          <span class="hidden sm:inline">Export backup</span>
+          <span class="hidden sm:inline">Export data</span>
         </a>
       }
     >
       <div class="mb-5 max-w-2xl">
-        <h2 class="text-2xl font-bold">Restore from a backup</h2>
+        <h2 class="text-2xl font-bold">Restore portable data</h2>
         <p class="mt-1 text-base-content/60">
-          Preview changes before merging a Job Tracker JSON backup into this database.
+          Preview before merging a portable JSON export (core companies, contacts, applications,
+          skills, activities, and Job Post text). This is not a full SQLite/artifact backup: derived
+          AI history, generated documents, and Google Drive settings are excluded and reset on
+          import.
         </p>
       </div>
       <form
