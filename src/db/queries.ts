@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { and, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm'
 import type { z } from 'zod'
 import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
 import {
@@ -325,6 +325,7 @@ export function getApplication(id: number): JobCardData | null {
         .select()
         .from(jobPostingAnalyses)
         .where(eq(jobPostingAnalyses.jobPostingId, jobPosting.id))
+        .orderBy(desc(jobPostingAnalyses.id))
         .get()
     : undefined
   const jobContacts = db
