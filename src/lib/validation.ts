@@ -8,7 +8,7 @@ import {
   matchLevels,
   priorities,
 } from './applications/constants'
-import { isISODate } from './date'
+import { isISODate, isISOTimestamp } from './date'
 import { hasProfile } from './profiles'
 import { skillImportances, skillReviewStatuses } from './skills/constants'
 import { hasSkillCategory } from './skills/taxonomy'
@@ -23,6 +23,9 @@ const optionalUrl = z.preprocess(
   z.string().trim().url().max(2048).nullable().optional(),
 )
 const isoDate = z.string().refine(isISODate, 'Use a valid YYYY-MM-DD date')
+export const isoTimestamp = z
+  .string()
+  .refine(isISOTimestamp, 'Use a valid UTC ISO 8601 timestamp with a Z designator')
 const direction = z
   .string()
   .trim()
