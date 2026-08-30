@@ -1,14 +1,5 @@
 import type { CandidateFit, EvidenceRef } from '../ai/schemas/candidate-fit'
-
-export const evidenceSourceTypes = [
-  'experience',
-  'achievement',
-  'project',
-  'publication',
-  'skill',
-  'story',
-] as const
-export type EvidenceSourceType = (typeof evidenceSourceTypes)[number]
+import type { EvidenceSourceType } from './evidence/constants'
 
 /**
  * The allowlist of canonical source IDs that may legally appear in an

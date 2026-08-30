@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { evidenceRelevances, evidenceSourceTypes } from '../../lib/evidence/constants'
 
 /**
  * Candidate-fit / evidence-matrix contract. This is the output of the combined
@@ -10,21 +11,11 @@ import { z } from 'zod'
 
 const fitRecommendations = ['apply', 'apply-selectively', 'skip'] as const
 const evidenceStatuses = ['direct', 'transferable', 'missing'] as const
-const sourceTypes = [
-  'experience',
-  'achievement',
-  'project',
-  'publication',
-  'skill',
-  'story',
-] as const
-const relevances = ['direct', 'transferable'] as const
-
 export const evidenceRefSchema = z
   .object({
-    sourceType: z.enum(sourceTypes),
+    sourceType: z.enum(evidenceSourceTypes),
     sourceId: z.string().trim().min(1).max(120),
-    relevance: z.enum(relevances),
+    relevance: z.enum(evidenceRelevances),
   })
   .strict()
 
@@ -124,9 +115,9 @@ const evidenceRefJsonSchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    sourceType: { type: 'string', enum: [...sourceTypes] },
+    sourceType: { type: 'string', enum: [...evidenceSourceTypes] },
     sourceId: { type: 'string', description: 'A canonical source ID from the frozen input.' },
-    relevance: { type: 'string', enum: [...relevances] },
+    relevance: { type: 'string', enum: [...evidenceRelevances] },
   },
   required: ['sourceType', 'sourceId', 'relevance'],
 }

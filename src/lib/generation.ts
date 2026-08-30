@@ -27,6 +27,7 @@ import type {
   BaselineEvidenceSelectionSnapshot,
   EvidenceSelectionSnapshot,
 } from './evidence-selection'
+import type { GeneratedArtifactType } from './generation/constants'
 import {
   assertGenerationEvidenceReferences,
   buildGenerationEvidenceAllowlist,
@@ -39,7 +40,7 @@ import {
 
 type JsonSchema = Record<string, unknown>
 type ArtifactOutput = {
-  type: 'job_context' | 'resume' | 'cover_letter'
+  type: GeneratedArtifactType
   fileName: string
   filePath: string
   mimeType: string

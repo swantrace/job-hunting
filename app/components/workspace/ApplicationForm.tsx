@@ -1,4 +1,5 @@
 import { type Filters, type JobCardData, listManagementData } from '../../../src/db/queries'
+import { matchLevels, priorities } from '../../../src/lib/applications/constants'
 import { todayISO } from '../../../src/lib/date'
 import { listProfiles } from '../../../src/lib/profiles'
 import type { FieldErrors } from '../../../src/lib/validation'
@@ -79,13 +80,13 @@ export function ApplicationForm({
           error={err(errors, 'appliedDate')}
         />
         <SelectField name="priority" label="Priority">
-          {['A', 'B', 'C'].map((value) => (
+          {priorities.map((value) => (
             <option selected={job.priority === value}>{value}</option>
           ))}
         </SelectField>
         <SelectField name="matchLevel" label="Match level">
           <option value="">Not set</option>
-          {['A', 'B'].map((value) => (
+          {matchLevels.map((value) => (
             <option selected={job.matchLevel === value}>{value}</option>
           ))}
         </SelectField>

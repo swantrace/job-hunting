@@ -1,6 +1,4 @@
-import type { JobStatus } from '../../../src/db/schema'
-
-const activeStatuses: JobStatus[] = ['Saved', 'Apply Today', 'Applied', 'Follow Up', 'Interviewing']
+import { activeStatuses, type JobStatus } from '../../../src/lib/applications/constants'
 
 export function Metrics({
   values,

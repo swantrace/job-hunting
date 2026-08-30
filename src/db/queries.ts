@@ -1,8 +1,15 @@
 import { createHash } from 'node:crypto'
-import { and, eq, inArray, like, or, sql } from 'drizzle-orm'
+import { and, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm'
 import type { z } from 'zod'
 import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
+import {
+  type ApplicationSort,
+  matchLevels,
+  priorities,
+  statuses,
+} from '../lib/applications/constants'
 import { todayISO } from '../lib/date'
+import { runStatuses } from '../lib/generation/constants'
 import {
   applicationKey,
   companyKey,
@@ -15,7 +22,18 @@ import {
   textValue,
   validateImportSnapshots,
 } from '../lib/import'
-import type { SkillOrigin, SkillReviewStatus } from '../lib/skills/constants'
+import {
+  persistedRequirementBases,
+  requirementImportances,
+  requirementTypes,
+} from '../lib/job-requirements/constants'
+import {
+  type SkillOrigin,
+  type SkillReviewStatus,
+  skillDecisions,
+  skillImportances,
+  skillMatchResults,
+} from '../lib/skills/constants'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
 import { hasSkillCategory, type SkillCategory } from '../lib/skills/taxonomy'
 import { advanceStatus } from '../lib/transitions'
@@ -37,7 +55,6 @@ import {
   generationRuns,
   interviews,
   type JobApplication,
-  type JobStatus,
   jobApplications,
   jobApplicationsToContacts,
   jobApplicationsToSkills,
@@ -47,7 +64,6 @@ import {
   jobRequirementsToSkills,
   skillAliases,
   skills,
-  statuses,
 } from './schema'
 import {
   type DbExecutor,
@@ -75,6 +91,17 @@ const cleanSkills = (value?: string | null) => [
       .filter(Boolean),
   ),
 ]
+
+function controlledValue<const Values extends readonly string[], const Fallback>(
+  values: Values,
+  value: unknown,
+  fallback: Fallback,
+): Values[number] | Fallback {
+  const normalized = textValue(value)
+  return (values as readonly string[]).includes(normalized)
+    ? (normalized as Values[number])
+    : fallback
+}
 
 function getOrCreateCompany(tx: DbExecutor, name: string, date: string) {
   let company = tx
@@ -244,7 +271,7 @@ export function listApplications(filters: Filters): JobCardData[] {
     target_asc: sql`${jobApplications.applyTodayTargetDate} is null, ${jobApplications.applyTodayTargetDate} asc, ${jobApplications.id} desc`,
     applied_desc: sql`${jobApplications.appliedDate} is null, ${jobApplications.appliedDate} desc, ${jobApplications.id} desc`,
     applied_asc: sql`${jobApplications.appliedDate} is null, ${jobApplications.appliedDate} asc, ${jobApplications.id} desc`,
-  } as const
+  } as const satisfies Record<ApplicationSort, SQL>
   const rows = db
     .select({
       job: jobApplications,
@@ -702,21 +729,15 @@ export function mergeImport(payload: ImportPayload) {
         location: nullableText(incoming.location),
         url: nullableText(incoming.url),
         postedDate,
-        priority: (['A', 'B', 'C'].includes(textValue(incoming.priority))
-          ? textValue(incoming.priority)
-          : 'B') as 'A' | 'B' | 'C',
+        priority: controlledValue(priorities, incoming.priority, 'B'),
         appliedDate: nullableText(incoming.appliedDate),
         resumeVersion: nullableText(incoming.resumeVersion),
-        matchLevel: (['A', 'B'].includes(textValue(incoming.matchLevel))
-          ? textValue(incoming.matchLevel)
-          : null) as 'A' | 'B' | null,
+        matchLevel: controlledValue(matchLevels, incoming.matchLevel, null),
         applicationSource: nullableText(incoming.applicationSource),
         salary: nullableText(incoming.salary),
         notes: nullableText(incoming.notes),
-        status: (statuses.includes(textValue(incoming.status) as JobStatus)
-          ? textValue(incoming.status)
-          : 'Saved') as JobStatus,
-        statusBeforeArchive: nullableText(incoming.statusBeforeArchive) as JobStatus | null,
+        status: controlledValue(statuses, incoming.status, 'Saved'),
+        statusBeforeArchive: controlledValue(statuses, incoming.statusBeforeArchive, null),
         applyTodayTargetDate: nullableText(incoming.applyTodayTargetDate),
         createdAt: textValue(incoming.createdAt) || todayISO(),
         updatedAt: textValue(incoming.updatedAt) || todayISO(),
@@ -748,22 +769,17 @@ export function mergeImport(payload: ImportPayload) {
             rawLabel:
               textValue(relationRecord.rawLabel) || textValue(relationRecord.skillName) || null,
             sourceText: textValue(relationRecord.sourceText) || null,
-            importance: (['required', 'preferred', 'mentioned'] as const).includes(
-              importanceValue as never,
-            )
-              ? (importanceValue as 'required' | 'preferred' | 'mentioned')
-              : 'mentioned',
+            importance: controlledValue(skillImportances, importanceValue, 'mentioned'),
             parserConfidence:
               typeof relationRecord.parserConfidence === 'number'
                 ? relationRecord.parserConfidence
                 : null,
-            analysisResult:
-              analysisResultValue === 'proven-match' ? 'proven-match' : 'not-in-career-data',
-            userDecision: (['pending', 'skip', 'include'] as const).includes(
-              userDecisionValue as never,
-            )
-              ? (userDecisionValue as 'pending' | 'skip' | 'include')
-              : 'pending',
+            analysisResult: controlledValue(
+              skillMatchResults,
+              analysisResultValue,
+              'not-in-career-data',
+            ),
+            userDecision: controlledValue(skillDecisions, userDecisionValue, 'pending'),
             decisionReason: reason,
             createdAt: textValue(relationRecord.createdAt) || date,
             updatedAt: textValue(relationRecord.updatedAt) || date,
@@ -910,28 +926,9 @@ export function mergeImport(payload: ImportPayload) {
       const values = {
         jobPostingAnalysisId: analysisId,
         sequence: Number(incoming.sequence) || 1,
-        requirementType: ([
-          'skill',
-          'experience',
-          'responsibility',
-          'education',
-          'soft-skill',
-          'domain',
-        ].includes(textValue(incoming.requirementType))
-          ? textValue(incoming.requirementType)
-          : 'experience') as
-          | 'skill'
-          | 'experience'
-          | 'responsibility'
-          | 'education'
-          | 'soft-skill'
-          | 'domain',
-        importance: (['required', 'preferred', 'mentioned'].includes(textValue(incoming.importance))
-          ? textValue(incoming.importance)
-          : 'mentioned') as 'required' | 'preferred' | 'mentioned',
-        basis: (['explicit', 'inferred', 'legacy'].includes(textValue(incoming.basis))
-          ? textValue(incoming.basis)
-          : 'legacy') as 'explicit' | 'inferred' | 'legacy',
+        requirementType: controlledValue(requirementTypes, incoming.requirementType, 'experience'),
+        importance: controlledValue(requirementImportances, incoming.importance, 'mentioned'),
+        basis: controlledValue(persistedRequirementBases, incoming.basis, 'legacy'),
         statement: textValue(incoming.statement),
         sourceText: nullableText(incoming.sourceText),
         inferenceRationale: nullableText(incoming.inferenceRationale),
@@ -956,11 +953,7 @@ export function mergeImport(payload: ImportPayload) {
       if (!applicationId) continue
       const values = {
         jobApplicationId: applicationId,
-        status: (['Queued', 'Processing', 'Completed', 'Failed'].includes(
-          textValue(incoming.status),
-        )
-          ? textValue(incoming.status)
-          : 'Completed') as 'Queued' | 'Processing' | 'Completed' | 'Failed',
+        status: controlledValue(runStatuses, incoming.status, 'Completed'),
         queueJobId: textValue(incoming.queueJobId) || `analysis-import-${incoming.id}`,
         attempts: Number(incoming.attempts) || 0,
         inputHash: nullableText(incoming.inputHash),
@@ -991,11 +984,7 @@ export function mergeImport(payload: ImportPayload) {
         .get()
       const values = {
         jobApplicationId: applicationId,
-        status: (['Queued', 'Processing', 'Completed', 'Failed'].includes(
-          textValue(incoming.status),
-        )
-          ? textValue(incoming.status)
-          : 'Completed') as 'Queued' | 'Processing' | 'Completed' | 'Failed',
+        status: controlledValue(runStatuses, incoming.status, 'Completed'),
         queueJobId,
         attempts: Number(incoming.attempts) || 0,
         errorMessage: nullableText(incoming.errorMessage),
@@ -1037,11 +1026,7 @@ export function mergeImport(payload: ImportPayload) {
       tx.insert(documentReviews)
         .values({
           generationRunId: runId,
-          status: (['Queued', 'Processing', 'Completed', 'Failed'].includes(
-            textValue(incoming.status),
-          )
-            ? textValue(incoming.status)
-            : 'Completed') as 'Queued' | 'Processing' | 'Completed' | 'Failed',
+          status: controlledValue(runStatuses, incoming.status, 'Completed'),
           queueJobId: textValue(incoming.queueJobId) || `document-review-import-${incoming.id}`,
           attempts: Number(incoming.attempts) || 0,
           inputHash: nullableText(incoming.inputHash),

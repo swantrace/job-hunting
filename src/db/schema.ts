@@ -10,6 +10,9 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
+import { matchLevels, priorities, statuses } from '../lib/applications/constants'
+import { generatedArtifactTypes, runStatuses } from '../lib/generation/constants'
+import { persistedRequirementBases, requirementTypes } from '../lib/job-requirements/constants'
 import {
   type SkillDecision,
   type SkillImportance,
@@ -23,29 +26,16 @@ import {
   skillReviewStatuses,
 } from '../lib/skills/constants'
 
-export const priorities = ['A', 'B', 'C'] as const
-export const matchLevels = ['A', 'B'] as const
-export const statuses = [
-  'Saved',
-  'Apply Today',
-  'Applied',
-  'Follow Up',
-  'Interviewing',
-  'Rejected',
-  'Archived',
-] as const
-export const generationStatuses = ['Queued', 'Processing', 'Completed', 'Failed'] as const
-export const generatedArtifactTypes = ['job_context', 'resume', 'cover_letter'] as const
-export const analysisRunStatuses = ['Queued', 'Processing', 'Completed', 'Failed'] as const
-export const requirementTypes = [
-  'skill',
-  'experience',
-  'responsibility',
-  'education',
-  'soft-skill',
-  'domain',
-] as const
-export const requirementBases = ['explicit', 'inferred', 'legacy'] as const
+export {
+  generatedArtifactTypes,
+  matchLevels,
+  persistedRequirementBases as requirementBases,
+  priorities,
+  requirementTypes,
+  runStatuses as analysisRunStatuses,
+  runStatuses as generationStatuses,
+  statuses,
+}
 
 export const companies = sqliteTable(
   'companies',
@@ -264,7 +254,7 @@ export const jobRequirements = sqliteTable(
     sequence: integer('sequence').notNull(),
     requirementType: text('requirement_type', { enum: requirementTypes }).notNull(),
     importance: text('importance', { enum: skillImportances }).notNull(),
-    basis: text('basis', { enum: requirementBases }).notNull(),
+    basis: text('basis', { enum: persistedRequirementBases }).notNull(),
     statement: text('statement').notNull(),
     sourceText: text('source_text'),
     inferenceRationale: text('inference_rationale'),
@@ -322,7 +312,7 @@ export const applicationAnalysisRuns = sqliteTable(
     jobApplicationId: integer('job_application_id')
       .notNull()
       .references(() => jobApplications.id, { onDelete: 'cascade' }),
-    status: text('status', { enum: analysisRunStatuses }).notNull().default('Queued'),
+    status: text('status', { enum: runStatuses }).notNull().default('Queued'),
     queueJobId: text('queue_job_id').notNull(),
     attempts: integer('attempts').notNull().default(0),
     inputHash: text('input_hash'),
@@ -403,7 +393,7 @@ export const generationRuns = sqliteTable(
     jobApplicationId: integer('job_application_id')
       .notNull()
       .references(() => jobApplications.id, { onDelete: 'cascade' }),
-    status: text('status', { enum: generationStatuses }).notNull().default('Queued'),
+    status: text('status', { enum: runStatuses }).notNull().default('Queued'),
     queueJobId: text('queue_job_id').notNull(),
     attempts: integer('attempts').notNull().default(0),
     errorMessage: text('error_message'),
@@ -496,7 +486,7 @@ export const documentReviews = sqliteTable(
     generationRunId: integer('generation_run_id')
       .notNull()
       .references(() => generationRuns.id, { onDelete: 'cascade' }),
-    status: text('status', { enum: generationStatuses }).notNull().default('Queued'),
+    status: text('status', { enum: runStatuses }).notNull().default('Queued'),
     queueJobId: text('queue_job_id').notNull(),
     attempts: integer('attempts').notNull().default(0),
     inputHash: text('input_hash'),
@@ -530,7 +520,7 @@ export const baselineGenerationRuns = sqliteTable(
     direction: text('direction').notNull(),
     targetTitle: text('target_title').notNull(),
     targetKeywords: text('target_keywords').notNull().default('[]'),
-    status: text('status', { enum: generationStatuses }).notNull().default('Queued'),
+    status: text('status', { enum: runStatuses }).notNull().default('Queued'),
     queueJobId: text('queue_job_id').notNull(),
     attempts: integer('attempts').notNull().default(0),
     errorMessage: text('error_message'),
@@ -633,7 +623,6 @@ export const interviews = sqliteTable(
   (table) => [index('interviews_job_date_idx').on(table.jobApplicationId, table.interviewDate)],
 )
 
-export type JobStatus = (typeof statuses)[number]
 export type JobApplication = typeof jobApplications.$inferSelect
 export type Contact = typeof contacts.$inferSelect
 export type JobPosting = typeof jobPostings.$inferSelect
@@ -648,4 +637,5 @@ export type Skill = typeof skills.$inferSelect
 export type SkillAlias = typeof skillAliases.$inferSelect
 export type JobApplicationSkill = typeof jobApplicationsToSkills.$inferSelect
 
+export type { JobStatus } from '../lib/applications/constants'
 export type { SkillDecision, SkillImportance, SkillMatchResult, SkillOrigin, SkillReviewStatus }

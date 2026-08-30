@@ -1,4 +1,9 @@
 import { z } from 'zod'
+import {
+  analysisRequirementBases,
+  requirementImportances,
+  requirementTypes,
+} from '../../lib/job-requirements/constants'
 
 /**
  * Candidate-independent structured job analysis. This schema is the single
@@ -8,7 +13,7 @@ import { z } from 'zod'
  * smuggle a fabricated fit score back into a stored analysis.
  */
 
-const roleTypes = [
+export const roleTypes = [
   'frontend',
   'backend',
   'fullstack',
@@ -17,7 +22,7 @@ const roleTypes = [
   'mixed',
 ] as const
 
-const seniorities = [
+export const seniorities = [
   'intern',
   'junior',
   'intermediate',
@@ -26,18 +31,6 @@ const seniorities = [
   'staff-plus',
   'ambiguous',
 ] as const
-
-const requirementTypes = [
-  'skill',
-  'experience',
-  'responsibility',
-  'education',
-  'soft-skill',
-  'domain',
-] as const
-
-const requirementImportances = ['required', 'preferred', 'mentioned'] as const
-const requirementBases = ['explicit', 'inferred'] as const
 
 const functionalEmphasisSchema = z
   .object({
@@ -53,7 +46,7 @@ const jobRequirementSchema = z
   .object({
     type: z.enum(requirementTypes),
     importance: z.enum(requirementImportances),
-    basis: z.enum(requirementBases),
+    basis: z.enum(analysisRequirementBases),
     statement: z.string().trim().min(1).max(1000),
     sourceText: z.string().trim().min(1).max(2000),
     inferenceRationale: z.string().trim().min(1).max(2000).nullable(),
@@ -137,7 +130,7 @@ const requirementJsonSchema = {
     },
     basis: {
       type: 'string',
-      enum: [...requirementBases],
+      enum: [...analysisRequirementBases],
       description: 'explicit when the posting states it directly; inferred when it is derived.',
     },
     statement: {

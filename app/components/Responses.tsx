@@ -1,5 +1,5 @@
 import type { Filters, JobCardData } from '../../src/db/queries'
-import type { JobStatus } from '../../src/db/schema'
+import type { JobStatus } from '../../src/lib/applications/constants'
 import { AiParser } from './AiParser'
 import { Board, Metrics, QuickCollect } from './Dashboard'
 
