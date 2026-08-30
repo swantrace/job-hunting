@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import { Hono } from 'hono'
-import { mockEnqueueGeneration, mockGetApplicationReadiness } from './support/runtime-mocks'
+import {
+  mockEnqueueGeneration,
+  mockGetApplicationReadiness,
+  mockGetGenerationState,
+} from './support/runtime-mocks'
 
 async function applicationsHarness() {
   const { POST } = (await import('../../app/routes/applications/index')) as Record<string, unknown>
@@ -50,5 +54,37 @@ describe('generation readiness gate', () => {
     expect(response.status).toBe(422)
     expect(mockEnqueueGeneration).not.toHaveBeenCalled()
     mockGetApplicationReadiness.mockReturnValue({ ready: true, reasons: [] })
+  })
+
+  test('shows state-specific regeneration copy and reasons for stale generations', async () => {
+    mockGetGenerationState.mockReturnValue({
+      state: 'stale',
+      latest: null,
+      latestCompleted: { id: 1, status: 'Completed' },
+      currentCompleted: null,
+      staleCompleted: { id: 1, status: 'Completed' },
+      reasons: ['candidate-analysis-changed'],
+    })
+    mockGetApplicationReadiness.mockReturnValue({ ready: true, reasons: [] })
+    const { GET } = (await import('../../app/routes/applications/[id]/generation-runs')) as Record<
+      string,
+      unknown
+    >
+    const app = new Hono()
+    app.get('/applications/:id/generation-runs', GET as never)
+    const response = await app.request('/applications/7/generation-runs')
+    const html = await response.text()
+
+    expect(response.status).toBe(200)
+    expect(html).toContain('Generate updated documents')
+    expect(html).toContain('candidate-analysis-changed')
+    mockGetGenerationState.mockReturnValue({
+      state: 'never-run',
+      latest: null,
+      latestCompleted: null,
+      currentCompleted: null,
+      staleCompleted: null,
+      reasons: [],
+    })
   })
 })

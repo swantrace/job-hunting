@@ -1,5 +1,5 @@
 import { listDocumentReviews } from '../../../src/db/document-review'
-import type { GenerationRunWithArtifacts } from '../../../src/db/generation'
+import type { GenerationRunWithArtifacts, GenerationState } from '../../../src/db/generation'
 import type { Filters } from '../../../src/db/queries'
 import type { ApplicationReadiness } from '../../../src/lib/application-readiness'
 import { DocumentReviewPanel } from './DocumentReview'
@@ -12,6 +12,7 @@ export function DocumentsPanel({
   evidenceSnapshot,
   googleDriveConnected,
   readiness = { ready: true, reasons: [] },
+  state,
   active = false,
 }: {
   jobId: number
@@ -20,9 +21,10 @@ export function DocumentsPanel({
   evidenceSnapshot: string | null
   googleDriveConnected: boolean
   readiness?: ApplicationReadiness
+  state?: GenerationState
   active?: boolean
 }) {
-  const latestRun = runs[0] ?? null
+  const latestRun = state?.latestCompleted ?? runs[0] ?? null
   return (
     <div
       id="workspace-documents-panel"
@@ -38,6 +40,7 @@ export function DocumentsPanel({
         evidenceSnapshot={evidenceSnapshot}
         googleDriveConnected={googleDriveConnected}
         readiness={readiness}
+        state={state}
       />
       {latestRun?.status === 'Completed' ? (
         <div class="mt-4">

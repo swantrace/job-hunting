@@ -1,5 +1,6 @@
 import {
   getGenerationEvidenceSnapshot,
+  getGenerationState,
   getGoogleDriveConnection,
   listGenerationRuns,
 } from '../../../src/db/generation'
@@ -41,6 +42,7 @@ export function WorkspaceShell({
   errorForm?: WorkspaceErrorForm
 }) {
   const generationRuns = listGenerationRuns(job.id)
+  const generationState = getGenerationState(job.id)
   const latestEvidenceSnapshot = generationRuns[0]
     ? getGenerationEvidenceSnapshot(generationRuns[0].id)
     : null
@@ -73,6 +75,7 @@ export function WorkspaceShell({
         evidenceSnapshot={latestEvidenceSnapshot?.snapshotJson ?? null}
         googleDriveConnected={googleDriveConnected}
         readiness={readiness}
+        state={generationState}
         active={activeTab === 'documents'}
       />
       <div

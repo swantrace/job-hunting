@@ -98,9 +98,19 @@ mock.module('../../../src/db/queries', () => ({
   updateManagedItem: () => true,
 }))
 
+export const mockGetGenerationState = mock((): any => ({
+  state: 'never-run',
+  latest: null,
+  latestCompleted: null,
+  currentCompleted: null,
+  staleCompleted: null,
+  reasons: [],
+}))
+
 mock.module('../../../src/db/generation', () => ({
   getGenerationEvidenceSnapshot: () => null,
   getGenerationRunResults: () => null,
+  getGenerationState: mockGetGenerationState,
   getGoogleDriveConnection: () => null,
   listBaselineGenerationRuns: () => [],
   listGenerationRuns: () => [],

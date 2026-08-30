@@ -1,6 +1,7 @@
 import { createRoute } from 'honox/factory'
 import {
   getGenerationEvidenceSnapshot,
+  getGenerationState,
   getGoogleDriveConnection,
   listGenerationRuns,
 } from '../../../../src/db/generation'
@@ -13,6 +14,7 @@ export const POST = createRoute(async (c) => {
   const id = parseId(c.req.param('id'))
   if (!id) return c.html(<div class="alert alert-error">Application not found.</div>, 404)
   const readiness = getApplicationReadiness(id)
+  const state = getGenerationState(id)
   if (!readiness.ready)
     return c.html(
       <GenerationPanel
@@ -22,6 +24,7 @@ export const POST = createRoute(async (c) => {
         evidenceSnapshot={null}
         googleDriveConnected={!!getGoogleDriveConnection()}
         readiness={readiness}
+        state={state}
       />,
       422,
     )
@@ -42,6 +45,7 @@ export const POST = createRoute(async (c) => {
       }
       googleDriveConnected={!!getGoogleDriveConnection()}
       readiness={readiness}
+      state={getGenerationState(id)}
     />,
   )
 })
@@ -60,6 +64,7 @@ export const GET = createRoute((c) => {
       }
       googleDriveConnected={!!getGoogleDriveConnection()}
       readiness={getApplicationReadiness(id)}
+      state={getGenerationState(id)}
     />,
   )
 })
