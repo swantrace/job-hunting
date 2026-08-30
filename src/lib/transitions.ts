@@ -1,4 +1,4 @@
-import type { JobStatus } from '../db/schema'
+import type { JobStatus } from './applications/constants'
 
 const rank: Partial<Record<JobStatus, number>> = {
   Saved: 0,

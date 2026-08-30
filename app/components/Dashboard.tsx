@@ -1,6 +1,15 @@
 import type { JobAnalysis } from '../../src/ai/schemas/job-analysis'
 import { type Filters, type JobCardData, listManagementData } from '../../src/db/queries'
-import type { JobStatus } from '../../src/db/schema'
+import {
+  activeStatuses,
+  applicationSortLabels,
+  applicationSortValues,
+  applicationViewLabels,
+  applicationViews,
+  type JobStatus,
+  priorities,
+  statuses,
+} from '../../src/lib/applications/constants'
 import { formatDisplayDate, todayISO } from '../../src/lib/date'
 import { listProfiles } from '../../src/lib/profiles'
 import {
@@ -20,19 +29,9 @@ import { InputField, SelectField, TextareaField } from './ui/FormField'
 import { Icon } from './ui/Icon'
 import { StatusBadge } from './ui/StatusBadge'
 
-const activeStatuses: JobStatus[] = ['Saved', 'Apply Today', 'Applied', 'Follow Up', 'Interviewing']
 const enc = (filters: Filters) => new URLSearchParams(filters).toString()
 const error = (errors: FieldErrors | undefined, name: string) => errors?.[name]?.[0]
 export function Filters({ filters }: { filters: Filters }) {
-  const statusOptions: JobStatus[] = [
-    'Saved',
-    'Apply Today',
-    'Applied',
-    'Follow Up',
-    'Interviewing',
-    'Rejected',
-    'Archived',
-  ]
   const selectedStatuses = parseCsvList(filters.statuses).length
     ? (parseCsvList(filters.statuses) as JobStatus[])
     : ([...activeStatuses] as JobStatus[])
@@ -71,38 +70,26 @@ export function Filters({ filters }: { filters: Filters }) {
           </div>
           <div class="lg:col-span-2">
             <SelectField name="view" label="View">
-              <option value="list" selected={filters.view === 'list'}>
-                List
-              </option>
-              <option value="board" selected={filters.view === 'board'}>
-                Board
-              </option>
+              {applicationViews.map((view) => (
+                <option value={view} selected={filters.view === view}>
+                  {applicationViewLabels[view]}
+                </option>
+              ))}
             </SelectField>
           </div>
           <div class="lg:col-span-2">
             <SelectField name="priority" label="Priority">
               <option value="">All priorities</option>
-              {['A', 'B', 'C'].map((p) => (
+              {priorities.map((p) => (
                 <option selected={filters.priority === p}>{p}</option>
               ))}
             </SelectField>
           </div>
           <div class="lg:col-span-2">
             <SelectField name="sort" label="Sort by">
-              {[
-                ['updated_desc', 'Recently updated'],
-                ['posted_desc', 'Posted: newest'],
-                ['posted_asc', 'Posted: oldest'],
-                ['company_asc', 'Company: A-Z'],
-                ['company_desc', 'Company: Z-A'],
-                ['priority_asc', 'Priority: A-C'],
-                ['priority_desc', 'Priority: C-A'],
-                ['target_asc', 'Today target'],
-                ['applied_desc', 'Applied: newest'],
-                ['applied_asc', 'Applied: oldest'],
-              ].map(([v, l]) => (
-                <option value={v} selected={filters.sort === v}>
-                  {l}
+              {applicationSortValues.map((sort) => (
+                <option value={sort} selected={filters.sort === sort}>
+                  {applicationSortLabels[sort]}
                 </option>
               ))}
             </SelectField>
@@ -137,7 +124,7 @@ export function Filters({ filters }: { filters: Filters }) {
             <fieldset class="fieldset">
               <legend class="fieldset-legend">Status</legend>
               <div class="flex flex-wrap gap-x-4 gap-y-2">
-                {statusOptions.map((status) => (
+                {statuses.map((status) => (
                   <label class="label cursor-pointer gap-2">
                     <input
                       type="checkbox"

@@ -1,5 +1,6 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
+import type { GeneratedArtifactType } from '../lib/generation/constants'
 import { listAnalysisRuns } from './analysis'
 import { db } from './client'
 import { listJobRequirements } from './job-analysis'
@@ -358,7 +359,7 @@ export function markGenerationRunProcessing(runId: number) {
 export function completeGenerationRun(
   runId: number,
   artifacts: Array<{
-    type: 'job_context' | 'resume' | 'cover_letter'
+    type: GeneratedArtifactType
     fileName: string
     filePath: string
     mimeType: string

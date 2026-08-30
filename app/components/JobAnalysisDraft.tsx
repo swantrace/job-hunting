@@ -1,31 +1,6 @@
-import type { JobAnalysis } from '../../src/ai/schemas/job-analysis'
+import { type JobAnalysis, roleTypes, seniorities } from '../../src/ai/schemas/job-analysis'
+import { requirementImportances, requirementTypes } from '../../src/lib/job-requirements/constants'
 
-const roleTypes = [
-  'frontend',
-  'backend',
-  'fullstack',
-  'platform-devops',
-  'data-ai',
-  'mixed',
-] as const
-const seniorities = [
-  'intern',
-  'junior',
-  'intermediate',
-  'strong-mid',
-  'senior',
-  'staff-plus',
-  'ambiguous',
-] as const
-const requirementTypes = [
-  'skill',
-  'experience',
-  'responsibility',
-  'education',
-  'soft-skill',
-  'domain',
-] as const
-const importances = ['required', 'preferred', 'mentioned'] as const
 const emphasisFields = [
   ['frontend', 'Frontend'],
   ['backend', 'Backend'],
@@ -167,7 +142,7 @@ export function JobAnalysisDraft({ analysis }: { analysis: JobAnalysis }) {
                   ))}
                 </select>
                 <select class="select select-xs" data-ja-importance onchange="updateJobAnalysis()">
-                  {importances.map((importance) => (
+                  {requirementImportances.map((importance) => (
                     <option value={importance} selected={requirement.importance === importance}>
                       {importance}
                     </option>

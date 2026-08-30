@@ -90,7 +90,9 @@ export async function enqueueDocumentReview(
     generationRunId,
     inputHash,
     model:
-      process.env.OPENAI_MODEL_DOCUMENT_REVIEW ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5-mini',
+      process.env.OPENAI_MODEL_DOCUMENT_REVIEW ??
+      process.env.OPENAI_MODEL_DEFAULT ??
+      'gpt-5.6-terra',
     promptVersion: documentReviewPromptVersion,
     schemaVersion: documentReviewSchemaVersion,
   })

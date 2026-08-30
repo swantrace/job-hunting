@@ -27,6 +27,7 @@ import type {
   BaselineEvidenceSelectionSnapshot,
   EvidenceSelectionSnapshot,
 } from './evidence-selection'
+import type { GeneratedArtifactType } from './generation/constants'
 import {
   assertGenerationEvidenceReferences,
   buildGenerationEvidenceAllowlist,
@@ -39,7 +40,7 @@ import {
 
 type JsonSchema = Record<string, unknown>
 type ArtifactOutput = {
-  type: 'job_context' | 'resume' | 'cover_letter'
+  type: GeneratedArtifactType
   fileName: string
   filePath: string
   mimeType: string
@@ -177,7 +178,7 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
   const aiInput = { jobContext, evidenceSnapshot: snapshot }
   const resume = await structuredOutput({
     apiKey,
-    model: process.env.OPENAI_MODEL_RESUME ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5-mini',
+    model: process.env.OPENAI_MODEL_RESUME ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-sol',
     name: 'tailored_resume',
     system: resumeGenerationSystemPrompt,
     schema: tailoredResumeResponseSchema,
@@ -187,7 +188,7 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
   const coverLetter = await structuredOutput({
     apiKey,
     model:
-      process.env.OPENAI_MODEL_COVER_LETTER ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5-mini',
+      process.env.OPENAI_MODEL_COVER_LETTER ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra',
     name: 'tailored_cover_letter',
     system: coverLetterGenerationSystemPrompt,
     schema: tailoredCoverLetterResponseSchema,
@@ -343,7 +344,7 @@ export async function generateBaselineResume(runId: number) {
   const facts = snapshot.facts as any
   const resume = await structuredOutput({
     apiKey,
-    model: process.env.OPENAI_MODEL_RESUME ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5-mini',
+    model: process.env.OPENAI_MODEL_RESUME ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-sol',
     name: 'baseline_resume',
     system: `${resumeGenerationSystemPrompt}\n- This is a direction baseline, not a specific job application. Do not mention an employer, job posting, or requirements that were not supplied.`,
     schema: tailoredResumeResponseSchema,

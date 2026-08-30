@@ -1,11 +1,13 @@
 import { z } from 'zod'
+import { evidenceSourceTypes } from '../../lib/evidence/constants'
 
 const text = z.string().trim().min(1).max(2200)
+const companyInterestSources = ['job-posting', 'user-note'] as const
 
 const skillItemsSchema = z.union([text, z.array(z.string().trim().min(1).max(100)).min(1).max(30)])
 
 export const evidenceRefSchema = z.object({
-  sourceType: z.enum(['experience', 'achievement', 'project', 'publication', 'skill', 'story']),
+  sourceType: z.enum(evidenceSourceTypes),
   sourceId: z.string().trim().min(1).max(120),
 })
 
@@ -39,7 +41,7 @@ export const tailoredCoverLetterSchema = z.object({
   openingParagraph: text,
   evidenceParagraphs: z.array(evidenceTextSchema).min(1).max(3),
   companyInterestParagraph: text,
-  companyInterestSource: z.enum(['job-posting', 'user-note']),
+  companyInterestSource: z.enum(companyInterestSources),
   includeAuthorization: z.boolean(),
   authorizationParagraph: z.string().trim().max(800),
   closingParagraph: text,
@@ -56,7 +58,7 @@ const evidenceRefJsonSchema = {
   properties: {
     sourceType: {
       type: 'string',
-      enum: ['experience', 'achievement', 'project', 'publication', 'skill', 'story'],
+      enum: [...evidenceSourceTypes],
     },
     sourceId: { type: 'string', description: 'A canonical source ID from the frozen snapshot.' },
   },
@@ -113,7 +115,7 @@ export const tailoredCoverLetterResponseSchema = {
     openingParagraph: stringSchema,
     evidenceParagraphs: { type: 'array', items: evidenceTextJsonSchema },
     companyInterestParagraph: stringSchema,
-    companyInterestSource: { type: 'string', enum: ['job-posting', 'user-note'] },
+    companyInterestSource: { type: 'string', enum: [...companyInterestSources] },
     includeAuthorization: { type: 'boolean' },
     authorizationParagraph: stringSchema,
     closingParagraph: stringSchema,

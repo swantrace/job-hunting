@@ -1,10 +1,18 @@
 import { z } from 'zod'
 import { jobAnalysisSchema } from '../ai/schemas/job-analysis'
-import { type JobStatus, matchLevels, priorities, statuses } from '../db/schema'
+import {
+  activeStatuses,
+  applicationSortValues,
+  applicationViews,
+  type JobStatus,
+  matchLevels,
+  priorities,
+} from './applications/constants'
 import { isISODate } from './date'
 import { hasProfile } from './profiles'
 import { skillImportances, skillReviewStatuses } from './skills/constants'
 import { hasSkillCategory } from './skills/taxonomy'
+import { workspaceTabs } from './workspace/constants'
 
 const emptyToNull = (value: unknown) =>
   typeof value === 'string' && value.trim() === '' ? null : value
@@ -174,26 +182,15 @@ export const baselineGenerationSchema = z.object({
   targetKeywords: optionalText(1000),
 })
 
-export const sortValues = [
-  'updated_desc',
-  'posted_desc',
-  'posted_asc',
-  'company_asc',
-  'company_desc',
-  'priority_asc',
-  'priority_desc',
-  'target_asc',
-  'applied_desc',
-  'applied_asc',
-] as const
+export { applicationSortValues as sortValues }
 export const filterSchema = z.object({
   q: z.string().trim().max(200).catch(''),
   priority: z.enum(['', ...priorities]).catch(''),
   statuses: z.string().trim().max(200).catch(''),
-  view: z.enum(['list', 'board']).catch('list'),
+  view: z.enum(applicationViews).catch('list'),
   today: z.enum(['', '1']).catch(''),
   attributes: z.string().trim().max(500).catch(''),
-  sort: z.enum(sortValues).catch('updated_desc'),
+  sort: z.enum(applicationSortValues).catch('updated_desc'),
 })
 
 export const applicationAttributes = [
@@ -236,22 +233,12 @@ export const parseCsvList = (value?: string) =>
     .map((item) => item.trim())
     .filter(Boolean)
 
-export const activeStatuses = [
-  'Saved',
-  'Apply Today',
-  'Applied',
-  'Follow Up',
-  'Interviewing',
-] as const
-
 export const statusesFromFilters = (filters: { statuses: string; today: string }): JobStatus[] => {
   if (filters.today === '1') return ['Apply Today']
   const requested = parseCsvList(filters.statuses) as JobStatus[]
   return requested.length ? requested : ([...activeStatuses] as JobStatus[])
 }
 
-export const workspaceTabs = ['application', 'contacts', 'activity', 'documents', 'review'] as const
-export type WorkspaceTab = (typeof workspaceTabs)[number]
 export const workspaceTabSchema = z.enum(workspaceTabs).catch('application')
 
 export type FieldErrors = Record<string, string[] | undefined>

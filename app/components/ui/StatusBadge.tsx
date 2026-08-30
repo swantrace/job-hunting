@@ -1,4 +1,4 @@
-import type { JobStatus } from '../../../src/db/schema'
+import type { JobStatus } from '../../../src/lib/applications/constants'
 
 const tones: Record<JobStatus, string> = {
   Saved: 'badge-ghost',
@@ -11,5 +11,5 @@ const tones: Record<JobStatus, string> = {
 }
 
 export function StatusBadge({ status }: { status: JobStatus }) {
-  return <span class={`badge ${tones[status]}`}>{status}</span>
+  return <span class={`badge shrink-0 text-nowrap ${tones[status]}`}>{status}</span>
 }
