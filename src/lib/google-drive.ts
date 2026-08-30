@@ -93,9 +93,18 @@ async function accessToken() {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
   })
-  const payload = (await response.json()) as { access_token?: string; error_description?: string }
+  const payload = (await response.json()) as {
+    access_token?: string
+    error?: string
+    error_description?: string
+  }
   if (!response.ok || !payload.access_token)
-    throw new Error(payload.error_description ?? 'Unable to refresh Google Drive access.')
+    throw new Error(
+      payload.error_description === 'Token has been expired or revoked.' ||
+        payload.error === 'invalid_grant'
+        ? 'Google Drive authorization expired or was revoked. Connect Google Drive again.'
+        : (payload.error_description ?? 'Unable to refresh Google Drive access.'),
+    )
   return { token: payload.access_token, folderId: connection.folderId }
 }
 
@@ -112,6 +121,20 @@ async function createFolder(token: string) {
   if (!response.ok || !payload.id)
     throw new Error(payload.error?.message ?? 'Unable to create Google Drive folder.')
   return payload.id
+}
+
+async function folderIsAvailable(token: string, folderId: string) {
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(folderId)}?fields=id,mimeType,trashed`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  )
+  if (!response.ok) return false
+  const payload = (await response.json()) as { id?: string; mimeType?: string; trashed?: boolean }
+  return (
+    payload.id === folderId &&
+    payload.mimeType === 'application/vnd.google-apps.folder' &&
+    !payload.trashed
+  )
 }
 
 export async function connectGoogleDrive(code: string) {
@@ -141,7 +164,17 @@ export async function uploadArtifactToGoogleDrive(artifact: {
   filePath: string
   mimeType: string
 }) {
-  const { token, folderId } = await accessToken()
+  const { token, folderId: configuredFolderId } = await accessToken()
+  // A stored folder can become inaccessible when a local database is moved to
+  // another Google account/project. Recreate the app folder instead of making
+  // every upload fail with Drive's opaque "File not found" response.
+  const folderId = (await folderIsAvailable(token, configuredFolderId))
+    ? configuredFolderId
+    : await createFolder(token)
+  if (folderId !== configuredFolderId) {
+    const connection = getGoogleDriveConnection()
+    if (connection) saveGoogleDriveConnection(connection.refreshTokenEncrypted, folderId)
+  }
   const bytes = await readFile(resolve(getArtifactsRoot(), artifact.filePath))
   const form = new FormData()
   form.set(

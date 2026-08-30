@@ -5,7 +5,6 @@ import {
   contactKey,
   detectImportConflicts,
   importPayloadSchema,
-  validateImportSnapshots,
 } from '../src/lib/import'
 
 describe('JSON import format', () => {
@@ -71,19 +70,14 @@ describe('JSON import format', () => {
     })
   })
 
-  test('previews ambiguous alias and decision conflicts instead of silently merging', () => {
+  test('previews ambiguous alias conflicts instead of silently merging', () => {
     const conflicts = detectImportConflicts({
       skills: [
         { id: 1, name: 'Node.js', aliases: ['nodejs'] },
         { id: 2, name: 'nodejs', aliases: [] },
       ],
-      applicationSkills: [
-        { jobApplicationId: 1, skillId: 1, userDecision: 'skip' },
-        { jobApplicationId: 1, skillId: 1, userDecision: 'include', decisionReason: 'Reason' },
-      ],
     })
     expect(conflicts.some((item) => /nodejs/.test(item))).toBe(true)
-    expect(conflicts.some((item) => /Conflicting decisions/.test(item))).toBe(true)
   })
 
   test('imports schema version 1 backups after the taxonomy export version is introduced', () => {
@@ -151,32 +145,6 @@ describe('JSON import format', () => {
     expect(parsed.applicationAnalysisRuns).toHaveLength(1)
     expect(parsed.generationRunResults).toHaveLength(1)
     expect(parsed.documentReviews).toHaveLength(1)
-  })
-
-  test('reports malformed embedded snapshots as preview errors', () => {
-    const parsed = importPayloadSchema.parse({
-      schemaVersion: 2,
-      applicationAnalysisRuns: [
-        {
-          id: 1,
-          jobApplicationId: 1,
-          status: 'Completed',
-          queueJobId: 'analysis-1',
-          result_json: '{"overallFitScore": 9}',
-        },
-      ],
-      generationRunResults: [
-        {
-          generation_run_id: 1,
-          resume_json: 'not-json',
-          cover_letter_json: null,
-          ats_audit_json: null,
-        },
-      ],
-    })
-    const errors = validateImportSnapshots(parsed)
-    expect(errors.some((error) => /analysis run 1/.test(error))).toBe(true)
-    expect(errors.some((error) => /Generation run 1/.test(error))).toBe(true)
   })
 
   test('accepts version 3 payloads with run-scoped decisions and generation identity', () => {

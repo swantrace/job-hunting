@@ -1,6 +1,6 @@
 export type GenerationRequirement = {
   analysisResult: string
-  userDecision: string
+  decision: string
 }
 
 /**
@@ -11,7 +11,7 @@ export type GenerationRequirement = {
 export function isGenerationEligible(requirement: GenerationRequirement): boolean {
   return (
     requirement.analysisResult === 'proven-match' ||
-    (requirement.analysisResult === 'not-in-career-data' && requirement.userDecision === 'include')
+    (requirement.analysisResult === 'not-in-career-data' && requirement.decision === 'include')
   )
 }
 

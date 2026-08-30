@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
 import { seedPendingRunDecisions } from './analysis-decisions'
 import { db } from './client'
@@ -6,13 +6,32 @@ import {
   type ApplicationAnalysisRun,
   applicationAnalysisRuns,
   jobApplications,
-  jobApplicationsToSkills,
+  jobPostingAnalyses,
+  jobPostings,
+  jobRequirements,
+  jobRequirementsToSkills,
+  skills,
 } from './schema'
 
 export type { ApplicationAnalysisRun }
 
+function applicationIdForAnalysisRun(runId: number): number | null {
+  return (
+    db
+      .select({ jobApplicationId: jobPostings.jobApplicationId })
+      .from(applicationAnalysisRuns)
+      .innerJoin(
+        jobPostingAnalyses,
+        eq(applicationAnalysisRuns.jobPostingAnalysisId, jobPostingAnalyses.id),
+      )
+      .innerJoin(jobPostings, eq(jobPostingAnalyses.jobPostingId, jobPostings.id))
+      .where(eq(applicationAnalysisRuns.id, runId))
+      .get()?.jobApplicationId ?? null
+  )
+}
+
 export function createAnalysisRun(input: {
-  jobApplicationId: number
+  jobPostingAnalysisId: number
   inputHash: string
   inputSnapshotJson: string
   model: string
@@ -23,7 +42,7 @@ export function createAnalysisRun(input: {
   return db
     .insert(applicationAnalysisRuns)
     .values({
-      jobApplicationId: input.jobApplicationId,
+      jobPostingAnalysisId: input.jobPostingAnalysisId,
       queueJobId: `analysis-${crypto.randomUUID()}`,
       status: 'Queued',
       inputHash: input.inputHash,
@@ -45,13 +64,19 @@ export function getAnalysisRun(runId: number) {
   )
 }
 
-export function listAnalysisRuns(jobApplicationId: number) {
+export function listAnalysisRuns(jobApplicationId: number): ApplicationAnalysisRun[] {
   return db
-    .select()
+    .select({ run: applicationAnalysisRuns })
     .from(applicationAnalysisRuns)
-    .where(eq(applicationAnalysisRuns.jobApplicationId, jobApplicationId))
+    .innerJoin(
+      jobPostingAnalyses,
+      eq(applicationAnalysisRuns.jobPostingAnalysisId, jobPostingAnalyses.id),
+    )
+    .innerJoin(jobPostings, eq(jobPostingAnalyses.jobPostingId, jobPostings.id))
+    .where(eq(jobPostings.jobApplicationId, jobApplicationId))
     .orderBy(desc(applicationAnalysisRuns.id))
     .all()
+    .map((row) => row.run)
 }
 
 export function listQueuedAnalysisRuns() {
@@ -66,33 +91,43 @@ export function listQueuedAnalysisRuns() {
 export function findReusableAnalysisRun(jobApplicationId: number, inputHash: string) {
   return (
     db
-      .select()
+      .select({ run: applicationAnalysisRuns })
       .from(applicationAnalysisRuns)
+      .innerJoin(
+        jobPostingAnalyses,
+        eq(applicationAnalysisRuns.jobPostingAnalysisId, jobPostingAnalyses.id),
+      )
+      .innerJoin(jobPostings, eq(jobPostingAnalyses.jobPostingId, jobPostings.id))
       .where(
         and(
-          eq(applicationAnalysisRuns.jobApplicationId, jobApplicationId),
+          eq(jobPostings.jobApplicationId, jobApplicationId),
           eq(applicationAnalysisRuns.inputHash, inputHash),
           sql`${applicationAnalysisRuns.status} in ('Queued', 'Processing')`,
         ),
       )
       .orderBy(desc(applicationAnalysisRuns.id))
-      .get() ?? null
+      .get()?.run ?? null
   )
 }
 
 export function latestCompletedAnalysisRun(jobApplicationId: number) {
   return (
     db
-      .select()
+      .select({ run: applicationAnalysisRuns })
       .from(applicationAnalysisRuns)
+      .innerJoin(
+        jobPostingAnalyses,
+        eq(applicationAnalysisRuns.jobPostingAnalysisId, jobPostingAnalyses.id),
+      )
+      .innerJoin(jobPostings, eq(jobPostingAnalyses.jobPostingId, jobPostings.id))
       .where(
         and(
-          eq(applicationAnalysisRuns.jobApplicationId, jobApplicationId),
+          eq(jobPostings.jobApplicationId, jobApplicationId),
           eq(applicationAnalysisRuns.status, 'Completed'),
         ),
       )
       .orderBy(desc(applicationAnalysisRuns.id))
-      .get() ?? null
+      .get()?.run ?? null
   )
 }
 
@@ -135,20 +170,35 @@ export function completeAnalysisRun(
       .where(eq(applicationAnalysisRuns.id, runId))
       .run()
 
-    // A new run starts pending for every current missing skill; prior decisions
-    // remain suggestions only and must be explicitly reconfirmed.
-    const missingSkillIds = tx
-      .select({ skillId: jobApplicationsToSkills.skillId })
-      .from(jobApplicationsToSkills)
-      .where(
-        and(
-          eq(jobApplicationsToSkills.jobApplicationId, run.jobApplicationId),
-          eq(jobApplicationsToSkills.analysisResult, 'not-in-career-data'),
+    // A new run starts pending for every current missing canonical skill. The
+    // missing set derives from the exact Job Analysis run's requirement-skill
+    // mappings where the skill is not in career data; prior decisions remain
+    // suggestions only and must be explicitly reconfirmed. Legacy runs without
+    // explicit lineage seed no decisions.
+    const jobPostingAnalysisId = run.jobPostingAnalysisId
+    if (jobPostingAnalysisId !== null) {
+      const missingSkillIds = [
+        ...new Set(
+          tx
+            .select({ skillId: jobRequirementsToSkills.skillId })
+            .from(jobRequirementsToSkills)
+            .innerJoin(
+              jobRequirements,
+              eq(jobRequirements.id, jobRequirementsToSkills.jobRequirementId),
+            )
+            .innerJoin(skills, eq(skills.id, jobRequirementsToSkills.skillId))
+            .where(
+              and(
+                eq(jobRequirements.jobPostingAnalysisId, jobPostingAnalysisId),
+                isNull(skills.careerSkillId),
+              ),
+            )
+            .all()
+            .map((row) => row.skillId),
         ),
-      )
-      .all()
-      .map((row) => row.skillId)
-    seedPendingRunDecisions(tx, runId, missingSkillIds)
+      ]
+      seedPendingRunDecisions(tx, runId, missingSkillIds)
+    }
   })
 }
 
@@ -173,23 +223,16 @@ export function confirmProfileSelection(runId: number, profileId: string) {
       .set({ confirmedProfileId: profileId, profileConfirmedAt: date, updatedAt: date })
       .where(eq(applicationAnalysisRuns.id, runId))
       .run()
-    tx.update(jobApplications)
-      .set({ direction: profileId, updatedAt: date })
-      .where(eq(jobApplications.id, run.jobApplicationId))
-      .run()
+    const jobApplicationId = applicationIdForAnalysisRun(runId)
+    if (jobApplicationId !== null)
+      tx.update(jobApplications)
+        .set({ direction: profileId, updatedAt: date })
+        .where(eq(jobApplications.id, jobApplicationId))
+        .run()
     return true
   })
 }
 
 export function analysisRunBelongsToApplication(runId: number, jobApplicationId: number) {
-  return !!db
-    .select({ id: applicationAnalysisRuns.id })
-    .from(applicationAnalysisRuns)
-    .where(
-      and(
-        eq(applicationAnalysisRuns.id, runId),
-        eq(applicationAnalysisRuns.jobApplicationId, jobApplicationId),
-      ),
-    )
-    .get()
+  return applicationIdForAnalysisRun(runId) === jobApplicationId
 }

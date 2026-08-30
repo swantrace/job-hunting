@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test'
-import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import * as schema from '../../src/db/schema'
 import {
@@ -12,7 +11,7 @@ import {
   rejectSkill,
   renameSkill,
 } from '../../src/db/skill-service'
-import { migratedDatabase, seedApplication } from '../support/sqlite'
+import { migratedDatabase } from '../support/sqlite'
 
 function database() {
   const sqlite = migratedDatabase()
@@ -28,37 +27,96 @@ function seedSkill(sqlite: ReturnType<typeof database>['sqlite'], key: string, n
     .get(key, name) as { id: number }
 }
 
-function relate(
+function seedRequirementLink(
   sqlite: ReturnType<typeof database>['sqlite'],
-  applicationId: number,
   skillId: number,
-  options: { decision?: string; reason?: string | null; rawLabel?: string } = {},
-) {
+): number {
+  const company = sqlite
+    .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
+    .get('Example Company', '2026-08-28', '2026-08-28') as { id: number }
+  const application = sqlite
+    .query(
+      `INSERT INTO job_applications (
+        company_id, job_title, direction, posted_date, priority, status, created_at, updated_at
+      ) VALUES (?, ?, 'fullstack', '2026-08-28', 'B', 'Saved', '2026-08-28', '2026-08-28') RETURNING id`,
+    )
+    .get(company.id, 'Engineer') as { id: number }
+  const posting = sqlite
+    .query(
+      `INSERT INTO job_postings (job_application_id, raw_text, captured_at, content_hash)
+       VALUES (?, ?, '2026-08-28', ?) RETURNING id`,
+    )
+    .get(application.id, 'Role.', 'hash') as { id: number }
+  const analysis = sqlite
+    .query(
+      'INSERT INTO job_posting_analyses (job_posting_id, created_at, updated_at) VALUES (?, ?, ?) RETURNING id',
+    )
+    .get(posting.id, '2026-08-28', '2026-08-28') as { id: number }
+  const requirement = sqlite
+    .query(
+      `INSERT INTO job_requirements (
+        job_posting_analysis_id, sequence, requirement_type, importance, basis, statement,
+        source_text, created_at, updated_at
+      ) VALUES (?, 1, 'skill', 'required', 'explicit', 'Skill requirement.', 'Skill requirement.', '2026-08-28', '2026-08-28') RETURNING id`,
+    )
+    .get(analysis.id) as { id: number }
+  sqlite
+    .query('INSERT INTO job_requirements_to_skills (job_requirement_id, skill_id) VALUES (?, ?)')
+    .run(requirement.id, skillId)
+  return requirement.id
+}
+
+function seedDecision(
+  sqlite: ReturnType<typeof database>['sqlite'],
+  skillId: number,
+  decision: string,
+): number {
+  const company = sqlite
+    .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
+    .get('Decision Company', '2026-08-28', '2026-08-28') as { id: number }
+  const application = sqlite
+    .query(
+      `INSERT INTO job_applications (
+        company_id, job_title, direction, posted_date, priority, status, created_at, updated_at
+      ) VALUES (?, ?, 'fullstack', '2026-08-28', 'B', 'Saved', '2026-08-28', '2026-08-28') RETURNING id`,
+    )
+    .get(company.id, 'Engineer') as { id: number }
+  const posting = sqlite
+    .query(
+      `INSERT INTO job_postings (job_application_id, raw_text, captured_at, content_hash)
+       VALUES (?, ?, '2026-08-28', ?) RETURNING id`,
+    )
+    .get(application.id, 'Role.', 'hash') as { id: number }
+  const analysis = sqlite
+    .query(
+      'INSERT INTO job_posting_analyses (job_posting_id, created_at, updated_at) VALUES (?, ?, ?) RETURNING id',
+    )
+    .get(posting.id, '2026-08-28', '2026-08-28') as { id: number }
+  const run = sqlite
+    .query(
+      `INSERT INTO application_analysis_runs (
+        job_posting_analysis_id, status, queue_job_id, created_at, updated_at
+      ) VALUES (?, 'Completed', ?, '2026-08-28', '2026-08-28') RETURNING id`,
+    )
+    .get(analysis.id, `run-${skillId}-${decision}`) as { id: number }
   sqlite
     .query(
-      `INSERT INTO job_applications_to_skills (
-        job_application_id, skill_id, raw_label, importance, analysis_result,
-        user_decision, decision_reason, created_at, updated_at
-      ) VALUES (?, ?, ?, 'required', 'not-in-career-data', ?, ?, '2026-08-28', '2026-08-28')`,
+      `INSERT INTO analysis_run_decisions (
+        application_analysis_run_id, skill_id, decision, reason, created_at, updated_at
+      ) VALUES (?, ?, ?, NULL, '2026-08-28', '2026-08-28')`,
     )
-    .run(
-      applicationId,
-      skillId,
-      options.rawLabel ?? null,
-      options.decision ?? 'pending',
-      options.reason ?? null,
-    )
+    .run(run.id, skillId, decision)
+  return run.id
 }
 
 describe('transactional skill review and merge services', () => {
-  test('moves aliases and application history without losing relations', () => {
+  test('moves aliases and requirement links without losing relations', () => {
     const { sqlite, db } = database()
     try {
       const source = seedSkill(sqlite, 'nodejs', 'Node.js')
       const target = seedSkill(sqlite, 'node-js', 'Node JS')
       addSkillAlias(source.id, 'node.js', 'manual', db)
-      const { applicationId } = seedApplication(sqlite)
-      relate(sqlite, applicationId, source.id)
+      seedRequirementLink(sqlite, source.id)
 
       mergeSkills(source.id, target.id, db)
 
@@ -74,56 +132,54 @@ describe('transactional skill review and merge services', () => {
       expect(alias.skill_id).toBe(target.id)
 
       const relation = sqlite
-        .query('SELECT skill_id FROM job_applications_to_skills WHERE job_application_id = ?')
-        .get(applicationId) as { skill_id: number }
+        .query('SELECT skill_id FROM job_requirements_to_skills LIMIT 1')
+        .get() as { skill_id: number }
       expect(relation.skill_id).toBe(target.id)
     } finally {
       sqlite.close()
     }
   })
 
-  test('deduplicates collisions while preserving raw labels and source excerpts', () => {
+  test('deduplicates requirement-link collisions', () => {
     const { sqlite, db } = database()
     try {
       const source = seedSkill(sqlite, 'react', 'React')
       const target = seedSkill(sqlite, 'reactjs', 'React.js')
-      const { applicationId } = seedApplication(sqlite)
-      relate(sqlite, applicationId, source.id, { rawLabel: 'React (raw)' })
-      relate(sqlite, applicationId, target.id, { rawLabel: 'React.js (raw)' })
+      const requirementId = seedRequirementLink(sqlite, source.id)
+      sqlite
+        .query(
+          'INSERT INTO job_requirements_to_skills (job_requirement_id, skill_id) VALUES (?, ?)',
+        )
+        .run(requirementId, target.id)
 
       mergeSkills(source.id, target.id, db)
 
-      const relations = sqlite
-        .query(
-          'SELECT skill_id, raw_label FROM job_applications_to_skills WHERE job_application_id = ?',
-        )
-        .all(applicationId) as Array<{ skill_id: number; raw_label: string | null }>
-      expect(relations).toHaveLength(1)
-      expect(relations[0].skill_id).toBe(target.id)
-      expect(relations[0].raw_label).toBe('React.js (raw)')
+      const links = sqlite
+        .query('SELECT skill_id FROM job_requirements_to_skills WHERE job_requirement_id = ?')
+        .all(requirementId) as Array<{ skill_id: number }>
+      expect(links).toHaveLength(1)
+      expect(links[0].skill_id).toBe(target.id)
     } finally {
       sqlite.close()
     }
   })
 
-  test('blocks and reports conflicting decisions without merging', () => {
+  test('blocks and reports conflicting run-scoped decisions without merging', () => {
     const { sqlite, db } = database()
     try {
       const source = seedSkill(sqlite, 'kafka', 'Kafka')
       const target = seedSkill(sqlite, 'apache-kafka', 'Apache Kafka')
-      const { applicationId } = seedApplication(sqlite)
-      relate(sqlite, applicationId, source.id, { decision: 'skip', reason: 'Not relevant' })
-      relate(sqlite, applicationId, target.id, {
-        decision: 'include',
-        reason: 'Used in a personal prototype',
-      })
+      const runId = seedDecision(sqlite, source.id, 'skip')
+      sqlite
+        .query(
+          `INSERT INTO analysis_run_decisions (
+            application_analysis_run_id, skill_id, decision, reason, created_at, updated_at
+          ) VALUES (?, ?, 'include', 'Used in a prototype', '2026-08-28', '2026-08-28')`,
+        )
+        .run(runId, target.id)
 
       expect(previewMerge(source.id, target.id, db).conflicts).toEqual([
-        {
-          applicationId,
-          sourceDecision: 'skip',
-          targetDecision: 'include',
-        },
+        { runId, sourceDecision: 'skip', targetDecision: 'include' },
       ])
       expect(() => mergeSkills(source.id, target.id, db)).toThrow(MergeConflictError)
 
@@ -145,17 +201,14 @@ describe('transactional skill review and merge services', () => {
       expect(sqlite.query('SELECT review_status FROM skills WHERE id = ?').get(skill.id)).toEqual({
         review_status: 'approved',
       })
-
       rejectSkill(skill.id, db)
       expect(sqlite.query('SELECT review_status FROM skills WHERE id = ?').get(skill.id)).toEqual({
         review_status: 'rejected',
       })
-
       recategorizeSkill(skill.id, 'frontend', db)
       expect(sqlite.query('SELECT category FROM skills WHERE id = ?').get(skill.id)).toEqual({
         category: 'frontend',
       })
-
       renameSkill(skill.id, 'Vue.js', db)
       const renamed = sqlite.query('SELECT name, key FROM skills WHERE id = ?').get(skill.id) as {
         name: string

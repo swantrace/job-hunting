@@ -1,11 +1,20 @@
 import { createRoute } from 'honox/factory'
-import { confirmProfileSelection, getAnalysisRun } from '../../../../src/db/analysis'
+import {
+  analysisRunBelongsToApplication,
+  confirmProfileSelection,
+  getAnalysisRun,
+} from '../../../../src/db/analysis'
 import { getApplication } from '../../../../src/db/queries'
+import { getApplicationReadiness } from '../../../../src/lib/application-readiness'
 import { getCandidateAnalysisState } from '../../../../src/lib/candidate-analysis'
 import { listProfiles } from '../../../../src/lib/profiles'
 import { parseFilters, parseForm, parseId } from '../../../../src/lib/request'
 import { profileSelectionSchema } from '../../../../src/lib/validation'
+import { computeWorkspaceAvailability } from '../../../../src/lib/workspace/availability'
+import { tabAvailability } from '../../../../src/lib/workspace/state'
 import { ProfileRecommendation } from '../../../components/workspace/ProfileRecommendation'
+import { ReviewReadiness } from '../../../components/workspace/ReviewReadiness'
+import { WorkspaceTabs } from '../../../components/workspace/WorkspaceTabs'
 
 function recommendationFor(jobId: number, filters: ReturnType<typeof parseFilters>) {
   const state = getCandidateAnalysisState(jobId)
@@ -17,6 +26,25 @@ function recommendationFor(jobId: number, filters: ReturnType<typeof parseFilter
       profiles={listProfiles()}
       canConfirm={state.state === 'current'}
     />
+  )
+}
+
+function completedReviewFragments(jobId: number, filters: ReturnType<typeof parseFilters>) {
+  return (
+    <>
+      {recommendationFor(jobId, filters)}
+      <WorkspaceTabs
+        activeTab="review"
+        availability={tabAvailability(computeWorkspaceAvailability(jobId))}
+        oob
+      />
+      <ReviewReadiness
+        jobId={jobId}
+        filters={filters}
+        readiness={getApplicationReadiness(jobId)}
+        oob
+      />
+    </>
   )
 }
 
@@ -35,7 +63,7 @@ export const POST = createRoute(async (c) => {
   }
 
   const run = getAnalysisRun(parsed.data.runId)
-  if (!run || run.jobApplicationId !== id || run.status !== 'Completed') {
+  if (!run || !analysisRunBelongsToApplication(run.id, id) || run.status !== 'Completed') {
     c.header('HX-Retarget', '#profile-recommendation')
     return c.html(recommendationFor(id, filters), 422)
   }
@@ -47,7 +75,7 @@ export const POST = createRoute(async (c) => {
   }
 
   confirmProfileSelection(run.id, parsed.data.profileId)
-  return c.html(recommendationFor(id, filters))
+  return c.html(completedReviewFragments(id, filters))
 })
 
 export const GET = createRoute((c) => {

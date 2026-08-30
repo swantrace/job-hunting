@@ -2,13 +2,9 @@ import { createHash } from 'node:crypto'
 import { and, desc, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm'
 import type { z } from 'zod'
 import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
-import {
-  type ApplicationSort,
-  matchLevels,
-  priorities,
-  statuses,
-} from '../lib/applications/constants'
-import { todayISO } from '../lib/date'
+import { followUpActionTypes, interviewRoundTypes } from '../lib/activities/constants'
+import { type ApplicationSort, priorities, statuses } from '../lib/applications/constants'
+import { nowISO, todayISO } from '../lib/date'
 import { runStatuses } from '../lib/generation/constants'
 import {
   applicationKey,
@@ -20,7 +16,6 @@ import {
   nullableText,
   skillKey,
   textValue,
-  validateImportSnapshots,
 } from '../lib/import'
 import { jobAnalysisInputFromContent } from '../lib/job-analysis-input'
 import {
@@ -59,7 +54,6 @@ import {
   type JobApplication,
   jobApplications,
   jobApplicationsToContacts,
-  jobApplicationsToSkills,
   jobPostingAnalyses,
   jobPostings,
   jobRequirements,
@@ -67,13 +61,7 @@ import {
   skillAliases,
   skills,
 } from './schema'
-import {
-  type DbExecutor,
-  getOrCreateSkill,
-  insertSkill,
-  persistSkillRequirements,
-  reconcileSkillNames,
-} from './skill-queries'
+import { type DbExecutor, getOrCreateSkill, insertSkill } from './skill-queries'
 
 export type Filters = z.infer<typeof filterSchema>
 export type JobCardData = JobApplication & {
@@ -84,15 +72,6 @@ export type JobCardData = JobApplication & {
   jobPosting?: typeof jobPostings.$inferSelect
   jobPostingAnalysis?: typeof jobPostingAnalyses.$inferSelect
 }
-
-const cleanSkills = (value?: string | null) => [
-  ...new Set(
-    (value ?? '')
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean),
-  ),
-]
 
 function controlledValue<const Values extends readonly string[], const Fallback>(
   values: Values,
@@ -112,7 +91,10 @@ function getOrCreateCompany(tx: DbExecutor, name: string, date: string) {
     .where(sql`lower(${companies.name}) = lower(${name})`)
     .get()
   if (!company) {
-    tx.insert(companies).values({ name, createdAt: date }).onConflictDoNothing().run()
+    tx.insert(companies)
+      .values({ name, createdAt: date, updatedAt: date })
+      .onConflictDoNothing()
+      .run()
     company = tx
       .select()
       .from(companies)
@@ -121,10 +103,6 @@ function getOrCreateCompany(tx: DbExecutor, name: string, date: string) {
   }
   if (!company) throw new Error('Unable to resolve company')
   return company
-}
-
-function replaceSkills(tx: DbExecutor, jobId: number, names: string[]) {
-  reconcileSkillNames(tx, jobId, names)
 }
 
 export function createApplication(input: z.infer<typeof quickCollectSchema>) {
@@ -149,11 +127,6 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
       })
       .returning({ id: jobApplications.id })
       .get()
-    if (input.skillRequirements?.length) {
-      persistSkillRequirements(tx, result.id, input.skillRequirements)
-    } else {
-      replaceSkills(tx, result.id, cleanSkills(input.skills))
-    }
     const rawText = input.jobPostText?.trim()
     if (rawText) {
       const contentHash = createHash('sha256').update(rawText).digest('hex')
@@ -164,14 +137,10 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
           rawText,
           capturedAt: date,
           contentHash,
-          parsedAt: input.analysisRequirements || input.jobAnalysis ? date : null,
-          parserModel: input.parserModel,
-          parserPromptVersion: input.parserPromptVersion,
         })
         .returning({ id: jobPostings.id })
         .get()
-      if (input.parserPromptVersion || input.jobAnalysis) {
-        const analysis = input.jobAnalysis
+      if (input.jobAnalysis) {
         const inputIdentity = jobAnalysisInputFromContent(contentHash)
         persistCompletedJobAnalysis(tx, {
           jobPostingId: posting.id,
@@ -179,34 +148,8 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
           frozenInputJson: JSON.stringify(inputIdentity.snapshot),
           model: input.parserModel,
           promptVersion: input.parserPromptVersion,
-          requirements: input.analysisRequirements,
-          responsibilities: input.analysisResponsibilities,
-          painPoints: input.analysisPainPoints,
-          culture: input.analysisCulture,
-          redFlags: input.analysisRedFlags,
-          successMetrics: input.analysisSuccessMetrics,
-          benefits: input.analysisBenefits,
-          notes: input.analysisNotes,
-          summary: analysis ? JSON.stringify(analysis.summary) : null,
-          roleType: analysis?.classification.roleType ?? null,
-          advertisedSeniority: analysis?.classification.advertisedSeniority ?? null,
-          practicalSeniority: analysis?.classification.practicalSeniority ?? null,
-          classificationRationale: analysis?.classification.rationale ?? null,
-          functionalEmphasisJson: analysis
-            ? JSON.stringify(analysis.classification.functionalEmphasis)
-            : null,
-          interviewQuestionsJson: analysis ? JSON.stringify(analysis.interviewQuestions) : null,
-          schemaVersion: analysis ? jobAnalysisSchemaVersion : null,
-          requirementsRows: analysis
-            ? analysis.requirements.map((requirement) => ({
-                type: requirement.type,
-                importance: requirement.importance,
-                basis: requirement.basis,
-                statement: requirement.statement,
-                sourceText: requirement.sourceText,
-                inferenceRationale: requirement.inferenceRationale,
-              }))
-            : [],
+          analysis: input.jobAnalysis,
+          schemaVersion: jobAnalysisSchemaVersion,
           date,
         })
       }
@@ -231,8 +174,6 @@ export function updateApplication(id: number, input: z.infer<typeof applicationS
         postedDate: input.postedDate,
         priority: input.priority,
         appliedDate: input.appliedDate ?? date,
-        resumeVersion: input.resumeVersion,
-        matchLevel: input.matchLevel,
         applicationSource: input.applicationSource,
         salary: input.salary,
         notes: input.notes,
@@ -241,7 +182,6 @@ export function updateApplication(id: number, input: z.infer<typeof applicationS
       })
       .where(eq(jobApplications.id, id))
       .run()
-    replaceSkills(tx, id, cleanSkills(input.skills))
     return true
   })
 }
@@ -281,22 +221,11 @@ export function listApplications(filters: Filters): JobCardData[] {
     .orderBy(orderMap[filters.sort])
     .all()
   if (!rows.length) return []
-  const skillRows = db
-    .select({ jobId: jobApplicationsToSkills.jobApplicationId, name: skills.name })
-    .from(jobApplicationsToSkills)
-    .innerJoin(skills, eq(jobApplicationsToSkills.skillId, skills.id))
-    .where(
-      inArray(
-        jobApplicationsToSkills.jobApplicationId,
-        rows.map((row) => row.job.id),
-      ),
-    )
-    .all()
   return rows.map((row) => ({
     ...row.job,
     companyName: row.companyName,
     companyWebsite: row.companyWebsite,
-    skills: skillRows.filter((skill) => skill.jobId === row.job.id).map((skill) => skill.name),
+    skills: [],
   }))
 }
 
@@ -312,14 +241,12 @@ export function getApplication(id: number): JobCardData | null {
     .where(eq(jobApplications.id, id))
     .get()
   if (!row) return null
-  const jobSkills = db
-    .select({ name: skills.name })
-    .from(jobApplicationsToSkills)
-    .innerJoin(skills, eq(jobApplicationsToSkills.skillId, skills.id))
-    .where(eq(jobApplicationsToSkills.jobApplicationId, id))
-    .all()
-    .map((skill) => skill.name)
-  const jobPosting = db.select().from(jobPostings).where(eq(jobPostings.jobApplicationId, id)).get()
+  const jobPosting = db
+    .select()
+    .from(jobPostings)
+    .where(eq(jobPostings.jobApplicationId, id))
+    .orderBy(desc(jobPostings.version), desc(jobPostings.id))
+    .get()
   const jobPostingAnalysis = jobPosting
     ? db
         .select()
@@ -339,7 +266,7 @@ export function getApplication(id: number): JobCardData | null {
     ...row.job,
     companyName: row.companyName,
     companyWebsite: row.companyWebsite,
-    skills: jobSkills,
+    skills: [],
     contacts: jobContacts,
     jobPosting,
     jobPostingAnalysis,
@@ -350,6 +277,7 @@ export function addContactToApplication(
   applicationId: number,
   input: { name: string; email?: string | null; linkedinUrl?: string | null },
 ) {
+  const date = todayISO()
   return db.transaction((tx) => {
     const application = tx
       .select({ companyId: jobApplications.companyId })
@@ -375,6 +303,8 @@ export function addContactToApplication(
           companyId: application.companyId,
           name: input.name,
           email: input.email ?? null,
+          createdAt: date,
+          updatedAt: date,
           linkedinUrl: input.linkedinUrl ?? null,
         })
         .returning()
@@ -404,27 +334,16 @@ export function listManagementData() {
 export function exportData() {
   const companyRows = db.select().from(companies).all()
   const companyById = new Map(companyRows.map((company) => [company.id, company.name]))
-  const skillRows = db.select().from(skills).all()
-  const skillById = new Map(skillRows.map((skill) => [skill.id, skill.name]))
   const contactRows = db.select().from(contacts).all()
   const contactById = new Map(contactRows.map((contact) => [contact.id, contact]))
   const applicationRows = db.select().from(jobApplications).all()
-  const postingRows = db.select().from(jobPostings).all()
-  const postingApplicationById = new Map(
-    postingRows.map((posting) => [posting.id, posting.jobApplicationId]),
-  )
-  const analysisRows = db.select().from(jobPostingAnalyses).all()
-  const analysisApplicationById = new Map(
-    analysisRows.map((analysis) => [
-      analysis.id,
-      postingApplicationById.get(analysis.jobPostingId),
-    ]),
-  )
   return {
-    schemaVersion: 3,
+    // Portable core-data format (v4). Derived AI history, generated artifacts,
+    // baseline history, and OAuth connections are deliberately omitted.
+    schemaVersion: 4,
     exportedAt: new Date().toISOString(),
     companies: companyRows,
-    skills: skillRows,
+    skills: db.select().from(skills).all(),
     skillAliases: db.select().from(skillAliases).all(),
     contacts: contactRows.map((contact) => ({
       ...contact,
@@ -434,14 +353,6 @@ export function exportData() {
       ...application,
       companyName: companyById.get(application.companyId),
     })),
-    applicationSkills: db
-      .select()
-      .from(jobApplicationsToSkills)
-      .all()
-      .map((item) => ({
-        ...item,
-        skillName: skillById.get(item.skillId),
-      })),
     applicationContacts: db
       .select()
       .from(jobApplicationsToContacts)
@@ -452,25 +363,7 @@ export function exportData() {
       })),
     followUps: db.select().from(followUps).all(),
     interviews: db.select().from(interviews).all(),
-    jobPostings: postingRows,
-    jobPostingAnalyses: analysisRows.map((analysis) => ({
-      ...analysis,
-      jobApplicationId: postingApplicationById.get(analysis.jobPostingId),
-    })),
-    jobRequirements: db
-      .select()
-      .from(jobRequirements)
-      .all()
-      .map((requirement) => ({
-        ...requirement,
-        jobApplicationId: analysisApplicationById.get(requirement.jobPostingAnalysisId),
-      })),
-    jobRequirementsToSkills: db.select().from(jobRequirementsToSkills).all(),
-    applicationAnalysisRuns: db.select().from(applicationAnalysisRuns).all(),
-    analysisRunDecisions: db.select().from(analysisRunDecisions).all(),
-    generationRuns: db.select().from(generationRuns).all(),
-    generationRunResults: db.select().from(generationRunResults).all(),
-    documentReviews: db.select().from(documentReviews).all(),
+    jobPostings: db.select().from(jobPostings).all(),
   }
 }
 
@@ -554,7 +447,9 @@ export function previewImport(payload: ImportPayload): ImportPreview {
     conflicts: [
       ...conflicts,
       ...detectImportConflicts(payload),
-      ...validateImportSnapshots(payload),
+      payload.schemaVersion < 4
+        ? 'Legacy AI history and application-skill rows are ignored; derived history is reset.'
+        : 'Derived AI history is not part of portable exports and is reset after import.',
     ],
   }
 }
@@ -565,9 +460,6 @@ export function mergeImport(payload: ImportPayload) {
     const skillIds = new Map<number, number>()
     const contactIds = new Map<number, number>()
     const applicationIds = new Map<number, number>()
-    const analysisIds = new Map<number, number>()
-    const applicationAnalysisRunIds = new Map<number, number>()
-    const generationRunIds = new Map<number, number>()
     const companiesByKey = new Map(
       tx
         .select()
@@ -593,6 +485,7 @@ export function mergeImport(payload: ImportPayload) {
             name,
             website: nullableText(incoming.website),
             createdAt: textValue(incoming.createdAt) || todayISO(),
+            updatedAt: textValue(incoming.updatedAt) || todayISO(),
           })
           .returning()
           .get()
@@ -701,6 +594,8 @@ export function mergeImport(payload: ImportPayload) {
         name,
         email: nullableText(incoming.email),
         linkedinUrl: nullableText(incoming.linkedinUrl),
+        createdAt: textValue(incoming.createdAt) || todayISO(),
+        updatedAt: textValue(incoming.updatedAt) || todayISO(),
       }
       if (existing) {
         tx.update(contacts).set(values).where(eq(contacts.id, existing.id)).run()
@@ -731,8 +626,6 @@ export function mergeImport(payload: ImportPayload) {
         postedDate,
         priority: controlledValue(priorities, incoming.priority, 'B'),
         appliedDate: nullableText(incoming.appliedDate),
-        resumeVersion: nullableText(incoming.resumeVersion),
-        matchLevel: controlledValue(matchLevels, incoming.matchLevel, null),
         applicationSource: nullableText(incoming.applicationSource),
         salary: nullableText(incoming.salary),
         notes: nullableText(incoming.notes),
@@ -748,44 +641,6 @@ export function mergeImport(payload: ImportPayload) {
       } else {
         const created = tx.insert(jobApplications).values(values).returning().get()
         applicationIds.set(Number(incoming.id), created.id)
-      }
-    }
-    for (const relation of payload.applicationSkills) {
-      const relationRecord = relation as Record<string, unknown>
-      const applicationId = applicationIds.get(Number(relationRecord.jobApplicationId))
-      const skillId =
-        skillIds.get(Number(relationRecord.skillId)) ??
-        skillsByKey.get(key(relationRecord.skillName))?.id
-      if (applicationId && skillId) {
-        const date = todayISO()
-        const importanceValue = relationRecord.importance
-        const analysisResultValue = relationRecord.analysisResult
-        const userDecisionValue = relationRecord.userDecision
-        const reason = textValue(relationRecord.decisionReason) || null
-        tx.insert(jobApplicationsToSkills)
-          .values({
-            jobApplicationId: applicationId,
-            skillId,
-            rawLabel:
-              textValue(relationRecord.rawLabel) || textValue(relationRecord.skillName) || null,
-            sourceText: textValue(relationRecord.sourceText) || null,
-            importance: controlledValue(skillImportances, importanceValue, 'mentioned'),
-            parserConfidence:
-              typeof relationRecord.parserConfidence === 'number'
-                ? relationRecord.parserConfidence
-                : null,
-            analysisResult: controlledValue(
-              skillMatchResults,
-              analysisResultValue,
-              'not-in-career-data',
-            ),
-            userDecision: controlledValue(skillDecisions, userDecisionValue, 'pending'),
-            decisionReason: reason,
-            createdAt: textValue(relationRecord.createdAt) || date,
-            updatedAt: textValue(relationRecord.updatedAt) || date,
-          })
-          .onConflictDoNothing()
-          .run()
       }
     }
     for (const relation of payload.applicationContacts) {
@@ -816,7 +671,10 @@ export function mergeImport(payload: ImportPayload) {
           .values({
             jobApplicationId: applicationId,
             actionDate: textValue(incoming.actionDate),
+            actionType: controlledValue(followUpActionTypes, incoming.actionType, 'other'),
             notes: nullableText(incoming.notes),
+            createdAt: textValue(incoming.createdAt) || todayISO(),
+            updatedAt: textValue(incoming.updatedAt) || todayISO(),
           })
           .run()
     }
@@ -841,7 +699,10 @@ export function mergeImport(payload: ImportPayload) {
             jobApplicationId: applicationId,
             interviewDate: textValue(incoming.interviewDate),
             roundName: textValue(incoming.roundName),
+            roundType: controlledValue(interviewRoundTypes, incoming.roundType, 'other'),
             notes: nullableText(incoming.notes),
+            createdAt: textValue(incoming.createdAt) || todayISO(),
+            updatedAt: textValue(incoming.updatedAt) || todayISO(),
           })
           .run()
     }
@@ -855,9 +716,6 @@ export function mergeImport(payload: ImportPayload) {
         capturedAt: textValue(incoming.capturedAt) || todayISO(),
         contentHash:
           textValue(incoming.contentHash) || createHash('sha256').update(rawText).digest('hex'),
-        parsedAt: nullableText(incoming.parsedAt),
-        parserModel: nullableText(incoming.parserModel),
-        parserPromptVersion: nullableText(incoming.parserPromptVersion),
       }
       const existing = tx
         .select()
@@ -866,235 +724,6 @@ export function mergeImport(payload: ImportPayload) {
         .get()
       if (existing) tx.update(jobPostings).set(values).where(eq(jobPostings.id, existing.id)).run()
       else tx.insert(jobPostings).values(values).run()
-    }
-    for (const incoming of payload.jobPostingAnalyses) {
-      const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
-      if (!applicationId) continue
-      const posting = tx
-        .select()
-        .from(jobPostings)
-        .where(eq(jobPostings.jobApplicationId, applicationId))
-        .get()
-      if (!posting) continue
-      const queueJobId = nullableText(incoming.queueJobId)
-      const existing = queueJobId
-        ? tx
-            .select()
-            .from(jobPostingAnalyses)
-            .where(eq(jobPostingAnalyses.queueJobId, queueJobId))
-            .get()
-        : undefined
-      const values = {
-        jobPostingId: posting.id,
-        status: controlledValue(runStatuses, incoming.status, 'Completed'),
-        queueJobId,
-        attempts: Number(incoming.attempts) || 0,
-        inputHash: nullableText(incoming.inputHash),
-        frozenInputJson: nullableText(incoming.frozenInputJson),
-        errorMessage: nullableText(incoming.errorMessage),
-        requirements: nullableText(incoming.requirements),
-        responsibilities: nullableText(incoming.responsibilities),
-        painPoints: nullableText(incoming.painPoints),
-        culture: nullableText(incoming.culture),
-        redFlags: nullableText(incoming.redFlags),
-        successMetrics: nullableText(incoming.successMetrics),
-        benefits: nullableText(incoming.benefits),
-        notes: nullableText(incoming.notes),
-        generatedAt: textValue(incoming.generatedAt) || todayISO(),
-        model: nullableText(incoming.model),
-        promptVersion: nullableText(incoming.promptVersion),
-        summary: nullableText(incoming.summary),
-        roleType: nullableText(incoming.roleType),
-        advertisedSeniority: nullableText(incoming.advertisedSeniority),
-        practicalSeniority: nullableText(incoming.practicalSeniority),
-        classificationRationale: nullableText(incoming.classificationRationale),
-        functionalEmphasisJson: nullableText(incoming.functionalEmphasisJson),
-        interviewQuestionsJson: nullableText(incoming.interviewQuestionsJson),
-        schemaVersion: nullableText(incoming.schemaVersion),
-        createdAt: textValue(incoming.createdAt) || todayISO(),
-        updatedAt: textValue(incoming.updatedAt) || todayISO(),
-        startedAt: nullableText(incoming.startedAt),
-        completedAt: nullableText(incoming.completedAt),
-      }
-      if (existing) analysisIds.set(Number(incoming.id), existing.id)
-      else {
-        const created = tx
-          .insert(jobPostingAnalyses)
-          .values(values)
-          .returning({ id: jobPostingAnalyses.id })
-          .get()
-        analysisIds.set(Number(incoming.id), created.id)
-      }
-    }
-    for (const incoming of payload.jobRequirements) {
-      const analysisId = analysisIds.get(Number(incoming.jobPostingAnalysisId))
-      if (!analysisId || !textValue(incoming.statement)) continue
-      const existing = tx
-        .select()
-        .from(jobRequirements)
-        .where(
-          and(
-            eq(jobRequirements.jobPostingAnalysisId, analysisId),
-            eq(jobRequirements.sequence, Number(incoming.sequence)),
-          ),
-        )
-        .get()
-      const values = {
-        jobPostingAnalysisId: analysisId,
-        sequence: Number(incoming.sequence) || 1,
-        requirementType: controlledValue(requirementTypes, incoming.requirementType, 'experience'),
-        importance: controlledValue(requirementImportances, incoming.importance, 'mentioned'),
-        basis: controlledValue(persistedRequirementBases, incoming.basis, 'legacy'),
-        statement: textValue(incoming.statement),
-        sourceText: nullableText(incoming.sourceText),
-        inferenceRationale: nullableText(incoming.inferenceRationale),
-        createdAt: textValue(incoming.createdAt) || todayISO(),
-        updatedAt: textValue(incoming.updatedAt) || todayISO(),
-      }
-      if (existing)
-        tx.update(jobRequirements).set(values).where(eq(jobRequirements.id, existing.id)).run()
-      else tx.insert(jobRequirements).values(values).run()
-    }
-    for (const incoming of payload.jobRequirementsToSkills) {
-      const requirementId = Number(incoming.jobRequirementId)
-      const skillId = skillIds.get(Number(incoming.skillId))
-      if (!requirementId || !skillId) continue
-      tx.insert(jobRequirementsToSkills)
-        .values({ jobRequirementId: requirementId, skillId })
-        .onConflictDoNothing()
-        .run()
-    }
-    for (const incoming of payload.applicationAnalysisRuns) {
-      const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
-      if (!applicationId) continue
-      const queueJobId = textValue(incoming.queueJobId) || `analysis-import-${incoming.id}`
-      const existing = tx
-        .select()
-        .from(applicationAnalysisRuns)
-        .where(eq(applicationAnalysisRuns.queueJobId, queueJobId))
-        .get()
-      const values = {
-        jobApplicationId: applicationId,
-        status: controlledValue(runStatuses, incoming.status, 'Completed'),
-        queueJobId,
-        attempts: Number(incoming.attempts) || 0,
-        inputHash: nullableText(incoming.inputHash),
-        inputSnapshotJson: nullableText(incoming.inputSnapshotJson),
-        resultJson: nullableText(incoming.resultJson),
-        model: nullableText(incoming.model),
-        promptVersion: nullableText(incoming.promptVersion),
-        schemaVersion: nullableText(incoming.schemaVersion),
-        errorMessage: nullableText(incoming.errorMessage),
-        recommendedProfileId: nullableText(incoming.recommendedProfileId),
-        confirmedProfileId: nullableText(incoming.confirmedProfileId),
-        profileConfirmedAt: nullableText(incoming.profileConfirmedAt),
-        createdAt: textValue(incoming.createdAt) || todayISO(),
-        updatedAt: textValue(incoming.updatedAt) || todayISO(),
-        startedAt: nullableText(incoming.startedAt),
-        completedAt: nullableText(incoming.completedAt),
-      }
-      if (existing) applicationAnalysisRunIds.set(Number(incoming.id), existing.id)
-      else {
-        const created = tx
-          .insert(applicationAnalysisRuns)
-          .values(values)
-          .returning({ id: applicationAnalysisRuns.id })
-          .get()
-        applicationAnalysisRunIds.set(Number(incoming.id), created.id)
-      }
-    }
-    for (const incoming of payload.analysisRunDecisions) {
-      const runId = applicationAnalysisRunIds.get(Number(incoming.applicationAnalysisRunId))
-      const skillId = skillIds.get(Number(incoming.skillId))
-      if (!runId || !skillId) continue
-      const date = todayISO()
-      tx.insert(analysisRunDecisions)
-        .values({
-          applicationAnalysisRunId: runId,
-          skillId,
-          decision: controlledValue(skillDecisions, incoming.decision, 'pending'),
-          reason: nullableText(incoming.reason),
-          createdAt: textValue(incoming.createdAt) || date,
-          updatedAt: textValue(incoming.updatedAt) || date,
-        })
-        .onConflictDoNothing()
-        .run()
-    }
-    for (const incoming of payload.generationRuns) {
-      const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
-      if (!applicationId) continue
-      const queueJobId = textValue(incoming.queueJobId) || `generation-import-${incoming.id}`
-      const existing = tx
-        .select()
-        .from(generationRuns)
-        .where(eq(generationRuns.queueJobId, queueJobId))
-        .get()
-      const values = {
-        jobApplicationId: applicationId,
-        status: controlledValue(runStatuses, incoming.status, 'Completed'),
-        queueJobId,
-        attempts: Number(incoming.attempts) || 0,
-        inputHash: nullableText(incoming.inputHash),
-        frozenInputJson: nullableText(incoming.frozenInputJson),
-        resumeModel: nullableText(incoming.resumeModel),
-        coverLetterModel: nullableText(incoming.coverLetterModel),
-        promptVersion: nullableText(incoming.promptVersion),
-        schemaVersion: nullableText(incoming.schemaVersion),
-        errorMessage: nullableText(incoming.errorMessage),
-        createdAt: textValue(incoming.createdAt) || todayISO(),
-        updatedAt: textValue(incoming.updatedAt) || todayISO(),
-        startedAt: nullableText(incoming.startedAt),
-        completedAt: nullableText(incoming.completedAt),
-      }
-      if (existing) {
-        tx.update(generationRuns).set(values).where(eq(generationRuns.id, existing.id)).run()
-        generationRunIds.set(Number(incoming.id), existing.id)
-      } else {
-        const created = tx
-          .insert(generationRuns)
-          .values(values)
-          .returning({ id: generationRuns.id })
-          .get()
-        generationRunIds.set(Number(incoming.id), created.id)
-      }
-    }
-    for (const incoming of payload.generationRunResults) {
-      const runId = generationRunIds.get(Number(incoming.generationRunId))
-      if (!runId) continue
-      tx.insert(generationRunResults)
-        .values({
-          generationRunId: runId,
-          resumeJson: nullableText(incoming.resumeJson),
-          coverLetterJson: nullableText(incoming.coverLetterJson),
-          atsAuditJson: nullableText(incoming.atsAuditJson),
-          createdAt: textValue(incoming.createdAt) || todayISO(),
-          updatedAt: textValue(incoming.updatedAt) || todayISO(),
-        })
-        .onConflictDoNothing()
-        .run()
-    }
-    for (const incoming of payload.documentReviews) {
-      const runId = generationRunIds.get(Number(incoming.generationRunId))
-      if (!runId) continue
-      tx.insert(documentReviews)
-        .values({
-          generationRunId: runId,
-          status: controlledValue(runStatuses, incoming.status, 'Completed'),
-          queueJobId: textValue(incoming.queueJobId) || `document-review-import-${incoming.id}`,
-          attempts: Number(incoming.attempts) || 0,
-          inputHash: nullableText(incoming.inputHash),
-          resultJson: nullableText(incoming.resultJson),
-          model: nullableText(incoming.model),
-          promptVersion: nullableText(incoming.promptVersion),
-          schemaVersion: nullableText(incoming.schemaVersion),
-          errorMessage: nullableText(incoming.errorMessage),
-          createdAt: textValue(incoming.createdAt) || todayISO(),
-          updatedAt: textValue(incoming.updatedAt) || todayISO(),
-          startedAt: nullableText(incoming.startedAt),
-          completedAt: nullableText(incoming.completedAt),
-        })
-        .onConflictDoNothing()
-        .run()
     }
   })
 }
@@ -1105,7 +734,7 @@ export function createSkill(name: string) {
 
 export function createCompany(name: string, website?: string | null) {
   db.insert(companies)
-    .values({ name, website: website ?? null, createdAt: todayISO() })
+    .values({ name, website: website ?? null, createdAt: todayISO(), updatedAt: todayISO() })
     .onConflictDoNothing()
     .run()
 }
@@ -1116,8 +745,15 @@ export function createContact(input: {
   email?: string | null
   linkedinUrl?: string | null
 }) {
+  const date = todayISO()
   db.insert(contacts)
-    .values({ ...input, email: input.email ?? null, linkedinUrl: input.linkedinUrl ?? null })
+    .values({
+      ...input,
+      email: input.email ?? null,
+      linkedinUrl: input.linkedinUrl ?? null,
+      createdAt: date,
+      updatedAt: date,
+    })
     .run()
 }
 
@@ -1260,15 +896,26 @@ export function changeStatus(
   return true
 }
 
-export function addFollowUp(id: number, input: { actionDate: string; notes?: string | null }) {
+export function addFollowUp(
+  id: number,
+  input: { actionDate: string; actionType?: string; notes?: string | null },
+) {
+  const date = nowISO()
   return db.transaction((tx) => {
     const job = tx.select().from(jobApplications).where(eq(jobApplications.id, id)).get()
     if (!job) return false
     tx.insert(followUps)
-      .values({ jobApplicationId: id, actionDate: input.actionDate, notes: input.notes })
+      .values({
+        jobApplicationId: id,
+        actionDate: input.actionDate,
+        actionType: input.actionType ?? 'other',
+        notes: input.notes,
+        createdAt: date,
+        updatedAt: date,
+      })
       .run()
     tx.update(jobApplications)
-      .set({ status: advanceStatus(job.status, 'Follow Up'), updatedAt: todayISO() })
+      .set({ status: advanceStatus(job.status, 'Follow Up'), updatedAt: date })
       .where(eq(jobApplications.id, id))
       .run()
     return true
@@ -1277,8 +924,9 @@ export function addFollowUp(id: number, input: { actionDate: string; notes?: str
 
 export function addInterview(
   id: number,
-  input: { interviewDate: string; roundName: string; notes?: string | null },
+  input: { interviewDate: string; roundName: string; roundType?: string; notes?: string | null },
 ) {
+  const date = nowISO()
   return db.transaction((tx) => {
     const job = tx.select().from(jobApplications).where(eq(jobApplications.id, id)).get()
     if (!job) return false
@@ -1287,11 +935,14 @@ export function addInterview(
         jobApplicationId: id,
         interviewDate: input.interviewDate,
         roundName: input.roundName,
+        roundType: input.roundType ?? 'other',
         notes: input.notes,
+        createdAt: date,
+        updatedAt: date,
       })
       .run()
     tx.update(jobApplications)
-      .set({ status: advanceStatus(job.status, 'Interviewing'), updatedAt: todayISO() })
+      .set({ status: advanceStatus(job.status, 'Interviewing'), updatedAt: date })
       .where(eq(jobApplications.id, id))
       .run()
     return true

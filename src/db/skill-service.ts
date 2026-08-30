@@ -1,32 +1,30 @@
 import { and, eq } from 'drizzle-orm'
-import type { CanonicalCareerData } from '../lib/career-data'
 import { todayISO } from '../lib/date'
-import { determineMatchResult } from '../lib/skills/match-career-skills'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
 import { resolveSkillInput, type SkillResolver } from '../lib/skills/resolve'
 import type { SkillCategory } from '../lib/skills/taxonomy'
 import { db } from './client'
-import { jobApplicationsToSkills, type Skill, skillAliases, skills } from './schema'
+import {
+  analysisRunDecisions,
+  jobRequirementsToSkills,
+  type Skill,
+  skillAliases,
+  skills,
+} from './schema'
 import { type DbExecutor, resolveSkillByAlias, resolveSkillByKey } from './skill-queries'
 
 export type SkillDb = Pick<typeof db, 'select' | 'insert' | 'delete' | 'update' | 'transaction'>
 
 export type MergeConflict = {
-  applicationId: number
+  runId: number
   sourceDecision: 'skip' | 'include'
   targetDecision: 'skip' | 'include'
 }
 
 export class MergeConflictError extends Error {
   constructor(readonly conflicts: MergeConflict[]) {
-    super('Cannot merge: one or more applications have conflicting user decisions.')
+    super('Cannot merge: one or more analysis runs have conflicting decisions.')
   }
-}
-
-const importanceRank = { mentioned: 0, preferred: 1, required: 2 } as const
-
-function isDecided(value: string): value is 'skip' | 'include' {
-  return value === 'skip' || value === 'include'
 }
 
 function resolverFor(tx: DbExecutor): SkillResolver {
@@ -104,40 +102,49 @@ export function addSkillAlias(
     .run()
 }
 
+function isDecided(value: string): value is 'skip' | 'include' {
+  return value === 'skip' || value === 'include'
+}
+
 export function previewMerge(sourceId: number, targetId: number, executor: SkillDb = db) {
-  const sourceRelations = executor
+  const sourceLinks = executor
     .select()
-    .from(jobApplicationsToSkills)
-    .where(eq(jobApplicationsToSkills.skillId, sourceId))
+    .from(jobRequirementsToSkills)
+    .where(eq(jobRequirementsToSkills.skillId, sourceId))
     .all()
-  const targetRelations = executor
+  const sourceDecisions = executor
     .select()
-    .from(jobApplicationsToSkills)
-    .where(eq(jobApplicationsToSkills.skillId, targetId))
+    .from(analysisRunDecisions)
+    .where(eq(analysisRunDecisions.skillId, sourceId))
     .all()
-  const targetByApplication = new Map(
-    targetRelations.map((relation) => [relation.jobApplicationId, relation]),
+  const targetDecisions = executor
+    .select()
+    .from(analysisRunDecisions)
+    .where(eq(analysisRunDecisions.skillId, targetId))
+    .all()
+  const targetByRun = new Map(
+    targetDecisions.map((decision) => [decision.applicationAnalysisRunId, decision]),
   )
   const conflicts: MergeConflict[] = []
-  for (const source of sourceRelations) {
-    const target = targetByApplication.get(source.jobApplicationId)
+  for (const source of sourceDecisions) {
+    const target = targetByRun.get(source.applicationAnalysisRunId)
     if (
       target &&
-      isDecided(source.userDecision) &&
-      isDecided(target.userDecision) &&
-      source.userDecision !== target.userDecision
+      isDecided(source.decision) &&
+      isDecided(target.decision) &&
+      source.decision !== target.decision
     ) {
       conflicts.push({
-        applicationId: source.jobApplicationId,
-        sourceDecision: source.userDecision,
-        targetDecision: target.userDecision,
+        runId: source.applicationAnalysisRunId,
+        sourceDecision: source.decision,
+        targetDecision: target.decision,
       })
     }
   }
   return {
     aliasCount: executor.select().from(skillAliases).where(eq(skillAliases.skillId, sourceId)).all()
       .length,
-    applicationCount: sourceRelations.length,
+    requirementCount: sourceLinks.length,
     conflicts,
   }
 }
@@ -169,72 +176,53 @@ export function mergeSkills(sourceId: number, targetId: number, executor: SkillD
       tx.update(skillAliases).set({ skillId: targetId }).where(eq(skillAliases.id, alias.id)).run()
     }
 
-    const sourceRelations = tx
+    const sourceLinks = tx
       .select()
-      .from(jobApplicationsToSkills)
-      .where(eq(jobApplicationsToSkills.skillId, sourceId))
+      .from(jobRequirementsToSkills)
+      .where(eq(jobRequirementsToSkills.skillId, sourceId))
       .all()
-    for (const sourceRelation of sourceRelations) {
-      const targetRelation = tx
+    for (const link of sourceLinks) {
+      const targetLink = tx
         .select()
-        .from(jobApplicationsToSkills)
+        .from(jobRequirementsToSkills)
         .where(
           and(
-            eq(jobApplicationsToSkills.jobApplicationId, sourceRelation.jobApplicationId),
-            eq(jobApplicationsToSkills.skillId, targetId),
+            eq(jobRequirementsToSkills.jobRequirementId, link.jobRequirementId),
+            eq(jobRequirementsToSkills.skillId, targetId),
           ),
         )
         .get()
-      if (!targetRelation) {
-        tx.update(jobApplicationsToSkills)
-          .set({ skillId: targetId, updatedAt: date })
+      if (targetLink) {
+        tx.delete(jobRequirementsToSkills)
           .where(
             and(
-              eq(jobApplicationsToSkills.jobApplicationId, sourceRelation.jobApplicationId),
-              eq(jobApplicationsToSkills.skillId, sourceId),
+              eq(jobRequirementsToSkills.jobRequirementId, link.jobRequirementId),
+              eq(jobRequirementsToSkills.skillId, sourceId),
             ),
           )
           .run()
         continue
       }
-      const keepTargetDecision = isDecided(targetRelation.userDecision)
-      const keptDecision = keepTargetDecision
-        ? targetRelation.userDecision
-        : sourceRelation.userDecision
-      const keptReason = keepTargetDecision
-        ? targetRelation.decisionReason
-        : sourceRelation.decisionReason
-      const sourceRank = importanceRank[sourceRelation.importance]
-      const targetRank = importanceRank[targetRelation.importance]
-      tx.update(jobApplicationsToSkills)
-        .set({
-          rawLabel: targetRelation.rawLabel ?? sourceRelation.rawLabel,
-          sourceText: targetRelation.sourceText ?? sourceRelation.sourceText,
-          importance:
-            sourceRank > targetRank ? sourceRelation.importance : targetRelation.importance,
-          analysisResult:
-            sourceRelation.analysisResult === 'proven-match' ||
-            targetRelation.analysisResult === 'proven-match'
-              ? 'proven-match'
-              : targetRelation.analysisResult,
-          userDecision: keptDecision,
-          decisionReason: keptReason,
-          updatedAt: date,
-        })
+      tx.update(jobRequirementsToSkills)
+        .set({ skillId: targetId })
         .where(
           and(
-            eq(jobApplicationsToSkills.jobApplicationId, targetRelation.jobApplicationId),
-            eq(jobApplicationsToSkills.skillId, targetId),
+            eq(jobRequirementsToSkills.jobRequirementId, link.jobRequirementId),
+            eq(jobRequirementsToSkills.skillId, sourceId),
           ),
         )
         .run()
-      tx.delete(jobApplicationsToSkills)
-        .where(
-          and(
-            eq(jobApplicationsToSkills.jobApplicationId, sourceRelation.jobApplicationId),
-            eq(jobApplicationsToSkills.skillId, sourceId),
-          ),
-        )
+    }
+
+    const sourceDecisions = tx
+      .select()
+      .from(analysisRunDecisions)
+      .where(eq(analysisRunDecisions.skillId, sourceId))
+      .all()
+    for (const decision of sourceDecisions) {
+      tx.update(analysisRunDecisions)
+        .set({ skillId: targetId, updatedAt: date })
+        .where(eq(analysisRunDecisions.id, decision.id))
         .run()
     }
 
@@ -243,36 +231,5 @@ export function mergeSkills(sourceId: number, targetId: number, executor: SkillD
       .where(eq(skills.id, sourceId))
       .run()
     return { sourceId: source.id, targetId: target.id }
-  })
-}
-
-/**
- * Recomputes the two-state analysis result for every stored application skill
- * requirement from current career-data truth. This runs after an explicit
- * career sync or application reanalysis and never touches frozen generation
- * snapshots.
- */
-export function recomputeMatchResults(
-  executor: SkillDb = db,
-  careerData: Pick<CanonicalCareerData, 'skills'>,
-) {
-  const date = todayISO()
-  const relations = executor.select().from(jobApplicationsToSkills).all()
-  return executor.transaction((tx) => {
-    for (const relation of relations) {
-      const skill = tx.select().from(skills).where(eq(skills.id, relation.skillId)).get()
-      const result = determineMatchResult(skill?.careerSkillId ?? null, careerData)
-      if (relation.analysisResult !== result) {
-        tx.update(jobApplicationsToSkills)
-          .set({ analysisResult: result, updatedAt: date })
-          .where(
-            and(
-              eq(jobApplicationsToSkills.jobApplicationId, relation.jobApplicationId),
-              eq(jobApplicationsToSkills.skillId, relation.skillId),
-            ),
-          )
-          .run()
-      }
-    }
   })
 }

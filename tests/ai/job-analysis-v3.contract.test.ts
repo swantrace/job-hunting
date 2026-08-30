@@ -35,6 +35,14 @@ function validAnalysis() {
         sourceText:
           'At least 3 years of experience building commercial SaaS applications using Node.js, TypeScript, and React.',
         inferenceRationale: null,
+        skillReferences: [
+          {
+            rawLabel: 'React',
+            canonicalLabel: 'React',
+            category: 'frontend',
+            confidence: 0.95,
+          },
+        ],
       },
       {
         type: 'responsibility',
@@ -43,8 +51,15 @@ function validAnalysis() {
         statement: 'Operate with strong-mid autonomy.',
         sourceText: 'Develop and deliver software features with minimal supervision.',
         inferenceRationale: 'Minimal supervision indicates meaningful independent ownership.',
+        skillReferences: [],
       },
     ],
+    painPoints: [],
+    culture: [],
+    redFlags: [],
+    successMetrics: [],
+    benefits: [],
+    notes: null,
     interviewQuestions: [
       'What does production support or on-call responsibility look like for this team?',
     ],

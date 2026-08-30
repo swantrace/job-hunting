@@ -37,8 +37,8 @@ function seedFutureSkill(sqlite: Database) {
 
 function seedApplication(sqlite: Database) {
   const company = sqlite
-    .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
-    .get('Example Company', '2026-08-28') as { id: number }
+    .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
+    .get('Example Company', '2026-08-28', '2026-08-28') as { id: number }
   return sqlite
     .query(
       `INSERT INTO job_applications (

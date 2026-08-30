@@ -1,7 +1,6 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { db } from '../db/client'
-import { recomputeMatchResults } from '../db/skill-service'
 import { loadCareerData } from '../lib/career-data'
 import { syncCareerSkills } from '../lib/skills/sync-career-skills'
 
@@ -56,7 +55,6 @@ function main() {
   }
 
   const report = syncCareerSkills(db, data, { apply })
-  if (apply) recomputeMatchResults(db, data)
 
   const lines = [
     `inserted: ${report.inserted}`,

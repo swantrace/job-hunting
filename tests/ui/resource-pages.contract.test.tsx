@@ -116,11 +116,11 @@ describe('planned resource page UI contracts', () => {
     const db = drizzle({ client: sqlite, schema })
     try {
       const source = sqlite
-        .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
-        .get('Source Co', '2026-08-28') as { id: number }
+        .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
+        .get('Source Co', '2026-08-28', '2026-08-28') as { id: number }
       const target = sqlite
-        .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
-        .get('Target Co', '2026-08-28') as { id: number }
+        .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
+        .get('Target Co', '2026-08-28', '2026-08-28') as { id: number }
       sqlite
         .query(
           `INSERT INTO job_applications (
@@ -138,8 +138,10 @@ describe('planned resource page UI contracts', () => {
           '2026-08-28',
         )
       sqlite
-        .query('INSERT INTO contacts (company_id, name, email) VALUES (?, ?, ?)')
-        .run(source.id, 'Alex', 'alex@example.com')
+        .query(
+          'INSERT INTO contacts (company_id, name, email, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+        )
+        .run(source.id, 'Alex', 'alex@example.com', '2026-08-28', '2026-08-28')
 
       mergeCompanies(source.id, target.id, db)
 
@@ -163,11 +165,13 @@ describe('planned resource page UI contracts', () => {
     const sqlite = migratedDatabase()
     try {
       const company = sqlite
-        .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
-        .get('Acme', '2026-08-28') as { id: number }
+        .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
+        .get('Acme', '2026-08-28', '2026-08-28') as { id: number }
       const contact = sqlite
-        .query('INSERT INTO contacts (company_id, name, email) VALUES (?, ?, ?) RETURNING id')
-        .get(company.id, 'Alex', 'alex@example.com') as { id: number }
+        .query(
+          'INSERT INTO contacts (company_id, name, email, created_at, updated_at) VALUES (?, ?, ?, ?, ?) RETURNING id',
+        )
+        .get(company.id, 'Alex', 'alex@example.com', '2026-08-28', '2026-08-28') as { id: number }
 
       sqlite
         .query('UPDATE contacts SET name = ?, email = ? WHERE id = ?')

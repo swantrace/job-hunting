@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto'
 import { and, desc, eq, sql } from 'drizzle-orm'
-import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
+import { type JobAnalysis, jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
 import type { ParsedJobResult } from '../lib/ai'
 import { type AnalysisRunState, classifyAnalysisRunState } from '../lib/analysis-run-state'
-import { todayISO } from '../lib/date'
+import { nowISO, todayISO } from '../lib/date'
 import type { db } from './client'
-import { type JobRequirementInput, persistJobRequirements } from './job-analysis'
+import { persistJobRequirements } from './job-analysis'
 import { type JobPostingAnalysis, jobPostingAnalyses, jobPostings } from './schema'
-import { type DbExecutor, persistSkillRequirements } from './skill-queries'
+import { type DbExecutor } from './skill-queries'
 
 export type JobAnalysisDb = Pick<
   typeof db,
@@ -60,7 +60,6 @@ export function createJobAnalysisRun(db: JobAnalysisDb, input: CreateJobAnalysis
       model: input.model,
       promptVersion: input.promptVersion,
       schemaVersion: input.schemaVersion,
-      generatedAt: date,
       createdAt: date,
       updatedAt: date,
     })
@@ -112,9 +111,9 @@ export function failJobAnalysisRun(db: JobAnalysisDb, runId: number, error: unkn
 }
 
 /**
- * Completes a run in one transaction: result columns, normalized requirements,
- * and current application skill reconciliation all commit together so a failure
- * never partially replaces the posting's current requirements or skills.
+ * Completes a run in one transaction: result JSON, normalized requirements,
+ * and canonical requirement-skill junction rows all commit together so a
+ * failure never partially replaces the posting's current analysis.
  */
 export function completeJobAnalysisRun(db: JobAnalysisDb, runId: number, parsed: ParsedJobResult) {
   const date = todayISO()
@@ -124,37 +123,22 @@ export function completeJobAnalysisRun(db: JobAnalysisDb, runId: number, parsed:
     const posting = tx.select().from(jobPostings).where(eq(jobPostings.id, run.jobPostingId)).get()
     if (!posting) throw new Error('Job posting no longer exists.')
 
+    const analysis = parsed.analysis
     tx.update(jobPostingAnalyses)
       .set({
         status: 'Completed',
         errorMessage: null,
-        requirements: parsed.requirements.join('\n'),
-        responsibilities: parsed.responsibilities.join('\n'),
-        painPoints: parsed.painPoints.join('\n'),
-        culture: parsed.culture.join('\n'),
-        redFlags: parsed.redFlags.join('\n'),
-        successMetrics: parsed.successMetrics.join('\n'),
-        benefits: parsed.benefits.join('\n'),
-        notes: parsed.notes,
-        generatedAt: date,
         model: parsed.parserModel,
         promptVersion: parsed.parserPromptVersion,
-        summary: JSON.stringify(parsed.analysis.summary),
-        roleType: parsed.analysis.classification.roleType,
-        advertisedSeniority: parsed.analysis.classification.advertisedSeniority,
-        practicalSeniority: parsed.analysis.classification.practicalSeniority,
-        classificationRationale: parsed.analysis.classification.rationale,
-        functionalEmphasisJson: JSON.stringify(parsed.analysis.classification.functionalEmphasis),
-        interviewQuestionsJson: JSON.stringify(parsed.analysis.interviewQuestions),
         schemaVersion: jobAnalysisSchemaVersion,
+        resultJson: JSON.stringify(analysis),
         completedAt: date,
         updatedAt: date,
       })
       .where(eq(jobPostingAnalyses.id, runId))
       .run()
 
-    persistJobRequirements(tx, runId, parsed.analysis.requirements, date)
-    persistSkillRequirements(tx, posting.jobApplicationId, parsed.skills)
+    persistJobRequirements(tx, runId, analysis.requirements, date)
   })
 }
 
@@ -164,31 +148,18 @@ export type CompletedJobAnalysisInput = {
   frozenInputJson: string
   model: string | null | undefined
   promptVersion: string | null | undefined
-  requirements: string | null | undefined
-  responsibilities: string | null | undefined
-  painPoints: string | null | undefined
-  culture: string | null | undefined
-  redFlags: string | null | undefined
-  successMetrics: string | null | undefined
-  benefits: string | null | undefined
-  notes: string | null | undefined
-  summary: string | null | undefined
-  roleType: string | null | undefined
-  advertisedSeniority: string | null | undefined
-  practicalSeniority: string | null | undefined
-  classificationRationale: string | null | undefined
-  functionalEmphasisJson: string | null | undefined
-  interviewQuestionsJson: string | null | undefined
-  schemaVersion: string | null | undefined
-  requirementsRows: JobRequirementInput[]
+  analysis: JobAnalysis
+  schemaVersion: string
   date: string
 }
 
 /**
  * Persists a pre-save Quick Collect draft as a completed run with full input
- * identity. No LLM is called; the reviewed draft already produced these fields.
+ * identity. No LLM is called; the reviewed draft already produced the validated
+ * analysis.
  */
 export function persistCompletedJobAnalysis(tx: DbExecutor, input: CompletedJobAnalysisInput) {
+  const analysis = input.analysis
   const saved = tx
     .insert(jobPostingAnalyses)
     .values({
@@ -196,33 +167,18 @@ export function persistCompletedJobAnalysis(tx: DbExecutor, input: CompletedJobA
       status: 'Completed',
       inputHash: input.inputHash,
       frozenInputJson: input.frozenInputJson,
-      requirements: input.requirements ?? null,
-      responsibilities: input.responsibilities ?? null,
-      painPoints: input.painPoints ?? null,
-      culture: input.culture ?? null,
-      redFlags: input.redFlags ?? null,
-      successMetrics: input.successMetrics ?? null,
-      benefits: input.benefits ?? null,
-      notes: input.notes ?? null,
-      generatedAt: input.date,
       model: input.model ?? null,
       promptVersion: input.promptVersion ?? null,
-      summary: input.summary ?? null,
-      roleType: input.roleType ?? null,
-      advertisedSeniority: input.advertisedSeniority ?? null,
-      practicalSeniority: input.practicalSeniority ?? null,
-      classificationRationale: input.classificationRationale ?? null,
-      functionalEmphasisJson: input.functionalEmphasisJson ?? null,
-      interviewQuestionsJson: input.interviewQuestionsJson ?? null,
-      schemaVersion: input.schemaVersion ?? null,
+      schemaVersion: input.schemaVersion,
+      resultJson: JSON.stringify(analysis),
       createdAt: input.date,
       updatedAt: input.date,
       completedAt: input.date,
     })
     .returning()
     .get()
-  if (input.requirementsRows.length) {
-    persistJobRequirements(tx, saved.id, input.requirementsRows, input.date)
+  if (analysis.requirements.length) {
+    persistJobRequirements(tx, saved.id, analysis.requirements, input.date)
   }
   return saved
 }
@@ -279,9 +235,37 @@ export function jobAnalysisRunBelongsToPosting(
     .get()
 }
 
-/** Updates the raw post text and its content hash before a rerun is queued. */
-export function updateJobPostingRawText(db: JobAnalysisDb, jobPostingId: number, rawText: string) {
+/**
+ * Saves a Job Post as an immutable content version. Identical normalized text
+ * reuses the current content version (no new row); changed text inserts the
+ * next version. Returns the resulting posting ID and content hash so callers
+ * can queue an analysis rerun against the exact version.
+ */
+export function saveJobPostingVersion(
+  db: JobAnalysisDb,
+  jobApplicationId: number,
+  rawText: string,
+) {
   const contentHash = createHash('sha256').update(rawText).digest('hex')
-  db.update(jobPostings).set({ rawText, contentHash }).where(eq(jobPostings.id, jobPostingId)).run()
-  return contentHash
+  const current = db
+    .select()
+    .from(jobPostings)
+    .where(eq(jobPostings.jobApplicationId, jobApplicationId))
+    .orderBy(desc(jobPostings.version), desc(jobPostings.id))
+    .get()
+  if (current?.contentHash === contentHash)
+    return { jobPostingId: current.id, contentHash, reused: true }
+  const version = current ? current.version + 1 : 1
+  const created = db
+    .insert(jobPostings)
+    .values({
+      jobApplicationId,
+      version,
+      rawText,
+      capturedAt: nowISO(),
+      contentHash,
+    })
+    .returning({ id: jobPostings.id })
+    .get()
+  return { jobPostingId: created.id, contentHash, reused: false }
 }

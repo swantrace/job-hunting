@@ -1,5 +1,6 @@
 import { type JobAnalysis, roleTypes, seniorities } from '../../src/ai/schemas/job-analysis'
 import { requirementImportances, requirementTypes } from '../../src/lib/job-requirements/constants'
+import { skillCategoryDefinitions } from '../../src/lib/skills/taxonomy'
 
 const emphasisFields = [
   ['frontend', 'Frontend'],
@@ -9,11 +10,22 @@ const emphasisFields = [
   ['collaborationOwnership', 'Collaboration & ownership'],
 ] as const
 
+const listSections = [
+  ['painPoints', 'Pain points', 'data-ja-pain'],
+  ['culture', 'Culture signals', 'data-ja-culture'],
+  ['redFlags', 'Red flags', 'data-ja-red-flag'],
+  ['successMetrics', 'Success metrics', 'data-ja-success'],
+  ['benefits', 'Benefits', 'data-ja-benefit'],
+] as const
+
+const categories = skillCategoryDefinitions()
+
 /**
  * Server-rendered editor for the structured, candidate-independent job
- * analysis. Editable classification and requirement wording sync into the
- * hidden `jobAnalysis` JSON field via `updateJobAnalysis`; source excerpts stay
- * read-only so editing a reviewed statement never rewrites the original quote.
+ * analysis. Editable classification, requirement wording, per-requirement skill
+ * references, and evidence lists sync into the hidden `jobAnalysis` JSON field
+ * via `updateJobAnalysis`; source excerpts stay read-only so editing a reviewed
+ * statement never rewrites the original quote.
  */
 export function JobAnalysisDraft({ analysis }: { analysis: JobAnalysis }) {
   const emphasis = analysis.classification.functionalEmphasis
@@ -171,9 +183,93 @@ export function JobAnalysisDraft({ analysis }: { analysis: JobAnalysis }) {
                   oninput="updateJobAnalysis()"
                 />
               )}
+              <div class="mt-2 space-y-2">
+                <p class="text-xs font-medium">Skills mapped to this requirement</p>
+                {requirement.skillReferences.map((reference, skillIndex) => (
+                  <div
+                    data-ja-skill-ref
+                    class="grid gap-2 rounded-lg border border-base-200 bg-base-200/40 p-2 md:grid-cols-4"
+                  >
+                    <input type="hidden" data-ja-skill-raw value={reference.rawLabel} />
+                    <div>
+                      <label class="label">Canonical name</label>
+                      <input
+                        class="input input-sm w-full"
+                        data-ja-skill-canonical
+                        value={reference.canonicalLabel}
+                        oninput="updateJobAnalysis()"
+                      />
+                    </div>
+                    <div>
+                      <label class="label">Category</label>
+                      <select
+                        class="select select-sm w-full"
+                        data-ja-skill-category
+                        onchange="updateJobAnalysis()"
+                      >
+                        {categories.map((category) => (
+                          <option
+                            value={category.key}
+                            selected={reference.category === category.key}
+                          >
+                            {category.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label class="label">Confidence</label>
+                      <input
+                        type="number"
+                        class="input input-sm w-full"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        data-ja-skill-confidence
+                        value={reference.confidence}
+                        oninput="updateJobAnalysis()"
+                      />
+                    </div>
+                    <div class="flex items-end">
+                      <span class="text-xs text-base-content/60">Raw: “{reference.rawLabel}”</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>
+      </section>
+
+      {listSections.map(([key, label, attribute]) => (
+        <section>
+          <p class="mb-2 text-sm font-medium">{label}</p>
+          <div class="space-y-2">
+            {analysis[key].map((item) => (
+              <input
+                class="input input-sm w-full"
+                {...{ [attribute]: true }}
+                value={item}
+                oninput="updateJobAnalysis()"
+              />
+            ))}
+            {analysis[key].length === 0 && (
+              <p class="text-xs text-base-content/50">None recorded.</p>
+            )}
+          </div>
+        </section>
+      ))}
+
+      <section>
+        <p class="mb-2 text-sm font-medium">Additional facts</p>
+        <textarea
+          class="textarea textarea-sm w-full"
+          rows={2}
+          data-ja-notes
+          oninput="updateJobAnalysis()"
+        >
+          {analysis.notes ?? ''}
+        </textarea>
       </section>
 
       <section>

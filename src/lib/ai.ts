@@ -31,20 +31,14 @@ export class OpenAIRequestTimeoutError extends Error {
   }
 }
 
-const parserArrayLimits = {
-  skills: 30,
-  requirements: 30,
-  responsibilities: 30,
+const analysisArrayLimits = {
+  requirements: 40,
+  interviewQuestions: 20,
   painPoints: 20,
   culture: 20,
   redFlags: 20,
   successMetrics: 20,
   benefits: 20,
-} as const
-
-const analysisArrayLimits = {
-  requirements: 40,
-  interviewQuestions: 20,
 } as const
 
 function limitAnalysisArrays(value: unknown) {
@@ -64,8 +58,7 @@ function limitParserArrays(value: unknown) {
   return Object.fromEntries(
     Object.entries(parsed).map(([key, field]) => {
       if (key === 'analysis') return [key, limitAnalysisArrays(field)]
-      const limit = parserArrayLimits[key as keyof typeof parserArrayLimits]
-      return [key, limit && Array.isArray(field) ? field.slice(0, limit) : field]
+      return [key, field]
     }),
   )
 }
@@ -146,40 +139,21 @@ export async function parseJobDescription(
   const cleanList = (values: string[]) => [
     ...new Set(values.map((value) => value.trim()).filter((value) => value && value !== 'null')),
   ]
-  const cleanSkills = (skills: typeof parsed.skills) => {
-    const seen = new Set<string>()
-    const result: typeof parsed.skills = []
-    for (const skill of skills) {
-      const rawLabel = skill.rawLabel.trim()
-      const canonicalLabel = skill.canonicalLabel.trim()
-      if (!rawLabel && !canonicalLabel) continue
-      const dedupeKey = (canonicalLabel || rawLabel).toLocaleLowerCase()
-      if (seen.has(dedupeKey)) continue
-      seen.add(dedupeKey)
-      result.push({
-        ...skill,
-        rawLabel: rawLabel || canonicalLabel,
-        canonicalLabel: canonicalLabel || rawLabel,
-        sourceText: skill.sourceText.trim(),
-      })
-    }
-    return result
-  }
   return {
     ...parsed,
     jobTitle: parsed.jobTitle.toLocaleLowerCase() === 'null' ? '' : parsed.jobTitle,
     location: nullString(parsed.location),
     postedDate: nullString(parsed.postedDate),
     salary: nullString(parsed.salary),
-    skills: cleanSkills(parsed.skills),
-    requirements: cleanList(parsed.requirements),
-    responsibilities: cleanList(parsed.responsibilities),
-    painPoints: cleanList(parsed.painPoints),
-    culture: cleanList(parsed.culture),
-    redFlags: cleanList(parsed.redFlags),
-    successMetrics: cleanList(parsed.successMetrics),
-    benefits: cleanList(parsed.benefits),
-    notes: nullString(parsed.notes),
+    analysis: {
+      ...parsed.analysis,
+      painPoints: cleanList(parsed.analysis.painPoints),
+      culture: cleanList(parsed.analysis.culture),
+      redFlags: cleanList(parsed.analysis.redFlags),
+      successMetrics: cleanList(parsed.analysis.successMetrics),
+      benefits: cleanList(parsed.analysis.benefits),
+      notes: nullString(parsed.analysis.notes),
+    },
     parserModel: model,
     parserPromptVersion: jobParserPromptVersion,
     analysisPromptVersion: jobAnalysisPromptVersion,

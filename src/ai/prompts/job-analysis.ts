@@ -1,4 +1,4 @@
-export const jobAnalysisPromptVersion = '3.0.0'
+export const jobAnalysisPromptVersion = '4.0.0'
 
 /**
  * Candidate-independent job analysis boundary. This prompt receives job-posting
@@ -22,6 +22,9 @@ Analysis rules:
 - classification.functionalEmphasis must be integer percentages that total exactly 100.
 - Every requirement must carry a bounded source excerpt in sourceText. An inferred requirement must also carry a concise inference rationale; an explicit requirement must use a null inference rationale.
 - requirement.type uses only the controlled values; requirement.importance is required, preferred, or mentioned; requirement.basis is explicit or inferred.
+- Each requirement carries its own skillReferences array. Map a technology or practice to the requirement that states it, never to a parallel top-level list. Each reference has an exact rawLabel, a concise canonicalLabel, one controlled category, and a confidence between 0 and 1. Leave skillReferences empty for requirements that are not about a specific skill.
+- Do not classify location, remote/hybrid/onsite arrangements, benefits, personality adjectives, or general responsibilities as skills.
+- painPoints, culture, redFlags, successMetrics, and benefits list only evidence-backed signals; use an empty array when unsupported. notes carries short factual context not represented elsewhere, or null.
 - interviewQuestions are role-focused and grounded in the posting; they must not ask about the candidate's background.
 
 Return only the JSON object required by the schema.`

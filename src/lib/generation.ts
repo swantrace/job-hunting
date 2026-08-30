@@ -32,6 +32,7 @@ import {
   assertGenerationEvidenceReferences,
   buildGenerationEvidenceAllowlist,
 } from './generation-provenance'
+import { parseJobAnalysisResult } from './job-analysis-result'
 import { resolveProjectAsset } from './profiles'
 import {
   generationEligibleRequirements,
@@ -144,6 +145,7 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
   const facts = snapshot.facts as any
   const requirements = snapshot.skillRequirements ?? []
   const includedRequirements = generationEligibleRequirements(requirements)
+  const analysisResult = parseJobAnalysisResult(source.analysis.resultJson)
   const jobContext = {
     version: 2,
     generatedAt: todayISO(),
@@ -164,14 +166,24 @@ export async function generateApplicationArtifacts(runId: number): Promise<Artif
       })),
     },
     analysis: {
-      requirements: splitLines(source.analysis.requirements),
-      responsibilities: splitLines(source.analysis.responsibilities),
-      painPoints: splitLines(source.analysis.painPoints),
-      culture: splitLines(source.analysis.culture),
-      redFlags: splitLines(source.analysis.redFlags),
-      successMetrics: splitLines(source.analysis.successMetrics),
-      benefits: splitLines(source.analysis.benefits),
-      notes: source.analysis.notes,
+      requirements: splitLines(
+        analysisResult?.requirements
+          .filter((requirement) => requirement.type !== 'responsibility')
+          .map((requirement) => requirement.statement)
+          .join('\n') ?? null,
+      ),
+      responsibilities: splitLines(
+        analysisResult?.requirements
+          .filter((requirement) => requirement.type === 'responsibility')
+          .map((requirement) => requirement.statement)
+          .join('\n') ?? null,
+      ),
+      painPoints: analysisResult?.painPoints ?? [],
+      culture: analysisResult?.culture ?? [],
+      redFlags: analysisResult?.redFlags ?? [],
+      successMetrics: analysisResult?.successMetrics ?? [],
+      benefits: analysisResult?.benefits ?? [],
+      notes: analysisResult?.notes ?? null,
     },
     evidenceSelection: snapshot.selection,
   }

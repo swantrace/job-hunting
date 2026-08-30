@@ -4,6 +4,7 @@ import {
   requirementImportances,
   requirementTypes,
 } from '../../lib/job-requirements/constants'
+import { hasSkillCategory, skillCategoryKeys } from '../../lib/skills/taxonomy'
 
 /**
  * Candidate-independent structured job analysis. This schema is the single
@@ -11,6 +12,11 @@ import {
  * only and must never contain candidate fit, profile selection, match scores,
  * or resume/cover-letter output. Unknown keys are rejected so a model cannot
  * smuggle a fabricated fit score back into a stored analysis.
+ *
+ * Requirements own their importance and grounding; each requirement carries
+ * zero or more structured skill references so the parser never emits a
+ * parallel top-level skill list that must later be fuzzy-matched back to a
+ * requirement.
  */
 
 export const roleTypes = [
@@ -42,7 +48,18 @@ const functionalEmphasisSchema = z
   })
   .strict()
 
-const jobRequirementSchema = z
+export const skillReferenceSchema = z
+  .object({
+    rawLabel: z.string().trim().min(1).max(120),
+    canonicalLabel: z.string().trim().min(1).max(120),
+    category: z.string().trim().min(1).refine(hasSkillCategory),
+    confidence: z.number().min(0).max(1),
+  })
+  .strict()
+
+export type SkillReference = z.infer<typeof skillReferenceSchema>
+
+export const jobRequirementSchema = z
   .object({
     type: z.enum(requirementTypes),
     importance: z.enum(requirementImportances),
@@ -50,8 +67,25 @@ const jobRequirementSchema = z
     statement: z.string().trim().min(1).max(1000),
     sourceText: z.string().trim().min(1).max(2000),
     inferenceRationale: z.string().trim().min(1).max(2000).nullable(),
+    skillReferences: z.array(skillReferenceSchema).max(20),
   })
   .strict()
+  .superRefine((requirement, ctx) => {
+    const seen = new Set<string>()
+    for (const [index, reference] of requirement.skillReferences.entries()) {
+      const key = reference.canonicalLabel.trim().toLocaleLowerCase()
+      if (seen.has(key))
+        ctx.addIssue({
+          code: 'custom',
+          message: `Duplicate skill reference "${reference.canonicalLabel}".`,
+          path: ['skillReferences', index, 'canonicalLabel'],
+        })
+      seen.add(key)
+    }
+  })
+
+const analysisText = z.string().trim().min(1).max(1000)
+const analysisTextList = z.array(analysisText).max(20)
 
 export const jobAnalysisSchema = z
   .object({
@@ -71,7 +105,13 @@ export const jobAnalysisSchema = z
       })
       .strict(),
     requirements: z.array(jobRequirementSchema).min(1).max(40),
-    interviewQuestions: z.array(z.string().trim().min(1).max(1000)).max(20),
+    painPoints: analysisTextList,
+    culture: analysisTextList,
+    redFlags: analysisTextList,
+    successMetrics: analysisTextList,
+    benefits: analysisTextList,
+    notes: z.string().trim().max(5000).nullable(),
+    interviewQuestions: z.array(analysisText).max(20),
   })
   .strict()
   .superRefine((analysis, ctx) => {
@@ -108,10 +148,36 @@ export const jobAnalysisSchema = z
 export type JobAnalysis = z.infer<typeof jobAnalysisSchema>
 export type JobAnalysisRequirement = z.infer<typeof jobRequirementSchema>
 
-export const jobAnalysisSchemaVersion = '3.0.0'
+export const jobAnalysisSchemaVersion = '4.0.0'
 
 const stringSchema = { type: 'string' } as const
 const nullableStringSchema = { type: ['string', 'null'] } as const
+
+const skillReferenceJsonSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    rawLabel: {
+      type: 'string',
+      description: 'The exact or tightly bounded skill wording used in the job posting.',
+    },
+    canonicalLabel: {
+      type: 'string',
+      description:
+        'A concise canonical name for the skill. Server-side alias resolution is authoritative.',
+    },
+    category: {
+      type: 'string',
+      enum: [...skillCategoryKeys()],
+      description: 'One controlled taxonomy category for this skill.',
+    },
+    confidence: {
+      type: 'number',
+      description: 'Parser confidence between 0 and 1.',
+    },
+  },
+  required: ['rawLabel', 'canonicalLabel', 'category', 'confidence'],
+}
 
 const requirementJsonSchema = {
   type: 'object',
@@ -146,9 +212,31 @@ const requirementJsonSchema = {
       description:
         'Required and non-null for inferred requirements; must be null for explicit requirements.',
     },
+    skillReferences: {
+      type: 'array',
+      items: skillReferenceJsonSchema,
+      maxItems: 20,
+      description:
+        'Skills this specific requirement maps to. Empty when the requirement is not a skill requirement.',
+    },
   },
-  required: ['type', 'importance', 'basis', 'statement', 'sourceText', 'inferenceRationale'],
+  required: [
+    'type',
+    'importance',
+    'basis',
+    'statement',
+    'sourceText',
+    'inferenceRationale',
+    'skillReferences',
+  ],
 }
+
+const textListSchema = (description: string) => ({
+  type: 'array',
+  items: stringSchema,
+  maxItems: 20,
+  description,
+})
 
 export const jobAnalysisResponseSchema = {
   type: 'object',
@@ -209,6 +297,25 @@ export const jobAnalysisResponseSchema = {
       minItems: 1,
       maxItems: 40,
     },
+    painPoints: textListSchema(
+      'Business or technical problems the role appears intended to solve; empty when not supported.',
+    ),
+    culture: textListSchema(
+      'Evidence-backed working-style or culture signals; empty when not supported.',
+    ),
+    redFlags: textListSchema(
+      'Evidence-backed concerns or ambiguities; empty when none are evident.',
+    ),
+    successMetrics: textListSchema(
+      'How success is explicitly or plausibly measured in the role; empty when not supported.',
+    ),
+    benefits: textListSchema(
+      'Compensation-adjacent benefits or perks explicitly stated; empty when absent.',
+    ),
+    notes: {
+      ...nullableStringSchema,
+      description: 'Short factual context not represented by another field, or null.',
+    },
     interviewQuestions: {
       type: 'array',
       items: stringSchema,
@@ -216,5 +323,16 @@ export const jobAnalysisResponseSchema = {
       description: 'Role-focused interview questions grounded in the posting.',
     },
   },
-  required: ['summary', 'classification', 'requirements', 'interviewQuestions'],
+  required: [
+    'summary',
+    'classification',
+    'requirements',
+    'painPoints',
+    'culture',
+    'redFlags',
+    'successMetrics',
+    'benefits',
+    'notes',
+    'interviewQuestions',
+  ],
 } as const

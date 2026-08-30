@@ -14,8 +14,8 @@ import { migratedDatabase } from '../support/sqlite'
  */
 function seedPosting(sqlite: ReturnType<typeof migratedDatabase>) {
   const company = sqlite
-    .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
-    .get('Example Corp', '2026-01-01') as { id: number }
+    .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
+    .get('Example Corp', '2026-01-01', '2026-01-01') as { id: number }
   const application = sqlite
     .query(
       `INSERT INTO job_applications (
@@ -55,33 +55,52 @@ describe('pre-save Quick Collect job analysis identity', () => {
         inputHash: identity.inputHash,
         frozenInputJson: JSON.stringify(identity.snapshot),
         model: 'gpt-test',
-        promptVersion: '2.2.0',
-        requirements: 'React experience',
-        responsibilities: null,
-        painPoints: null,
-        culture: null,
-        redFlags: null,
-        successMetrics: null,
-        benefits: null,
-        notes: null,
-        summary: JSON.stringify({ rolePurpose: 'Build frontend features.' }),
-        roleType: 'frontend',
-        advertisedSeniority: 'intermediate',
-        practicalSeniority: 'intermediate',
-        classificationRationale: 'Frontend ownership.',
-        functionalEmphasisJson: null,
-        interviewQuestionsJson: null,
-        schemaVersion: jobAnalysisSchemaVersion,
-        requirementsRows: [
-          {
-            type: 'skill',
-            importance: 'required',
-            basis: 'explicit',
-            statement: 'React experience.',
-            sourceText: 'React experience.',
-            inferenceRationale: null,
+        promptVersion: '3.0.0',
+        analysis: {
+          summary: {
+            rolePurpose: 'Build frontend features.',
+            idealCandidate: 'A frontend engineer.',
           },
-        ],
+          classification: {
+            roleType: 'frontend',
+            advertisedSeniority: 'intermediate',
+            practicalSeniority: 'intermediate',
+            rationale: 'Frontend ownership.',
+            functionalEmphasis: {
+              frontend: 50,
+              backend: 10,
+              testingQuality: 15,
+              devopsInfrastructure: 10,
+              collaborationOwnership: 15,
+            },
+          },
+          requirements: [
+            {
+              type: 'skill',
+              importance: 'required',
+              basis: 'explicit',
+              statement: 'React experience.',
+              sourceText: 'React experience.',
+              inferenceRationale: null,
+              skillReferences: [
+                {
+                  rawLabel: 'React',
+                  canonicalLabel: 'React',
+                  category: 'frontend',
+                  confidence: 0.95,
+                },
+              ],
+            },
+          ],
+          painPoints: [],
+          culture: [],
+          redFlags: [],
+          successMetrics: [],
+          benefits: [],
+          notes: null,
+          interviewQuestions: [],
+        },
+        schemaVersion: jobAnalysisSchemaVersion,
         date: '2026-01-01',
       })
 

@@ -10,23 +10,22 @@ import {
 
 function requirement(overrides: Record<string, unknown> = {}) {
   return {
-    jobApplicationId: 7,
     skillId: 1,
     rawLabel: 'Kafka',
-    sourceText: 'Experience building event-driven systems with Kafka',
+    requirementStatement: 'Experience building event-driven systems with Kafka',
     importance: 'required',
-    parserConfidence: 0.9,
+    confidence: 0.9,
     analysisResult: 'not-in-career-data',
-    userDecision: 'pending',
+    decision: 'pending',
     decisionReason: null,
-    createdAt: '2026-08-28',
-    updatedAt: '2026-08-28',
     skillName: 'Kafka',
     skillKey: 'kafka',
-    skillCategory: 'messaging-async',
+    category: 'messaging-async',
     careerSkillId: null,
     reviewStatus: 'pending',
     aliases: [],
+    requirementId: 1,
+    requirementSequence: 1,
     ...overrides,
   }
 }
@@ -71,7 +70,7 @@ describe('evidence selection snapshots', () => {
       application: { id: 7, direction: 'fullstack', jobTitle: 'Full-Stack Developer' },
       skills: conditionalSkill ? [conditionalSkill] : [],
       analysis: { requirements: conditionalSkill ?? '' },
-    } as GenerationSource)
+    } as unknown as GenerationSource)
     expect(snapshot.selection.experienceIds).toEqual(profile.experienceSelection.priorityOrder)
     expect(snapshot.selection.achievementIds).toEqual(
       profile.preferredAchievementIds.filter(
@@ -95,7 +94,7 @@ describe('evidence selection snapshots', () => {
           skillId: 2,
           skillName: 'Kafka',
           analysisResult: 'not-in-career-data',
-          userDecision: 'skip',
+          decision: 'skip',
         }),
       ]),
     )
@@ -104,7 +103,7 @@ describe('evidence selection snapshots', () => {
       expect.objectContaining({ skillName: 'TypeScript', analysisResult: 'proven-match' }),
     )
     expect(snapshot.skillRequirements).toContainEqual(
-      expect.objectContaining({ skillName: 'Kafka', userDecision: 'skip' }),
+      expect.objectContaining({ skillName: 'Kafka', decision: 'skip' }),
     )
   })
 
@@ -115,12 +114,12 @@ describe('evidence selection snapshots', () => {
           skillId: 2,
           skillName: 'Kafka',
           analysisResult: 'not-in-career-data',
-          userDecision: 'skip',
+          decision: 'skip',
         }),
         requirement({ skillId: 1, skillName: 'TypeScript', analysisResult: 'proven-match' }),
       ]),
     )
-    expect(snapshot.skillRequirements.map((item) => item.userDecision)).toContain('skip')
+    expect(snapshot.skillRequirements.map((item) => item.decision)).toContain('skip')
     expect(snapshot.provenance.map((item) => item.skillName)).toEqual(['TypeScript'])
   })
 
@@ -131,7 +130,7 @@ describe('evidence selection snapshots', () => {
           skillId: 3,
           skillName: 'Kafka',
           analysisResult: 'not-in-career-data',
-          userDecision: 'include',
+          decision: 'include',
           decisionReason: 'Used in a personal event-processing prototype.',
         }),
       ]),
@@ -196,7 +195,7 @@ describe('evidence selection snapshots', () => {
           skillId: 1,
           skillName: 'TypeScript',
           analysisResult: 'proven-match',
-          userDecision: 'pending',
+          decision: 'pending',
         }),
       ],
       jobPosting: undefined,

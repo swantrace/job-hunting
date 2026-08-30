@@ -1,38 +1,16 @@
 import { describe, expect, test } from 'bun:test'
 import { jobParserPromptVersion, jobParserSystemPrompt } from '../src/ai/prompts/job-parser'
-import { jobParserResponseSchema, skillRequirementItemSchema } from '../src/ai/schemas/job-parser'
+import { skillReferenceSchema } from '../src/ai/schemas/job-analysis'
+import { jobParserResponseSchema } from '../src/ai/schemas/job-parser'
 import { parsedJobSchema } from '../src/lib/ai'
 
 describe('AI job parser output', () => {
-  test('accepts a complete structured result', () => {
-    const skillItems = jobParserResponseSchema.properties.skills.items as { type?: string }
-    const skills =
-      skillItems.type === 'object'
-        ? [
-            {
-              canonicalLabel: 'TypeScript',
-              category: 'languages-web',
-              confidence: 0.98,
-              importance: 'required',
-              rawLabel: 'TypeScript',
-              sourceText: 'Professional TypeScript experience',
-            },
-          ]
-        : ['typescript']
+  test('accepts a complete structured result with requirement-owned skills', () => {
     const result = parsedJobSchema.parse({
       jobTitle: 'Backend Engineer',
       location: null,
       postedDate: null,
-      skills,
       salary: null,
-      requirements: ['TypeScript experience'],
-      responsibilities: ['Build APIs'],
-      painPoints: [],
-      culture: [],
-      redFlags: [],
-      successMetrics: [],
-      benefits: [],
-      notes: null,
     })
     expect(result.jobTitle).toBe('Backend Engineer')
   })
@@ -43,38 +21,33 @@ describe('AI job parser output', () => {
     expect(jobParserSystemPrompt).toContain('job URL')
     expect(jobParserSystemPrompt).toContain('application source')
     expect(jobParserSystemPrompt).toContain('postedDate')
-    expect(jobParserResponseSchema.properties.skills.maxItems).toBe(30)
+    // The parser no longer publishes a parallel top-level skills list.
+    expect(jobParserResponseSchema.properties).not.toHaveProperty('skills')
   })
 
   test('rejects malformed skill confidence and source excerpts', () => {
-    const valid = skillRequirementItemSchema.safeParse({
+    const valid = skillReferenceSchema.safeParse({
       rawLabel: 'Kafka',
       canonicalLabel: 'Kafka',
       category: 'messaging-async',
-      importance: 'required',
-      sourceText: 'Kafka experience',
       confidence: 0.96,
     })
     expect(valid.success).toBe(true)
 
     expect(
-      skillRequirementItemSchema.safeParse({
+      skillReferenceSchema.safeParse({
         rawLabel: 'Kafka',
         canonicalLabel: 'Kafka',
         category: 'messaging-async',
-        importance: 'required',
-        sourceText: 'Kafka experience',
         confidence: 1.2,
       }).success,
     ).toBe(false)
 
     expect(
-      skillRequirementItemSchema.safeParse({
+      skillReferenceSchema.safeParse({
         rawLabel: 'Kafka',
         canonicalLabel: 'Kafka',
-        category: 'messaging-async',
-        importance: 'required',
-        sourceText: '',
+        category: 'miscellaneous',
         confidence: 0.96,
       }).success,
     ).toBe(false)

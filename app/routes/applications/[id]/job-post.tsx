@@ -1,6 +1,6 @@
 import { createRoute } from 'honox/factory'
 import { db } from '../../../../src/db/client'
-import { updateJobPostingRawText } from '../../../../src/db/job-analysis-runs'
+import { saveJobPostingVersion } from '../../../../src/db/job-analysis-runs'
 import { getApplication } from '../../../../src/db/queries'
 import { parseFilters, parseId } from '../../../../src/lib/request'
 import { ApplicationPanel } from '../../../components/workspace/ApplicationPanel'
@@ -17,6 +17,8 @@ export const POST = createRoute(async (c) => {
     c.header('HX-Retarget', '#workspace-application-panel')
     return c.html(<ApplicationPanel job={job} filters={filters} active />, 422)
   }
-  if (job.jobPosting) updateJobPostingRawText(db, job.jobPosting.id, rawText)
+  // Editing raw text creates the next immutable version (or reuses the current
+  // version when the normalized text is unchanged).
+  saveJobPostingVersion(db, id, rawText)
   return c.html(<ApplicationPanel job={getApplication(id)!} filters={filters} active />)
 })

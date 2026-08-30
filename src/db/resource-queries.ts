@@ -5,7 +5,10 @@ import {
   contacts,
   jobApplications,
   jobApplicationsToContacts,
-  jobApplicationsToSkills,
+  jobPostingAnalyses,
+  jobPostings,
+  jobRequirements,
+  jobRequirementsToSkills,
   type Skill,
   skillAliases,
   skills,
@@ -26,17 +29,35 @@ export type ContactOverview = typeof contacts.$inferSelect & {
 export function listSkillsOverview(): SkillOverview[] {
   const skillRows = db.select().from(skills).orderBy(sql`lower(${skills.name})`).all()
   const aliases = db.select().from(skillAliases).all()
-  const relations = db.select().from(jobApplicationsToSkills).all()
+  const relations = db
+    .select({
+      skillId: jobRequirementsToSkills.skillId,
+      applicationId: jobPostings.jobApplicationId,
+    })
+    .from(jobRequirementsToSkills)
+    .innerJoin(
+      jobRequirements,
+      sql`${jobRequirements.id} = ${jobRequirementsToSkills.jobRequirementId}`,
+    )
+    .innerJoin(
+      jobPostingAnalyses,
+      sql`${jobPostingAnalyses.id} = ${jobRequirements.jobPostingAnalysisId}`,
+    )
+    .innerJoin(jobPostings, sql`${jobPostings.id} = ${jobPostingAnalyses.jobPostingId}`)
+    .all()
   const aliasCount = new Map<number, number>()
-  const applicationCount = new Map<number, number>()
+  const applicationIdsBySkill = new Map<number, Set<number>>()
   for (const alias of aliases)
     aliasCount.set(alias.skillId, (aliasCount.get(alias.skillId) ?? 0) + 1)
-  for (const relation of relations)
-    applicationCount.set(relation.skillId, (applicationCount.get(relation.skillId) ?? 0) + 1)
+  for (const relation of relations) {
+    const set = applicationIdsBySkill.get(relation.skillId) ?? new Set()
+    set.add(relation.applicationId)
+    applicationIdsBySkill.set(relation.skillId, set)
+  }
   return skillRows.map((skill) => ({
     ...skill,
     aliasCount: aliasCount.get(skill.id) ?? 0,
-    applicationCount: applicationCount.get(skill.id) ?? 0,
+    applicationCount: applicationIdsBySkill.get(skill.id)?.size ?? 0,
   }))
 }
 

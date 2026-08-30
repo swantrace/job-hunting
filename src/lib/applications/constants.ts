@@ -1,9 +1,6 @@
 export const priorities = ['A', 'B', 'C'] as const
 export type JobPriority = (typeof priorities)[number]
 
-export const matchLevels = ['A', 'B'] as const
-export type MatchLevel = (typeof matchLevels)[number]
-
 export const statuses = [
   'Saved',
   'Apply Today',

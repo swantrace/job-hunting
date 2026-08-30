@@ -1,5 +1,5 @@
 import { type Filters, type JobCardData, listManagementData } from '../../../src/db/queries'
-import { matchLevels, priorities } from '../../../src/lib/applications/constants'
+import { priorities } from '../../../src/lib/applications/constants'
 import { todayISO } from '../../../src/lib/date'
 import { listProfiles } from '../../../src/lib/profiles'
 import type { FieldErrors } from '../../../src/lib/validation'
@@ -11,16 +11,13 @@ export function ApplicationForm({
   filters,
   errors,
   companies,
-  skills,
 }: {
   job: JobCardData
   filters: Filters
   errors?: FieldErrors
   companies?: { name: string }[]
-  skills?: { name: string }[]
 }) {
   const companyOptions = companies ?? listManagementData().companies
-  const skillOptions = skills ?? listManagementData().skills
   const profiles = listProfiles()
   return (
     <form
@@ -84,22 +81,8 @@ export function ApplicationForm({
             <option selected={job.priority === value}>{value}</option>
           ))}
         </SelectField>
-        <SelectField name="matchLevel" label="Match level">
-          <option value="">Not set</option>
-          {matchLevels.map((value) => (
-            <option selected={job.matchLevel === value}>{value}</option>
-          ))}
-        </SelectField>
         <InputField label="Source" name="applicationSource" value={job.applicationSource} />
         <InputField label="Salary" name="salary" value={job.salary} />
-        <div class="sm:col-span-2">
-          <InputField
-            label="Skills"
-            name="skills"
-            value={job.skills.join(', ')}
-            list="workspace-skill-options"
-          />
-        </div>
         <div class="sm:col-span-2">
           <TextareaField label="Notes" name="notes" value={job.notes ?? ''} rows={5} />
         </div>
@@ -107,11 +90,6 @@ export function ApplicationForm({
       <datalist id="workspace-company-options">
         {companyOptions.map((company) => (
           <option value={company.name} />
-        ))}
-      </datalist>
-      <datalist id="workspace-skill-options">
-        {skillOptions.map((skill) => (
-          <option value={skill.name} />
         ))}
       </datalist>
       <button class="btn btn-primary w-full" type="submit">

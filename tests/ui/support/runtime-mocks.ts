@@ -38,11 +38,7 @@ const realSkillDecisionSchema = z
 export const mockSkillDecisionSafeParse = (value: unknown) =>
   realSkillDecisionSchema.safeParse(value)
 
-export const mockGetApplicationSkillRequirement = mock((): any => undefined)
-export const mockListApplicationSkillRequirements = mock((): any => [])
-export const mockSkipRemainingSkillDecisions = mock((): any => {})
-export const mockUpdateSkillDecision = mock((): any => {})
-export const mockHasPendingSkillDecisions = mock(() => false)
+export const mockListRunSkillReviews = mock((): any => [])
 
 export const mockJob = {
   appliedDate: null,
@@ -59,11 +55,9 @@ export const mockJob = {
   jobPostingAnalysis: undefined,
   jobTitle: 'Full-Stack Developer',
   location: 'Edmonton, AB',
-  matchLevel: null,
   notes: null,
   postedDate: '2026-08-20',
   priority: 'B',
-  resumeVersion: null,
   salary: null,
   skills: [],
   status: 'Saved',
@@ -141,6 +135,7 @@ mock.module('../../../src/lib/analysis-queue', () => ({
 }))
 
 mock.module('../../../src/db/analysis', () => ({
+  analysisRunBelongsToApplication: mock(() => true),
   confirmProfileSelection: mockConfirmProfileSelection,
   getAnalysisRun: mockGetAnalysisRun,
   listAnalysisRuns: mockListAnalysisRuns,
@@ -158,6 +153,7 @@ export const mockLoadReviewData = mock((): any => ({
     reasons: [],
   },
   requirements: [],
+  requirementSkills: [],
   profiles: [],
 }))
 
@@ -258,11 +254,7 @@ mock.module('../../../src/lib/validation', () => ({
 
 mock.module('../../../src/db/skill-queries', () => ({
   ...realSkillQueries,
-  getApplicationSkillRequirement: mockGetApplicationSkillRequirement,
-  hasPendingSkillDecisions: mockHasPendingSkillDecisions,
-  listApplicationSkillRequirements: mockListApplicationSkillRequirements,
-  skipRemainingSkillDecisions: mockSkipRemainingSkillDecisions,
-  updateSkillDecision: mockUpdateSkillDecision,
+  listRunSkillReviews: mockListRunSkillReviews,
 }))
 
 mock.module('../../../src/lib/career-data', () => ({

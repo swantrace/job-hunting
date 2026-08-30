@@ -19,90 +19,84 @@ const documentSchema = z.object({ schemaVersion: z.literal(1), lastUpdated: date
 
 const candidateSchema = documentSchema
   .extend({
-    identity: z.object({ fullName: z.string().min(1), email: z.string().email() }).passthrough(),
+    identity: z.looseObject({ fullName: z.string().min(1), email: z.email().min(1) }),
     education: z.array(
       z.object({ id: idSchema, degree: z.string().min(1), school: z.string().min(1) }),
     ),
   })
-  .passthrough()
+  .loose()
 const experiencesSchema = documentSchema.extend({
   experiences: z.array(
-    z.object({ id: idSchema, company: z.string().min(1), role: z.string().min(1) }).passthrough(),
+    z.looseObject({ id: idSchema, company: z.string().min(1), role: z.string().min(1) }),
   ),
 })
 const achievementsSchema = documentSchema.extend({
   achievements: z.array(
-    z
-      .object({
-        id: idSchema,
-        experienceId: idSchema.nullable(),
-        skills: referenceIdsSchema,
-        directions: referenceIdsSchema,
-        publicationIds: referenceIdsSchema.optional(),
-        safeToUse: z.boolean(),
-        evidence: z.array(z.string()),
-      })
-      .passthrough(),
+    z.looseObject({
+      id: idSchema,
+      experienceId: idSchema.nullable(),
+      skills: referenceIdsSchema,
+      directions: referenceIdsSchema,
+      publicationIds: referenceIdsSchema.optional(),
+      safeToUse: z.boolean(),
+      evidence: z.array(z.string()),
+    }),
   ),
 })
 const publicationsSchema = documentSchema.extend({
   publications: z.array(
-    z
-      .object({
-        id: idSchema,
-        citation: z.string().trim().min(1),
-        title: z.string().trim().min(1),
-        year: z.number().int().min(1900).max(2100),
-        publicationType: z.enum(['journal-article', 'conference-paper', 'preprint', 'other']),
-        status: z.enum(['published', 'in-review', 'preprint', 'needs-verification']),
-        authors: z
-          .array(z.object({ name: z.string().trim().min(1), isCandidate: z.boolean() }))
-          .min(1),
-        authorListIsTruncated: z.boolean().optional(),
-        experienceId: idSchema.nullable(),
-        projectIds: referenceIdsSchema,
-        directions: referenceIdsSchema,
-        contributions: z.array(z.string().trim().min(1)).default([]),
-        sourceUrls: z.array(z.string().url()).default([]),
-        safeToUse: z.boolean(),
-      })
-      .passthrough(),
+    z.looseObject({
+      id: idSchema,
+      citation: z.string().trim().min(1),
+      title: z.string().trim().min(1),
+      year: z.number().int().min(1900).max(2100),
+      publicationType: z.enum(['journal-article', 'conference-paper', 'preprint', 'other']),
+      status: z.enum(['published', 'in-review', 'preprint', 'needs-verification']),
+      authors: z
+        .array(z.object({ name: z.string().trim().min(1), isCandidate: z.boolean() }))
+        .min(1),
+      authorListIsTruncated: z.boolean().optional(),
+      experienceId: idSchema.nullable(),
+      projectIds: referenceIdsSchema,
+      directions: referenceIdsSchema,
+      contributions: z.array(z.string().trim().min(1)).default([]),
+      sourceUrls: z.array(z.string().url()).default([]),
+      safeToUse: z.boolean(),
+    }),
   ),
 })
 const projectsSchema = documentSchema.extend({
   projects: z.array(
-    z
-      .object({
-        id: idSchema,
-        name: z.string().min(1),
-        skills: referenceIdsSchema,
-        directions: referenceIdsSchema,
-      })
-      .passthrough(),
+    z.looseObject({
+      id: idSchema,
+      name: z.string().min(1),
+      skills: referenceIdsSchema,
+      directions: referenceIdsSchema,
+    }),
   ),
 })
 const skillsSchema = documentSchema.extend({
   skills: z.array(
-    z
-      .object({
-        id: idSchema,
-        label: z.string().min(1),
-        category: z
-          .string()
-          .trim()
-          .min(1)
-          .refine(hasSkillCategory, 'Choose a category from career-data/skill-taxonomy.json.'),
-        aliases: z.array(z.string().trim().min(1).max(120)).default([]),
-        directions: referenceIdsSchema,
-      })
-      .passthrough(),
+    z.looseObject({
+      id: idSchema,
+      label: z.string().min(1),
+      category: z
+        .string()
+        .trim()
+        .min(1)
+        .refine(hasSkillCategory, 'Choose a category from career-data/skill-taxonomy.json.'),
+      aliases: z.array(z.string().trim().min(1).max(120)).default([]),
+      directions: referenceIdsSchema,
+    }),
   ),
 })
 const storiesSchema = documentSchema.extend({
   stories: z.array(
-    z
-      .object({ id: idSchema, experienceId: idSchema.nullable(), directions: referenceIdsSchema })
-      .passthrough(),
+    z.looseObject({
+      id: idSchema,
+      experienceId: idSchema.nullable(),
+      directions: referenceIdsSchema,
+    }),
   ),
 })
 const preferencesSchema = documentSchema
@@ -112,16 +106,14 @@ const preferencesSchema = documentSchema
       z.object({ label: z.string().min(1), targetTitles: z.array(z.string().min(1)).min(1) }),
     ),
   })
-  .passthrough()
+  .loose()
 const portfolioSchema = documentSchema
   .extend({
     topics: z.array(
-      z
-        .object({ id: idSchema, projects: referenceIdsSchema, directions: referenceIdsSchema })
-        .passthrough(),
+      z.looseObject({ id: idSchema, projects: referenceIdsSchema, directions: referenceIdsSchema }),
     ),
   })
-  .passthrough()
+  .loose()
 
 export const careerProfileSchema = documentSchema
   .extend({
@@ -139,9 +131,9 @@ export const careerProfileSchema = documentSchema
       priorityOrder: referenceIdsSchema,
       maxBulletsByExperience: z.record(idSchema, z.number().int().min(0).max(10)),
     }),
-    coverLetterStrategy: z.object({ preferredStoryIds: referenceIdsSchema }).passthrough(),
+    coverLetterStrategy: z.looseObject({ preferredStoryIds: referenceIdsSchema }),
   })
-  .passthrough()
+  .loose()
 
 export type CanonicalCareerData = {
   candidate: z.infer<typeof candidateSchema>

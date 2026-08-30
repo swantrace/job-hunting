@@ -93,33 +93,31 @@ describe('application generation', () => {
     // The save path persists requirements without a generation run; pending and
     // skipped requirements stay outside the generation-eligible boundary.
     expect(
-      isGenerationEligible({ analysisResult: 'not-in-career-data', userDecision: 'pending' }),
+      isGenerationEligible({ analysisResult: 'not-in-career-data', decision: 'pending' }),
     ).toBe(false)
-    expect(
-      isGenerationEligible({ analysisResult: 'not-in-career-data', userDecision: 'skip' }),
-    ).toBe(false)
+    expect(isGenerationEligible({ analysisResult: 'not-in-career-data', decision: 'skip' })).toBe(
+      false,
+    )
   })
 
   test('blocks explicit generation while a missing-skill decision is pending', () => {
     expect(
-      isGenerationEligible({ analysisResult: 'not-in-career-data', userDecision: 'pending' }),
+      isGenerationEligible({ analysisResult: 'not-in-career-data', decision: 'pending' }),
     ).toBe(false)
     expect(
-      isGenerationEligible({ analysisResult: 'not-in-career-data', userDecision: 'include' }),
+      isGenerationEligible({ analysisResult: 'not-in-career-data', decision: 'include' }),
     ).toBe(true)
-    expect(isGenerationEligible({ analysisResult: 'proven-match', userDecision: 'pending' })).toBe(
-      true,
-    )
+    expect(isGenerationEligible({ analysisResult: 'proven-match', decision: 'pending' })).toBe(true)
   })
 
   test('allows application-only skills to use only the user-authored reason', () => {
     const eligible = generationEligibleRequirements([
       {
         analysisResult: 'not-in-career-data',
-        userDecision: 'include',
+        decision: 'include',
         decisionReason: 'Used in a personal event-processing prototype.',
       },
-      { analysisResult: 'not-in-career-data', userDecision: 'include', decisionReason: 'Learning' },
+      { analysisResult: 'not-in-career-data', decision: 'include', decisionReason: 'Learning' },
     ])
     expect(eligible).toHaveLength(2)
     expect(eligible[0].decisionReason).toBe('Used in a personal event-processing prototype.')
@@ -127,10 +125,10 @@ describe('application generation', () => {
 
   test('never sends skipped skills to resume or cover-letter prompts', () => {
     const eligible = generationEligibleRequirements([
-      { analysisResult: 'proven-match', userDecision: 'pending', skillName: 'TypeScript' },
-      { analysisResult: 'not-in-career-data', userDecision: 'skip', skillName: 'Kafka' },
-      { analysisResult: 'not-in-career-data', userDecision: 'pending', skillName: 'Redis' },
-      { analysisResult: 'not-in-career-data', userDecision: 'include', skillName: 'Kubernetes' },
+      { analysisResult: 'proven-match', decision: 'pending', skillName: 'TypeScript' },
+      { analysisResult: 'not-in-career-data', decision: 'skip', skillName: 'Kafka' },
+      { analysisResult: 'not-in-career-data', decision: 'pending', skillName: 'Redis' },
+      { analysisResult: 'not-in-career-data', decision: 'include', skillName: 'Kubernetes' },
     ])
     expect(eligible.map((item) => item.skillName)).toEqual(['TypeScript', 'Kubernetes'])
   })

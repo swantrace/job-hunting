@@ -5,7 +5,6 @@ import {
   applicationSortValues,
   applicationViewLabels,
   applicationViews,
-  matchLevels,
   priorities,
   statuses,
 } from '../src/lib/applications/constants'
@@ -26,7 +25,6 @@ describe('domain-owned runtime constants', () => {
     expect(Object.keys(applicationViewLabels)).toEqual([...applicationViews])
     expect(Object.keys(applicationSortLabels)).toEqual([...applicationSortValues])
     expect(priorities).toEqual(['A', 'B', 'C'])
-    expect(matchLevels).toEqual(['A', 'B'])
   })
 
   test('uses one lifecycle for every persisted asynchronous run', () => {
