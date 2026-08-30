@@ -386,6 +386,7 @@ export type RunSkillReview = RequirementSkillMapping & {
   analysisResult: SkillMatchResult
   decision: SkillDecision
   decisionReason: string | null
+  aliases: string[]
 }
 
 /**
@@ -402,6 +403,19 @@ export function listRunSkillReviews(runId: number, executor: DbExecutor = db): R
     .get()
   if (!run) return []
   const mappings = listRequirementSkillMappings(run.jobPostingAnalysisId, executor)
+  if (!mappings.length) return []
+  const skillIds = [...new Set(mappings.map((mapping) => mapping.skillId))]
+  const aliasRows = executor
+    .select()
+    .from(skillAliases)
+    .where(inArray(skillAliases.skillId, skillIds))
+    .all()
+  const aliasesBySkill = new Map<number, string[]>()
+  for (const alias of aliasRows) {
+    const list = aliasesBySkill.get(alias.skillId) ?? []
+    list.push(alias.alias)
+    aliasesBySkill.set(alias.skillId, list)
+  }
   const decisions = executor
     .select()
     .from(analysisRunDecisions)
@@ -415,6 +429,7 @@ export function listRunSkillReviews(runId: number, executor: DbExecutor = db): R
       analysisResult: mapping.careerSkillId ? 'proven-match' : 'not-in-career-data',
       decision: decision?.decision ?? 'pending',
       decisionReason: decision?.reason ?? null,
+      aliases: aliasesBySkill.get(mapping.skillId) ?? [],
     }
   })
 }

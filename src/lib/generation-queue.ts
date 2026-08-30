@@ -130,6 +130,7 @@ export async function enqueueGeneration(jobApplicationId: number) {
   if (!built) return null
   const run = createGenerationRun({
     jobApplicationId,
+    applicationAnalysisRunId: built.snapshot.candidateAnalysisRunId,
     inputHash: built.inputHash,
     frozenInputJson: JSON.stringify(built.snapshot),
     resumeModel: built.snapshot.resumeModel,

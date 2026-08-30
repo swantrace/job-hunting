@@ -21,7 +21,7 @@ export const snapshotSkillRequirementSchema = z.object({
   category: z.string().nullable(),
   importance: z.string(),
   analysisResult: z.string(),
-  userDecision: z.string(),
+  decision: z.string(),
   decisionReason: z.string().nullable(),
   rawLabel: z.string().nullable(),
   sourceText: z.string().nullable(),
@@ -180,7 +180,7 @@ export function buildEvidenceSelectionSnapshot(
     requirements.map((item) => ({
       analysisResult: item.analysisResult,
       importance: item.importance,
-      userDecision: item.userDecision,
+      userDecision: item.decision,
     })),
   )
   const provenance = generationEligibleRequirements(requirements).map((item) => ({
@@ -234,13 +234,13 @@ export function buildEvidenceSelectionSnapshot(
     },
     skillRequirements: requirements.map((item) => ({
       skillName: item.skillName,
-      category: item.skillCategory,
+      category: item.category,
       importance: item.importance,
       analysisResult: item.analysisResult,
-      userDecision: item.userDecision,
+      decision: item.decision,
       decisionReason: item.decisionReason ?? null,
       rawLabel: item.rawLabel ?? null,
-      sourceText: item.sourceText ?? null,
+      sourceText: item.requirementStatement ?? null,
     })),
     scores,
     versions: {

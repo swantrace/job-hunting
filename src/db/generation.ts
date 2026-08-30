@@ -4,10 +4,11 @@ import { type AnalysisRunState, classifyAnalysisRunState } from '../lib/analysis
 import { todayISO } from '../lib/date'
 import type { GeneratedArtifactType } from '../lib/generation/constants'
 import { buildGenerationInput, generationStalenessReasons } from '../lib/generation-input'
-import { listAnalysisRuns } from './analysis'
+import type { ApplicationAnalysisRun } from './analysis'
 import { db } from './client'
 import { listJobRequirements } from './job-analysis'
 import {
+  applicationAnalysisRuns,
   type BaselineGenerationRun,
   baselineGeneratedArtifacts,
   baselineGenerationEvidenceSnapshots,
@@ -23,7 +24,7 @@ import {
   jobPostingAnalyses,
   jobPostings,
 } from './schema'
-import { listApplicationSkillRequirements } from './skill-queries'
+import { listRunSkillReviews, type RunSkillReview } from './skill-queries'
 
 export type GenerationRunWithArtifacts = GenerationRun & {
   artifacts: (typeof generatedArtifacts.$inferSelect)[]
@@ -38,16 +39,17 @@ export type GenerationSource = {
   application: typeof jobApplications.$inferSelect
   company: typeof companies.$inferSelect
   skills: string[]
-  requirements: ReturnType<typeof listApplicationSkillRequirements>
+  requirements: RunSkillReview[]
   jobPosting: typeof jobPostings.$inferSelect | undefined
   analysis: typeof jobPostingAnalyses.$inferSelect | undefined
   jobRequirements: ReturnType<typeof listJobRequirements>
-  analysisRun: ReturnType<typeof listAnalysisRuns>[number] | null
+  analysisRun: ApplicationAnalysisRun | null
   companyInterestNote: string | null
 }
 
 export type CreateGenerationRunInput = {
   jobApplicationId: number
+  applicationAnalysisRunId: number
   inputHash: string
   frozenInputJson: string
   resumeModel: string
@@ -68,6 +70,7 @@ export function createGenerationRun(input: CreateGenerationRunInput) {
     .insert(generationRuns)
     .values({
       jobApplicationId: input.jobApplicationId,
+      applicationAnalysisRunId: input.applicationAnalysisRunId,
       queueJobId: `generation-${crypto.randomUUID()}`,
       status: 'Queued',
       inputHash: input.inputHash,
@@ -378,31 +381,37 @@ export function getGenerationRunResults(runId: number) {
 export function getGenerationSource(runId: number): GenerationSource | null {
   const run = getGenerationRun(runId)
   if (!run) return null
+  // Resolve lineage explicitly: Candidate Analysis -> Job Analysis -> Job Post
+  // -> Application -> Company. No redundant application FK or legacy
+  // application-skill table is consulted.
+  const candidateRun = run.applicationAnalysisRunId
+    ? db
+        .select()
+        .from(applicationAnalysisRuns)
+        .where(eq(applicationAnalysisRuns.id, run.applicationAnalysisRunId))
+        .get()
+    : undefined
+  const analysis = candidateRun?.jobPostingAnalysisId
+    ? db
+        .select()
+        .from(jobPostingAnalyses)
+        .where(eq(jobPostingAnalyses.id, candidateRun.jobPostingAnalysisId))
+        .get()
+    : undefined
+  const jobPosting = analysis
+    ? db.select().from(jobPostings).where(eq(jobPostings.id, analysis.jobPostingId)).get()
+    : undefined
+  const applicationId = jobPosting?.jobApplicationId
+  if (!applicationId) return null
   const row = db
     .select({ application: jobApplications, company: companies })
     .from(jobApplications)
     .innerJoin(companies, eq(jobApplications.companyId, companies.id))
-    .where(eq(jobApplications.id, run.jobApplicationId))
+    .where(eq(jobApplications.id, applicationId))
     .get()
   if (!row) return null
-  const jobPosting = db
-    .select()
-    .from(jobPostings)
-    .where(eq(jobPostings.jobApplicationId, row.application.id))
-    .get()
-  const analysis = jobPosting
-    ? db
-        .select()
-        .from(jobPostingAnalyses)
-        .where(eq(jobPostingAnalyses.jobPostingId, jobPosting.id))
-        .get()
-    : undefined
-  const requirements = listApplicationSkillRequirements(row.application.id)
+  const requirements = candidateRun ? listRunSkillReviews(candidateRun.id) : []
   const jobRequirements = analysis ? listJobRequirements(analysis.id) : []
-  const analysisRun =
-    listAnalysisRuns(row.application.id).find(
-      (run) => run.status === 'Completed' && !!run.confirmedProfileId,
-    ) ?? null
   return {
     run,
     application: row.application,
@@ -412,7 +421,7 @@ export function getGenerationSource(runId: number): GenerationSource | null {
     jobPosting,
     analysis,
     jobRequirements,
-    analysisRun,
+    analysisRun: candidateRun ?? null,
     companyInterestNote: null,
   }
 }
