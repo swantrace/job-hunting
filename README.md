@@ -190,6 +190,8 @@ Back up `jobs.db` and the `artifacts/` directory before applying migrations or r
 
 Migrations are hand-written SQLite files in `drizzle/` with journal entries in `drizzle/meta/_journal.json`; `bun run db:migrate` applies them in order. They are tested against empty and populated temporary databases and must never invoke an LLM. To apply locally: `bun run db:migrate`. To apply on Fly without a local production copy, run the migration against an isolated copy first, then deploy the artifact and run `bun run db:migrate` in the app context (e.g. `fly ssh console` and execute the `start` command) — never run migration or sync commands directly against a live production SQLite file without a backup.
 
+The canonical contract migration (`0021`) preserves companies, contacts, applications and their URLs, application-contact links, follow-ups, interviews, Job Post raw text/hash, canonical skills/categories/aliases, and the encrypted Drive connection. It intentionally resets derived AI history (Job Analysis, requirements, Candidate Analysis, decisions, generation and document-review history, and baseline history). After migrating, re-run Job Analysis for each application (the saved Job Post text is preserved), then Candidate Analysis and document generation as needed.
+
 ## Useful commands
 
 ```sh
