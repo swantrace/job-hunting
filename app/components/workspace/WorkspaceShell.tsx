@@ -9,6 +9,7 @@ import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
 import { getApplicationReadiness } from '../../../src/lib/application-readiness'
 import type { FieldErrors } from '../../../src/lib/validation'
 import type { WorkspaceTab } from '../../../src/lib/workspace/constants'
+import type { TabAvailability } from '../../../src/lib/workspace/state'
 import { ActivityPanel } from './ActivityPanel'
 import { ApplicationPanel } from './ApplicationPanel'
 import { ContactsPanel } from './ContactsPanel'
@@ -25,6 +26,7 @@ export function WorkspaceShell({
   requirements = [],
   careerEvidence = {},
   activeTab = 'application',
+  availability,
   errors,
   errorForm,
 }: {
@@ -34,6 +36,7 @@ export function WorkspaceShell({
   requirements?: ApplicationSkillRequirement[]
   careerEvidence?: Record<string, string[]>
   activeTab?: WorkspaceTab
+  availability: TabAvailability[]
   errors?: FieldErrors
   errorForm?: WorkspaceErrorForm
 }) {
@@ -47,7 +50,7 @@ export function WorkspaceShell({
   return (
     <div id="workspace-shell">
       <WorkspaceHeader job={job} />
-      <WorkspaceTabs activeTab={activeTab} />
+      <WorkspaceTabs activeTab={activeTab} availability={availability} />
       <ApplicationPanel job={job} filters={filters} active={activeTab === 'application'} />
       <ContactsPanel
         job={job}

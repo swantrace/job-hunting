@@ -3,7 +3,11 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { Hono } from 'hono'
 import { fragmentRecords, recordsFor } from './support/html-contract'
-import { mockApplicationSafeParse, mockStatusSafeParse } from './support/runtime-mocks'
+import {
+  mockApplicationSafeParse,
+  mockComputeWorkspaceAvailability,
+  mockStatusSafeParse,
+} from './support/runtime-mocks'
 
 async function createRouteHarness() {
   const { PATCH: statusRoute } = (await import(
@@ -94,6 +98,36 @@ describe('workspace HTMX response boundaries', () => {
       'generation-panel',
     ]) {
       expect(records.filter((record) => record.id === id)).toHaveLength(1)
+    }
+  })
+
+  test('falls back to Job Post for a forged locked tab and disables it accessibly', async () => {
+    mockComputeWorkspaceAvailability.mockReturnValue({
+      jobAnalysisCurrent: false,
+      reviewReady: false,
+      hasHistoricalReview: false,
+      hasHistoricalDocuments: false,
+    })
+    try {
+      const response = await (await createRouteHarness()).request(
+        '/applications/7/workspace?workspaceTab=review',
+      )
+      const html = await response.text()
+
+      expect(response.status).toBe(200)
+      expect(html.match(/id="workspace-tab-application"[^>]*/)?.[0]).toContain(
+        'aria-selected="true"',
+      )
+      const reviewTab = html.match(/id="workspace-tab-review"[^>]*/)?.[0]
+      expect(reviewTab).toContain('aria-disabled="true"')
+      expect(reviewTab).toContain('disabled')
+    } finally {
+      mockComputeWorkspaceAvailability.mockReturnValue({
+        jobAnalysisCurrent: true,
+        reviewReady: true,
+        hasHistoricalReview: false,
+        hasHistoricalDocuments: false,
+      })
     }
   })
 })

@@ -153,6 +153,17 @@ mock.module('../../../src/lib/application-readiness', () => ({
   getApplicationReadiness: mockGetApplicationReadiness,
 }))
 
+export const mockComputeWorkspaceAvailability = mock((): any => ({
+  jobAnalysisCurrent: true,
+  reviewReady: true,
+  hasHistoricalReview: false,
+  hasHistoricalDocuments: false,
+}))
+
+mock.module('../../../src/lib/workspace/availability', () => ({
+  computeWorkspaceAvailability: mockComputeWorkspaceAvailability,
+}))
+
 export const mockListDocumentReviews = mock((): any => [])
 export const mockEnqueueDocumentReview = mock(
   async () => ({ review: { id: 1, status: 'Queued' } }) as const,
@@ -166,8 +177,18 @@ mock.module('../../../src/lib/document-review-queue', () => ({
   enqueueDocumentReview: mockEnqueueDocumentReview,
 }))
 
+export const mockGetCandidateAnalysisState = mock((): any => ({
+  state: 'never-run',
+  latest: null,
+  latestCompleted: null,
+  currentCompleted: null,
+  staleCompleted: null,
+  reasons: [],
+}))
+
 mock.module('../../../src/lib/candidate-analysis', () => ({
   currentCandidateAnalysisHash: mockCurrentCandidateAnalysisHash,
+  getCandidateAnalysisState: mockGetCandidateAnalysisState,
 }))
 
 mock.module('../../../src/lib/profiles', () => ({
