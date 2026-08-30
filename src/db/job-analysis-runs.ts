@@ -7,11 +7,7 @@ import { todayISO } from '../lib/date'
 import type { db } from './client'
 import { persistJobRequirements } from './job-analysis'
 import { type JobPostingAnalysis, jobPostingAnalyses, jobPostings } from './schema'
-import {
-  type DbExecutor,
-  persistSkillRequirements,
-  type SkillRequirementInput,
-} from './skill-queries'
+import { type DbExecutor } from './skill-queries'
 
 export type JobAnalysisDb = Pick<
   typeof db,
@@ -116,28 +112,9 @@ export function failJobAnalysisRun(db: JobAnalysisDb, runId: number, error: unkn
 }
 
 /**
- * Flattens the requirement-owned skill references into the legacy application
- * skill projection for backward compatibility. Importance and source excerpt
- * come from the owning requirement; the canonical persistence path
- * (`job_requirements_to_skills`) replaces this adapter in Step 2.2.
- */
-export function requirementSkillReferences(analysis: JobAnalysis): SkillRequirementInput[] {
-  return analysis.requirements.flatMap((requirement) =>
-    requirement.skillReferences.map((reference) => ({
-      rawLabel: reference.rawLabel,
-      canonicalLabel: reference.canonicalLabel,
-      category: reference.category,
-      importance: requirement.importance,
-      sourceText: requirement.sourceText,
-      confidence: reference.confidence,
-    })),
-  )
-}
-
-/**
- * Completes a run in one transaction: result columns, normalized requirements,
- * and current application skill reconciliation all commit together so a failure
- * never partially replaces the posting's current requirements or skills.
+ * Completes a run in one transaction: result JSON, normalized requirements,
+ * and canonical requirement-skill junction rows all commit together so a
+ * failure never partially replaces the posting's current analysis.
  */
 export function completeJobAnalysisRun(db: JobAnalysisDb, runId: number, parsed: ParsedJobResult) {
   const date = todayISO()
@@ -185,7 +162,6 @@ export function completeJobAnalysisRun(db: JobAnalysisDb, runId: number, parsed:
       .run()
 
     persistJobRequirements(tx, runId, analysis.requirements, date)
-    persistSkillRequirements(tx, posting.jobApplicationId, requirementSkillReferences(analysis))
   })
 }
 

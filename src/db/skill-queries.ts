@@ -1,10 +1,19 @@
-import { and, eq, inArray, notInArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, notInArray } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
 import type { SkillImportance, SkillOrigin, SkillReviewStatus } from '../lib/skills/constants'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
 import type { SkillCategory } from '../lib/skills/taxonomy'
 import { db } from './client'
-import { jobApplicationsToSkills, type Skill, skillAliases, skills } from './schema'
+import {
+  jobApplicationsToSkills,
+  jobPostingAnalyses,
+  jobPostings,
+  jobRequirements,
+  jobRequirementsToSkills,
+  type Skill,
+  skillAliases,
+  skills,
+} from './schema'
 
 export type DbExecutor = Pick<typeof db, 'select' | 'insert' | 'delete' | 'update'>
 
@@ -88,7 +97,7 @@ export function getOrCreateSkill(
   return existing ?? insertSkill(tx, { name, origin })
 }
 
-function resolveApprovedSkill(tx: DbExecutor, normalized: string): Skill | undefined {
+export function resolveApprovedSkill(tx: DbExecutor, normalized: string): Skill | undefined {
   const byKey = tx
     .select()
     .from(skills)
@@ -108,7 +117,12 @@ function resolveApprovedSkill(tx: DbExecutor, normalized: string): Skill | undef
     .get()
 }
 
-function addAliasIfAbsent(tx: DbExecutor, skillId: number, alias: string, origin: SkillOrigin) {
+export function addAliasIfAbsent(
+  tx: DbExecutor,
+  skillId: number,
+  alias: string,
+  origin: SkillOrigin,
+) {
   const normalized = normalizeSkillAlias(alias)
   const existing = tx
     .select()
@@ -337,4 +351,82 @@ export function hasPendingSkillDecisions(jobId: number) {
     )
     .limit(1)
     .get()
+}
+
+export type RequirementSkillMapping = {
+  skillId: number
+  skillName: string
+  skillKey: string
+  category: SkillCategory | null
+  careerSkillId: string | null
+  reviewStatus: SkillReviewStatus
+  requirementId: number
+  requirementSequence: number
+  requirementStatement: string
+  importance: SkillImportance
+  rawLabel: string | null
+  confidence: number | null
+}
+
+/**
+ * Canonical requirement-owned skill projection for one Job Analysis run. This
+ * joins `job_requirements` through `job_requirements_to_skills` to `skills`,
+ * never `job_applications_to_skills`, so the same skill may appear once per
+ * requirement without losing source or importance context.
+ */
+export function listRequirementSkillMappings(
+  jobPostingAnalysisId: number,
+  executor: DbExecutor = db,
+): RequirementSkillMapping[] {
+  return executor
+    .select({
+      skillId: skills.id,
+      skillName: skills.name,
+      skillKey: skills.key,
+      category: skills.category,
+      careerSkillId: skills.careerSkillId,
+      reviewStatus: skills.reviewStatus,
+      requirementId: jobRequirements.id,
+      requirementSequence: jobRequirements.sequence,
+      requirementStatement: jobRequirements.statement,
+      importance: jobRequirements.importance,
+      rawLabel: jobRequirementsToSkills.rawLabel,
+      confidence: jobRequirementsToSkills.confidence,
+    })
+    .from(jobRequirements)
+    .innerJoin(
+      jobRequirementsToSkills,
+      eq(jobRequirements.id, jobRequirementsToSkills.jobRequirementId),
+    )
+    .innerJoin(skills, eq(skills.id, jobRequirementsToSkills.skillId))
+    .where(eq(jobRequirements.jobPostingAnalysisId, jobPostingAnalysisId))
+    .orderBy(asc(jobRequirements.sequence), asc(skills.id))
+    .all()
+}
+
+/**
+ * Application skill summary derived from the latest completed Job Analysis
+ * run's requirement-skill mappings. This replaces the legacy
+ * `job_applications_to_skills` projection; the current run selection is
+ * refined by explicit lineage in later steps.
+ */
+export function listApplicationSkills(
+  jobApplicationId: number,
+  executor: DbExecutor = db,
+): RequirementSkillMapping[] {
+  const analysis = executor
+    .select({ id: jobPostingAnalyses.id })
+    .from(jobPostingAnalyses)
+    .innerJoin(jobPostings, eq(jobPostingAnalyses.jobPostingId, jobPostings.id))
+    .where(
+      and(
+        eq(jobPostings.jobApplicationId, jobApplicationId),
+        eq(jobPostingAnalyses.status, 'Completed'),
+      ),
+    )
+    .orderBy(desc(jobPostingAnalyses.id))
+    .limit(1)
+    .get()
+  if (!analysis) return []
+  return listRequirementSkillMappings(analysis.id, executor)
 }
