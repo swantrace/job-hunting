@@ -6,31 +6,30 @@ A local-first, server-rendered job pipeline built with Bun, HonoX, htmx, Drizzle
 
 ```mermaid
 flowchart LR
-  subgraph Capture
-    A[Paste job posting] --> B[AI job parser]
-    B --> C[Review and complete facts]
-    C --> D[Save opportunity]
-  end
+  Browser[Browser] <-->|Server-rendered HTML + htmx| App[HonoX application]
+  App <--> DB[(SQLite<br/>jobs.db)]
+  App <--> Career[Canonical career data<br/>and profiles]
 
-  subgraph Tracker
-    D --> E[(SQLite: jobs.db)]
-    E --> F[Server-rendered dashboard]
-    F <-->|htmx partial swaps| G[Browser]
-    F --> H[Application workspace]
-  end
+  App --> Queue[Durable async queues<br/>bunqueue.db]
+  Queue --> JA[Job analysis]
+  Queue --> CA[Candidate analysis]
+  Queue --> DG[Document generation]
+  Queue --> DR[Document review]
 
-  subgraph Generation
-    H --> I[Job requirements analysis]
-    J[Canonical career data] --> K[Evidence selection snapshot]
-    I --> K
-    L[Direction profile] --> K
-    K --> M[Resume and cover-letter generation]
-    M --> N[DOCX artifacts]
-    N --> O[Optional Google Drive upload]
-    K --> E
-    N --> E
-  end
+  JA -->|structured job requirements| LLM[OpenAI API]
+  CA -->|fit recommendation + evidence matrix| LLM
+  DG -->|resume + cover letter| LLM
+  DR -->|read-only quality findings| LLM
+
+  JA --> DB
+  CA --> DB
+  DG --> DB
+  DR --> DB
+  DG --> Files[Generated DOCX files<br/>and evidence snapshots]
+  Files --> Drive[Optional Google Drive]
 ```
+
+The application persists each requested operation as an append-only run in SQLite before queuing it. In production, all four named queues use embedded Bunqueue and durable state in `QUEUE_FILE_NAME` (normally `/data/bunqueue.db`); at startup the application recovers queued runs. In development, the same jobs run in-process without Bunqueue persistence. The browser never waits for a model response: it polls the persisted run state through htmx. A generated document is a draft, not an approved application artifact: the user reviews it and decides whether to download or upload it.
 
 ## Career data setup
 
@@ -115,8 +114,10 @@ Run `bun run taxonomy:sync --apply` before career skill sync whenever the JSON t
 2. Review the draft. Add the job URL, source, company, and direction yourself, then save it as **Saved**.
 3. Move a role to **Apply Today** when it becomes a task. Complete the application workspace and select **Sent application** after applying.
 4. Record follow-ups and interviews in the workspace. These activities advance the visible pipeline without overwriting a more advanced status.
-5. Generate a resume and cover letter only after configuring OpenAI and career data. Review the evidence snapshot and generated files before using them.
-6. Manage reusable companies, contacts, and skills from their dedicated pages under Career and Network. Export JSON periodically as a backup.
+5. In **Review**, confirm the recommended profile and resolve every missing skill: **Skip**, or **Include** with a truthful, application-specific reason. This creates the evidence selection used for generation.
+6. In **Documents**, explicitly generate the resume and cover letter. Review the frozen evidence snapshot and DOCX files; optionally request a semantic document review. A generated file is a draft until you decide it is suitable to use.
+7. Download approved documents or upload them to Google Drive when it is connected. Existing artifacts and Drive links remain available if a newer run later becomes outdated.
+8. Manage reusable companies, contacts, and skills from their dedicated pages under Career and Network. Export JSON periodically as a backup.
 
 ### Configuration
 
