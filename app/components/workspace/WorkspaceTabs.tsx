@@ -8,13 +8,20 @@ import {
 export function WorkspaceTabs({
   activeTab,
   availability,
+  oob = false,
 }: {
   activeTab: WorkspaceTab
   availability: TabAvailability[]
+  oob?: boolean
 }) {
   const byKey = new Map(availability.map((tab) => [tab.key, tab]))
   return (
-    <div id="workspace-tabs" role="tablist" class="tabs tabs-box mb-4">
+    <div
+      id="workspace-tabs"
+      role="tablist"
+      class="tabs tabs-box mb-4"
+      {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
+    >
       {workspaceTabOrder.map((key) => {
         const tab = byKey.get(key) ?? {
           key,

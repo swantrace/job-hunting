@@ -66,3 +66,43 @@ describe('analysis run-status fragment', () => {
     expect(recordsFor(html, 'analysis-run-status')).toHaveLength(1)
   })
 })
+
+async function createJobAnalysisHarness() {
+  const { GET, POST } = (await import(
+    '../../app/routes/applications/[id]/job-analysis-runs'
+  )) as Record<string, unknown>
+  const app = new Hono()
+  app.get('/applications/:id/job-analysis-runs', GET as never)
+  app.post('/applications/:id/job-analysis-runs', POST as never)
+  return app
+}
+
+describe('job analysis run-status fragment', () => {
+  test('returns the job-analysis status fragment plus an OOB tab update', async () => {
+    mockGetApplication.mockReturnValue(mockJob)
+    const response = await (await createJobAnalysisHarness()).request(
+      '/applications/7/job-analysis-runs',
+    )
+    const html = await response.text()
+
+    expect(response.status).toBe(200)
+    expect(recordsFor(html, 'workspace-job-analysis-status')).toEqual([
+      expect.objectContaining({ depth: 0, id: 'workspace-job-analysis-status' }),
+    ])
+    expect(recordsFor(html, 'workspace-tabs')).toEqual([
+      expect.objectContaining({ id: 'workspace-tabs', oob: 'outerHTML' }),
+    ])
+    expect(html).not.toMatch(/<AppShell|<html|<body/)
+  })
+
+  test('rejects a rerun with a targeted 422 before a job post exists', async () => {
+    mockGetApplication.mockReturnValue(mockJob)
+    const response = await (await createJobAnalysisHarness()).request(
+      '/applications/7/job-analysis-runs',
+      { method: 'POST' },
+    )
+
+    expect(response.status).toBe(422)
+    expect(response.headers.get('HX-Retarget')).toBe('#workspace-job-analysis-status')
+  })
+})

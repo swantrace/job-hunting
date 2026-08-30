@@ -92,6 +92,7 @@ describe('workspace HTMX response boundaries', () => {
     const records = fragmentRecords(html)
 
     for (const id of [
+      'workspace-job-analysis-status',
       'analysis-run-status',
       'requirement-readiness',
       'workspace-documents-panel',

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
 import type { ParsedJobResult } from '../lib/ai'
@@ -276,4 +277,11 @@ export function jobAnalysisRunBelongsToPosting(
     .from(jobPostingAnalyses)
     .where(and(eq(jobPostingAnalyses.id, runId), eq(jobPostingAnalyses.jobPostingId, jobPostingId)))
     .get()
+}
+
+/** Updates the raw post text and its content hash before a rerun is queued. */
+export function updateJobPostingRawText(db: JobAnalysisDb, jobPostingId: number, rawText: string) {
+  const contentHash = createHash('sha256').update(rawText).digest('hex')
+  db.update(jobPostings).set({ rawText, contentHash }).where(eq(jobPostings.id, jobPostingId)).run()
+  return contentHash
 }
