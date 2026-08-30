@@ -129,23 +129,71 @@ describe('planned run-scoped skill decision contract', () => {
         const { listRunDecisions, seedPendingRunDecisions, upsertRunDecision } = await import(
           analysisDecisionsPath
         )
-        const runA = 1
-        const runB = 2
-        const skillId = 1
+        const company = sqlite
+          .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
+          .get('Example', '2026-01-01') as { id: number }
+        const application = sqlite
+          .query(
+            `INSERT INTO job_applications (
+              company_id, job_title, direction, posted_date, priority, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+          )
+          .get(
+            company.id,
+            'Engineer',
+            'fullstack',
+            '2026-01-01',
+            'B',
+            'Saved',
+            '2026-01-01',
+            '2026-01-01',
+          ) as { id: number }
+        const skill = sqlite
+          .query(
+            `INSERT INTO skills (key, name, review_status, origin, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+          )
+          .get('kafka', 'Kafka', 'pending', 'job-parser', '2026-01-01', '2026-01-01') as {
+          id: number
+        }
+        const runA = sqlite
+          .query(
+            `INSERT INTO application_analysis_runs (
+              job_application_id, status, queue_job_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+          )
+          .get(application.id, 'Completed', 'analysis-a', '2026-01-01', '2026-01-01') as {
+          id: number
+        }
+        const runB = sqlite
+          .query(
+            `INSERT INTO application_analysis_runs (
+              job_application_id, status, queue_job_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+          )
+          .get(application.id, 'Completed', 'analysis-b', '2026-01-02', '2026-01-02') as {
+          id: number
+        }
 
-        seedPendingRunDecisions(db, runA, [skillId])
+        seedPendingRunDecisions(db, runA.id, [skill.id])
         expect(
-          listRunDecisions(db, runA).map((item: { decision: string }) => item.decision),
+          listRunDecisions(db, runA.id).map((item: { decision: string }) => item.decision),
         ).toEqual(['pending'])
-        expect(listRunDecisions(db, runB)).toEqual([])
+        expect(listRunDecisions(db, runB.id)).toEqual([])
 
-        upsertRunDecision(db, { runId: runA, skillId, decision: 'skip', reason: null })
+        upsertRunDecision(db, {
+          runId: runA.id,
+          skillId: skill.id,
+          decision: 'skip',
+          reason: null,
+        })
         // A later run starts pending; the prior decision is a suggestion, not an
         // inherited state.
-        seedPendingRunDecisions(db, runB, [skillId])
+        seedPendingRunDecisions(db, runB.id, [skill.id])
         expect(
-          listRunDecisions(db, runB).map((item: { decision: string }) => item.decision),
+          listRunDecisions(db, runB.id).map((item: { decision: string }) => item.decision),
         ).toEqual(['pending'])
+        expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
       } finally {
         sqlite.close()
       }

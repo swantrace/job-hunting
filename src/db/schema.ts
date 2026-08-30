@@ -359,6 +359,48 @@ export const applicationAnalysisRuns = sqliteTable(
   ],
 )
 
+/**
+ * Run-scoped skill decisions. Each row belongs to one Candidate Analysis run;
+ * a new run starts pending and matches prior suggestions only by canonical
+ * skill ID (recorded via previous_decision_id). The legacy application-wide
+ * `job_applications_to_skills.user_decision` columns remain for imports.
+ */
+export const analysisRunDecisions = sqliteTable(
+  'analysis_run_decisions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    applicationAnalysisRunId: integer('application_analysis_run_id')
+      .notNull()
+      .references(() => applicationAnalysisRuns.id, { onDelete: 'cascade' }),
+    skillId: integer('skill_id')
+      .notNull()
+      .references(() => skills.id, { onDelete: 'cascade' }),
+    decision: text('decision', { enum: skillDecisions }).notNull().default('pending'),
+    reason: text('reason'),
+    previousDecisionId: integer('previous_decision_id').references(
+      (): AnySQLiteColumn => analysisRunDecisions.id,
+      { onDelete: 'set null' },
+    ),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('analysis_run_decisions_run_skill_unique_idx').on(
+      table.applicationAnalysisRunId,
+      table.skillId,
+    ),
+    index('analysis_run_decisions_run_idx').on(table.applicationAnalysisRunId),
+    check(
+      'analysis_run_decisions_decision_check',
+      sql`${table.decision} in ('pending', 'skip', 'include')`,
+    ),
+    check(
+      'analysis_run_decisions_include_reason_check',
+      sql`${table.decision} != 'include' or (${table.reason} is not null and trim(${table.reason}) != '')`,
+    ),
+  ],
+)
+
 export const jobApplicationsToSkills = sqliteTable(
   'job_applications_to_skills',
   {
@@ -648,6 +690,7 @@ export type GenerationRunResult = typeof generationRunResults.$inferSelect
 export type DocumentReview = typeof documentReviews.$inferSelect
 export type BaselineGenerationRun = typeof baselineGenerationRuns.$inferSelect
 export type ApplicationAnalysisRun = typeof applicationAnalysisRuns.$inferSelect
+export type AnalysisRunDecision = typeof analysisRunDecisions.$inferSelect
 export type Skill = typeof skills.$inferSelect
 export type SkillAlias = typeof skillAliases.$inferSelect
 export type JobApplicationSkill = typeof jobApplicationsToSkills.$inferSelect

@@ -1,7 +1,7 @@
-import { listAnalysisRuns } from '../db/analysis'
+import { hasPendingRunDecisions } from '../db/analysis-decisions'
+import { db } from '../db/client'
 import { getApplication } from '../db/queries'
-import { hasPendingSkillDecisions } from '../db/skill-queries'
-import { currentCandidateAnalysisHash } from './candidate-analysis'
+import { getCandidateAnalysisState } from './candidate-analysis'
 
 export type AnalysisReadinessStatus =
   | 'none'
@@ -49,7 +49,9 @@ export function assessApplicationReadiness(input: ApplicationReadinessInput): Ap
 
 export function getApplicationReadiness(jobId: number): ApplicationReadiness {
   const job = getApplication(jobId)
-  const run = listAnalysisRuns(jobId)[0] ?? null
+  const state = getCandidateAnalysisState(jobId)
+  const run = state.latest
+  const current = state.currentCompleted
   const hasReviewedAnalysis = !!job?.jobPostingAnalysis?.schemaVersion
 
   let analysisStatus: AnalysisReadinessStatus = 'none'
@@ -57,21 +59,13 @@ export function getApplicationReadiness(jobId: number): ApplicationReadiness {
     if (run.status === 'Queued') analysisStatus = 'queued'
     else if (run.status === 'Processing') analysisStatus = 'processing'
     else if (run.status === 'Failed') analysisStatus = 'failed'
-    else if (run.status === 'Completed') {
-      let currentHash: string | null = null
-      try {
-        currentHash = currentCandidateAnalysisHash(jobId)
-      } catch {
-        currentHash = run.inputHash
-      }
-      analysisStatus = currentHash && run.inputHash !== currentHash ? 'stale' : 'completed'
-    }
+    else if (run.status === 'Completed') analysisStatus = current ? 'completed' : 'stale'
   }
 
   return assessApplicationReadiness({
     hasReviewedAnalysis,
     analysisStatus,
-    profileConfirmed: !!run?.confirmedProfileId,
-    hasPendingSkillDecisions: hasPendingSkillDecisions(jobId),
+    profileConfirmed: !!current?.confirmedProfileId,
+    hasPendingSkillDecisions: current ? hasPendingRunDecisions(db, current.id) : true,
   })
 }
