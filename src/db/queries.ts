@@ -3,12 +3,7 @@ import { and, desc, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm'
 import type { z } from 'zod'
 import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
 import { followUpActionTypes, interviewRoundTypes } from '../lib/activities/constants'
-import {
-  type ApplicationSort,
-  matchLevels,
-  priorities,
-  statuses,
-} from '../lib/applications/constants'
+import { type ApplicationSort, priorities, statuses } from '../lib/applications/constants'
 import { nowISO, todayISO } from '../lib/date'
 import { runStatuses } from '../lib/generation/constants'
 import {
@@ -662,8 +657,6 @@ export function mergeImport(payload: ImportPayload) {
         postedDate,
         priority: controlledValue(priorities, incoming.priority, 'B'),
         appliedDate: nullableText(incoming.appliedDate),
-        resumeVersion: nullableText(incoming.resumeVersion),
-        matchLevel: controlledValue(matchLevels, incoming.matchLevel, null),
         applicationSource: nullableText(incoming.applicationSource),
         salary: nullableText(incoming.salary),
         notes: nullableText(incoming.notes),

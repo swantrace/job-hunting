@@ -67,7 +67,7 @@ function audit(sqlite: Database): AuditReport {
     .query(
       `SELECT s.id AS id, s.name AS name, count(j.skill_id) AS applications
        FROM skills AS s
-       LEFT JOIN job_applications_to_skills AS j ON j.skill_id = s.id
+       LEFT JOIN job_requirements_to_skills AS j ON j.skill_id = s.id
        GROUP BY s.id
        ORDER BY lower(s.name), s.id`,
     )

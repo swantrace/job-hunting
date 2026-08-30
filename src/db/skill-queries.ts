@@ -150,7 +150,7 @@ export type RequirementSkillMapping = {
 /**
  * Canonical requirement-owned skill projection for one Job Analysis run. This
  * joins `job_requirements` through `job_requirements_to_skills` to `skills`,
- * never `job_applications_to_skills`, so the same skill may appear once per
+ * never the removed application-skill relation table, so the same skill may appear once per
  * requirement without losing source or importance context.
  */
 export function listRequirementSkillMappings(
@@ -186,7 +186,7 @@ export function listRequirementSkillMappings(
 /**
  * Application skill summary derived from the latest completed Job Analysis
  * run's requirement-skill mappings. This replaces the legacy
- * `job_applications_to_skills` projection; the current run selection is
+ * removed application-skill projection; the current run selection is
  * refined by explicit lineage in later steps.
  */
 export function listApplicationSkills(
