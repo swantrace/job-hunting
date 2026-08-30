@@ -265,7 +265,12 @@ export function getApplication(id: number): JobCardData | null {
     .where(eq(jobApplicationsToSkills.jobApplicationId, id))
     .all()
     .map((skill) => skill.name)
-  const jobPosting = db.select().from(jobPostings).where(eq(jobPostings.jobApplicationId, id)).get()
+  const jobPosting = db
+    .select()
+    .from(jobPostings)
+    .where(eq(jobPostings.jobApplicationId, id))
+    .orderBy(desc(jobPostings.version), desc(jobPostings.id))
+    .get()
   const jobPostingAnalysis = jobPosting
     ? db
         .select()

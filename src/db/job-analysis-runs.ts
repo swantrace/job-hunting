@@ -3,7 +3,7 @@ import { and, desc, eq, sql } from 'drizzle-orm'
 import { type JobAnalysis, jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
 import type { ParsedJobResult } from '../lib/ai'
 import { type AnalysisRunState, classifyAnalysisRunState } from '../lib/analysis-run-state'
-import { todayISO } from '../lib/date'
+import { nowISO, todayISO } from '../lib/date'
 import type { db } from './client'
 import { persistJobRequirements } from './job-analysis'
 import { type JobPostingAnalysis, jobPostingAnalyses, jobPostings } from './schema'
@@ -280,9 +280,37 @@ export function jobAnalysisRunBelongsToPosting(
     .get()
 }
 
-/** Updates the raw post text and its content hash before a rerun is queued. */
-export function updateJobPostingRawText(db: JobAnalysisDb, jobPostingId: number, rawText: string) {
+/**
+ * Saves a Job Post as an immutable content version. Identical normalized text
+ * reuses the current content version (no new row); changed text inserts the
+ * next version. Returns the resulting posting ID and content hash so callers
+ * can queue an analysis rerun against the exact version.
+ */
+export function saveJobPostingVersion(
+  db: JobAnalysisDb,
+  jobApplicationId: number,
+  rawText: string,
+) {
   const contentHash = createHash('sha256').update(rawText).digest('hex')
-  db.update(jobPostings).set({ rawText, contentHash }).where(eq(jobPostings.id, jobPostingId)).run()
-  return contentHash
+  const current = db
+    .select()
+    .from(jobPostings)
+    .where(eq(jobPostings.jobApplicationId, jobApplicationId))
+    .orderBy(desc(jobPostings.version), desc(jobPostings.id))
+    .get()
+  if (current?.contentHash === contentHash)
+    return { jobPostingId: current.id, contentHash, reused: true }
+  const version = current ? current.version + 1 : 1
+  const created = db
+    .insert(jobPostings)
+    .values({
+      jobApplicationId,
+      version,
+      rawText,
+      capturedAt: nowISO(),
+      contentHash,
+    })
+    .returning({ id: jobPostings.id })
+    .get()
+  return { jobPostingId: created.id, contentHash, reused: false }
 }
