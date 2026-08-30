@@ -79,6 +79,23 @@ describe('workspace HTMX response boundaries', () => {
     expect(recordsFor(html, 'workspace-tabs')).toHaveLength(1)
     expect(html).not.toMatch(/<AppShell|<html|<body/)
   })
+
+  test('preserves the review status, readiness, and generation boundaries exactly once', async () => {
+    const response = await (await createRouteHarness()).request(
+      '/applications/7/workspace?workspaceTab=review',
+    )
+    const html = await response.text()
+    const records = fragmentRecords(html)
+
+    for (const id of [
+      'analysis-run-status',
+      'requirement-readiness',
+      'workspace-documents-panel',
+      'generation-panel',
+    ]) {
+      expect(records.filter((record) => record.id === id)).toHaveLength(1)
+    }
+  })
 })
 
 describe('status mutation HTMX response boundaries', () => {
