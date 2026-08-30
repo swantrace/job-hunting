@@ -87,7 +87,7 @@ export function RequirementEvidenceMatrix({
                           {statusLabel[assessment.evidenceStatus]}
                         </span>
                       ) : (
-                        <span class="badge badge-ghost">Not assessed</span>
+                        <span class="badge badge-ghost shrink-0 text-nowrap">Not assessed</span>
                       )}
                     </td>
                   </tr>
