@@ -43,11 +43,13 @@ export function SkillGapPanel({
   filters,
   requirements,
   careerEvidence,
+  canDecide = true,
 }: {
   job: JobCardData
   filters: Filters
   requirements: ApplicationSkillRequirement[]
   careerEvidence: Record<string, string[]>
+  canDecide?: boolean
 }) {
   const scores = calculateSkillScores(requirements)
   const pendingCount = requirements.filter(
@@ -106,7 +108,9 @@ export function SkillGapPanel({
               hx-confirm="Skip every remaining pending skill?"
             >
               <input type="hidden" name="action" value="skip-remaining" />
-              <button class="btn btn-outline btn-sm">Skip remaining</button>
+              <button class="btn btn-outline btn-sm" disabled={!canDecide}>
+                Skip remaining
+              </button>
             </form>
           )}
           <div class="space-y-5">
@@ -145,6 +149,7 @@ export function SkillGapPanel({
                             job={job}
                             filters={filters}
                             requirement={requirement}
+                            canDecide={canDecide}
                           />
                         )}
                       </div>

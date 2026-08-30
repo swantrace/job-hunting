@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { reviewGateCopy } from '../../src/lib/workspace/state'
 
 const componentRoot = resolve(process.cwd(), 'app/components/workspace')
 const routeRoot = resolve(process.cwd(), 'app/routes/applications/[id]')
@@ -45,5 +46,23 @@ describe('LLM analysis review HTMX boundaries', () => {
     expect(matrix).toContain('overflow-x-auto')
     expect(matrix).toMatch(/class=["'{`][^\n]*table/)
     expect(matrix).not.toMatch(/form-control|input-bordered|select-bordered|textarea-bordered/)
+  })
+})
+
+describe('legacy review copy contract', () => {
+  test('presents a legacy analysis as outdated with a rerun action, never as never-analyzed', () => {
+    const legacy = reviewGateCopy('legacy')
+    const never = reviewGateCopy('never-run')
+
+    expect(legacy.message.toLowerCase()).toContain('outdated')
+    expect(legacy.actionLabel).toMatch(/re-run/i)
+    expect(legacy.message).not.toContain('never')
+    expect(legacy.message).not.toBe(never.message)
+  })
+
+  test('keeps stale and failed states distinct from legacy and current', () => {
+    expect(reviewGateCopy('stale').actionLabel).toMatch(/re-run/i)
+    expect(reviewGateCopy('failed').actionLabel).toMatch(/retry/i)
+    expect(reviewGateCopy('current').actionLabel).toBe('')
   })
 })

@@ -1,7 +1,13 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
+import { seedPendingRunDecisions } from './analysis-decisions'
 import { db } from './client'
-import { type ApplicationAnalysisRun, applicationAnalysisRuns, jobApplications } from './schema'
+import {
+  type ApplicationAnalysisRun,
+  applicationAnalysisRuns,
+  jobApplications,
+  jobApplicationsToSkills,
+} from './schema'
 
 export type { ApplicationAnalysisRun }
 
@@ -110,17 +116,40 @@ export function completeAnalysisRun(
   recommendedProfileId: string | null,
 ) {
   const date = todayISO()
-  db.update(applicationAnalysisRuns)
-    .set({
-      status: 'Completed',
-      resultJson,
-      recommendedProfileId,
-      errorMessage: null,
-      completedAt: date,
-      updatedAt: date,
-    })
-    .where(eq(applicationAnalysisRuns.id, runId))
-    .run()
+  return db.transaction((tx) => {
+    const run = tx
+      .select()
+      .from(applicationAnalysisRuns)
+      .where(eq(applicationAnalysisRuns.id, runId))
+      .get()
+    if (!run) return
+    tx.update(applicationAnalysisRuns)
+      .set({
+        status: 'Completed',
+        resultJson,
+        recommendedProfileId,
+        errorMessage: null,
+        completedAt: date,
+        updatedAt: date,
+      })
+      .where(eq(applicationAnalysisRuns.id, runId))
+      .run()
+
+    // A new run starts pending for every current missing skill; prior decisions
+    // remain suggestions only and must be explicitly reconfirmed.
+    const missingSkillIds = tx
+      .select({ skillId: jobApplicationsToSkills.skillId })
+      .from(jobApplicationsToSkills)
+      .where(
+        and(
+          eq(jobApplicationsToSkills.jobApplicationId, run.jobApplicationId),
+          eq(jobApplicationsToSkills.analysisResult, 'not-in-career-data'),
+        ),
+      )
+      .all()
+      .map((row) => row.skillId)
+    seedPendingRunDecisions(tx, runId, missingSkillIds)
+  })
 }
 
 export function failAnalysisRun(runId: number, error: unknown) {

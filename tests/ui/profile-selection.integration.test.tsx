@@ -5,6 +5,7 @@ import {
   mockConfirmProfileSelection,
   mockCurrentCandidateAnalysisHash,
   mockGetAnalysisRun,
+  mockGetCandidateAnalysisState,
   mockListAnalysisRuns,
 } from './support/runtime-mocks'
 
@@ -67,6 +68,31 @@ describe('profile selection confirmation boundaries', () => {
       inputHash: 'current-hash',
     })
     mockCurrentCandidateAnalysisHash.mockReturnValue('current-hash')
+    mockGetCandidateAnalysisState.mockReturnValue({
+      state: 'current',
+      latest: { id: 1, status: 'Completed' },
+      latestCompleted: {
+        id: 1,
+        status: 'Completed',
+        resultJson: JSON.stringify({
+          fitRecommendation: 'apply',
+          recommendationRationale: 'Good fit.',
+          profileRecommendation: {
+            recommendedProfileId: 'fullstack',
+            rationale: 'Balanced role.',
+            alternatives: [],
+          },
+          requirementAssessments: [],
+          strengths: [],
+          concerns: [],
+          interviewPreparation: [],
+          careerDataSuggestions: [],
+        }),
+      },
+      currentCompleted: { id: 1, status: 'Completed' },
+      staleCompleted: null,
+      reasons: [],
+    })
     mockListAnalysisRuns.mockReturnValue([
       {
         id: 1,
@@ -105,5 +131,13 @@ describe('profile selection confirmation boundaries', () => {
     expect(html).not.toMatch(/<AppShell|<html|<body/)
     mockGetAnalysisRun.mockReturnValue(null)
     mockListAnalysisRuns.mockReturnValue([])
+    mockGetCandidateAnalysisState.mockReturnValue({
+      state: 'never-run',
+      latest: null,
+      latestCompleted: null,
+      currentCompleted: null,
+      staleCompleted: null,
+      reasons: [],
+    })
   })
 })

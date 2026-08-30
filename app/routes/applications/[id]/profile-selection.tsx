@@ -1,20 +1,22 @@
 import { createRoute } from 'honox/factory'
-import {
-  confirmProfileSelection,
-  getAnalysisRun,
-  listAnalysisRuns,
-} from '../../../../src/db/analysis'
+import { confirmProfileSelection, getAnalysisRun } from '../../../../src/db/analysis'
 import { getApplication } from '../../../../src/db/queries'
-import { currentCandidateAnalysisHash } from '../../../../src/lib/candidate-analysis'
+import { getCandidateAnalysisState } from '../../../../src/lib/candidate-analysis'
 import { listProfiles } from '../../../../src/lib/profiles'
 import { parseFilters, parseForm, parseId } from '../../../../src/lib/request'
 import { profileSelectionSchema } from '../../../../src/lib/validation'
 import { ProfileRecommendation } from '../../../components/workspace/ProfileRecommendation'
 
 function recommendationFor(jobId: number, filters: ReturnType<typeof parseFilters>) {
-  const run = listAnalysisRuns(jobId)[0] ?? null
+  const state = getCandidateAnalysisState(jobId)
   return (
-    <ProfileRecommendation jobId={jobId} filters={filters} run={run} profiles={listProfiles()} />
+    <ProfileRecommendation
+      jobId={jobId}
+      filters={filters}
+      run={state.latestCompleted}
+      profiles={listProfiles()}
+      canConfirm={state.state === 'current'}
+    />
   )
 }
 
@@ -37,12 +39,9 @@ export const POST = createRoute(async (c) => {
     c.header('HX-Retarget', '#profile-recommendation')
     return c.html(recommendationFor(id, filters), 422)
   }
-  if (run.status !== 'Completed') {
-    c.header('HX-Retarget', '#profile-recommendation')
-    return c.html(recommendationFor(id, filters), 422)
-  }
-  const currentHash = currentCandidateAnalysisHash(id)
-  if (currentHash && run.inputHash !== currentHash) {
+  // Reject confirmation against an outdated/non-current run.
+  const state = getCandidateAnalysisState(id)
+  if (!state.currentCompleted || state.currentCompleted.id !== run.id) {
     c.header('HX-Retarget', '#profile-recommendation')
     return c.html(recommendationFor(id, filters), 422)
   }

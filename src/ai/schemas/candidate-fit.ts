@@ -9,6 +9,8 @@ import { evidenceRelevances, evidenceSourceTypes } from '../../lib/evidence/cons
  * canonical input.
  */
 
+export const candidateFitSchemaVersion = '1.0.0'
+
 const fitRecommendations = ['apply', 'apply-selectively', 'skip'] as const
 const evidenceStatuses = ['direct', 'transferable', 'missing'] as const
 export const evidenceRefSchema = z

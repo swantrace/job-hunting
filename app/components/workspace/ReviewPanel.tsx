@@ -2,9 +2,12 @@ import type { ApplicationAnalysisRun } from '../../../src/db/analysis'
 import type { JobRequirement } from '../../../src/db/job-analysis'
 import type { Filters, JobCardData } from '../../../src/db/queries'
 import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
+import type { CandidateAnalysisState } from '../../../src/lib/candidate-analysis'
 import type { ProfileOption } from '../../../src/lib/profiles'
+import { reviewGateCopy } from '../../../src/lib/workspace/state'
 import { AnalysisRunStatus } from './AnalysisRunStatus'
 import { FitRecommendation } from './FitRecommendation'
+import { query } from './helpers'
 import { JobAnalysisSummary } from './JobAnalysisSummary'
 import { ProfileRecommendation } from './ProfileRecommendation'
 import { RequirementEvidenceMatrix } from './RequirementEvidenceMatrix'
@@ -15,7 +18,7 @@ export function ReviewPanel({
   filters,
   requirements,
   careerEvidence,
-  analysisRun,
+  state,
   jobRequirements,
   profiles,
 }: {
@@ -23,46 +26,69 @@ export function ReviewPanel({
   filters: Filters
   requirements: ApplicationSkillRequirement[]
   careerEvidence: Record<string, string[]>
-  analysisRun: ApplicationAnalysisRun | null
+  state: CandidateAnalysisState
   jobRequirements: JobRequirement[]
   profiles: ProfileOption[]
 }) {
-  const hasReviewedAnalysis = !!job.jobPostingAnalysis?.schemaVersion
+  const copy = reviewGateCopy(state.state)
+  const displayRun = state.latestCompleted
+  const canAct = state.state === 'current' && !!state.currentCompleted
   const pendingCount = requirements.filter(
     (item) => item.analysisResult === 'not-in-career-data' && item.userDecision === 'pending',
   ).length
+
   return (
     <div class="space-y-4">
+      <section class="rounded-box border border-base-300 p-4" aria-live="polite">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 class="font-semibold">{copy.heading}</h3>
+            <p class="mt-1 text-sm text-base-content/60">{copy.message}</p>
+            {state.reasons.length ? (
+              <p class="mt-1 text-xs text-base-content/60">Reasons: {state.reasons.join(', ')}</p>
+            ) : null}
+          </div>
+          {state.state !== 'current' && state.state !== 'queued' && state.state !== 'processing' ? (
+            <form
+              hx-post={`/applications/${job.id}/analysis-runs?${query(filters)}&workspaceTab=review`}
+              hx-target="#analysis-run-status"
+              hx-swap="outerHTML"
+              hx-disabled-elt="find button"
+            >
+              <button class="btn btn-secondary btn-sm">{copy.actionLabel}</button>
+            </form>
+          ) : null}
+        </div>
+      </section>
+
       <AnalysisRunStatus
         jobId={job.id}
         filters={filters}
-        run={analysisRun}
-        hasReviewedAnalysis={hasReviewedAnalysis}
+        run={state.latest}
+        hasReviewedAnalysis={canAct || !!displayRun}
       />
       <JobAnalysisSummary job={job} />
-      <FitRecommendation run={analysisRun} />
+      <FitRecommendation run={displayRun} />
       <ProfileRecommendation
         jobId={job.id}
         filters={filters}
-        run={analysisRun}
+        run={displayRun}
         profiles={profiles}
+        canConfirm={canAct}
       />
-      <RequirementEvidenceMatrix run={analysisRun} requirements={jobRequirements} />
+      <RequirementEvidenceMatrix run={displayRun} requirements={jobRequirements} />
       <SkillGapPanel
         job={job}
         filters={filters}
         requirements={requirements}
         careerEvidence={careerEvidence}
+        canDecide={canAct}
       />
       <section id="requirement-readiness" class="rounded-box border border-base-300 p-4">
         <h3 class="font-semibold">Document readiness</h3>
-        {!hasReviewedAnalysis ? (
+        {!canAct ? (
           <p class="mt-2 text-sm text-base-content/60">
-            Analyze this application first before generating documents.
-          </p>
-        ) : !analysisRun || analysisRun.status !== 'Completed' ? (
-          <p class="mt-2 text-sm text-base-content/60">
-            Run candidate analysis and confirm a profile before generating documents.
+            {copy.message} Re-run to refresh before generating documents.
           </p>
         ) : pendingCount > 0 ? (
           <p class="mt-2 text-sm text-base-content/60">

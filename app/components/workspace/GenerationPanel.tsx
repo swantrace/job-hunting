@@ -1,5 +1,5 @@
 import { applicationGenerationPromptVersion } from '../../../src/ai/prompts/application-generation'
-import type { GenerationRunWithArtifacts } from '../../../src/db/generation'
+import type { GenerationRunWithArtifacts, GenerationState } from '../../../src/db/generation'
 import type { Filters } from '../../../src/db/queries'
 import type { ApplicationReadiness } from '../../../src/lib/application-readiness'
 import {
@@ -9,6 +9,45 @@ import {
 import { ArtifactActions } from './ArtifactActions'
 import { query } from './helpers'
 
+function generationCopy(state?: GenerationState) {
+  switch (state?.state) {
+    case 'current':
+      return {
+        heading: 'Documents current',
+        message: 'Generated documents match the current review.',
+        actionLabel: 'Regenerate documents',
+      }
+    case 'stale':
+      return {
+        heading: 'Outdated documents',
+        message: 'Generated documents are outdated because upstream inputs changed.',
+        actionLabel: 'Generate updated documents',
+      }
+    case 'legacy':
+      return {
+        heading: 'Legacy documents',
+        message: 'These documents predate the current generation workflow.',
+        actionLabel: 'Generate updated documents',
+      }
+    case 'failed':
+      return {
+        heading: 'Generation failed',
+        message: 'The latest attempt failed; a previous result may still be usable.',
+        actionLabel: 'Retry generation',
+      }
+    case 'queued':
+      return { heading: 'Queued', message: 'Document generation is queued.', actionLabel: '' }
+    case 'processing':
+      return { heading: 'Generating', message: 'Document generation is running.', actionLabel: '' }
+    default:
+      return {
+        heading: 'Not generated',
+        message: 'Generate tailored documents once the review is ready.',
+        actionLabel: 'Generate documents',
+      }
+  }
+}
+
 export function GenerationPanel({
   jobId,
   filters,
@@ -16,6 +55,7 @@ export function GenerationPanel({
   evidenceSnapshot,
   googleDriveConnected,
   readiness = { ready: true, reasons: [] },
+  state,
 }: {
   jobId: number
   filters: Filters
@@ -23,8 +63,13 @@ export function GenerationPanel({
   evidenceSnapshot: string | null
   googleDriveConnected: boolean
   readiness?: ApplicationReadiness
+  state?: GenerationState
 }) {
   const latest = runs[0]
+  const usableCompleted = state?.latestCompleted
+    ? (runs.find((run) => run.id === state.latestCompleted?.id) ?? null)
+    : null
+  const copy = generationCopy(state)
   const statusClass =
     latest?.status === 'Completed'
       ? 'badge-success'
@@ -49,10 +94,11 @@ export function GenerationPanel({
     >
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 class="font-semibold">Application documents</h3>
-          <p class="text-sm text-base-content/60">
-            Generate a structured job context, tailored resume, and cover letter.
-          </p>
+          <h3 class="font-semibold">{copy.heading}</h3>
+          <p class="text-sm text-base-content/60">{copy.message}</p>
+          {state?.reasons.length ? (
+            <p class="mt-1 text-xs text-base-content/60">Reasons: {state.reasons.join(', ')}</p>
+          ) : null}
         </div>
         <form
           hx-post={`/applications/${jobId}/generation-runs?${query(filters)}`}
@@ -60,9 +106,9 @@ export function GenerationPanel({
           hx-swap="outerHTML"
           hx-disabled-elt="find button"
         >
-          <button class="btn btn-secondary btn-sm" disabled={!readiness.ready}>
-            <span class="loading loading-spinner loading-xs htmx-indicator" />
-            {latest?.status === 'Failed' ? 'Retry generation' : 'Generate documents'}
+          <button class="btn btn-secondary btn-sm" disabled={!readiness.ready || shouldPoll}>
+            {shouldPoll ? <span class="loading loading-spinner loading-xs" /> : null}
+            {copy.actionLabel}
           </button>
         </form>
       </div>
@@ -90,7 +136,32 @@ export function GenerationPanel({
           </a>
         </div>
       )}
-      {latest ? (
+      {latest && latest.id !== usableCompleted?.id ? (
+        <div class="mt-4 flex flex-wrap items-center gap-2 text-sm">
+          <span class="text-base-content/60">Latest attempt:</span>
+          <span class={`badge ${statusClass}`}>{latest.status}</span>
+          {latest.errorMessage ? <span class="text-error">{latest.errorMessage}</span> : null}
+        </div>
+      ) : null}
+      {usableCompleted ? (
+        <div class="mt-4 space-y-3">
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="badge badge-success">Completed</span>
+            <span class="text-base-content/60">Attempts: {usableCompleted.attempts}</span>
+            {usableCompleted.completedAt ? (
+              <span class="text-base-content/60">Date: {usableCompleted.completedAt}</span>
+            ) : null}
+          </div>
+          {usableCompleted.artifacts.length ? (
+            <div class="flex flex-wrap gap-2">
+              {usableCompleted.artifacts.map((artifact) => (
+                <ArtifactActions artifact={artifact} />
+              ))}
+            </div>
+          ) : null}
+          {snapshot ? <EvidenceReview snapshot={snapshot} runId={usableCompleted.id} /> : null}
+        </div>
+      ) : latest ? (
         <div class="mt-4 space-y-3">
           <div class="flex flex-wrap items-center gap-2 text-sm">
             <span class={`badge ${statusClass}`}>{latest.status}</span>
@@ -101,18 +172,26 @@ export function GenerationPanel({
               <span>{latest.errorMessage}</span>
             </div>
           ) : null}
-          {latest.artifacts.length ? (
-            <div class="flex flex-wrap gap-2">
-              {latest.artifacts.map((artifact) => (
-                <ArtifactActions artifact={artifact} />
-              ))}
-            </div>
-          ) : null}
-          {snapshot ? <EvidenceReview snapshot={snapshot} runId={latest.id} /> : null}
         </div>
       ) : (
         <p class="text-sm text-base-content/60">No document generation has been queued yet.</p>
       )}
+      {runs.length ? (
+        <details class="mt-4 text-sm">
+          <summary class="cursor-pointer font-semibold">Generation history ({runs.length})</summary>
+          <ul class="mt-2 list-inside space-y-1 text-xs text-base-content/70">
+            {runs.map((run) => (
+              <li class="flex flex-wrap items-center gap-2">
+                <span class="font-mono">#{run.id}</span>
+                <span class={`badge badge-sm ${statusClass}`}>{run.status}</span>
+                {(run.completedAt ?? run.createdAt) ? (
+                  <span>{run.completedAt ?? run.createdAt}</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </section>
   )
 }

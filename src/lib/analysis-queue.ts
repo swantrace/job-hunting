@@ -1,6 +1,6 @@
 import type { Queue, Worker } from 'bunqueue/client'
 import { candidateFitPromptVersion } from '../ai/prompts/candidate-fit'
-import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
+import { candidateFitSchemaVersion } from '../ai/schemas/candidate-fit'
 import {
   completeAnalysisRun,
   createAnalysisRun,
@@ -115,7 +115,7 @@ export async function enqueueCandidateAnalysis(
     inputSnapshotJson: JSON.stringify(built.snapshot),
     model,
     promptVersion: candidateFitPromptVersion,
-    schemaVersion: jobAnalysisSchemaVersion,
+    schemaVersion: candidateFitSchemaVersion,
   })
 
   const persistentQueue = await getQueue()

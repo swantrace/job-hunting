@@ -1,10 +1,6 @@
-export const workspaceTabs = ['application', 'contacts', 'activity', 'documents', 'review'] as const
-export type WorkspaceTab = (typeof workspaceTabs)[number]
+// Workspace tab order and labels are centralized in `./state` so availability,
+// labels, and locked reasons never diverge. Re-exported here for the existing
+// `workspaceTabs`/`workspaceTabLabels` import sites.
 
-export const workspaceTabLabels: Record<WorkspaceTab, string> = {
-  application: 'Application',
-  contacts: 'Contacts',
-  activity: 'Activity',
-  documents: 'Documents',
-  review: 'Review',
-}
+export type { WorkspaceTab } from './state'
+export { workspaceTabLabels, workspaceTabOrder as workspaceTabs } from './state'

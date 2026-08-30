@@ -1,4 +1,8 @@
 import { createRoute } from 'honox/factory'
+import {
+  decideRunSkill,
+  skipRemainingRunDecisions,
+} from '../../../../src/db/analysis-decision-service'
 import type { Filters } from '../../../../src/db/queries'
 import { getApplication, type JobCardData } from '../../../../src/db/queries'
 import {
@@ -7,6 +11,7 @@ import {
   skipRemainingSkillDecisions,
   updateSkillDecision,
 } from '../../../../src/db/skill-queries'
+import { getCandidateAnalysisState } from '../../../../src/lib/candidate-analysis'
 import { careerSkillEvidenceMap } from '../../../../src/lib/career-data'
 import { parseFilters, parseForm, parseId } from '../../../../src/lib/request'
 import { skillDecisionSchema } from '../../../../src/lib/validation'
@@ -24,6 +29,10 @@ function reviewPanel(job: JobCardData, filters: Filters, id: number) {
   )
 }
 
+function currentRunId(id: number) {
+  return getCandidateAnalysisState(id).currentCompleted?.id ?? null
+}
+
 export const POST = createRoute(async (c) => {
   const id = parseId(c.req.param('id'))
   const filters = parseFilters(c)
@@ -31,8 +40,14 @@ export const POST = createRoute(async (c) => {
   if (!id || !job) return c.html(<div class="alert alert-error">Application not found.</div>, 404)
 
   const raw = await parseForm(c)
+  const runId = currentRunId(id)
+  if (!runId) {
+    c.header('HX-Retarget', '#skill-review-panel')
+    return c.html(reviewPanel(job, filters, id), 422)
+  }
   if (raw.action === 'skip-remaining') {
     skipRemainingSkillDecisions(id)
+    if (runId) skipRemainingRunDecisions(runId)
     return c.html(reviewPanel(job, filters, id))
   }
 
@@ -55,6 +70,9 @@ export const POST = createRoute(async (c) => {
     )
   }
 
-  updateSkillDecision(id, skillId, parsed.data.action, parsed.data.reason.trim() || null)
+  const decision = parsed.data.action
+  const reason = parsed.data.reason.trim() || null
+  updateSkillDecision(id, skillId, decision, reason)
+  if (runId) decideRunSkill({ runId, skillId, decision, reason })
   return c.html(reviewPanel(job, filters, id))
 })

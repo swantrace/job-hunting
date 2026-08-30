@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { and, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm'
 import type { z } from 'zod'
 import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
 import {
@@ -22,6 +22,7 @@ import {
   textValue,
   validateImportSnapshots,
 } from '../lib/import'
+import { jobAnalysisInputFromContent } from '../lib/job-analysis-input'
 import {
   persistedRequirementBases,
   requirementImportances,
@@ -44,8 +45,9 @@ import {
   statusesFromFilters,
 } from '../lib/validation'
 import { db } from './client'
-import { persistJobRequirements } from './job-analysis'
+import { persistCompletedJobAnalysis } from './job-analysis-runs'
 import {
+  analysisRunDecisions,
   applicationAnalysisRuns,
   companies,
   contacts,
@@ -154,13 +156,14 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
     }
     const rawText = input.jobPostText?.trim()
     if (rawText) {
+      const contentHash = createHash('sha256').update(rawText).digest('hex')
       const posting = tx
         .insert(jobPostings)
         .values({
           jobApplicationId: result.id,
           rawText,
           capturedAt: date,
-          contentHash: createHash('sha256').update(rawText).digest('hex'),
+          contentHash,
           parsedAt: input.analysisRequirements || input.jobAnalysis ? date : null,
           parserModel: input.parserModel,
           parserPromptVersion: input.parserPromptVersion,
@@ -169,49 +172,43 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
         .get()
       if (input.parserPromptVersion || input.jobAnalysis) {
         const analysis = input.jobAnalysis
-        const saved = tx
-          .insert(jobPostingAnalyses)
-          .values({
-            jobPostingId: posting.id,
-            requirements: input.analysisRequirements,
-            responsibilities: input.analysisResponsibilities,
-            painPoints: input.analysisPainPoints,
-            culture: input.analysisCulture,
-            redFlags: input.analysisRedFlags,
-            successMetrics: input.analysisSuccessMetrics,
-            benefits: input.analysisBenefits,
-            notes: input.analysisNotes,
-            generatedAt: date,
-            model: input.parserModel,
-            promptVersion: input.parserPromptVersion,
-            summary: analysis ? JSON.stringify(analysis.summary) : null,
-            roleType: analysis?.classification.roleType ?? null,
-            advertisedSeniority: analysis?.classification.advertisedSeniority ?? null,
-            practicalSeniority: analysis?.classification.practicalSeniority ?? null,
-            classificationRationale: analysis?.classification.rationale ?? null,
-            functionalEmphasisJson: analysis
-              ? JSON.stringify(analysis.classification.functionalEmphasis)
-              : null,
-            interviewQuestionsJson: analysis ? JSON.stringify(analysis.interviewQuestions) : null,
-            schemaVersion: analysis ? jobAnalysisSchemaVersion : null,
-          })
-          .returning({ id: jobPostingAnalyses.id })
-          .get()
-        if (analysis?.requirements.length) {
-          persistJobRequirements(
-            tx,
-            saved.id,
-            analysis.requirements.map((requirement) => ({
-              type: requirement.type,
-              importance: requirement.importance,
-              basis: requirement.basis,
-              statement: requirement.statement,
-              sourceText: requirement.sourceText,
-              inferenceRationale: requirement.inferenceRationale,
-            })),
-            date,
-          )
-        }
+        const inputIdentity = jobAnalysisInputFromContent(contentHash)
+        persistCompletedJobAnalysis(tx, {
+          jobPostingId: posting.id,
+          inputHash: inputIdentity.inputHash,
+          frozenInputJson: JSON.stringify(inputIdentity.snapshot),
+          model: input.parserModel,
+          promptVersion: input.parserPromptVersion,
+          requirements: input.analysisRequirements,
+          responsibilities: input.analysisResponsibilities,
+          painPoints: input.analysisPainPoints,
+          culture: input.analysisCulture,
+          redFlags: input.analysisRedFlags,
+          successMetrics: input.analysisSuccessMetrics,
+          benefits: input.analysisBenefits,
+          notes: input.analysisNotes,
+          summary: analysis ? JSON.stringify(analysis.summary) : null,
+          roleType: analysis?.classification.roleType ?? null,
+          advertisedSeniority: analysis?.classification.advertisedSeniority ?? null,
+          practicalSeniority: analysis?.classification.practicalSeniority ?? null,
+          classificationRationale: analysis?.classification.rationale ?? null,
+          functionalEmphasisJson: analysis
+            ? JSON.stringify(analysis.classification.functionalEmphasis)
+            : null,
+          interviewQuestionsJson: analysis ? JSON.stringify(analysis.interviewQuestions) : null,
+          schemaVersion: analysis ? jobAnalysisSchemaVersion : null,
+          requirementsRows: analysis
+            ? analysis.requirements.map((requirement) => ({
+                type: requirement.type,
+                importance: requirement.importance,
+                basis: requirement.basis,
+                statement: requirement.statement,
+                sourceText: requirement.sourceText,
+                inferenceRationale: requirement.inferenceRationale,
+              }))
+            : [],
+          date,
+        })
       }
     }
     return result.id
@@ -328,6 +325,7 @@ export function getApplication(id: number): JobCardData | null {
         .select()
         .from(jobPostingAnalyses)
         .where(eq(jobPostingAnalyses.jobPostingId, jobPosting.id))
+        .orderBy(desc(jobPostingAnalyses.id))
         .get()
     : undefined
   const jobContacts = db
@@ -423,7 +421,7 @@ export function exportData() {
     ]),
   )
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     exportedAt: new Date().toISOString(),
     companies: companyRows,
     skills: skillRows,
@@ -469,6 +467,7 @@ export function exportData() {
       })),
     jobRequirementsToSkills: db.select().from(jobRequirementsToSkills).all(),
     applicationAnalysisRuns: db.select().from(applicationAnalysisRuns).all(),
+    analysisRunDecisions: db.select().from(analysisRunDecisions).all(),
     generationRuns: db.select().from(generationRuns).all(),
     generationRunResults: db.select().from(generationRunResults).all(),
     documentReviews: db.select().from(documentReviews).all(),
@@ -567,6 +566,7 @@ export function mergeImport(payload: ImportPayload) {
     const contactIds = new Map<number, number>()
     const applicationIds = new Map<number, number>()
     const analysisIds = new Map<number, number>()
+    const applicationAnalysisRunIds = new Map<number, number>()
     const generationRunIds = new Map<number, number>()
     const companiesByKey = new Map(
       tx
@@ -876,8 +876,22 @@ export function mergeImport(payload: ImportPayload) {
         .where(eq(jobPostings.jobApplicationId, applicationId))
         .get()
       if (!posting) continue
+      const queueJobId = nullableText(incoming.queueJobId)
+      const existing = queueJobId
+        ? tx
+            .select()
+            .from(jobPostingAnalyses)
+            .where(eq(jobPostingAnalyses.queueJobId, queueJobId))
+            .get()
+        : undefined
       const values = {
         jobPostingId: posting.id,
+        status: controlledValue(runStatuses, incoming.status, 'Completed'),
+        queueJobId,
+        attempts: Number(incoming.attempts) || 0,
+        inputHash: nullableText(incoming.inputHash),
+        frozenInputJson: nullableText(incoming.frozenInputJson),
+        errorMessage: nullableText(incoming.errorMessage),
         requirements: nullableText(incoming.requirements),
         responsibilities: nullableText(incoming.responsibilities),
         painPoints: nullableText(incoming.painPoints),
@@ -889,19 +903,21 @@ export function mergeImport(payload: ImportPayload) {
         generatedAt: textValue(incoming.generatedAt) || todayISO(),
         model: nullableText(incoming.model),
         promptVersion: nullableText(incoming.promptVersion),
+        summary: nullableText(incoming.summary),
+        roleType: nullableText(incoming.roleType),
+        advertisedSeniority: nullableText(incoming.advertisedSeniority),
+        practicalSeniority: nullableText(incoming.practicalSeniority),
+        classificationRationale: nullableText(incoming.classificationRationale),
+        functionalEmphasisJson: nullableText(incoming.functionalEmphasisJson),
+        interviewQuestionsJson: nullableText(incoming.interviewQuestionsJson),
+        schemaVersion: nullableText(incoming.schemaVersion),
+        createdAt: textValue(incoming.createdAt) || todayISO(),
+        updatedAt: textValue(incoming.updatedAt) || todayISO(),
+        startedAt: nullableText(incoming.startedAt),
+        completedAt: nullableText(incoming.completedAt),
       }
-      const existing = tx
-        .select()
-        .from(jobPostingAnalyses)
-        .where(eq(jobPostingAnalyses.jobPostingId, posting.id))
-        .get()
-      if (existing) {
-        tx.update(jobPostingAnalyses)
-          .set(values)
-          .where(eq(jobPostingAnalyses.id, existing.id))
-          .run()
-        analysisIds.set(Number(incoming.id), existing.id)
-      } else {
+      if (existing) analysisIds.set(Number(incoming.id), existing.id)
+      else {
         const created = tx
           .insert(jobPostingAnalyses)
           .values(values)
@@ -951,10 +967,16 @@ export function mergeImport(payload: ImportPayload) {
     for (const incoming of payload.applicationAnalysisRuns) {
       const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
       if (!applicationId) continue
+      const queueJobId = textValue(incoming.queueJobId) || `analysis-import-${incoming.id}`
+      const existing = tx
+        .select()
+        .from(applicationAnalysisRuns)
+        .where(eq(applicationAnalysisRuns.queueJobId, queueJobId))
+        .get()
       const values = {
         jobApplicationId: applicationId,
         status: controlledValue(runStatuses, incoming.status, 'Completed'),
-        queueJobId: textValue(incoming.queueJobId) || `analysis-import-${incoming.id}`,
+        queueJobId,
         attempts: Number(incoming.attempts) || 0,
         inputHash: nullableText(incoming.inputHash),
         inputSnapshotJson: nullableText(incoming.inputSnapshotJson),
@@ -971,7 +993,32 @@ export function mergeImport(payload: ImportPayload) {
         startedAt: nullableText(incoming.startedAt),
         completedAt: nullableText(incoming.completedAt),
       }
-      tx.insert(applicationAnalysisRuns).values(values).onConflictDoNothing().run()
+      if (existing) applicationAnalysisRunIds.set(Number(incoming.id), existing.id)
+      else {
+        const created = tx
+          .insert(applicationAnalysisRuns)
+          .values(values)
+          .returning({ id: applicationAnalysisRuns.id })
+          .get()
+        applicationAnalysisRunIds.set(Number(incoming.id), created.id)
+      }
+    }
+    for (const incoming of payload.analysisRunDecisions) {
+      const runId = applicationAnalysisRunIds.get(Number(incoming.applicationAnalysisRunId))
+      const skillId = skillIds.get(Number(incoming.skillId))
+      if (!runId || !skillId) continue
+      const date = todayISO()
+      tx.insert(analysisRunDecisions)
+        .values({
+          applicationAnalysisRunId: runId,
+          skillId,
+          decision: controlledValue(skillDecisions, incoming.decision, 'pending'),
+          reason: nullableText(incoming.reason),
+          createdAt: textValue(incoming.createdAt) || date,
+          updatedAt: textValue(incoming.updatedAt) || date,
+        })
+        .onConflictDoNothing()
+        .run()
     }
     for (const incoming of payload.generationRuns) {
       const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
@@ -987,6 +1034,12 @@ export function mergeImport(payload: ImportPayload) {
         status: controlledValue(runStatuses, incoming.status, 'Completed'),
         queueJobId,
         attempts: Number(incoming.attempts) || 0,
+        inputHash: nullableText(incoming.inputHash),
+        frozenInputJson: nullableText(incoming.frozenInputJson),
+        resumeModel: nullableText(incoming.resumeModel),
+        coverLetterModel: nullableText(incoming.coverLetterModel),
+        promptVersion: nullableText(incoming.promptVersion),
+        schemaVersion: nullableText(incoming.schemaVersion),
         errorMessage: nullableText(incoming.errorMessage),
         createdAt: textValue(incoming.createdAt) || todayISO(),
         updatedAt: textValue(incoming.updatedAt) || todayISO(),

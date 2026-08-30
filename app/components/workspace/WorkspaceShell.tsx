@@ -1,5 +1,6 @@
 import {
   getGenerationEvidenceSnapshot,
+  getGenerationState,
   getGoogleDriveConnection,
   listGenerationRuns,
 } from '../../../src/db/generation'
@@ -9,6 +10,7 @@ import type { ApplicationSkillRequirement } from '../../../src/db/skill-queries'
 import { getApplicationReadiness } from '../../../src/lib/application-readiness'
 import type { FieldErrors } from '../../../src/lib/validation'
 import type { WorkspaceTab } from '../../../src/lib/workspace/constants'
+import type { TabAvailability } from '../../../src/lib/workspace/state'
 import { ActivityPanel } from './ActivityPanel'
 import { ApplicationPanel } from './ApplicationPanel'
 import { ContactsPanel } from './ContactsPanel'
@@ -25,6 +27,7 @@ export function WorkspaceShell({
   requirements = [],
   careerEvidence = {},
   activeTab = 'application',
+  availability,
   errors,
   errorForm,
 }: {
@@ -34,10 +37,12 @@ export function WorkspaceShell({
   requirements?: ApplicationSkillRequirement[]
   careerEvidence?: Record<string, string[]>
   activeTab?: WorkspaceTab
+  availability: TabAvailability[]
   errors?: FieldErrors
   errorForm?: WorkspaceErrorForm
 }) {
   const generationRuns = listGenerationRuns(job.id)
+  const generationState = getGenerationState(job.id)
   const latestEvidenceSnapshot = generationRuns[0]
     ? getGenerationEvidenceSnapshot(generationRuns[0].id)
     : null
@@ -47,7 +52,7 @@ export function WorkspaceShell({
   return (
     <div id="workspace-shell">
       <WorkspaceHeader job={job} />
-      <WorkspaceTabs activeTab={activeTab} />
+      <WorkspaceTabs activeTab={activeTab} availability={availability} />
       <ApplicationPanel job={job} filters={filters} active={activeTab === 'application'} />
       <ContactsPanel
         job={job}
@@ -70,6 +75,7 @@ export function WorkspaceShell({
         evidenceSnapshot={latestEvidenceSnapshot?.snapshotJson ?? null}
         googleDriveConnected={googleDriveConnected}
         readiness={readiness}
+        state={generationState}
         active={activeTab === 'documents'}
       />
       <div
@@ -84,7 +90,7 @@ export function WorkspaceShell({
           filters={filters}
           requirements={requirements}
           careerEvidence={careerEvidence}
-          analysisRun={review.run}
+          state={review.state}
           jobRequirements={review.requirements}
           profiles={review.profiles}
         />

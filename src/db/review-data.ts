@@ -1,20 +1,30 @@
+import { getCandidateAnalysisState } from '../lib/candidate-analysis'
+import { currentJobAnalysisHash } from '../lib/job-analysis-input'
 import { listProfiles } from '../lib/profiles'
-import { listAnalysisRuns } from './analysis'
+import { db } from './client'
 import { listJobRequirements } from './job-analysis'
+import { getJobAnalysisState } from './job-analysis-runs'
 import { getApplication } from './queries'
 
 /**
- * Single loader for the review workspace. Returns the latest analysis run,
- * normalized job requirements, and available profiles so the ReviewPanel and
- * the analysis-runs fragment route render the same authoritative data.
+ * Single loader for the review workspace. Returns the full candidate-analysis
+ * state (latest attempt, latest completed, current completed, stale completed,
+ * and reason codes), normalized job requirements from the current Job Analysis
+ * run, and available profiles so the ReviewPanel and the analysis-runs fragment
+ * route render the same data.
  */
 export function loadReviewData(jobId: number) {
   const job = getApplication(jobId)
-  const run = listAnalysisRuns(jobId)[0] ?? null
-  const requirements = job?.jobPostingAnalysis ? listJobRequirements(job.jobPostingAnalysis.id) : []
+  const state = getCandidateAnalysisState(jobId)
+  const jobState = job?.jobPosting
+    ? getJobAnalysisState(db, job.jobPosting.id, currentJobAnalysisHash(db, job.jobPosting.id))
+    : null
+  const jobAnalysis = jobState?.currentCompleted ?? jobState?.latestCompleted ?? null
+  const requirements = jobAnalysis ? listJobRequirements(jobAnalysis.id) : []
   return {
     job,
-    run,
+    run: state.latest,
+    state,
     requirements,
     profiles: listProfiles(),
   }

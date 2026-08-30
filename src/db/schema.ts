@@ -218,6 +218,15 @@ export const jobPostingAnalyses = sqliteTable(
     jobPostingId: integer('job_posting_id')
       .notNull()
       .references(() => jobPostings.id, { onDelete: 'cascade' }),
+    // Run lifecycle. Existing rows backfill to Completed; new runs start Queued.
+    // Staleness is always derived from input_hash/schema_version, never stored.
+    status: text('status', { enum: runStatuses }).notNull().default('Completed'),
+    queueJobId: text('queue_job_id'),
+    attempts: integer('attempts').notNull().default(0),
+    inputHash: text('input_hash'),
+    frozenInputJson: text('frozen_input_json'),
+    errorMessage: text('error_message'),
+    // Result columns kept for backward compatibility with the pre-run schema.
     requirements: text('requirements'),
     responsibilities: text('responsibilities'),
     painPoints: text('pain_points'),
@@ -237,9 +246,15 @@ export const jobPostingAnalyses = sqliteTable(
     functionalEmphasisJson: text('functional_emphasis_json'),
     interviewQuestionsJson: text('interview_questions_json'),
     schemaVersion: text('schema_version'),
+    createdAt: text('created_at').notNull().default(''),
+    updatedAt: text('updated_at').notNull().default(''),
+    startedAt: text('started_at'),
+    completedAt: text('completed_at'),
   },
   (table) => [
-    uniqueIndex('job_posting_analyses_posting_unique_idx').on(table.jobPostingId),
+    uniqueIndex('job_posting_analyses_queue_job_unique_idx').on(table.queueJobId),
+    index('job_posting_analyses_posting_id_idx').on(table.jobPostingId, table.id),
+    index('job_posting_analyses_status_idx').on(table.status),
     index('job_posting_analyses_generated_idx').on(table.generatedAt),
   ],
 )
@@ -344,6 +359,48 @@ export const applicationAnalysisRuns = sqliteTable(
   ],
 )
 
+/**
+ * Run-scoped skill decisions. Each row belongs to one Candidate Analysis run;
+ * a new run starts pending and matches prior suggestions only by canonical
+ * skill ID (recorded via previous_decision_id). The legacy application-wide
+ * `job_applications_to_skills.user_decision` columns remain for imports.
+ */
+export const analysisRunDecisions = sqliteTable(
+  'analysis_run_decisions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    applicationAnalysisRunId: integer('application_analysis_run_id')
+      .notNull()
+      .references(() => applicationAnalysisRuns.id, { onDelete: 'cascade' }),
+    skillId: integer('skill_id')
+      .notNull()
+      .references(() => skills.id, { onDelete: 'cascade' }),
+    decision: text('decision', { enum: skillDecisions }).notNull().default('pending'),
+    reason: text('reason'),
+    previousDecisionId: integer('previous_decision_id').references(
+      (): AnySQLiteColumn => analysisRunDecisions.id,
+      { onDelete: 'set null' },
+    ),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('analysis_run_decisions_run_skill_unique_idx').on(
+      table.applicationAnalysisRunId,
+      table.skillId,
+    ),
+    index('analysis_run_decisions_run_idx').on(table.applicationAnalysisRunId),
+    check(
+      'analysis_run_decisions_decision_check',
+      sql`${table.decision} in ('pending', 'skip', 'include')`,
+    ),
+    check(
+      'analysis_run_decisions_include_reason_check',
+      sql`${table.decision} != 'include' or (${table.reason} is not null and trim(${table.reason}) != '')`,
+    ),
+  ],
+)
+
 export const jobApplicationsToSkills = sqliteTable(
   'job_applications_to_skills',
   {
@@ -396,6 +453,14 @@ export const generationRuns = sqliteTable(
     status: text('status', { enum: runStatuses }).notNull().default('Queued'),
     queueJobId: text('queue_job_id').notNull(),
     attempts: integer('attempts').notNull().default(0),
+    // Generation input identity, frozen before queueing. Existing rows without
+    // identity remain viewable legacy records.
+    inputHash: text('input_hash'),
+    frozenInputJson: text('frozen_input_json'),
+    resumeModel: text('resume_model'),
+    coverLetterModel: text('cover_letter_model'),
+    promptVersion: text('prompt_version'),
+    schemaVersion: text('schema_version'),
     errorMessage: text('error_message'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
@@ -633,6 +698,7 @@ export type GenerationRunResult = typeof generationRunResults.$inferSelect
 export type DocumentReview = typeof documentReviews.$inferSelect
 export type BaselineGenerationRun = typeof baselineGenerationRuns.$inferSelect
 export type ApplicationAnalysisRun = typeof applicationAnalysisRuns.$inferSelect
+export type AnalysisRunDecision = typeof analysisRunDecisions.$inferSelect
 export type Skill = typeof skills.$inferSelect
 export type SkillAlias = typeof skillAliases.$inferSelect
 export type JobApplicationSkill = typeof jobApplicationsToSkills.$inferSelect

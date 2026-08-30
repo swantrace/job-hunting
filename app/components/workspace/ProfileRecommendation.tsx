@@ -19,12 +19,14 @@ export function ProfileRecommendation({
   run,
   profiles,
   oob = false,
+  canConfirm = true,
 }: {
   jobId: number
   filters: Filters
   run: ApplicationAnalysisRun | null
   profiles: ProfileOption[]
   oob?: boolean
+  canConfirm?: boolean
 }) {
   const result = parseResult(run)
   const recommendation = result?.profileRecommendation ?? null
@@ -41,6 +43,7 @@ export function ProfileRecommendation({
       {confirmedProfileId ? (
         <div class="mt-3">
           <span class="badge badge-success">Confirmed</span>
+          {!canConfirm ? <span class="badge badge-warning badge-sm">Outdated</span> : null}
           <p class="mt-2 text-sm">
             Using <strong>{label(confirmedProfileId)}</strong> for document generation.
           </p>
@@ -76,7 +79,7 @@ export function ProfileRecommendation({
             <input type="hidden" name="runId" value={run?.id ?? ''} />
             <label class="fieldset">
               <legend class="fieldset-legend">Confirm generation profile</legend>
-              <select class="select" name="profileId">
+              <select class="select" name="profileId" disabled={!canConfirm}>
                 {profiles.map((profile) => (
                   <option
                     value={profile.id}
@@ -87,10 +90,15 @@ export function ProfileRecommendation({
                 ))}
               </select>
             </label>
-            <button class="btn btn-secondary">
+            <button class="btn btn-secondary" disabled={!canConfirm}>
               <span class="loading loading-spinner loading-xs htmx-indicator" /> Confirm
             </button>
           </form>
+          {!canConfirm ? (
+            <p class="text-xs text-base-content/60">
+              Re-run candidate analysis before confirming a profile.
+            </p>
+          ) : null}
         </div>
       ) : (
         <p class="mt-3 text-sm text-base-content/60">

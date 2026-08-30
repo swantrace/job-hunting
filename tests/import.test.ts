@@ -178,4 +178,56 @@ describe('JSON import format', () => {
     expect(errors.some((error) => /analysis run 1/.test(error))).toBe(true)
     expect(errors.some((error) => /Generation run 1/.test(error))).toBe(true)
   })
+
+  test('accepts version 3 payloads with run-scoped decisions and generation identity', () => {
+    const parsed = importPayloadSchema.parse({
+      schemaVersion: 3,
+      jobPostingAnalyses: [
+        {
+          id: 10,
+          jobApplicationId: 1,
+          status: 'Completed',
+          queueJobId: 'job-analysis-10',
+          inputHash: 'job-input-hash',
+          frozenInputJson: '{"version":1}',
+          schemaVersion: '3.0.0',
+        },
+      ],
+      applicationAnalysisRuns: [
+        { id: 5, jobApplicationId: 1, status: 'Completed', queueJobId: 'analysis-5' },
+      ],
+      analysisRunDecisions: [
+        { id: 1, applicationAnalysisRunId: 5, skillId: 1, decision: 'skip', reason: null },
+      ],
+      generationRuns: [
+        {
+          id: 2,
+          jobApplicationId: 1,
+          status: 'Completed',
+          queueJobId: 'generation-2',
+          inputHash: 'generation-input-hash',
+          frozenInputJson: '{"version":1}',
+          resumeModel: 'gpt-5.6-sol',
+          coverLetterModel: 'gpt-5.6-terra',
+          promptVersion: '2.1.0',
+          schemaVersion: '2.1.0',
+        },
+      ],
+    })
+    expect(parsed.schemaVersion).toBe(3)
+    expect(parsed.jobPostingAnalyses[0]).toMatchObject({
+      status: 'Completed',
+      inputHash: 'job-input-hash',
+    })
+    expect(parsed.analysisRunDecisions).toHaveLength(1)
+    expect(parsed.generationRuns[0]).toMatchObject({
+      inputHash: 'generation-input-hash',
+      resumeModel: 'gpt-5.6-sol',
+    })
+  })
+
+  test('defaults versioned collections for old backups', () => {
+    const parsed = importPayloadSchema.parse({ schemaVersion: 1 })
+    expect(parsed.analysisRunDecisions).toEqual([])
+  })
 })
