@@ -22,6 +22,7 @@ import {
   textValue,
   validateImportSnapshots,
 } from '../lib/import'
+import { jobAnalysisInputFromContent } from '../lib/job-analysis-input'
 import {
   persistedRequirementBases,
   requirementImportances,
@@ -44,7 +45,7 @@ import {
   statusesFromFilters,
 } from '../lib/validation'
 import { db } from './client'
-import { persistJobRequirements } from './job-analysis'
+import { persistCompletedJobAnalysis } from './job-analysis-runs'
 import {
   applicationAnalysisRuns,
   companies,
@@ -154,13 +155,14 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
     }
     const rawText = input.jobPostText?.trim()
     if (rawText) {
+      const contentHash = createHash('sha256').update(rawText).digest('hex')
       const posting = tx
         .insert(jobPostings)
         .values({
           jobApplicationId: result.id,
           rawText,
           capturedAt: date,
-          contentHash: createHash('sha256').update(rawText).digest('hex'),
+          contentHash,
           parsedAt: input.analysisRequirements || input.jobAnalysis ? date : null,
           parserModel: input.parserModel,
           parserPromptVersion: input.parserPromptVersion,
@@ -169,49 +171,43 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
         .get()
       if (input.parserPromptVersion || input.jobAnalysis) {
         const analysis = input.jobAnalysis
-        const saved = tx
-          .insert(jobPostingAnalyses)
-          .values({
-            jobPostingId: posting.id,
-            requirements: input.analysisRequirements,
-            responsibilities: input.analysisResponsibilities,
-            painPoints: input.analysisPainPoints,
-            culture: input.analysisCulture,
-            redFlags: input.analysisRedFlags,
-            successMetrics: input.analysisSuccessMetrics,
-            benefits: input.analysisBenefits,
-            notes: input.analysisNotes,
-            generatedAt: date,
-            model: input.parserModel,
-            promptVersion: input.parserPromptVersion,
-            summary: analysis ? JSON.stringify(analysis.summary) : null,
-            roleType: analysis?.classification.roleType ?? null,
-            advertisedSeniority: analysis?.classification.advertisedSeniority ?? null,
-            practicalSeniority: analysis?.classification.practicalSeniority ?? null,
-            classificationRationale: analysis?.classification.rationale ?? null,
-            functionalEmphasisJson: analysis
-              ? JSON.stringify(analysis.classification.functionalEmphasis)
-              : null,
-            interviewQuestionsJson: analysis ? JSON.stringify(analysis.interviewQuestions) : null,
-            schemaVersion: analysis ? jobAnalysisSchemaVersion : null,
-          })
-          .returning({ id: jobPostingAnalyses.id })
-          .get()
-        if (analysis?.requirements.length) {
-          persistJobRequirements(
-            tx,
-            saved.id,
-            analysis.requirements.map((requirement) => ({
-              type: requirement.type,
-              importance: requirement.importance,
-              basis: requirement.basis,
-              statement: requirement.statement,
-              sourceText: requirement.sourceText,
-              inferenceRationale: requirement.inferenceRationale,
-            })),
-            date,
-          )
-        }
+        const inputIdentity = jobAnalysisInputFromContent(contentHash)
+        persistCompletedJobAnalysis(tx, {
+          jobPostingId: posting.id,
+          inputHash: inputIdentity.inputHash,
+          frozenInputJson: JSON.stringify(inputIdentity.snapshot),
+          model: input.parserModel,
+          promptVersion: input.parserPromptVersion,
+          requirements: input.analysisRequirements,
+          responsibilities: input.analysisResponsibilities,
+          painPoints: input.analysisPainPoints,
+          culture: input.analysisCulture,
+          redFlags: input.analysisRedFlags,
+          successMetrics: input.analysisSuccessMetrics,
+          benefits: input.analysisBenefits,
+          notes: input.analysisNotes,
+          summary: analysis ? JSON.stringify(analysis.summary) : null,
+          roleType: analysis?.classification.roleType ?? null,
+          advertisedSeniority: analysis?.classification.advertisedSeniority ?? null,
+          practicalSeniority: analysis?.classification.practicalSeniority ?? null,
+          classificationRationale: analysis?.classification.rationale ?? null,
+          functionalEmphasisJson: analysis
+            ? JSON.stringify(analysis.classification.functionalEmphasis)
+            : null,
+          interviewQuestionsJson: analysis ? JSON.stringify(analysis.interviewQuestions) : null,
+          schemaVersion: analysis ? jobAnalysisSchemaVersion : null,
+          requirementsRows: analysis
+            ? analysis.requirements.map((requirement) => ({
+                type: requirement.type,
+                importance: requirement.importance,
+                basis: requirement.basis,
+                statement: requirement.statement,
+                sourceText: requirement.sourceText,
+                inferenceRationale: requirement.inferenceRationale,
+              }))
+            : [],
+          date,
+        })
       }
     }
     return result.id
