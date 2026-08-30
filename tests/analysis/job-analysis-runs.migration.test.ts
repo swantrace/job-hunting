@@ -1,11 +1,9 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { resolve } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import * as schema from '../../src/db/schema'
+import { migratedAt, migrationFolderUpTo, removeTempDir } from '../db/support/migrations'
 import { migratedDatabase } from '../support/sqlite'
 
 /**
@@ -25,31 +23,6 @@ const jobAnalysisRunColumns = [
   'started_at',
   'completed_at',
 ]
-
-function migrationFolderUpTo(lastIndex: number) {
-  const root = mkdtempSync(resolve(tmpdir(), 'job-tracker-migration-'))
-  const metaDirectory = resolve(root, 'meta')
-  mkdirSync(metaDirectory)
-  for (let index = 0; index <= lastIndex; index += 1) {
-    const prefix = `${String(index).padStart(4, '0')}_`
-    const fileName = Array.from(new Bun.Glob(`${prefix}*.sql`).scanSync('drizzle'))[0]
-    if (!fileName) throw new Error(`Missing migration with prefix ${prefix}.`)
-    cpSync(resolve('drizzle', fileName), resolve(root, fileName))
-  }
-  const journal = JSON.parse(readFileSync('drizzle/meta/_journal.json', 'utf8')) as {
-    entries: Array<{ idx: number }>
-  }
-  journal.entries = journal.entries.filter((entry) => entry.idx <= lastIndex)
-  writeFileSync(resolve(metaDirectory, '_journal.json'), JSON.stringify(journal))
-  return root
-}
-
-function migratedAt(folder: string) {
-  const sqlite = new Database(':memory:')
-  sqlite.exec('PRAGMA foreign_keys = ON;')
-  migrate(drizzle({ client: sqlite }), { migrationsFolder: folder })
-  return sqlite
-}
 
 function seedPopulatedAnalysis(sqlite: Database) {
   const company = sqlite
@@ -177,7 +150,7 @@ describe('job posting analysis run-history migration', () => {
       expect(count.count).toBe(2)
     } finally {
       sqlite.close()
-      rmSync(folder, { force: true, recursive: true })
+      removeTempDir(folder)
     }
   })
 })
