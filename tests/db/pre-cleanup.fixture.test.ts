@@ -108,8 +108,9 @@ describe('pre-cleanup fixture infrastructure', () => {
     }
   })
 
-  test('seeds the fixture on the full repository migration chain', () => {
-    const sqlite = migratedDatabase()
+  test('seeds the fixture on the pre-contract repository migration chain', () => {
+    const folder = migrationFolderUpTo(20)
+    const sqlite = migratedAt(folder)
     try {
       const fixture = seedPreCleanupFixture(sqlite)
 
@@ -122,6 +123,7 @@ describe('pre-cleanup fixture infrastructure', () => {
       expect(sqlite.query('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
     } finally {
       sqlite.close()
+      removeTempDir(folder)
     }
   })
 

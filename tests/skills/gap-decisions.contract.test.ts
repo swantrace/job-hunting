@@ -130,8 +130,10 @@ describe('planned run-scoped skill decision contract', () => {
           analysisDecisionsPath
         )
         const company = sqlite
-          .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
-          .get('Example', '2026-01-01') as { id: number }
+          .query(
+            'INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id',
+          )
+          .get('Example', '2026-01-01', '2026-01-01') as { id: number }
         const application = sqlite
           .query(
             `INSERT INTO job_applications (
@@ -156,22 +158,34 @@ describe('planned run-scoped skill decision contract', () => {
           .get('kafka', 'Kafka', 'pending', 'job-parser', '2026-01-01', '2026-01-01') as {
           id: number
         }
+        const posting = sqlite
+          .query(
+            `INSERT INTO job_postings (job_application_id, raw_text, captured_at, content_hash)
+             VALUES (?, ?, ?, ?) RETURNING id`,
+          )
+          .get(application.id, 'Role.', '2026-01-01', 'hash') as { id: number }
+        const analysis = sqlite
+          .query(
+            `INSERT INTO job_posting_analyses (job_posting_id, created_at, updated_at)
+             VALUES (?, ?, ?) RETURNING id`,
+          )
+          .get(posting.id, '2026-01-01', '2026-01-01') as { id: number }
         const runA = sqlite
           .query(
             `INSERT INTO application_analysis_runs (
-              job_application_id, status, queue_job_id, created_at, updated_at
+              job_posting_analysis_id, status, queue_job_id, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?) RETURNING id`,
           )
-          .get(application.id, 'Completed', 'analysis-a', '2026-01-01', '2026-01-01') as {
+          .get(analysis.id, 'Completed', 'analysis-a', '2026-01-01', '2026-01-01') as {
           id: number
         }
         const runB = sqlite
           .query(
             `INSERT INTO application_analysis_runs (
-              job_application_id, status, queue_job_id, created_at, updated_at
+              job_posting_analysis_id, status, queue_job_id, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?) RETURNING id`,
           )
-          .get(application.id, 'Completed', 'analysis-b', '2026-01-02', '2026-01-02') as {
+          .get(analysis.id, 'Completed', 'analysis-b', '2026-01-02', '2026-01-02') as {
           id: number
         }
 

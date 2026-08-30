@@ -60,7 +60,6 @@ export function createJobAnalysisRun(db: JobAnalysisDb, input: CreateJobAnalysis
       model: input.model,
       promptVersion: input.promptVersion,
       schemaVersion: input.schemaVersion,
-      generatedAt: date,
       createdAt: date,
       updatedAt: date,
     })
@@ -129,30 +128,8 @@ export function completeJobAnalysisRun(db: JobAnalysisDb, runId: number, parsed:
       .set({
         status: 'Completed',
         errorMessage: null,
-        requirements: analysis.requirements
-          .filter((requirement) => requirement.type !== 'responsibility')
-          .map((requirement) => requirement.statement)
-          .join('\n'),
-        responsibilities: analysis.requirements
-          .filter((requirement) => requirement.type === 'responsibility')
-          .map((requirement) => requirement.statement)
-          .join('\n'),
-        painPoints: analysis.painPoints.join('\n'),
-        culture: analysis.culture.join('\n'),
-        redFlags: analysis.redFlags.join('\n'),
-        successMetrics: analysis.successMetrics.join('\n'),
-        benefits: analysis.benefits.join('\n'),
-        notes: analysis.notes,
-        generatedAt: date,
         model: parsed.parserModel,
         promptVersion: parsed.parserPromptVersion,
-        summary: JSON.stringify(analysis.summary),
-        roleType: analysis.classification.roleType,
-        advertisedSeniority: analysis.classification.advertisedSeniority,
-        practicalSeniority: analysis.classification.practicalSeniority,
-        classificationRationale: analysis.classification.rationale,
-        functionalEmphasisJson: JSON.stringify(analysis.classification.functionalEmphasis),
-        interviewQuestionsJson: JSON.stringify(analysis.interviewQuestions),
         schemaVersion: jobAnalysisSchemaVersion,
         resultJson: JSON.stringify(analysis),
         completedAt: date,
@@ -190,30 +167,8 @@ export function persistCompletedJobAnalysis(tx: DbExecutor, input: CompletedJobA
       status: 'Completed',
       inputHash: input.inputHash,
       frozenInputJson: input.frozenInputJson,
-      requirements: analysis.requirements
-        .filter((requirement) => requirement.type !== 'responsibility')
-        .map((requirement) => requirement.statement)
-        .join('\n'),
-      responsibilities: analysis.requirements
-        .filter((requirement) => requirement.type === 'responsibility')
-        .map((requirement) => requirement.statement)
-        .join('\n'),
-      painPoints: analysis.painPoints.join('\n'),
-      culture: analysis.culture.join('\n'),
-      redFlags: analysis.redFlags.join('\n'),
-      successMetrics: analysis.successMetrics.join('\n'),
-      benefits: analysis.benefits.join('\n'),
-      notes: analysis.notes,
-      generatedAt: input.date,
       model: input.model ?? null,
       promptVersion: input.promptVersion ?? null,
-      summary: JSON.stringify(analysis.summary),
-      roleType: analysis.classification.roleType,
-      advertisedSeniority: analysis.classification.advertisedSeniority,
-      practicalSeniority: analysis.classification.practicalSeniority,
-      classificationRationale: analysis.classification.rationale,
-      functionalEmphasisJson: JSON.stringify(analysis.classification.functionalEmphasis),
-      interviewQuestionsJson: JSON.stringify(analysis.interviewQuestions),
       schemaVersion: input.schemaVersion,
       resultJson: JSON.stringify(analysis),
       createdAt: input.date,

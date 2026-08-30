@@ -40,9 +40,7 @@ function RunRow({ run }: { run: JobAnalysisRun }) {
       <span class={`badge badge-sm ${statusClass(run.status)}`}>{run.status}</span>
       {run.schemaVersion ? <span>schema {run.schemaVersion}</span> : null}
       {run.model ? <span>{run.model}</span> : null}
-      {(run.completedAt ?? run.generatedAt) ? (
-        <span>{run.completedAt ?? run.generatedAt}</span>
-      ) : null}
+      {(run.completedAt ?? run.createdAt) ? <span>{run.completedAt ?? run.createdAt}</span> : null}
     </li>
   )
 }
@@ -125,8 +123,8 @@ export function JobAnalysisStatus({
           {info.schemaVersion ? (
             <span class="text-base-content/60">Schema: {info.schemaVersion}</span>
           ) : null}
-          {(info.completedAt ?? info.generatedAt) ? (
-            <span class="text-base-content/60">Date: {info.completedAt ?? info.generatedAt}</span>
+          {(info.completedAt ?? info.createdAt) ? (
+            <span class="text-base-content/60">Date: {info.completedAt ?? info.createdAt}</span>
           ) : null}
           {info.schemaVersion == null ? (
             <span class="badge badge-warning badge-sm">Legacy</span>

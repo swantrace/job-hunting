@@ -107,7 +107,7 @@ describe('run-scoped decision migration', () => {
     try {
       const { runId } = seedLegacyDecisions(sqlite)
 
-      migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
+      migrate(drizzle({ client: sqlite }), { migrationsFolder: migrationFolderUpTo(20) })
 
       const rows = sqlite
         .query(

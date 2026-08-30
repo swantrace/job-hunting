@@ -1,5 +1,3 @@
-import { mkdir, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
 import { z } from 'zod'
 import { applicationGenerationPromptVersion } from '../ai/prompts/application-generation'
 import { candidateFitSchema } from '../ai/schemas/candidate-fit'
@@ -9,9 +7,9 @@ import {
   saveBaselineGenerationEvidenceSnapshot,
   saveGenerationEvidenceSnapshot,
 } from '../db/generation'
-import { getArtifactsRoot } from './artifact-storage'
 import { loadCareerData } from './career-data'
 import { todayISO } from './date'
+import { parseJobAnalysisResult } from './job-analysis-result'
 import { calculateRequirementCoverage } from './requirements/score'
 import { generationEligibleRequirements } from './skills/generation-eligibility'
 import { calculateSkillScores } from './skills/score'
@@ -148,7 +146,9 @@ export function buildEvidenceSelectionSnapshot(
     throw new Error(`No canonical profile exists for direction "${source.application.direction}".`)
   const jobTerms = new Set([
     ...source.skills.map(normalise),
-    ...(source.analysis?.requirements ?? '').split('\n').map(normalise),
+    ...(parseJobAnalysisResult(source.analysis?.resultJson ?? null)?.requirements.map(
+      (requirement) => normalise(requirement.statement),
+    ) ?? []),
   ])
   const experiences = profile.experienceSelection.priorityOrder
     .map((id) => data.experiences.experiences.find((item) => item.id === id))
@@ -244,7 +244,7 @@ export function buildEvidenceSelectionSnapshot(
     })),
     scores,
     versions: {
-      parserPrompt: source.jobPosting?.parserPromptVersion ?? null,
+      parserPrompt: null,
       generationPrompt: applicationGenerationPromptVersion,
     },
     provenance,
@@ -292,12 +292,7 @@ export function buildEvidenceSelectionSnapshot(
 
 export async function persistEvidenceSelectionSnapshot(source: GenerationSource) {
   const snapshot = buildEvidenceSelectionSnapshot(source)
-  const relativePath = `run-${source.run.id}/evidence-selection.json`
-  const destination = resolve(getArtifactsRoot(), relativePath)
-  await mkdir(resolve(destination, '..'), { recursive: true })
-  const json = JSON.stringify(snapshot, null, 2)
-  await writeFile(destination, json)
-  saveGenerationEvidenceSnapshot(source.run.id, json, relativePath)
+  saveGenerationEvidenceSnapshot(source.run.id, JSON.stringify(snapshot, null, 2))
   return snapshot
 }
 
@@ -383,11 +378,6 @@ export async function persistBaselineEvidenceSelectionSnapshot(runId: number) {
   const run = getBaselineGenerationRun(runId)
   if (!run) throw new Error('Baseline generation run no longer exists.')
   const snapshot = buildBaselineEvidenceSelectionSnapshot(run)
-  const relativePath = `baseline-run-${run.id}/evidence-selection.json`
-  const destination = resolve(getArtifactsRoot(), relativePath)
-  await mkdir(resolve(destination, '..'), { recursive: true })
-  const json = JSON.stringify(snapshot, null, 2)
-  await writeFile(destination, json)
-  saveBaselineGenerationEvidenceSnapshot(run.id, json, relativePath)
+  saveBaselineGenerationEvidenceSnapshot(run.id, JSON.stringify(snapshot, null, 2))
   return snapshot
 }

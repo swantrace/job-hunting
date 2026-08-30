@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, notInArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
 import type {
   SkillDecision,
@@ -12,7 +12,6 @@ import type { SkillCategory } from '../lib/skills/taxonomy'
 import { db } from './client'
 import {
   analysisRunDecisions,
-  jobApplicationsToSkills,
   jobPostingAnalyses,
   jobPostings,
   jobRequirements,
@@ -23,15 +22,6 @@ import {
 } from './schema'
 
 export type DbExecutor = Pick<typeof db, 'select' | 'insert' | 'delete' | 'update'>
-
-export type SkillRequirementInput = {
-  rawLabel: string
-  canonicalLabel: string
-  category: SkillCategory | null
-  importance: SkillImportance
-  sourceText?: string | null
-  confidence?: number | null
-}
 
 export function resolveSkillByKey(tx: DbExecutor, key: string): Skill | undefined {
   return tx.select().from(skills).where(eq(skills.key, key)).get()
@@ -140,168 +130,6 @@ export function addAliasIfAbsent(
   tx.insert(skillAliases)
     .values({ skillId, alias, normalizedAlias: normalized, origin, createdAt: todayISO() })
     .run()
-}
-
-/**
- * Persists structured parser requirements for one application. Approved skills
- * are reused, unknown concepts become pending skills only at save time, and
- * repeated canonical skills collapse into a single relation. The relationship
- * stores raw label, source excerpt, importance, confidence, and analysis result.
- */
-export function persistSkillRequirements(
-  tx: DbExecutor,
-  jobId: number,
-  requirements: SkillRequirementInput[],
-) {
-  const date = todayISO()
-  const seen = new Set<string>()
-  const skillIdByCanonical = new Map<string, number>()
-  const rawLabelBySkillId = new Map<number, string>()
-
-  for (const requirement of requirements) {
-    const canonicalLabel = requirement.canonicalLabel.trim() || requirement.rawLabel.trim()
-    const canonical = normalizeSkillAlias(canonicalLabel)
-    if (seen.has(canonical)) continue
-    seen.add(canonical)
-
-    let skill = resolveApprovedSkill(tx, canonical)
-    if (!skill) {
-      skill = resolveSkillByKey(tx, canonical) ?? resolveSkillByAlias(tx, canonical)
-    }
-    if (!skill) {
-      skill = insertSkill(tx, {
-        name: canonicalLabel,
-        category: requirement.category,
-        reviewStatus: 'pending',
-        origin: 'job-parser',
-      })
-    }
-    const rawLabel = requirement.rawLabel.trim() || canonicalLabel
-    addAliasIfAbsent(tx, skill.id, rawLabel, 'job-parser')
-    skillIdByCanonical.set(canonical, skill.id)
-    rawLabelBySkillId.set(skill.id, rawLabel)
-
-    tx.insert(jobApplicationsToSkills)
-      .values({
-        jobApplicationId: jobId,
-        skillId: skill.id,
-        rawLabel,
-        sourceText: requirement.sourceText?.trim() || null,
-        importance: requirement.importance,
-        parserConfidence: requirement.confidence ?? null,
-        analysisResult: skill.careerSkillId ? 'proven-match' : 'not-in-career-data',
-        userDecision: 'pending',
-        createdAt: date,
-        updatedAt: date,
-      })
-      .onConflictDoNothing()
-      .run()
-  }
-
-  const skillIds = [...skillIdByCanonical.values()]
-  if (skillIds.length) {
-    tx.delete(jobApplicationsToSkills)
-      .where(
-        and(
-          eq(jobApplicationsToSkills.jobApplicationId, jobId),
-          notInArray(jobApplicationsToSkills.skillId, skillIds),
-        ),
-      )
-      .run()
-  } else {
-    tx.delete(jobApplicationsToSkills)
-      .where(eq(jobApplicationsToSkills.jobApplicationId, jobId))
-      .run()
-  }
-}
-
-/**
- * Reconciles an application's skill requirements by canonical skill ID while
- * preserving user decisions for skills that remain present. Rows for skills no
- * longer in the list are removed only for this application; other applications
- * and their decisions are never touched.
- */
-export function reconcileSkillNames(tx: DbExecutor, jobId: number, names: string[]) {
-  const date = todayISO()
-  const rawLabelBySkillId = new Map<number, string>()
-  for (const name of names) {
-    const skill = getOrCreateSkill(tx, name, 'manual')
-    if (!rawLabelBySkillId.has(skill.id)) rawLabelBySkillId.set(skill.id, name)
-  }
-  for (const [skillId, rawLabel] of rawLabelBySkillId) {
-    tx.insert(jobApplicationsToSkills)
-      .values({
-        jobApplicationId: jobId,
-        skillId,
-        rawLabel,
-        importance: 'mentioned',
-        analysisResult: 'not-in-career-data',
-        userDecision: 'pending',
-        createdAt: date,
-        updatedAt: date,
-      })
-      .onConflictDoNothing()
-      .run()
-  }
-  const skillIds = [...rawLabelBySkillId.keys()]
-  if (skillIds.length) {
-    tx.delete(jobApplicationsToSkills)
-      .where(
-        and(
-          eq(jobApplicationsToSkills.jobApplicationId, jobId),
-          notInArray(jobApplicationsToSkills.skillId, skillIds),
-        ),
-      )
-      .run()
-  } else {
-    tx.delete(jobApplicationsToSkills)
-      .where(eq(jobApplicationsToSkills.jobApplicationId, jobId))
-      .run()
-  }
-}
-
-export type ApplicationSkillRequirement = typeof jobApplicationsToSkills.$inferSelect & {
-  skillName: string
-  skillKey: string
-  skillCategory: SkillCategory | null
-  careerSkillId: string | null
-  reviewStatus: SkillReviewStatus
-  aliases: string[]
-}
-
-export function listApplicationSkillRequirements(jobId: number): ApplicationSkillRequirement[] {
-  const relations = db
-    .select()
-    .from(jobApplicationsToSkills)
-    .where(eq(jobApplicationsToSkills.jobApplicationId, jobId))
-    .all()
-  if (!relations.length) return []
-  const skillIds = relations.map((relation) => relation.skillId)
-  const skillRows = db.select().from(skills).where(inArray(skills.id, skillIds)).all()
-  const aliasRows = db
-    .select()
-    .from(skillAliases)
-    .where(inArray(skillAliases.skillId, skillIds))
-    .all()
-  const skillById = new Map(skillRows.map((skill) => [skill.id, skill]))
-  const aliasesBySkill = new Map<number, string[]>()
-  for (const alias of aliasRows) {
-    const list = aliasesBySkill.get(alias.skillId) ?? []
-    list.push(alias.alias)
-    aliasesBySkill.set(alias.skillId, list)
-  }
-  return relations.map((relation) => {
-    const skill = skillById.get(relation.skillId)
-    return {
-      ...relation,
-      skillName: skill?.name ?? relation.rawLabel ?? '',
-      skillKey: skill?.key ?? '',
-      skillCategory: skill?.category ?? null,
-      careerSkillId: skill?.careerSkillId ?? null,
-      reviewStatus: skill?.reviewStatus ?? 'pending',
-      aliases: aliasesBySkill.get(relation.skillId) ?? [],
-    }
-  })
 }
 
 export type RequirementSkillMapping = {

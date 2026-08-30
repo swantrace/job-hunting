@@ -71,7 +71,7 @@ async function processGeneration(
     completeGenerationRun(run.id, artifacts)
     const { uploadArtifactToGoogleDrive } = await import('./google-drive')
     const savedArtifacts =
-      listGenerationRuns(run.jobApplicationId).find((item) => item.id === run.id)?.artifacts ?? []
+      listGenerationRuns(source.application.id).find((item) => item.id === run.id)?.artifacts ?? []
     for (const artifact of savedArtifacts) {
       try {
         await uploadArtifactToGoogleDrive(artifact)
@@ -129,7 +129,6 @@ export async function enqueueGeneration(jobApplicationId: number) {
   const built = buildGenerationInput(jobApplicationId)
   if (!built) return null
   const run = createGenerationRun({
-    jobApplicationId,
     applicationAnalysisRunId: built.snapshot.candidateAnalysisRunId,
     inputHash: built.inputHash,
     frozenInputJson: JSON.stringify(built.snapshot),

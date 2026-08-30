@@ -103,7 +103,7 @@ describe('canonical lineage expand migration', () => {
       const fixture = seedPreCleanupFixture(sqlite)
 
       // Apply only the expand migration (0020) over the populated fixture.
-      migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
+      migrate(drizzle({ client: sqlite }), { migrationsFolder: migrationFolderUpTo(20) })
 
       const versions = sqlite
         .query('SELECT version FROM job_postings ORDER BY id')

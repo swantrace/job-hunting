@@ -1,5 +1,9 @@
 import { createRoute } from 'honox/factory'
-import { confirmProfileSelection, getAnalysisRun } from '../../../../src/db/analysis'
+import {
+  analysisRunBelongsToApplication,
+  confirmProfileSelection,
+  getAnalysisRun,
+} from '../../../../src/db/analysis'
 import { getApplication } from '../../../../src/db/queries'
 import { getCandidateAnalysisState } from '../../../../src/lib/candidate-analysis'
 import { listProfiles } from '../../../../src/lib/profiles'
@@ -35,7 +39,7 @@ export const POST = createRoute(async (c) => {
   }
 
   const run = getAnalysisRun(parsed.data.runId)
-  if (!run || run.jobApplicationId !== id || run.status !== 'Completed') {
+  if (!run || !analysisRunBelongsToApplication(run.id, id) || run.status !== 'Completed') {
     c.header('HX-Retarget', '#profile-recommendation')
     return c.html(recommendationFor(id, filters), 422)
   }

@@ -177,7 +177,6 @@ describe('job analysis run-state queries', () => {
           jobPostingId: applicationId,
           status: 'Completed',
           schemaVersion: null,
-          generatedAt: '2026-08-01',
           createdAt: '2026-08-01',
           updatedAt: '2026-08-01',
           completedAt: '2026-08-01',
@@ -198,7 +197,6 @@ describe('job analysis run-state queries', () => {
           status: 'Completed',
           inputHash: 'current-hash',
           schemaVersion: '4.0.0',
-          generatedAt: '2026-08-02',
           createdAt: '2026-08-02',
           updatedAt: '2026-08-02',
           completedAt: '2026-08-02',
@@ -222,7 +220,6 @@ describe('job analysis run-state queries', () => {
           inputHash: 'current-hash',
           schemaVersion: '4.0.0',
           errorMessage: 'boom',
-          generatedAt: '2026-08-03',
           createdAt: '2026-08-03',
           updatedAt: '2026-08-03',
         })
@@ -265,7 +262,7 @@ describe('job analysis completion transaction', () => {
         expect(completed?.status).toBe('Completed')
         expect(completed?.schemaVersion).toBe('4.0.0')
         expect(completed?.completedAt).toBeTruthy()
-        expect(completed?.summary).toContain('Build software.')
+        expect(completed?.resultJson).toContain('Build software.')
 
         const requirements = db
           .select()
@@ -341,8 +338,8 @@ function minimalParsedResult() {
 
 function seedApplicationHelper(sqlite: ReturnType<typeof migratedDatabase>) {
   const company = sqlite
-    .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
-    .get('Example Company', '2026-08-28') as { id: number }
+    .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
+    .get('Example Company', '2026-08-28', '2026-08-28') as { id: number }
   const application = sqlite
     .query(
       `INSERT INTO job_applications (

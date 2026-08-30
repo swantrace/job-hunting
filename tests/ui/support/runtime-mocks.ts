@@ -55,11 +55,9 @@ export const mockJob = {
   jobPostingAnalysis: undefined,
   jobTitle: 'Full-Stack Developer',
   location: 'Edmonton, AB',
-  matchLevel: null,
   notes: null,
   postedDate: '2026-08-20',
   priority: 'B',
-  resumeVersion: null,
   salary: null,
   skills: [],
   status: 'Saved',
@@ -137,6 +135,7 @@ mock.module('../../../src/lib/analysis-queue', () => ({
 }))
 
 mock.module('../../../src/db/analysis', () => ({
+  analysisRunBelongsToApplication: mock(() => true),
   confirmProfileSelection: mockConfirmProfileSelection,
   getAnalysisRun: mockGetAnalysisRun,
   listAnalysisRuns: mockListAnalysisRuns,

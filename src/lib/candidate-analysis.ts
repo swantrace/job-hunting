@@ -18,6 +18,7 @@ import { careerEvidenceIds, loadCareerData } from './career-data'
 import { todayISO } from './date'
 import { assertEveryRequirementAssessed, validateCandidateFitEvidence } from './fit-analysis'
 import { currentJobAnalysisHash } from './job-analysis-input'
+import { parseJobAnalysisResult } from './job-analysis-result'
 import { listProfiles } from './profiles'
 
 export const candidateAnalysisInputVersion = 2
@@ -101,14 +102,6 @@ export function canonicalCandidateAnalysisInputHash(input: CandidateAnalysisInpu
   return canonicalHash(input)
 }
 
-function parseJsonOrNull(value: string): unknown {
-  try {
-    return JSON.parse(value)
-  } catch {
-    return null
-  }
-}
-
 /**
  * Builds the frozen canonical input for one application. This is the only
  * factual source the candidate model sees; it never receives a generated
@@ -128,6 +121,7 @@ export function buildCandidateAnalysisInput(
   const data = loadCareerData()
   const requirements = listJobRequirements(currentJobAnalysis.id)
   const requirementSkills = listRequirementSkillMappings(currentJobAnalysis.id)
+  const parsedAnalysis = parseJobAnalysisResult(currentJobAnalysis.resultJson)
   const profiles = listProfiles().map((profile) => {
     const canonical = data.profiles.find((item) => item.id === profile.id)
     return { ...profile, ...(canonical ?? {}) }
@@ -169,16 +163,8 @@ export function buildCandidateAnalysisInput(
       runId: currentJobAnalysis.id,
       schemaVersion: currentJobAnalysis.schemaVersion,
       promptVersion: currentJobAnalysis.promptVersion,
-      summary: currentJobAnalysis.summary ? parseJsonOrNull(currentJobAnalysis.summary) : null,
-      classification: {
-        roleType: currentJobAnalysis.roleType,
-        advertisedSeniority: currentJobAnalysis.advertisedSeniority,
-        practicalSeniority: currentJobAnalysis.practicalSeniority,
-        rationale: currentJobAnalysis.classificationRationale,
-        functionalEmphasis: currentJobAnalysis.functionalEmphasisJson
-          ? parseJsonOrNull(currentJobAnalysis.functionalEmphasisJson)
-          : null,
-      },
+      summary: parsedAnalysis?.summary ?? null,
+      classification: parsedAnalysis?.classification ?? null,
       requirements: requirements.map((requirement) => ({
         id: requirement.id,
         sequence: requirement.sequence,

@@ -14,8 +14,8 @@ import { migratedDatabase } from '../support/sqlite'
  */
 function seedPosting(sqlite: ReturnType<typeof migratedDatabase>) {
   const company = sqlite
-    .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
-    .get('Example Corp', '2026-01-01') as { id: number }
+    .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
+    .get('Example Corp', '2026-01-01', '2026-01-01') as { id: number }
   const application = sqlite
     .query(
       `INSERT INTO job_applications (

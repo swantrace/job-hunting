@@ -1,81 +1,66 @@
 import { describe, expect, test } from 'bun:test'
-import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import * as schema from '../../src/db/schema'
-import { reconcileSkillNames } from '../../src/db/skill-queries'
+import { persistJobRequirements } from '../../src/db/job-analysis'
+import { listRequirementSkillMappings } from '../../src/db/skill-queries'
 import { skillDecisionSchema } from '../../src/lib/validation'
-import { migratedDatabase, seedApplication } from '../support/sqlite'
+import { migratedDatabase } from '../support/sqlite'
 
 function database() {
   const sqlite = migratedDatabase()
-  return { sqlite, db: drizzle({ client: sqlite, schema }) }
+  return { sqlite, db: drizzle({ client: sqlite }) }
 }
 
-describe('application skill requirement persistence', () => {
-  test('re-saving an unchanged application preserves user decisions and reasons', () => {
+function seedAnalysis(sqlite: ReturnType<typeof database>['sqlite']): number {
+  const company = sqlite
+    .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
+    .get('Example Company', '2026-08-28', '2026-08-28') as { id: number }
+  const application = sqlite
+    .query(
+      `INSERT INTO job_applications (
+        company_id, job_title, direction, posted_date, priority, status, created_at, updated_at
+      ) VALUES (?, ?, 'fullstack', '2026-08-28', 'B', 'Saved', '2026-08-28', '2026-08-28') RETURNING id`,
+    )
+    .get(company.id, 'Engineer') as { id: number }
+  const posting = sqlite
+    .query(
+      `INSERT INTO job_postings (job_application_id, raw_text, captured_at, content_hash)
+       VALUES (?, ?, '2026-08-28', ?) RETURNING id`,
+    )
+    .get(application.id, 'Role.', 'hash') as { id: number }
+  const analysis = sqlite
+    .query(
+      'INSERT INTO job_posting_analyses (job_posting_id, created_at, updated_at) VALUES (?, ?, ?) RETURNING id',
+    )
+    .get(posting.id, '2026-08-28', '2026-08-28') as { id: number }
+  return analysis.id
+}
+
+describe('canonical requirement-skill persistence', () => {
+  test('persists requirement-owned skills into the canonical junction', () => {
     const { sqlite, db } = database()
     try {
-      const { applicationId } = seedApplication(sqlite)
-      reconcileSkillNames(db, applicationId, ['React'])
-
-      const relation = db
-        .select()
-        .from(schema.jobApplicationsToSkills)
-        .where(eq(schema.jobApplicationsToSkills.jobApplicationId, applicationId))
-        .get()
-      expect(relation?.skillId).toBeGreaterThan(0)
-
-      sqlite
-        .query(
-          'UPDATE job_applications_to_skills SET user_decision = ?, decision_reason = ? WHERE job_application_id = ? AND skill_id = ?',
-        )
-        .run('skip', 'Not relevant to this application.', applicationId, relation!.skillId)
-
-      reconcileSkillNames(db, applicationId, ['React'])
-
-      const after = db
-        .select()
-        .from(schema.jobApplicationsToSkills)
-        .where(eq(schema.jobApplicationsToSkills.jobApplicationId, applicationId))
-        .get()
-      expect(after?.userDecision).toBe('skip')
-      expect(after?.decisionReason).toBe('Not relevant to this application.')
-    } finally {
-      sqlite.close()
-    }
-  })
-
-  test('collapses repeated spellings of the same canonical skill into one relation', () => {
-    const { sqlite, db } = database()
-    try {
-      const { applicationId } = seedApplication(sqlite)
-      reconcileSkillNames(db, applicationId, ['React', 'react', ' react '])
-      const rows = db
-        .select()
-        .from(schema.jobApplicationsToSkills)
-        .where(eq(schema.jobApplicationsToSkills.jobApplicationId, applicationId))
-        .all()
-      expect(rows).toHaveLength(1)
-    } finally {
-      sqlite.close()
-    }
-  })
-
-  test('removes only skills that leave the edited list, never unrelated relations', () => {
-    const { sqlite, db } = database()
-    try {
-      const { applicationId } = seedApplication(sqlite)
-      reconcileSkillNames(db, applicationId, ['React', 'Vue'])
-      reconcileSkillNames(db, applicationId, ['React'])
-
-      const names = db
-        .select({ name: schema.skills.name })
-        .from(schema.jobApplicationsToSkills)
-        .innerJoin(schema.skills, eq(schema.jobApplicationsToSkills.skillId, schema.skills.id))
-        .where(eq(schema.jobApplicationsToSkills.jobApplicationId, applicationId))
-        .all()
-        .map((row) => row.name)
-      expect(names).toEqual(['React'])
+      const analysisId = seedAnalysis(sqlite)
+      persistJobRequirements(
+        db,
+        analysisId,
+        [
+          {
+            type: 'skill',
+            importance: 'required',
+            basis: 'explicit',
+            statement: 'React experience.',
+            sourceText: 'React experience',
+            inferenceRationale: null,
+            skillReferences: [
+              { rawLabel: 'React', canonicalLabel: 'React', category: 'frontend', confidence: 0.9 },
+            ],
+          },
+        ],
+        '2026-08-28',
+      )
+      const mappings = listRequirementSkillMappings(analysisId, db)
+      expect(mappings).toHaveLength(1)
+      expect(mappings[0].skillName).toBe('React')
     } finally {
       sqlite.close()
     }

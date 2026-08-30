@@ -2,7 +2,6 @@ import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
-import * as schema from '../../src/db/schema'
 import { migratedAt, migrationFolderUpTo, removeTempDir } from '../db/support/migrations'
 import { migratedDatabase } from '../support/sqlite'
 
@@ -99,7 +98,7 @@ describe('job posting analysis run-history migration', () => {
     try {
       const { analysisId, postingId } = seedPopulatedAnalysis(sqlite)
 
-      migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
+      migrate(drizzle({ client: sqlite }), { migrationsFolder: migrationFolderUpTo(20) })
 
       const analysis = sqlite
         .query(
@@ -132,18 +131,15 @@ describe('job posting analysis run-history migration', () => {
       expect(requirement[0].basis).toBe('legacy')
       expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
 
-      // A second analysis for the same posting is now allowed.
-      const db = drizzle({ client: sqlite, schema })
-      db.insert(schema.jobPostingAnalyses)
-        .values({
-          jobPostingId: postingId,
-          requirements: 'TypeScript',
-          generatedAt: '2026-02-01',
-          status: 'Queued',
-          createdAt: '2026-02-01',
-          updatedAt: '2026-02-01',
-        })
-        .run()
+      // A second analysis for the same posting is now allowed (raw SQL because
+      // the expand schema still requires the legacy generated_at column).
+      sqlite
+        .query(
+          `INSERT INTO job_posting_analyses (
+            job_posting_id, status, generated_at, created_at, updated_at
+          ) VALUES (?, 'Queued', '2026-02-01', '2026-02-01', '2026-02-01')`,
+        )
+        .run(postingId)
       const count = sqlite
         .query('SELECT count(*) AS count FROM job_posting_analyses WHERE job_posting_id = ?')
         .get(postingId) as { count: number }

@@ -51,7 +51,7 @@ export function syncSkillTaxonomy(
         if (apply)
           tx.update(skillCategories)
             .set({ label: category.label, sortOrder: category.sortOrder, updatedAt: date })
-            .where(eq(skillCategories.id, current.id))
+            .where(eq(skillCategories.key, current.key))
             .run()
         report.updated += 1
       } else {

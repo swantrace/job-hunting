@@ -12,8 +12,8 @@ import { migratedDatabase } from '../support/sqlite'
 
 function seedLineage(sqlite: Database, companyName: string) {
   const company = sqlite
-    .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
-    .get(companyName, '2026-01-01') as { id: number }
+    .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
+    .get(companyName, '2026-01-01', '2026-01-01') as { id: number }
   const application = sqlite
     .query(
       `INSERT INTO job_applications (
@@ -29,16 +29,16 @@ function seedLineage(sqlite: Database, companyName: string) {
     .get(application.id, `hash-${companyName}`) as { id: number }
   const analysis = sqlite
     .query(
-      `INSERT INTO job_posting_analyses (job_posting_id, generated_at) VALUES (?, '2026-01-01') RETURNING id`,
+      `INSERT INTO job_posting_analyses (job_posting_id, created_at, updated_at) VALUES (?, '2026-01-01', '2026-01-01') RETURNING id`,
     )
     .get(posting.id) as { id: number }
   const run = sqlite
     .query(
       `INSERT INTO application_analysis_runs (
-        job_application_id, job_posting_analysis_id, status, queue_job_id, created_at, updated_at
-      ) VALUES (?, ?, 'Completed', ?, '2026-01-01', '2026-01-01') RETURNING id`,
+        job_posting_analysis_id, status, queue_job_id, created_at, updated_at
+      ) VALUES (?, 'Completed', ?, '2026-01-01', '2026-01-01') RETURNING id`,
     )
-    .get(application.id, analysis.id, `run-${companyName}`) as { id: number }
+    .get(analysis.id, `run-${companyName}`) as { id: number }
   return { applicationId: application.id, analysisId: analysis.id, runId: run.id }
 }
 
@@ -46,10 +46,10 @@ function seedRun(sqlite: Database, applicationId: number, analysisId: number, na
   return sqlite
     .query(
       `INSERT INTO application_analysis_runs (
-        job_application_id, job_posting_analysis_id, status, queue_job_id, created_at, updated_at
-      ) VALUES (?, ?, 'Completed', ?, '2026-01-01', '2026-01-01') RETURNING id`,
+        job_posting_analysis_id, status, queue_job_id, created_at, updated_at
+      ) VALUES (?, 'Completed', ?, '2026-01-01', '2026-01-01') RETURNING id`,
     )
-    .get(applicationId, analysisId, name) as { id: number }
+    .get(analysisId, name) as { id: number }
 }
 
 describe('run-scoped decision lineage', () => {

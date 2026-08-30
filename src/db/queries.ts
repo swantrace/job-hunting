@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { and, desc, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm'
 import type { z } from 'zod'
 import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
+import { followUpActionTypes, interviewRoundTypes } from '../lib/activities/constants'
 import {
   type ApplicationSort,
   matchLevels,
@@ -59,7 +60,6 @@ import {
   type JobApplication,
   jobApplications,
   jobApplicationsToContacts,
-  jobApplicationsToSkills,
   jobPostingAnalyses,
   jobPostings,
   jobRequirements,
@@ -97,7 +97,10 @@ function getOrCreateCompany(tx: DbExecutor, name: string, date: string) {
     .where(sql`lower(${companies.name}) = lower(${name})`)
     .get()
   if (!company) {
-    tx.insert(companies).values({ name, createdAt: date }).onConflictDoNothing().run()
+    tx.insert(companies)
+      .values({ name, createdAt: date, updatedAt: date })
+      .onConflictDoNothing()
+      .run()
     company = tx
       .select()
       .from(companies)
@@ -140,9 +143,6 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
           rawText,
           capturedAt: date,
           contentHash,
-          parsedAt: input.jobAnalysis ? date : null,
-          parserModel: input.parserModel,
-          parserPromptVersion: input.parserPromptVersion,
         })
         .returning({ id: jobPostings.id })
         .get()
@@ -227,22 +227,11 @@ export function listApplications(filters: Filters): JobCardData[] {
     .orderBy(orderMap[filters.sort])
     .all()
   if (!rows.length) return []
-  const skillRows = db
-    .select({ jobId: jobApplicationsToSkills.jobApplicationId, name: skills.name })
-    .from(jobApplicationsToSkills)
-    .innerJoin(skills, eq(jobApplicationsToSkills.skillId, skills.id))
-    .where(
-      inArray(
-        jobApplicationsToSkills.jobApplicationId,
-        rows.map((row) => row.job.id),
-      ),
-    )
-    .all()
   return rows.map((row) => ({
     ...row.job,
     companyName: row.companyName,
     companyWebsite: row.companyWebsite,
-    skills: skillRows.filter((skill) => skill.jobId === row.job.id).map((skill) => skill.name),
+    skills: [],
   }))
 }
 
@@ -258,13 +247,6 @@ export function getApplication(id: number): JobCardData | null {
     .where(eq(jobApplications.id, id))
     .get()
   if (!row) return null
-  const jobSkills = db
-    .select({ name: skills.name })
-    .from(jobApplicationsToSkills)
-    .innerJoin(skills, eq(jobApplicationsToSkills.skillId, skills.id))
-    .where(eq(jobApplicationsToSkills.jobApplicationId, id))
-    .all()
-    .map((skill) => skill.name)
   const jobPosting = db
     .select()
     .from(jobPostings)
@@ -290,7 +272,7 @@ export function getApplication(id: number): JobCardData | null {
     ...row.job,
     companyName: row.companyName,
     companyWebsite: row.companyWebsite,
-    skills: jobSkills,
+    skills: [],
     contacts: jobContacts,
     jobPosting,
     jobPostingAnalysis,
@@ -301,6 +283,7 @@ export function addContactToApplication(
   applicationId: number,
   input: { name: string; email?: string | null; linkedinUrl?: string | null },
 ) {
+  const date = todayISO()
   return db.transaction((tx) => {
     const application = tx
       .select({ companyId: jobApplications.companyId })
@@ -326,6 +309,8 @@ export function addContactToApplication(
           companyId: application.companyId,
           name: input.name,
           email: input.email ?? null,
+          createdAt: date,
+          updatedAt: date,
           linkedinUrl: input.linkedinUrl ?? null,
         })
         .returning()
@@ -385,14 +370,6 @@ export function exportData() {
       ...application,
       companyName: companyById.get(application.companyId),
     })),
-    applicationSkills: db
-      .select()
-      .from(jobApplicationsToSkills)
-      .all()
-      .map((item) => ({
-        ...item,
-        skillName: skillById.get(item.skillId),
-      })),
     applicationContacts: db
       .select()
       .from(jobApplicationsToContacts)
@@ -544,6 +521,7 @@ export function mergeImport(payload: ImportPayload) {
             name,
             website: nullableText(incoming.website),
             createdAt: textValue(incoming.createdAt) || todayISO(),
+            updatedAt: textValue(incoming.updatedAt) || todayISO(),
           })
           .returning()
           .get()
@@ -652,6 +630,8 @@ export function mergeImport(payload: ImportPayload) {
         name,
         email: nullableText(incoming.email),
         linkedinUrl: nullableText(incoming.linkedinUrl),
+        createdAt: textValue(incoming.createdAt) || todayISO(),
+        updatedAt: textValue(incoming.updatedAt) || todayISO(),
       }
       if (existing) {
         tx.update(contacts).set(values).where(eq(contacts.id, existing.id)).run()
@@ -701,44 +681,6 @@ export function mergeImport(payload: ImportPayload) {
         applicationIds.set(Number(incoming.id), created.id)
       }
     }
-    for (const relation of payload.applicationSkills) {
-      const relationRecord = relation as Record<string, unknown>
-      const applicationId = applicationIds.get(Number(relationRecord.jobApplicationId))
-      const skillId =
-        skillIds.get(Number(relationRecord.skillId)) ??
-        skillsByKey.get(key(relationRecord.skillName))?.id
-      if (applicationId && skillId) {
-        const date = todayISO()
-        const importanceValue = relationRecord.importance
-        const analysisResultValue = relationRecord.analysisResult
-        const userDecisionValue = relationRecord.userDecision
-        const reason = textValue(relationRecord.decisionReason) || null
-        tx.insert(jobApplicationsToSkills)
-          .values({
-            jobApplicationId: applicationId,
-            skillId,
-            rawLabel:
-              textValue(relationRecord.rawLabel) || textValue(relationRecord.skillName) || null,
-            sourceText: textValue(relationRecord.sourceText) || null,
-            importance: controlledValue(skillImportances, importanceValue, 'mentioned'),
-            parserConfidence:
-              typeof relationRecord.parserConfidence === 'number'
-                ? relationRecord.parserConfidence
-                : null,
-            analysisResult: controlledValue(
-              skillMatchResults,
-              analysisResultValue,
-              'not-in-career-data',
-            ),
-            userDecision: controlledValue(skillDecisions, userDecisionValue, 'pending'),
-            decisionReason: reason,
-            createdAt: textValue(relationRecord.createdAt) || date,
-            updatedAt: textValue(relationRecord.updatedAt) || date,
-          })
-          .onConflictDoNothing()
-          .run()
-      }
-    }
     for (const relation of payload.applicationContacts) {
       const applicationId = applicationIds.get(Number(relation.jobApplicationId))
       const contactId = contactIds.get(Number(relation.contactId))
@@ -767,7 +709,10 @@ export function mergeImport(payload: ImportPayload) {
           .values({
             jobApplicationId: applicationId,
             actionDate: textValue(incoming.actionDate),
+            actionType: controlledValue(followUpActionTypes, incoming.actionType, 'other'),
             notes: nullableText(incoming.notes),
+            createdAt: textValue(incoming.createdAt) || todayISO(),
+            updatedAt: textValue(incoming.updatedAt) || todayISO(),
           })
           .run()
     }
@@ -792,7 +737,10 @@ export function mergeImport(payload: ImportPayload) {
             jobApplicationId: applicationId,
             interviewDate: textValue(incoming.interviewDate),
             roundName: textValue(incoming.roundName),
+            roundType: controlledValue(interviewRoundTypes, incoming.roundType, 'other'),
             notes: nullableText(incoming.notes),
+            createdAt: textValue(incoming.createdAt) || todayISO(),
+            updatedAt: textValue(incoming.updatedAt) || todayISO(),
           })
           .run()
     }
@@ -806,9 +754,6 @@ export function mergeImport(payload: ImportPayload) {
         capturedAt: textValue(incoming.capturedAt) || todayISO(),
         contentHash:
           textValue(incoming.contentHash) || createHash('sha256').update(rawText).digest('hex'),
-        parsedAt: nullableText(incoming.parsedAt),
-        parserModel: nullableText(incoming.parserModel),
-        parserPromptVersion: nullableText(incoming.parserPromptVersion),
       }
       const existing = tx
         .select()
@@ -843,24 +788,9 @@ export function mergeImport(payload: ImportPayload) {
         inputHash: nullableText(incoming.inputHash),
         frozenInputJson: nullableText(incoming.frozenInputJson),
         errorMessage: nullableText(incoming.errorMessage),
-        requirements: nullableText(incoming.requirements),
-        responsibilities: nullableText(incoming.responsibilities),
-        painPoints: nullableText(incoming.painPoints),
-        culture: nullableText(incoming.culture),
-        redFlags: nullableText(incoming.redFlags),
-        successMetrics: nullableText(incoming.successMetrics),
-        benefits: nullableText(incoming.benefits),
-        notes: nullableText(incoming.notes),
-        generatedAt: textValue(incoming.generatedAt) || todayISO(),
+        resultJson: nullableText(incoming.resultJson),
         model: nullableText(incoming.model),
         promptVersion: nullableText(incoming.promptVersion),
-        summary: nullableText(incoming.summary),
-        roleType: nullableText(incoming.roleType),
-        advertisedSeniority: nullableText(incoming.advertisedSeniority),
-        practicalSeniority: nullableText(incoming.practicalSeniority),
-        classificationRationale: nullableText(incoming.classificationRationale),
-        functionalEmphasisJson: nullableText(incoming.functionalEmphasisJson),
-        interviewQuestionsJson: nullableText(incoming.interviewQuestionsJson),
         schemaVersion: nullableText(incoming.schemaVersion),
         createdAt: textValue(incoming.createdAt) || todayISO(),
         updatedAt: textValue(incoming.updatedAt) || todayISO(),
@@ -916,8 +846,8 @@ export function mergeImport(payload: ImportPayload) {
         .run()
     }
     for (const incoming of payload.applicationAnalysisRuns) {
-      const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
-      if (!applicationId) continue
+      const jobPostingAnalysisId = analysisIds.get(Number(incoming.jobPostingAnalysisId))
+      if (!jobPostingAnalysisId) continue
       const queueJobId = textValue(incoming.queueJobId) || `analysis-import-${incoming.id}`
       const existing = tx
         .select()
@@ -925,7 +855,7 @@ export function mergeImport(payload: ImportPayload) {
         .where(eq(applicationAnalysisRuns.queueJobId, queueJobId))
         .get()
       const values = {
-        jobApplicationId: applicationId,
+        jobPostingAnalysisId,
         status: controlledValue(runStatuses, incoming.status, 'Completed'),
         queueJobId,
         attempts: Number(incoming.attempts) || 0,
@@ -972,8 +902,10 @@ export function mergeImport(payload: ImportPayload) {
         .run()
     }
     for (const incoming of payload.generationRuns) {
-      const applicationId = applicationIds.get(Number(incoming.jobApplicationId))
-      if (!applicationId) continue
+      const applicationAnalysisRunId = applicationAnalysisRunIds.get(
+        Number(incoming.applicationAnalysisRunId),
+      )
+      if (!applicationAnalysisRunId) continue
       const queueJobId = textValue(incoming.queueJobId) || `generation-import-${incoming.id}`
       const existing = tx
         .select()
@@ -981,7 +913,7 @@ export function mergeImport(payload: ImportPayload) {
         .where(eq(generationRuns.queueJobId, queueJobId))
         .get()
       const values = {
-        jobApplicationId: applicationId,
+        applicationAnalysisRunId,
         status: controlledValue(runStatuses, incoming.status, 'Completed'),
         queueJobId,
         attempts: Number(incoming.attempts) || 0,
@@ -1056,7 +988,7 @@ export function createSkill(name: string) {
 
 export function createCompany(name: string, website?: string | null) {
   db.insert(companies)
-    .values({ name, website: website ?? null, createdAt: todayISO() })
+    .values({ name, website: website ?? null, createdAt: todayISO(), updatedAt: todayISO() })
     .onConflictDoNothing()
     .run()
 }
@@ -1067,8 +999,15 @@ export function createContact(input: {
   email?: string | null
   linkedinUrl?: string | null
 }) {
+  const date = todayISO()
   db.insert(contacts)
-    .values({ ...input, email: input.email ?? null, linkedinUrl: input.linkedinUrl ?? null })
+    .values({
+      ...input,
+      email: input.email ?? null,
+      linkedinUrl: input.linkedinUrl ?? null,
+      createdAt: date,
+      updatedAt: date,
+    })
     .run()
 }
 

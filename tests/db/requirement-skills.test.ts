@@ -16,8 +16,8 @@ import { migratedDatabase } from '../support/sqlite'
 
 function seedPosting(sqlite: Database): { postingId: number; applicationId: number } {
   const company = sqlite
-    .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
-    .get('Example Company', '2026-08-28') as { id: number }
+    .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
+    .get('Example Company', '2026-08-28', '2026-08-28') as { id: number }
   const application = sqlite
     .query(
       `INSERT INTO job_applications (
@@ -37,9 +37,9 @@ function seedPosting(sqlite: Database): { postingId: number; applicationId: numb
 function seedAnalysis(sqlite: Database, postingId: number): number {
   const analysis = sqlite
     .query(
-      'INSERT INTO job_posting_analyses (job_posting_id, generated_at) VALUES (?, ?) RETURNING id',
+      'INSERT INTO job_posting_analyses (job_posting_id, created_at, updated_at) VALUES (?, ?, ?) RETURNING id',
     )
-    .get(postingId, '2026-08-28') as { id: number }
+    .get(postingId, '2026-08-28', '2026-08-28') as { id: number }
   return analysis.id
 }
 
@@ -287,12 +287,12 @@ describe('canonical requirement-skill persistence', () => {
       const mappings = listRequirementSkillMappings(run.id, db)
       expect(mappings).toHaveLength(1)
 
-      const applicationSkills = sqlite
-        .query(
-          'SELECT count(*) AS count FROM job_applications_to_skills WHERE job_application_id = ?',
-        )
-        .get(applicationId) as { count: number }
-      expect(applicationSkills.count).toBe(0)
+      // The legacy application-skill table no longer exists.
+      const tables = sqlite
+        .query("SELECT name FROM sqlite_master WHERE type = 'table'")
+        .all()
+        .map((row) => String((row as { name: string }).name))
+      expect(tables).not.toContain('job_applications_to_skills')
       expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
     } finally {
       sqlite.close()

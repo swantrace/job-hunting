@@ -70,7 +70,7 @@ describe('evidence selection snapshots', () => {
       application: { id: 7, direction: 'fullstack', jobTitle: 'Full-Stack Developer' },
       skills: conditionalSkill ? [conditionalSkill] : [],
       analysis: { requirements: conditionalSkill ?? '' },
-    } as GenerationSource)
+    } as unknown as GenerationSource)
     expect(snapshot.selection.experienceIds).toEqual(profile.experienceSelection.priorityOrder)
     expect(snapshot.selection.achievementIds).toEqual(
       profile.preferredAchievementIds.filter(

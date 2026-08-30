@@ -48,7 +48,6 @@ export type GenerationSource = {
 }
 
 export type CreateGenerationRunInput = {
-  jobApplicationId: number
   applicationAnalysisRunId: number
   inputHash: string
   frozenInputJson: string
@@ -59,17 +58,10 @@ export type CreateGenerationRunInput = {
 }
 
 export function createGenerationRun(input: CreateGenerationRunInput) {
-  const application = db
-    .select({ id: jobApplications.id })
-    .from(jobApplications)
-    .where(eq(jobApplications.id, input.jobApplicationId))
-    .get()
-  if (!application) return null
   const date = todayISO()
   return db
     .insert(generationRuns)
     .values({
-      jobApplicationId: input.jobApplicationId,
       applicationAnalysisRunId: input.applicationAnalysisRunId,
       queueJobId: `generation-${crypto.randomUUID()}`,
       status: 'Queued',
@@ -201,18 +193,14 @@ export function listQueuedBaselineGenerationRuns() {
     .all()
 }
 
-export function saveBaselineGenerationEvidenceSnapshot(
-  runId: number,
-  snapshotJson: string,
-  filePath: string,
-) {
+export function saveBaselineGenerationEvidenceSnapshot(runId: number, snapshotJson: string) {
   const date = todayISO()
   return db
     .insert(baselineGenerationEvidenceSnapshots)
-    .values({ baselineGenerationRunId: runId, snapshotJson, filePath, createdAt: date })
+    .values({ baselineGenerationRunId: runId, snapshotJson, createdAt: date })
     .onConflictDoUpdate({
       target: baselineGenerationEvidenceSnapshots.baselineGenerationRunId,
-      set: { snapshotJson, filePath, createdAt: date },
+      set: { snapshotJson, createdAt: date },
     })
     .run()
 }
@@ -288,11 +276,21 @@ export function getBaselineArtifact(id: number) {
 
 export function listGenerationRuns(jobApplicationId: number): GenerationRunWithArtifacts[] {
   const runs = db
-    .select()
+    .select({ run: generationRuns })
     .from(generationRuns)
-    .where(eq(generationRuns.jobApplicationId, jobApplicationId))
+    .innerJoin(
+      applicationAnalysisRuns,
+      eq(generationRuns.applicationAnalysisRunId, applicationAnalysisRuns.id),
+    )
+    .innerJoin(
+      jobPostingAnalyses,
+      eq(applicationAnalysisRuns.jobPostingAnalysisId, jobPostingAnalyses.id),
+    )
+    .innerJoin(jobPostings, eq(jobPostingAnalyses.jobPostingId, jobPostings.id))
+    .where(eq(jobPostings.jobApplicationId, jobApplicationId))
     .orderBy(desc(generationRuns.id))
     .all()
+    .map((row) => row.run)
   if (!runs.length) return []
   const artifacts = db
     .select()
@@ -323,18 +321,14 @@ export function getGenerationRun(runId: number) {
   return db.select().from(generationRuns).where(eq(generationRuns.id, runId)).get() ?? null
 }
 
-export function saveGenerationEvidenceSnapshot(
-  runId: number,
-  snapshotJson: string,
-  filePath: string,
-) {
+export function saveGenerationEvidenceSnapshot(runId: number, snapshotJson: string) {
   const date = todayISO()
   return db
     .insert(generationEvidenceSnapshots)
-    .values({ generationRunId: runId, snapshotJson, filePath, createdAt: date })
+    .values({ generationRunId: runId, snapshotJson, createdAt: date })
     .onConflictDoUpdate({
       target: generationEvidenceSnapshots.generationRunId,
-      set: { snapshotJson, filePath, createdAt: date },
+      set: { snapshotJson, createdAt: date },
     })
     .run()
 }
@@ -526,6 +520,15 @@ export function generationRunBelongsToApplication(runId: number, jobApplicationI
   return !!db
     .select({ id: generationRuns.id })
     .from(generationRuns)
-    .where(and(eq(generationRuns.id, runId), eq(generationRuns.jobApplicationId, jobApplicationId)))
+    .innerJoin(
+      applicationAnalysisRuns,
+      eq(generationRuns.applicationAnalysisRunId, applicationAnalysisRuns.id),
+    )
+    .innerJoin(
+      jobPostingAnalyses,
+      eq(applicationAnalysisRuns.jobPostingAnalysisId, jobPostingAnalyses.id),
+    )
+    .innerJoin(jobPostings, eq(jobPostingAnalyses.jobPostingId, jobPostings.id))
+    .where(and(eq(generationRuns.id, runId), eq(jobPostings.jobApplicationId, jobApplicationId)))
     .get()
 }

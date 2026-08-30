@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import { persistJobRequirements } from '../../src/db/job-analysis'
+import { migrationFolderUpTo } from '../db/support/migrations'
 import { migratedDatabase } from '../support/sqlite'
 
 function createBaselineMigrationFolder(lastMigrationIndex: number) {
@@ -95,14 +96,11 @@ describe('structured job requirements migration', () => {
         name: string
       }>
       for (const name of [
-        'summary',
-        'role_type',
-        'advertised_seniority',
-        'practical_seniority',
-        'classification_rationale',
-        'functional_emphasis_json',
-        'interview_questions_json',
+        'result_json',
         'schema_version',
+        'status',
+        'input_hash',
+        'frozen_input_json',
       ]) {
         expect(analysisColumns.some((column) => column.name === name)).toBe(true)
       }
@@ -118,7 +116,7 @@ describe('structured job requirements migration', () => {
     migrate(drizzle({ client: sqlite }), { migrationsFolder: baselineFolder })
     try {
       seedLegacyAnalysis(sqlite)
-      migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
+      migrate(drizzle({ client: sqlite }), { migrationsFolder: migrationFolderUpTo(20) })
 
       const rows = sqlite
         .query(
@@ -147,8 +145,8 @@ describe('structured job requirements migration', () => {
     const db = drizzle({ client: sqlite })
     try {
       const company = sqlite
-        .query('INSERT INTO companies (name, created_at) VALUES (?, ?) RETURNING id')
-        .get('Example Company', '2026-08-28') as { id: number }
+        .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
+        .get('Example Company', '2026-08-28', '2026-08-28') as { id: number }
       const application = sqlite
         .query(
           `INSERT INTO job_applications (
@@ -174,10 +172,10 @@ describe('structured job requirements migration', () => {
         .get(application.id, 'A job post', '2026-08-28', 'hash') as { id: number }
       const analysis = sqlite
         .query(
-          `INSERT INTO job_posting_analyses (job_posting_id, generated_at)
-           VALUES (?, ?) RETURNING id`,
+          `INSERT INTO job_posting_analyses (job_posting_id, created_at, updated_at)
+           VALUES (?, ?, ?) RETURNING id`,
         )
-        .get(posting.id, '2026-08-28') as { id: number }
+        .get(posting.id, '2026-08-28', '2026-08-28') as { id: number }
 
       persistJobRequirements(
         db,
@@ -257,16 +255,15 @@ describe('structured job requirements migration', () => {
       const columns = sqlite.query("PRAGMA table_info('generation_run_results')").all() as Array<{
         name: string
         type: string
+        pk: number
       }>
       for (const column of columns) {
         if (column.name.endsWith('_at')) expect(column.type.toUpperCase()).toBe('TEXT')
       }
-
-      const indexes = sqlite.query("PRAGMA index_list('generation_run_results')").all() as Array<{
-        name: string
-        unique: number
-      }>
-      expect(indexes.some((index) => index.unique === 1)).toBe(true)
+      // The run id is the one-to-one primary key.
+      expect(columns.some((column) => column.name === 'generation_run_id' && column.pk === 1)).toBe(
+        true,
+      )
     } finally {
       sqlite.close()
     }
