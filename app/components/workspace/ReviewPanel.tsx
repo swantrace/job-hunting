@@ -2,6 +2,7 @@ import type { ApplicationAnalysisRun } from '../../../src/db/analysis'
 import type { JobRequirement } from '../../../src/db/job-analysis'
 import type { Filters, JobCardData } from '../../../src/db/queries'
 import type { RunSkillReview } from '../../../src/db/skill-queries'
+import type { ApplicationReadiness } from '../../../src/lib/application-readiness'
 import type { CandidateAnalysisState } from '../../../src/lib/candidate-analysis'
 import type { ProfileOption } from '../../../src/lib/profiles'
 import { reviewGateCopy } from '../../../src/lib/workspace/state'
@@ -11,6 +12,7 @@ import { query } from './helpers'
 import { JobAnalysisSummary } from './JobAnalysisSummary'
 import { ProfileRecommendation } from './ProfileRecommendation'
 import { RequirementEvidenceMatrix } from './RequirementEvidenceMatrix'
+import { ReviewReadiness } from './ReviewReadiness'
 import { SkillGapPanel } from './SkillGapPanel'
 
 export function ReviewPanel({
@@ -21,6 +23,7 @@ export function ReviewPanel({
   state,
   jobRequirements,
   profiles,
+  readiness,
 }: {
   job: JobCardData
   filters: Filters
@@ -29,13 +32,11 @@ export function ReviewPanel({
   state: CandidateAnalysisState
   jobRequirements: JobRequirement[]
   profiles: ProfileOption[]
+  readiness: ApplicationReadiness
 }) {
   const copy = reviewGateCopy(state.state)
   const displayRun = state.latestCompleted
   const canAct = state.state === 'current' && !!state.currentCompleted
-  const pendingCount = requirements.filter(
-    (item) => item.analysisResult === 'not-in-career-data' && item.decision === 'pending',
-  ).length
 
   return (
     <div class="space-y-4">
@@ -84,22 +85,7 @@ export function ReviewPanel({
         careerEvidence={careerEvidence}
         canDecide={canAct}
       />
-      <section id="requirement-readiness" class="rounded-box border border-base-300 p-4">
-        <h3 class="font-semibold">Document readiness</h3>
-        {!canAct ? (
-          <p class="mt-2 text-sm text-base-content/60">
-            {copy.message} Re-run to refresh before generating documents.
-          </p>
-        ) : pendingCount > 0 ? (
-          <p class="mt-2 text-sm text-base-content/60">
-            {pendingCount} skill decision{pendingCount === 1 ? '' : 's'} still pending.
-          </p>
-        ) : (
-          <p class="mt-2 text-sm">
-            <span class="badge badge-success">Ready</span> for document generation.
-          </p>
-        )}
-      </section>
+      <ReviewReadiness jobId={job.id} filters={filters} readiness={readiness} />
     </div>
   )
 }

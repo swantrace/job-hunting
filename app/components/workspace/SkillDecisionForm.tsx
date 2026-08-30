@@ -16,72 +16,122 @@ export function SkillDecisionForm({
   canDecide?: boolean
 }) {
   const decided = requirement.decision === 'skip' || requirement.decision === 'include'
+  const modalId = `include-skill-modal-${requirement.skillId}`
   if (decided && !error) {
     return (
-      <div id={`skill-decision-${requirement.skillId}`} class="text-right">
-        <span
-          class={`badge ${requirement.decision === 'include' ? 'badge-primary' : 'badge-neutral'}`}
-        >
-          {requirement.decision === 'include' ? 'Included' : 'Skipped'}
-        </span>
+      <div id={`skill-decision-${requirement.skillId}`} class="contents">
+        <div class="col-start-2 row-start-1 self-start justify-self-end">
+          <span
+            class={`badge whitespace-nowrap ${requirement.decision === 'include' ? 'badge-primary' : 'badge-neutral'}`}
+          >
+            {requirement.decision === 'include' ? 'Included' : 'Skipped'}
+          </span>
+        </div>
         {requirement.decisionReason ? (
-          <p class="mt-1 max-w-xs text-xs text-base-content/60">“{requirement.decisionReason}”</p>
+          <p class="col-span-2 row-start-2 text-left text-xs text-base-content/60">
+            Reason: “{requirement.decisionReason}”
+          </p>
         ) : null}
       </div>
     )
   }
   return (
-    <form
-      id={`skill-decision-${requirement.skillId}`}
-      hx-post={`/applications/${job.id}/skill-decisions?${query(filters)}`}
-      hx-target="#skill-review-panel"
-      hx-swap="outerHTML"
-      hx-disabled-elt="find button"
-      novalidate
-    >
-      <input type="hidden" name="skillId" value={requirement.skillId} />
-      <div class="flex flex-wrap items-center justify-end gap-2">
-        <button name="action" value="skip" class="btn btn-ghost btn-sm" disabled={!canDecide}>
-          Skip
+    <div id={`skill-decision-${requirement.skillId}`} class="contents">
+      <div class="col-start-2 row-start-1 flex flex-wrap items-center justify-end gap-2 self-start">
+        <form
+          hx-post={`/applications/${job.id}/skill-decisions?${query(filters)}`}
+          hx-target="#skill-review-panel"
+          hx-swap="outerHTML"
+          hx-disabled-elt="find button"
+        >
+          <input type="hidden" name="skillId" value={requirement.skillId} />
+          <input type="hidden" name="action" value="skip" />
+          <button type="submit" class="btn btn-ghost btn-sm" disabled={!canDecide}>
+            Skip
+          </button>
+        </form>
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          popovertarget={modalId}
+          disabled={!canDecide}
+        >
+          Include
         </button>
-        <details class="dropdown dropdown-end">
-          <summary class="btn btn-outline btn-sm" tabindex={canDecide ? 0 : -1}>
-            Include for this application
-          </summary>
-          <div class="dropdown-content z-30 mt-2 w-80 rounded-box border border-base-300 bg-base-100 p-3 shadow-lg">
-            <label class="label" for={`include-reason-${requirement.skillId}`}>
-              <span>
-                Why can this skill be used? <span class="text-error">*</span>
-              </span>
-            </label>
-            <textarea
-              id={`include-reason-${requirement.skillId}`}
-              name="reason"
-              rows={3}
-              class="textarea textarea-sm w-full"
-              placeholder="e.g. Used this in a personal prototype with retry handling."
-            />
-            <button
-              name="action"
-              value="include"
-              class="btn btn-primary btn-sm mt-2 w-full"
-              disabled={!canDecide}
+        <div id={modalId} class="modal" popover="auto">
+          <div class="modal-box">
+            <h3 class="text-lg font-bold">Include {requirement.skillName}</h3>
+            <p class="mt-1 text-sm text-base-content/60">
+              Explain why this skill can be claimed for this application. This reason will be
+              available to resume and cover-letter generation.
+            </p>
+            <form
+              class="mt-4"
+              hx-post={`/applications/${job.id}/skill-decisions?${query(filters)}`}
+              hx-target="#skill-review-panel"
+              hx-swap="outerHTML"
+              hx-disabled-elt="find button"
             >
-              Include
+              <input type="hidden" name="skillId" value={requirement.skillId} />
+              <input type="hidden" name="action" value="include" />
+              <fieldset class="fieldset">
+                <legend class="fieldset-legend">
+                  Reason <span class="text-error">*</span>
+                </legend>
+                <textarea
+                  id={`include-reason-${requirement.skillId}`}
+                  name="reason"
+                  rows={4}
+                  class={`textarea w-full ${error ? 'textarea-error' : ''}`}
+                  placeholder="e.g. Used this in a personal prototype with retry handling."
+                  required
+                  aria-describedby={
+                    error ? `include-reason-error-${requirement.skillId}` : undefined
+                  }
+                  aria-invalid={error ? 'true' : 'false'}
+                />
+                {error ? (
+                  <p
+                    id={`include-reason-error-${requirement.skillId}`}
+                    role="alert"
+                    class="label text-error"
+                  >
+                    {error}
+                  </p>
+                ) : null}
+              </fieldset>
+              <div class="modal-action">
+                <button
+                  type="button"
+                  class="btn"
+                  popovertarget={modalId}
+                  popovertargetaction="hide"
+                >
+                  Cancel
+                </button>
+                <button type="submit" class="btn btn-primary" disabled={!canDecide}>
+                  Include
+                </button>
+              </div>
+            </form>
+          </div>
+          <div class="modal-backdrop">
+            <button
+              type="button"
+              popovertarget={modalId}
+              popovertargetaction="hide"
+              aria-label="Close Include dialog"
+            >
+              Close
             </button>
           </div>
-        </details>
+        </div>
       </div>
       {!canDecide ? (
-        <p class="mt-1 text-xs text-base-content/60">
+        <p class="col-span-2 row-start-2 text-left text-xs text-base-content/60">
           Re-run candidate analysis to update decisions.
         </p>
       ) : null}
-      {error ? (
-        <p role="alert" class="mt-2 text-sm text-error">
-          {error}
-        </p>
-      ) : null}
-    </form>
+    </div>
   )
 }

@@ -130,10 +130,10 @@ export function GenerationPanel({
         </div>
       ) : (
         <div class="mt-4 flex items-center justify-between gap-3 rounded-box bg-base-200 p-3 text-sm">
-          <span>Google Drive is connected.</span>
-          <a class="btn btn-ghost btn-sm" href="/auth/google/start">
-            Reconnect Drive
-          </a>
+          <span class="flex items-center gap-2">
+            <span class="badge badge-success">Connected</span>
+            <span>Google Drive is connected.</span>
+          </span>
         </div>
       )}
       {latest && latest.id !== usableCompleted?.id ? (

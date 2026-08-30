@@ -6,12 +6,17 @@ import {
 import type { Filters } from '../../../../src/db/queries'
 import { getApplication, type JobCardData } from '../../../../src/db/queries'
 import { listRunSkillReviews } from '../../../../src/db/skill-queries'
+import { getApplicationReadiness } from '../../../../src/lib/application-readiness'
 import { getCandidateAnalysisState } from '../../../../src/lib/candidate-analysis'
 import { careerSkillEvidenceMap } from '../../../../src/lib/career-data'
 import { parseFilters, parseForm, parseId } from '../../../../src/lib/request'
 import { skillDecisionSchema } from '../../../../src/lib/validation'
+import { computeWorkspaceAvailability } from '../../../../src/lib/workspace/availability'
+import { tabAvailability } from '../../../../src/lib/workspace/state'
+import { ReviewReadiness } from '../../../components/workspace/ReviewReadiness'
 import { SkillDecisionForm } from '../../../components/workspace/SkillDecisionForm'
 import { SkillGapPanel } from '../../../components/workspace/SkillGapPanel'
+import { WorkspaceTabs } from '../../../components/workspace/WorkspaceTabs'
 
 function reviewPanel(job: JobCardData, filters: Filters, runId: number) {
   return (
@@ -21,6 +26,25 @@ function reviewPanel(job: JobCardData, filters: Filters, runId: number) {
       requirements={listRunSkillReviews(runId)}
       careerEvidence={careerSkillEvidenceMap()}
     />
+  )
+}
+
+function completedDecisionFragments(job: JobCardData, filters: Filters, runId: number) {
+  return (
+    <>
+      {reviewPanel(job, filters, runId)}
+      <WorkspaceTabs
+        activeTab="review"
+        availability={tabAvailability(computeWorkspaceAvailability(job.id))}
+        oob
+      />
+      <ReviewReadiness
+        jobId={job.id}
+        filters={filters}
+        readiness={getApplicationReadiness(job.id)}
+        oob
+      />
+    </>
   )
 }
 
@@ -43,7 +67,7 @@ export const POST = createRoute(async (c) => {
   const raw = await parseForm(c)
   if (raw.action === 'skip-remaining') {
     skipRemainingRunDecisions(runId)
-    return c.html(reviewPanel(job, filters, runId))
+    return c.html(completedDecisionFragments(job, filters, runId))
   }
 
   const skillId = Number(raw.skillId)
@@ -68,5 +92,5 @@ export const POST = createRoute(async (c) => {
   const decision = parsed.data.action
   const reason = parsed.data.reason.trim() || null
   decideRunSkill({ runId, skillId, decision, reason })
-  return c.html(reviewPanel(job, filters, runId))
+  return c.html(completedDecisionFragments(job, filters, runId))
 })

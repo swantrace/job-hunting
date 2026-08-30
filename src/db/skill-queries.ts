@@ -9,6 +9,7 @@ import type {
 } from '../lib/skills/constants'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
 import type { SkillCategory } from '../lib/skills/taxonomy'
+import { jobPostingAnalysisIdForCandidateRun } from './analysis-lineage'
 import { db } from './client'
 import {
   analysisRunDecisions,
@@ -224,13 +225,9 @@ export type RunSkillReview = RequirementSkillMapping & {
  * career-skill link; decisions belong only to the referenced run.
  */
 export function listRunSkillReviews(runId: number, executor: DbExecutor = db): RunSkillReview[] {
-  const run = executor
-    .select({ jobPostingAnalysisId: jobPostingAnalyses.id })
-    .from(jobPostingAnalyses)
-    .where(eq(jobPostingAnalyses.id, runId))
-    .get()
-  if (!run) return []
-  const mappings = listRequirementSkillMappings(run.jobPostingAnalysisId, executor)
+  const jobPostingAnalysisId = jobPostingAnalysisIdForCandidateRun(runId, executor)
+  if (jobPostingAnalysisId === null) return []
+  const mappings = listRequirementSkillMappings(jobPostingAnalysisId, executor)
   if (!mappings.length) return []
   const skillIds = [...new Set(mappings.map((mapping) => mapping.skillId))]
   const aliasRows = executor

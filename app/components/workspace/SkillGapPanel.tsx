@@ -126,8 +126,8 @@ export function SkillGapPanel({
                 <ul class="space-y-2">
                   {group.items.map((requirement) => (
                     <li class="rounded-box border border-base-300 p-3">
-                      <div class="flex flex-wrap items-center justify-between gap-2">
-                        <div>
+                      <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2">
+                        <div class="col-start-1 row-start-1 min-w-0">
                           <p class="font-medium">{requirement.skillName}</p>
                           <p class="text-xs text-base-content/60">
                             Importance: {requirement.importance}
@@ -177,14 +177,16 @@ function ProvenMatch({
   evidence: string[]
 }) {
   return (
-    <div class="text-right">
-      <span class="badge badge-success">Proven match</span>
-      {careerSkillId && (
-        <p class="mt-1 text-xs text-base-content/60">Linked to career skill “{careerSkillId}”</p>
-      )}
-      {evidence.length > 0 && (
-        <p class="mt-1 max-w-xs text-xs text-base-content/60">Evidence: {evidence.join(', ')}</p>
-      )}
+    <div class="contents">
+      <div class="col-start-2 row-start-1 self-start justify-self-end">
+        <span class="badge badge-success whitespace-nowrap">Proven match</span>
+      </div>
+      {careerSkillId || evidence.length > 0 ? (
+        <div class="col-span-2 row-start-2 space-y-1 text-left text-xs text-base-content/60">
+          {careerSkillId && <p>Linked to career skill “{careerSkillId}”</p>}
+          {evidence.length > 0 && <p>Evidence: {evidence.join(', ')}</p>}
+        </div>
+      ) : null}
     </div>
   )
 }

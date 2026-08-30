@@ -90,6 +90,7 @@ export function WorkspaceShell({
           state={review.state}
           jobRequirements={review.requirements}
           profiles={review.profiles}
+          readiness={readiness}
         />
       </div>
     </div>

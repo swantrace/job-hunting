@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
+import { jobPostingAnalysisIdForCandidateRun } from '../../src/db/analysis-lineage'
 import { persistJobRequirements } from '../../src/db/job-analysis'
 import { listRequirementSkillMappings } from '../../src/db/skill-queries'
 import { skillDecisionSchema } from '../../src/lib/validation'
@@ -61,6 +62,52 @@ describe('canonical requirement-skill persistence', () => {
       const mappings = listRequirementSkillMappings(analysisId, db)
       expect(mappings).toHaveLength(1)
       expect(mappings[0].skillName).toBe('React')
+    } finally {
+      sqlite.close()
+    }
+  })
+
+  test('resolves the exact Job Analysis through candidate-run lineage when IDs differ', () => {
+    const { sqlite, db } = database()
+    try {
+      const jobPostingAnalysisId = seedAnalysis(sqlite)
+      persistJobRequirements(
+        db,
+        jobPostingAnalysisId,
+        [
+          {
+            type: 'skill',
+            importance: 'required',
+            basis: 'explicit',
+            statement: 'React experience.',
+            sourceText: 'React experience',
+            inferenceRationale: null,
+            skillReferences: [
+              { rawLabel: 'React', canonicalLabel: 'React', category: 'frontend', confidence: 0.9 },
+            ],
+          },
+        ],
+        '2026-08-28',
+      )
+      sqlite
+        .query(
+          `INSERT INTO application_analysis_runs (
+            job_posting_analysis_id, queue_job_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?)`,
+        )
+        .run(jobPostingAnalysisId, 'candidate-dummy', '2026-08-28', '2026-08-28')
+      const candidateRun = sqlite
+        .query(
+          `INSERT INTO application_analysis_runs (
+            job_posting_analysis_id, queue_job_id, created_at, updated_at
+          ) VALUES (?, ?, ?, ?) RETURNING id`,
+        )
+        .get(jobPostingAnalysisId, 'candidate-current', '2026-08-28', '2026-08-28') as {
+        id: number
+      }
+
+      expect(candidateRun.id).not.toBe(jobPostingAnalysisId)
+      expect(jobPostingAnalysisIdForCandidateRun(candidateRun.id, db)).toBe(jobPostingAnalysisId)
     } finally {
       sqlite.close()
     }
