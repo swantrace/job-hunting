@@ -2,7 +2,12 @@ import { describe, expect, test } from 'bun:test'
 import { Hono } from 'hono'
 import type { JobCardData } from '../../src/db/queries'
 import { recordsFor } from './support/html-contract'
-import { mockEnqueueCandidateAnalysis, mockGetApplication, mockJob } from './support/runtime-mocks'
+import {
+  mockEnqueueCandidateAnalysis,
+  mockGetApplication,
+  mockJob,
+  mockLoadReviewData,
+} from './support/runtime-mocks'
 
 async function analysisRunsHarness() {
   const { POST, GET } = (await import(
@@ -17,6 +22,15 @@ async function analysisRunsHarness() {
 describe('candidate analysis run HTMX boundaries', () => {
   test('rejects with 422 and retargets the status region before a reviewed analysis exists', async () => {
     mockGetApplication.mockReturnValue(mockJob)
+    mockLoadReviewData.mockReturnValue({
+      job: mockJob,
+      jobAnalysis: null,
+      jobAnalysisCurrent: false,
+      run: null,
+      state: { latest: null },
+      requirements: [],
+      profiles: [],
+    })
     mockEnqueueCandidateAnalysis.mockClear()
 
     const response = await (await analysisRunsHarness()).request('/applications/7/analysis-runs', {
@@ -36,6 +50,15 @@ describe('candidate analysis run HTMX boundaries', () => {
       jobPostingAnalysis: { id: 1, schemaVersion: '3.0.0' },
     } as unknown as JobCardData)
     mockEnqueueCandidateAnalysis.mockClear()
+    mockLoadReviewData.mockReturnValue({
+      job: mockJob,
+      jobAnalysis: { id: 1, schemaVersion: '3.0.0' },
+      jobAnalysisCurrent: true,
+      run: null,
+      state: { latest: null },
+      requirements: [],
+      profiles: [],
+    })
 
     const response = await (await analysisRunsHarness()).request('/applications/7/analysis-runs', {
       method: 'POST',
@@ -47,10 +70,28 @@ describe('candidate analysis run HTMX boundaries', () => {
     expect(recordsFor(html, 'analysis-run-status')).toHaveLength(1)
     expect(html).not.toMatch(/<AppShell|<html|<body/)
     mockGetApplication.mockReturnValue(mockJob)
+    mockLoadReviewData.mockReturnValue({
+      job: mockJob,
+      jobAnalysis: null,
+      jobAnalysisCurrent: false,
+      run: null,
+      state: { latest: null },
+      requirements: [],
+      profiles: [],
+    })
   })
 
   test('returns the status fragment for polling without a nested shell', async () => {
     mockGetApplication.mockReturnValue(mockJob)
+    mockLoadReviewData.mockReturnValue({
+      job: mockJob,
+      jobAnalysis: null,
+      jobAnalysisCurrent: false,
+      run: null,
+      state: { latest: null },
+      requirements: [],
+      profiles: [],
+    })
     const response = await (await analysisRunsHarness()).request('/applications/7/analysis-runs', {
       method: 'GET',
     })

@@ -143,6 +143,8 @@ mock.module('../../../src/db/analysis', () => ({
 
 export const mockLoadReviewData = mock((): any => ({
   job: mockJob,
+  jobAnalysis: null,
+  jobAnalysisCurrent: false,
   run: null,
   state: {
     state: 'never-run',

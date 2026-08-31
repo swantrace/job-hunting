@@ -6,12 +6,14 @@ export function AnalysisRunStatus({
   jobId,
   filters,
   run,
-  hasReviewedAnalysis,
+  hasCurrentJobAnalysis,
+  oob = false,
 }: {
   jobId: number
   filters: Filters
   run: ApplicationAnalysisRun | null
-  hasReviewedAnalysis: boolean
+  hasCurrentJobAnalysis: boolean
+  oob?: boolean
 }) {
   const statusClass =
     run?.status === 'Completed'
@@ -27,6 +29,7 @@ export function AnalysisRunStatus({
       id="analysis-run-status"
       class="rounded-box border border-base-300 p-4"
       aria-live="polite"
+      {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
       {...(shouldPoll
         ? {
             'hx-get': `/applications/${jobId}/analysis-runs?${query(filters)}`,
@@ -48,7 +51,7 @@ export function AnalysisRunStatus({
           hx-swap="outerHTML"
           hx-disabled-elt="find button"
         >
-          <button class="btn btn-secondary btn-sm" disabled={!hasReviewedAnalysis}>
+          <button class="btn btn-secondary btn-sm" disabled={!hasCurrentJobAnalysis}>
             <span class="loading loading-spinner loading-xs htmx-indicator" />
             {run?.status === 'Failed'
               ? 'Re-analyze'
@@ -58,7 +61,7 @@ export function AnalysisRunStatus({
           </button>
         </form>
       </div>
-      {!hasReviewedAnalysis ? (
+      {!hasCurrentJobAnalysis ? (
         <div class="alert alert-warning mt-4 text-sm" role="alert">
           <span>Analyze the job post first before running candidate analysis.</span>
         </div>

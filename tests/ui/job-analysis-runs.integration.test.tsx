@@ -22,7 +22,15 @@ async function createHarness() {
 describe('analysis run-status fragment', () => {
   test('returns one self-contained status fragment, never a nested document', async () => {
     mockGetApplication.mockReturnValue(mockJob)
-    mockLoadReviewData.mockReturnValue({ job: mockJob, run: null, requirements: [], profiles: [] })
+    mockLoadReviewData.mockReturnValue({
+      job: mockJob,
+      jobAnalysis: null,
+      jobAnalysisCurrent: false,
+      run: null,
+      state: { latest: null },
+      requirements: [],
+      profiles: [],
+    })
     const response = await (await createHarness()).request('/applications/7/analysis-runs')
     const html = await response.text()
 
@@ -43,6 +51,9 @@ describe('analysis run-status fragment', () => {
       run: { id: 1, status: 'Queued', attempts: 0, errorMessage: null, model: null },
       requirements: [],
       profiles: [],
+      jobAnalysis: null,
+      jobAnalysisCurrent: false,
+      state: { latest: null },
     })
     const response = await (await createHarness()).request(
       '/applications/7/analysis-runs?workspaceTab=review',
@@ -55,7 +66,15 @@ describe('analysis run-status fragment', () => {
 
   test('rejects a forged run against an unreviewed application with a targeted 422', async () => {
     mockGetApplication.mockReturnValue(mockJob)
-    mockLoadReviewData.mockReturnValue({ job: mockJob, run: null, requirements: [], profiles: [] })
+    mockLoadReviewData.mockReturnValue({
+      job: mockJob,
+      jobAnalysis: null,
+      jobAnalysisCurrent: false,
+      run: null,
+      state: { latest: null },
+      requirements: [],
+      profiles: [],
+    })
     const response = await (await createHarness()).request('/applications/7/analysis-runs', {
       method: 'POST',
     })
@@ -91,6 +110,12 @@ describe('job analysis run-status fragment', () => {
     ])
     expect(recordsFor(html, 'workspace-tabs')).toEqual([
       expect.objectContaining({ id: 'workspace-tabs', oob: 'outerHTML' }),
+    ])
+    expect(recordsFor(html, 'analysis-run-status')).toEqual([
+      expect.objectContaining({ id: 'analysis-run-status', oob: 'outerHTML' }),
+    ])
+    expect(recordsFor(html, 'job-analysis-summary')).toEqual([
+      expect.objectContaining({ id: 'job-analysis-summary', oob: 'outerHTML' }),
     ])
     expect(html).not.toMatch(/<AppShell|<html|<body/)
   })

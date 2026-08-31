@@ -1,16 +1,20 @@
 import { createRoute } from 'honox/factory'
 import { getApplication } from '../../../../src/db/queries'
+import { loadReviewData } from '../../../../src/db/review-data'
 import { enqueueJobAnalysis } from '../../../../src/lib/job-analysis-queue'
 import { parseFilters, parseId } from '../../../../src/lib/request'
 import { computeWorkspaceAvailability } from '../../../../src/lib/workspace/availability'
 import { resolveWorkspaceTab, tabAvailability } from '../../../../src/lib/workspace/state'
+import { AnalysisRunStatus } from '../../../components/workspace/AnalysisRunStatus'
 import { JobAnalysisStatus } from '../../../components/workspace/JobAnalysisStatus'
+import { JobAnalysisSummary } from '../../../components/workspace/JobAnalysisSummary'
 import { WorkspaceTabs } from '../../../components/workspace/WorkspaceTabs'
 
 function statusFragment(jobId: number, filters: ReturnType<typeof parseFilters>) {
   const job = getApplication(jobId)
   if (!job) return <div class="alert alert-error">Application not found.</div>
   const availabilityState = computeWorkspaceAvailability(jobId)
+  const review = loadReviewData(jobId)
   return (
     <>
       <JobAnalysisStatus job={job} filters={filters} />
@@ -19,6 +23,14 @@ function statusFragment(jobId: number, filters: ReturnType<typeof parseFilters>)
         availability={tabAvailability(availabilityState)}
         oob
       />
+      <AnalysisRunStatus
+        jobId={jobId}
+        filters={filters}
+        run={review.state.latest}
+        hasCurrentJobAnalysis={review.jobAnalysisCurrent}
+        oob
+      />
+      <JobAnalysisSummary analysis={review.jobAnalysis} oob />
     </>
   )
 }

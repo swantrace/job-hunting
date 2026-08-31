@@ -1,7 +1,9 @@
 import { hasPendingRunDecisions } from '../db/analysis-decisions'
 import { db } from '../db/client'
+import { getJobAnalysisState } from '../db/job-analysis-runs'
 import { getApplication } from '../db/queries'
 import { getCandidateAnalysisState } from './candidate-analysis'
+import { currentJobAnalysisHash } from './job-analysis-input'
 
 export type AnalysisReadinessStatus =
   | 'none'
@@ -52,7 +54,10 @@ export function getApplicationReadiness(jobId: number): ApplicationReadiness {
   const state = getCandidateAnalysisState(jobId)
   const run = state.latest
   const current = state.currentCompleted
-  const hasReviewedAnalysis = !!job?.jobPostingAnalysis?.schemaVersion
+  const jobState = job?.jobPosting
+    ? getJobAnalysisState(db, job.jobPosting.id, currentJobAnalysisHash(db, job.jobPosting.id))
+    : null
+  const hasReviewedAnalysis = !!jobState?.currentCompleted
 
   let analysisStatus: AnalysisReadinessStatus = 'none'
   if (run) {
