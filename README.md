@@ -9,27 +9,34 @@ flowchart LR
   Browser[Browser] <-->|Server-rendered HTML + htmx| App[HonoX application]
   App <--> DB[(SQLite<br/>jobs.db)]
   App <--> Career[Canonical career data<br/>and profiles]
+  App <--> Base[Approved Base Resumes<br/>career-data/base-resumes]
 
-  App --> Queue[Durable async queues<br/>bunqueue.db]
+  App --> Intake[Batch job post intake<br/>https URLs or pasted text]
+  Intake --> Queue[Durable async queues<br/>bunqueue.db]
+
   Queue --> JA[Job analysis]
   Queue --> CA[Candidate analysis]
-  Queue --> DG[Document generation]
+  Queue --> DG[Markdown drafting]
   Queue --> DR[Document review]
 
   JA -->|structured job requirements| LLM[OpenAI API]
   CA -->|fit recommendation + evidence matrix| LLM
-  DG -->|resume + cover letter| LLM
+  DG -->|resume + cover letter Markdown| LLM
   DR -->|read-only quality findings| LLM
 
+  DG --> DOCX[Code-rendered DOCX<br/>validated draft model]
   JA --> DB
   CA --> DB
   DG --> DB
   DR --> DB
-  DG --> Files[Generated DOCX files<br/>and evidence snapshots]
+  DOCX --> Files[Generated DOCX files<br/>and snapshots]
   Files --> Drive[Optional Google Drive]
+  DB --> Growth[Career growth<br/>derived read model]
+  DB --> Gap[Per-application gap report]
 ```
 
-The application persists each requested operation as an append-only run in SQLite before queuing it. In production, all four named queues use embedded Bunqueue and durable state in `QUEUE_FILE_NAME` (normally `/data/bunqueue.db`); at startup the application recovers queued runs. In development, the same jobs run in-process without Bunqueue persistence. The browser never waits for a model response: it polls the persisted run state through htmx. A generated document is a draft, not an approved application artifact: the user reviews it and decides whether to download or upload it.
+The application persists each requested operation as an append-only run in SQLite before queuing it. In production, the named queues use embedded Bunqueue and durable state in `QUEUE_FILE_NAME` (normally `/data/bunqueue.db`); at startup the application recovers queued runs. In development, the same jobs run in-process without Bunqueue persistence. The browser never waits for a model response: it polls the persisted run state through htmx. Document generation drafts Markdown from an approved Base Resume plus complete canonical Career Data (and a reviewed JD when present), validates it deterministically, and renders DOCX in code; a generated document is a draft, not an approved application artifact.
+
 
 ## Career data setup
 
@@ -135,6 +142,24 @@ bun run fly:sync-career-data -- --sync-db career-data/skills.json
 
 The Fly app defaults to `FLY_APP_NAME` and then the `app` value in `fly.toml`. For a single-Machine app, the CLI resolves and starts that Machine before each transfer so Fly auto-stop cannot interrupt a long sync. Use `--app <name>` to override the app; an app with multiple Machines requires `--machine <id>` so every file reaches the same volume. `--sync-db` runs the production taxonomy and career-skill synchronization through `sh -lc` after all uploads succeed. The command requires an authenticated `fly` CLI and an existing `/data` volume.
 
+## Base-grounded document generation
+
+Documents are drafted from an **approved Base Resume** (editorial prior) plus **complete safe canonical Career Data** (factual authority), and a reviewed Job Description when generating for a specific application. The model writes Markdown using a controlled section vocabulary; a safe parser produces a typed document model, deterministic checks report omissions, dates, and unsupported claims, and code renders the DOCX. The renderer owns the title, contact line, and layout — the model never overwrites user-confirmed metadata.
+
+- With a JD: a targeted resume and cover letter grounded in the reviewed JD, resolved Include/Skip decisions, and profile ranking hints. Profiles rank facts; they never hide all other safe career facts.
+- Without a JD (baseline): a reusable direction baseline from the Base Resume and Career Data only. It never invents an employer or claims JD alignment.
+
+Generation freshness covers the Base Resume, Career Data, JD, decisions, profile, prompt, model, and draft/render contract, so prior documents become visibly stale when their true inputs change.
+
+## Batch job post intake
+
+**Import jobs** (`/applications/import`) accepts one `https` URL or one pasted job description per line, preserving input order. URLs are validated before any fetch: `https` only, no credentials, no localhost/private/reserved addresses, bounded redirects/bytes/time, and scripts/styles are stripped. A blocked or failed link keeps its URL and becomes **Needs pasted text** — blank or error HTML is never sent to the model. Successful text is analyzed through the existing Job Analysis, and the created application appears in Review with placeholder metadata for you to confirm. First drafts are generated only for explicitly selected, Documents-ready applications.
+
+## Gap report and Career growth
+
+- **Gap report** (per application): the Review workspace shows each requirement's importance, source excerpt, evidence references, status (`direct`, `transferable`, or `unknown-evidence`), and Include/Skip controls. `unknown-evidence` means Career Data does not verify the requirement; it never claims you lack a skill.
+- **Career growth** (`/career-growth`): a derived read model over active applications, grouped by canonical skill and ranked by application frequency, requirement importance, direction relevance, and retention. It uses neutral labels — *Verify existing evidence*, *Consider learning/project evidence*, and *Low priority* — and never writes a mutable table or modifies private Career Data.
+
 ## How to use the tracker
 
 1. In **Applications**, paste a posting and use **Parse with AI**, or enter the known facts directly in Quick collect.
@@ -142,13 +167,13 @@ The Fly app defaults to `FLY_APP_NAME` and then the `app` value in `fly.toml`. F
 3. Move a role to **Apply Today** when it becomes a task. Complete the application workspace and select **Sent application** after applying.
 4. Record follow-ups and interviews in the workspace. These activities advance the visible pipeline without overwriting a more advanced status.
 5. In **Review**, confirm the recommended profile and resolve every missing skill: **Skip**, or **Include** with a truthful, application-specific reason. This creates the evidence selection used for generation.
-6. In **Documents**, explicitly generate the resume and cover letter. Review the frozen evidence snapshot and DOCX files; optionally request a semantic document review. A generated file is a draft until you decide it is suitable to use.
+6. In **Documents**, explicitly generate the resume and cover letter. Review the reviewed Markdown draft, deterministic warnings, and DOCX files; optionally request a semantic document review. A generated file is a draft until you decide it is suitable to use.
 7. Download approved documents or upload them to Google Drive when it is connected. Existing artifacts and Drive links remain available if a newer run later becomes outdated.
 8. Manage reusable companies, contacts, and skills from their dedicated pages under Career and Network. Export JSON periodically as a backup.
 
 ### Configuration
 
-Copy `.env.example` to `.env` for local development. `OPENAI_API_KEY` is needed only for AI parsing, analysis, and document generation. Google OAuth variables are needed only for optional Drive uploads. `CAREER_DATA_DIR` and `CAREER_PROFILES_DIR` optionally point to the runtime fact directories; local defaults are `career-data` and `profiles`. The skill taxonomy is always loaded from `skill-taxonomy.json` inside `CAREER_DATA_DIR`. Each specialized model variable (`OPENAI_MODEL_JOB_PARSER`, `OPENAI_MODEL_CANDIDATE_FIT`, `OPENAI_MODEL_RESUME`, `OPENAI_MODEL_COVER_LETTER`, `OPENAI_MODEL_DOCUMENT_REVIEW`) falls back to `OPENAI_MODEL_DEFAULT`.
+Copy `.env.example` to `.env` for local development. `OPENAI_API_KEY` is needed only for AI parsing, analysis, and document generation. Google OAuth variables are needed only for optional Drive uploads. `CAREER_DATA_DIR` and `CAREER_PROFILES_DIR` optionally point to the runtime fact directories; local defaults are `career-data` and `profiles`. `CAREER_BASE_RESUMES_DIR` optionally relocates the approved Base Resume Markdown directory; it defaults to `CAREER_DATA_DIR/base-resumes`. The skill taxonomy is always loaded from `skill-taxonomy.json` inside `CAREER_DATA_DIR`. Each specialized model variable (`OPENAI_MODEL_JOB_PARSER`, `OPENAI_MODEL_CANDIDATE_FIT`, `OPENAI_MODEL_RESUME`, `OPENAI_MODEL_COVER_LETTER`, `OPENAI_MODEL_DOCUMENT_REVIEW`) falls back to `OPENAI_MODEL_DEFAULT`.
 
 ### Private deployment authentication
 
