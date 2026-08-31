@@ -15,6 +15,7 @@ import {
   saveGenerationRunResults,
 } from '../db/generation'
 import { getArtifactsRoot } from './artifact-storage'
+import { todayISO } from './date'
 import { type DocumentDraft, parseDocumentDraft } from './document-draft'
 import {
   buildBaselineDocumentDraftSnapshot,
@@ -22,6 +23,10 @@ import {
   type DocumentDraftSnapshot,
 } from './document-draft-input'
 import { extractMetricClaims, validateDocumentDraft } from './document-draft-validation'
+import { renderCoverLetterDocx } from './docx/cover-letter-renderer'
+import { type DocumentIdentity } from './docx/render-common'
+import { renderResumeDocx } from './docx/resume-renderer'
+import { docxRendererVersion } from './docx/styles'
 import type { GeneratedArtifactType } from './generation/constants'
 import { coverLetterModelId, resumeModelId } from './generation-input'
 import { stripMarkdownFence } from './resume-experiment'
@@ -125,9 +130,34 @@ function validateCoverLetterDraft(draft: DocumentDraft, snapshot: DocumentDraftS
   })
 }
 
+function renderIdentity(snapshot: DocumentDraftSnapshot): DocumentIdentity {
+  const candidate = snapshot.careerData.candidate as {
+    identity?: Record<string, unknown>
+    location?: { city?: string; province?: string }
+  }
+  const identity = candidate.identity ?? {}
+  const location = [candidate.location?.city, candidate.location?.province]
+    .filter(Boolean)
+    .join(', ')
+  return {
+    fullName: typeof identity.fullName === 'string' ? identity.fullName : '',
+    email: typeof identity.email === 'string' ? identity.email : null,
+    phone: typeof identity.phone === 'string' ? identity.phone : null,
+    location: location || null,
+    linkedin: typeof identity.linkedin === 'string' ? identity.linkedin : null,
+    github: typeof identity.github === 'string' ? identity.github : null,
+    portfolio: typeof identity.portfolio === 'string' ? identity.portfolio : null,
+  }
+}
+
 async function writeDraftArtifacts(
   directory: string,
-  files: Array<{ name: string; content: string; type: GeneratedArtifactType; mimeType: string }>,
+  files: Array<{
+    name: string
+    content: string | Buffer
+    type: GeneratedArtifactType
+    mimeType: string
+  }>,
 ): Promise<ArtifactOutput[]> {
   const root = getArtifactsRoot()
   await mkdir(resolve(root, directory), { recursive: true })
@@ -144,6 +174,8 @@ async function writeDraftArtifacts(
   }
   return outputs
 }
+
+const docxMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 export async function generateApplicationDrafts(runId: number): Promise<ArtifactOutput[]> {
   const source = getGenerationSource(runId)
@@ -179,8 +211,19 @@ export async function generateApplicationDrafts(runId: number): Promise<Artifact
     resumeMarkdown,
     coverLetterMarkdown,
     draftValidationJson: JSON.stringify(validation),
-    rendererVersion: null,
+    rendererVersion: docxRendererVersion,
   })
+
+  const identity = renderIdentity(snapshot)
+  const [resumeDocx, coverLetterDocx] = await Promise.all([
+    renderResumeDocx(resumeDraft, { identity, targetTitle: source.application.jobTitle }),
+    renderCoverLetterDocx(coverLetterDraft, {
+      identity,
+      company: source.company.name,
+      date: todayISO(),
+      targetTitle: source.application.jobTitle,
+    }),
+  ])
 
   const baseName = `${filenamePart(source.company.name)}-${filenamePart(source.application.jobTitle)}`
   const directory = `run-${runId}`
@@ -192,16 +235,16 @@ export async function generateApplicationDrafts(runId: number): Promise<Artifact
       mimeType: 'application/json',
     },
     {
-      name: `${baseName}-resume.md`,
-      content: `${resumeMarkdown.trim()}\n`,
+      name: `${baseName}-resume.docx`,
+      content: resumeDocx,
       type: 'resume',
-      mimeType: 'text/markdown',
+      mimeType: docxMimeType,
     },
     {
-      name: `${baseName}-cover-letter.md`,
-      content: `${coverLetterMarkdown.trim()}\n`,
+      name: `${baseName}-cover-letter.docx`,
+      content: coverLetterDocx,
       type: 'cover_letter',
-      mimeType: 'text/markdown',
+      mimeType: docxMimeType,
     },
   ])
 }
@@ -227,13 +270,16 @@ export async function generateBaselineDraft(runId: number) {
   saveBaselineGenerationResults(runId, {
     resumeMarkdown,
     draftValidationJson: JSON.stringify(validation),
-    rendererVersion: null,
+    rendererVersion: docxRendererVersion,
   })
 
+  const identity = renderIdentity(snapshot)
+  const resumeDocx = await renderResumeDocx(draft, { identity, targetTitle: run.targetTitle })
+
   const directory = `baseline-run-${runId}`
-  const fileName = `${filenamePart(run.direction)}-${filenamePart(run.targetTitle)}-baseline-resume.md`
+  const fileName = `${filenamePart(run.direction)}-${filenamePart(run.targetTitle)}-baseline-resume.docx`
   const filePath = `${directory}/${fileName}`
   await mkdir(resolve(getArtifactsRoot(), directory), { recursive: true })
-  await writeFile(resolve(getArtifactsRoot(), filePath), `${resumeMarkdown.trim()}\n`)
-  return { fileName, filePath, mimeType: 'text/markdown' }
+  await writeFile(resolve(getArtifactsRoot(), filePath), resumeDocx)
+  return { fileName, filePath, mimeType: docxMimeType }
 }

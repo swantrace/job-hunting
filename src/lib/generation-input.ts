@@ -6,6 +6,7 @@ import { getCandidateAnalysisState } from './candidate-analysis'
 import { canonicalHash } from './canonical-hash'
 import { loadCareerData } from './career-data'
 import { baseResumeIdentity } from './document-draft-input'
+import { docxRendererVersion } from './docx/styles'
 
 export const generationInputVersion = 2
 
@@ -20,6 +21,7 @@ export type GenerationInputParts = {
   baseResumeVersion: string | null
   generationPromptVersion: string
   generationSchemaVersion: string
+  rendererVersion: string
   resumeModel: string
   coverLetterModel: string
 }
@@ -73,6 +75,7 @@ export function buildGenerationInput(jobApplicationId: number) {
     ...baseResumeIdentity(current.confirmedProfileId),
     generationPromptVersion: documentDraftPromptVersion,
     generationSchemaVersion: documentDraftSchemaVersion,
+    rendererVersion: docxRendererVersion,
     resumeModel: resumeModelId(),
     coverLetterModel: coverLetterModelId(),
   }
@@ -99,6 +102,7 @@ function generationSubHashes(snapshot: unknown) {
       promptVersion: record.generationPromptVersion,
       schemaVersion: record.generationSchemaVersion,
     }),
+    renderer: record.rendererVersion,
     models: canonicalHash({
       resumeModel: record.resumeModel,
       coverLetterModel: record.coverLetterModel,
@@ -118,6 +122,7 @@ export function generationStalenessReasons(current: unknown, stored: unknown) {
   if (currentSub.evidenceHash !== storedSub.evidenceHash) reasons.push('career-evidence-changed')
   if (currentSub.baseResume !== storedSub.baseResume) reasons.push('base-resume-changed')
   if (currentSub.contract !== storedSub.contract) reasons.push('generation-contract-changed')
+  if (currentSub.renderer !== storedSub.renderer) reasons.push('renderer-contract-changed')
   if (currentSub.models !== storedSub.models) reasons.push('generation-model-changed')
   return reasons
 }
