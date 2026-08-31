@@ -40,12 +40,15 @@ export function resolveSkillByAlias(tx: DbExecutor, normalizedAlias: string): Sk
 }
 
 /**
- * Resolves a raw skill name to an existing canonical skill by normalized key
- * first and then by normalized alias. Returns undefined when no skill matches.
+ * Resolves a raw skill name to an existing canonical skill by canonical key
+ * first (the immutable `skills.key` is kebab-case via `canonicalSkillKey` or a
+ * career-data id), then by normalized key for legacy rows, then by normalized
+ * alias. Returns undefined when no skill matches.
  */
 export function resolveSkill(tx: DbExecutor, name: string): Skill | undefined {
   const normalized = normalizeSkillAlias(name)
-  return resolveSkillByKey(tx, normalized) ?? resolveSkillByAlias(tx, normalized)
+  const byKey = resolveSkillByKey(tx, canonicalSkillKey(name)) ?? resolveSkillByKey(tx, normalized)
+  return byKey ?? resolveSkillByAlias(tx, normalized)
 }
 
 export function insertSkill(
@@ -98,7 +101,7 @@ export function resolveApprovedSkill(tx: DbExecutor, normalized: string): Skill 
   const byKey = tx
     .select()
     .from(skills)
-    .where(and(eq(skills.key, normalized), eq(skills.reviewStatus, 'approved')))
+    .where(and(eq(skills.key, canonicalSkillKey(normalized)), eq(skills.reviewStatus, 'approved')))
     .get()
   if (byKey) return byKey
   const alias = tx
