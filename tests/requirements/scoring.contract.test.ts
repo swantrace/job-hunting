@@ -11,8 +11,8 @@ describe('deterministic requirement evidence coverage', () => {
     const result = calculateRequirementCoverage([
       { evidenceStatus: 'direct', importance: 'required' },
       { evidenceStatus: 'transferable', importance: 'required' },
-      { evidenceStatus: 'missing', importance: 'preferred' },
-      { evidenceStatus: 'missing', importance: 'mentioned' },
+      { evidenceStatus: 'unknown-evidence', importance: 'preferred' },
+      { evidenceStatus: 'unknown-evidence', importance: 'mentioned' },
     ])
 
     expect(result.directCoverage).toEqual({
@@ -30,7 +30,7 @@ describe('deterministic requirement evidence coverage', () => {
   contractTest('excludes mentioned requirements from the denominator', async () => {
     const { calculateRequirementCoverage } = await import(scorePath)
     const result = calculateRequirementCoverage([
-      { evidenceStatus: 'missing', importance: 'mentioned' },
+      { evidenceStatus: 'unknown-evidence', importance: 'mentioned' },
     ])
 
     expect(result.directCoverage.percentage).toBeNull()
@@ -44,13 +44,35 @@ describe('deterministic requirement evidence coverage', () => {
       const result = calculateRequirementCoverage([
         { evidenceStatus: 'transferable', importance: 'required' },
         { evidenceStatus: 'transferable', importance: 'preferred' },
-        { evidenceStatus: 'missing', importance: 'required' },
+        { evidenceStatus: 'unknown-evidence', importance: 'required' },
       ])
 
       expect(result.directCoverage.matchedWeight).toBe(0)
       expect(result.supportedCoverage.matchedWeight).toBe(4)
       expect(result.supportedCoverage.totalWeight).toBe(7)
       expect(calculateRequirementCoverage([]).directCoverage.percentage).toBeNull()
+    },
+  )
+
+  contractTest(
+    'counts one semantic requirement once regardless of how many skills map to it',
+    async () => {
+      const { requirementCoverageFromAssessments } = (await import(scorePath)) as {
+        requirementCoverageFromAssessments: (
+          assessments: Array<{ jobRequirementId: number; evidenceStatus: string }>,
+          importanceById: ReadonlyMap<number, string>,
+        ) => { directCoverage: { matchedWeight: number; totalWeight: number; percentage: number | null } }
+      }
+      // Two skills map to requirement 41, but the assessment list has exactly
+      // one entry for that requirement, so its weight contributes once.
+      const coverage = requirementCoverageFromAssessments(
+        [{ jobRequirementId: 41, evidenceStatus: 'direct' }],
+        new Map([[41, 'required']]),
+      )
+
+      expect(coverage.directCoverage.matchedWeight).toBe(3)
+      expect(coverage.directCoverage.totalWeight).toBe(3)
+      expect(coverage.directCoverage.percentage).toBe(100)
     },
   )
 })
