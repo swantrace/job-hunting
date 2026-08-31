@@ -1,5 +1,5 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
-import { applicationGenerationSchemaVersion } from '../ai/schemas/application-generation'
+import { documentDraftSchemaVersion } from '../ai/schemas/document-draft'
 import { type AnalysisRunState, classifyAnalysisRunState } from '../lib/analysis-run-state'
 import { todayISO } from '../lib/date'
 import type { GeneratedArtifactType } from '../lib/generation/constants'
@@ -12,6 +12,7 @@ import {
   type BaselineGenerationRun,
   baselineGeneratedArtifacts,
   baselineGenerationEvidenceSnapshots,
+  baselineGenerationResults,
   baselineGenerationRuns,
   companies,
   type GenerationRun,
@@ -112,7 +113,7 @@ export function getGenerationState(jobApplicationId: number): GenerationState {
       schemaVersion: run.schemaVersion,
     })),
     currentInput?.inputHash ?? null,
-    applicationGenerationSchemaVersion,
+    documentDraftSchemaVersion,
   )
   const byId = new Map(runs.map((run) => [run.id, run]))
   const resolve = (id: number | null | undefined) => (id == null ? null : (byId.get(id) ?? null))
@@ -211,6 +212,47 @@ export function getBaselineGenerationEvidenceSnapshot(runId: number) {
       .select()
       .from(baselineGenerationEvidenceSnapshots)
       .where(eq(baselineGenerationEvidenceSnapshots.baselineGenerationRunId, runId))
+      .get() ?? null
+  )
+}
+
+export function saveBaselineGenerationResults(
+  runId: number,
+  results: {
+    resumeMarkdown: string | null
+    draftValidationJson: string | null
+    rendererVersion: string | null
+  },
+) {
+  const date = todayISO()
+  return db
+    .insert(baselineGenerationResults)
+    .values({
+      baselineGenerationRunId: runId,
+      resumeMarkdown: results.resumeMarkdown,
+      draftValidationJson: results.draftValidationJson,
+      rendererVersion: results.rendererVersion,
+      createdAt: date,
+      updatedAt: date,
+    })
+    .onConflictDoUpdate({
+      target: baselineGenerationResults.baselineGenerationRunId,
+      set: {
+        resumeMarkdown: results.resumeMarkdown,
+        draftValidationJson: results.draftValidationJson,
+        rendererVersion: results.rendererVersion,
+        updatedAt: date,
+      },
+    })
+    .run()
+}
+
+export function getBaselineGenerationResults(runId: number) {
+  return (
+    db
+      .select()
+      .from(baselineGenerationResults)
+      .where(eq(baselineGenerationResults.baselineGenerationRunId, runId))
       .get() ?? null
   )
 }
@@ -349,15 +391,39 @@ export function saveGenerationRunResults(
     resumeJson: string | null
     coverLetterJson: string | null
     atsAuditJson: string | null
+    resumeMarkdown?: string | null
+    coverLetterMarkdown?: string | null
+    draftValidationJson?: string | null
+    rendererVersion?: string | null
   },
 ) {
   const date = todayISO()
   return db
     .insert(generationRunResults)
-    .values({ generationRunId: runId, ...results, createdAt: date, updatedAt: date })
+    .values({
+      generationRunId: runId,
+      resumeJson: results.resumeJson,
+      coverLetterJson: results.coverLetterJson,
+      atsAuditJson: results.atsAuditJson,
+      resumeMarkdown: results.resumeMarkdown ?? null,
+      coverLetterMarkdown: results.coverLetterMarkdown ?? null,
+      draftValidationJson: results.draftValidationJson ?? null,
+      rendererVersion: results.rendererVersion ?? null,
+      createdAt: date,
+      updatedAt: date,
+    })
     .onConflictDoUpdate({
       target: generationRunResults.generationRunId,
-      set: { ...results, updatedAt: date },
+      set: {
+        resumeJson: results.resumeJson,
+        coverLetterJson: results.coverLetterJson,
+        atsAuditJson: results.atsAuditJson,
+        resumeMarkdown: results.resumeMarkdown ?? null,
+        coverLetterMarkdown: results.coverLetterMarkdown ?? null,
+        draftValidationJson: results.draftValidationJson ?? null,
+        rendererVersion: results.rendererVersion ?? null,
+        updatedAt: date,
+      },
     })
     .run()
 }

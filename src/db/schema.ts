@@ -484,6 +484,10 @@ export const generationRunResults = sqliteTable(
     resumeJson: text('resume_json'),
     coverLetterJson: text('cover_letter_json'),
     atsAuditJson: text('ats_audit_json'),
+    resumeMarkdown: text('resume_markdown'),
+    coverLetterMarkdown: text('cover_letter_markdown'),
+    draftValidationJson: text('draft_validation_json'),
+    rendererVersion: text('renderer_version'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
@@ -583,6 +587,21 @@ export const baselineGenerationEvidenceSnapshots = sqliteTable(
   (table) => [],
 )
 
+export const baselineGenerationResults = sqliteTable(
+  'baseline_generation_results',
+  {
+    baselineGenerationRunId: integer('baseline_generation_run_id')
+      .primaryKey()
+      .references(() => baselineGenerationRuns.id, { onDelete: 'cascade' }),
+    resumeMarkdown: text('resume_markdown'),
+    draftValidationJson: text('draft_validation_json'),
+    rendererVersion: text('renderer_version'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [],
+)
+
 export const jobApplicationsToContacts = sqliteTable(
   'job_applications_to_contacts',
   {
@@ -648,6 +667,7 @@ export type GenerationRun = typeof generationRuns.$inferSelect
 export type GenerationRunResult = typeof generationRunResults.$inferSelect
 export type DocumentReview = typeof documentReviews.$inferSelect
 export type BaselineGenerationRun = typeof baselineGenerationRuns.$inferSelect
+export type BaselineGenerationResult = typeof baselineGenerationResults.$inferSelect
 export type ApplicationAnalysisRun = typeof applicationAnalysisRuns.$inferSelect
 export type AnalysisRunDecision = typeof analysisRunDecisions.$inferSelect
 export type Skill = typeof skills.$inferSelect

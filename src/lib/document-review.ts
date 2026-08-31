@@ -21,13 +21,13 @@ function buildDocumentReviewInput(generationRunId: number) {
   const run = getGenerationRun(generationRunId)
   if (!run || run.status !== 'Completed') return null
   const results = getGenerationRunResults(generationRunId)
-  if (!results?.resumeJson || !results?.coverLetterJson) return null
+  if (!results?.resumeMarkdown || !results?.coverLetterMarkdown) return null
   const evidence = getGenerationEvidenceSnapshot(generationRunId)
   return {
     generationRunId,
-    resume: JSON.parse(results.resumeJson),
-    coverLetter: JSON.parse(results.coverLetterJson),
-    atsAudit: results.atsAuditJson ? JSON.parse(results.atsAuditJson) : null,
+    resumeMarkdown: results.resumeMarkdown,
+    coverLetterMarkdown: results.coverLetterMarkdown,
+    draftValidation: results.draftValidationJson ? JSON.parse(results.draftValidationJson) : null,
     evidenceSnapshot: evidence ? JSON.parse(evidence.snapshotJson) : null,
   }
 }

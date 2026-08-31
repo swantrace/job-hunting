@@ -1,12 +1,13 @@
-import { applicationGenerationPromptVersion } from '../ai/prompts/application-generation'
-import { applicationGenerationSchemaVersion } from '../ai/schemas/application-generation'
+import { documentDraftPromptVersion } from '../ai/prompts/document-draft'
+import { documentDraftSchemaVersion } from '../ai/schemas/document-draft'
 import { listRunDecisions } from '../db/analysis-decisions'
 import { db } from '../db/client'
 import { getCandidateAnalysisState } from './candidate-analysis'
 import { canonicalHash } from './canonical-hash'
 import { loadCareerData } from './career-data'
+import { baseResumeIdentity } from './document-draft-input'
 
-export const generationInputVersion = 1
+export const generationInputVersion = 2
 
 export type GenerationInputParts = {
   candidateAnalysisRunId: number
@@ -15,6 +16,8 @@ export type GenerationInputParts = {
   decisions: { skillId: number; decision: string }[]
   reasons: { skillId: number; reason: string }[]
   evidenceHash: string
+  baseResumeHash: string | null
+  baseResumeVersion: string | null
   generationPromptVersion: string
   generationSchemaVersion: string
   resumeModel: string
@@ -67,8 +70,9 @@ export function buildGenerationInput(jobApplicationId: number) {
       .filter((decision) => decision.decision === 'include')
       .map((decision) => ({ skillId: decision.skillId, reason: decision.reason ?? '' })),
     evidenceHash: evidenceSourceHash(),
-    generationPromptVersion: applicationGenerationPromptVersion,
-    generationSchemaVersion: applicationGenerationSchemaVersion,
+    ...baseResumeIdentity(current.confirmedProfileId),
+    generationPromptVersion: documentDraftPromptVersion,
+    generationSchemaVersion: documentDraftSchemaVersion,
     resumeModel: resumeModelId(),
     coverLetterModel: coverLetterModelId(),
   }
@@ -87,6 +91,10 @@ function generationSubHashes(snapshot: unknown) {
     confirmedProfileId: record.confirmedProfileId,
     decisions: canonicalHash(record.decisions ?? []),
     evidenceHash: record.evidenceHash,
+    baseResume: canonicalHash({
+      hash: record.baseResumeHash,
+      version: record.baseResumeVersion,
+    }),
     contract: canonicalHash({
       promptVersion: record.generationPromptVersion,
       schemaVersion: record.generationSchemaVersion,
@@ -108,6 +116,7 @@ export function generationStalenessReasons(current: unknown, stored: unknown) {
     reasons.push('profile-selection-changed')
   if (currentSub.decisions !== storedSub.decisions) reasons.push('skill-decisions-changed')
   if (currentSub.evidenceHash !== storedSub.evidenceHash) reasons.push('career-evidence-changed')
+  if (currentSub.baseResume !== storedSub.baseResume) reasons.push('base-resume-changed')
   if (currentSub.contract !== storedSub.contract) reasons.push('generation-contract-changed')
   if (currentSub.models !== storedSub.models) reasons.push('generation-model-changed')
   return reasons

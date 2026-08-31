@@ -169,6 +169,8 @@ export function validateDocumentDraft(
     maxWords?: number
     maxBullets?: number
     today?: string
+    supportedMetrics?: string[]
+    excludedSkills?: string[]
   } = {},
 ): DraftValidationWarning[] {
   return [
@@ -180,5 +182,56 @@ export function validateDocumentDraft(
       salutation: options.salutation,
     }),
     ...validatePageBudget(draft, { maxWords: options.maxWords, maxBullets: options.maxBullets }),
+    ...validateMetricProvenance(draft, options.supportedMetrics ?? []),
+    ...validateExcludedSkills(draft, options.excludedSkills ?? []),
   ]
+}
+
+const metricClaimPattern =
+  /(?:USD|CAD|EUR|GBP|\$)\s?\d[\d,.]*|\d+(?:\.\d+)?\s?(?:%|percent|per cent|hours|days|weeks|months|years|users|requests|ms|seconds|minutes)\b/gi
+
+/** Extracts deterministic metric-like claims (currency, percentage, or unit counts). */
+export function extractMetricClaims(text: string): string[] {
+  return [...new Set((text.match(metricClaimPattern) ?? []).map(normalizeForComparison))]
+}
+
+/**
+ * Flags metric claims that do not trace to the supplied source wording. This is
+ * advisory provenance: a metric must appear in the Base Resume or canonical
+ * Career Data before it may appear in a draft.
+ */
+export function validateMetricProvenance(
+  draft: DocumentDraft,
+  supportedMetrics: string[],
+): DraftValidationWarning[] {
+  const supported = new Set(supportedMetrics.map(normalizeForComparison))
+  const warnings: DraftValidationWarning[] = []
+  for (const claim of extractMetricClaims(collectDraftText(draft)))
+    if (!supported.has(claim))
+      warnings.push({
+        code: 'unsupported-metric',
+        message: `The document claims "${claim}", which is not in the supplied source data.`,
+      })
+  return warnings
+}
+
+/**
+ * Flags any excluded (skipped or pending) skill name that reappears in the
+ * draft. The model must never mention a skill the user did not Include.
+ */
+export function validateExcludedSkills(
+  draft: DocumentDraft,
+  excludedSkills: string[],
+): DraftValidationWarning[] {
+  const text = normalizeForComparison(collectDraftText(draft))
+  const warnings: DraftValidationWarning[] = []
+  for (const skill of excludedSkills) {
+    const needle = normalizeForComparison(skill)
+    if (needle && text.includes(needle))
+      warnings.push({
+        code: 'excluded-skill-mentioned',
+        message: `The document mentions the excluded skill "${skill}".`,
+      })
+  }
+  return warnings
 }

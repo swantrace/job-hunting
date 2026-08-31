@@ -68,6 +68,14 @@ describe('generation staleness reason codes', () => {
     const reasons = generationStalenessReasons(snapshot(), snapshot({ resumeModel: 'gpt-5.7' }))
     expect(reasons).toContain('generation-model-changed')
   })
+
+  test('detects Base Resume identity changes', () => {
+    const reasons = generationStalenessReasons(
+      snapshot({ baseResumeHash: 'hash-a', baseResumeVersion: 'v1' }),
+      snapshot({ baseResumeHash: 'hash-b', baseResumeVersion: 'v2' }),
+    )
+    expect(reasons).toContain('base-resume-changed')
+  })
 })
 
 describe('generation input identity migration', () => {

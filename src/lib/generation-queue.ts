@@ -59,15 +59,13 @@ async function processGeneration(
   if (!run) return { runId }
   if (run.status === 'Completed') return { runId: run.id }
   markGenerationRunProcessing(run.id)
-  await updateProgress(10, 'Preparing structured job context')
+  await updateProgress(10, 'Preparing base-grounded draft input')
   try {
     const source = getGenerationSource(run.id)
     if (!source) throw new Error('Generation source no longer exists.')
-    const { persistEvidenceSelectionSnapshot } = await import('./evidence-selection')
-    await persistEvidenceSelectionSnapshot(source)
-    const { generateApplicationArtifacts } = await import('./generation')
-    const artifacts = await generateApplicationArtifacts(run.id)
-    await updateProgress(95, 'Saving generated documents')
+    const { generateApplicationDrafts } = await import('./document-draft-generation')
+    const artifacts = await generateApplicationDrafts(run.id)
+    await updateProgress(95, 'Saving generated drafts')
     completeGenerationRun(run.id, artifacts)
     const { uploadArtifactToGoogleDrive } = await import('./google-drive')
     const savedArtifacts =
@@ -94,10 +92,8 @@ async function processBaselineGeneration(runId: number) {
   if (!run || run.status === 'Completed') return
   markBaselineGenerationRunProcessing(runId)
   try {
-    const { persistBaselineEvidenceSelectionSnapshot } = await import('./evidence-selection')
-    await persistBaselineEvidenceSelectionSnapshot(runId)
-    const { generateBaselineResume } = await import('./generation')
-    completeBaselineGenerationRun(runId, await generateBaselineResume(runId))
+    const { generateBaselineDraft } = await import('./document-draft-generation')
+    completeBaselineGenerationRun(runId, await generateBaselineDraft(runId))
   } catch (error) {
     failBaselineGenerationRun(runId, error)
     throw error
