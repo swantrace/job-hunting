@@ -2,17 +2,23 @@ import { createRoute } from 'honox/factory'
 import { getApplication } from '../../../../src/db/queries'
 import { loadReviewData } from '../../../../src/db/review-data'
 import { enqueueCandidateAnalysis } from '../../../../src/lib/analysis-queue'
+import { getApplicationReadiness } from '../../../../src/lib/application-readiness'
+import { careerSkillEvidenceMap } from '../../../../src/lib/career-data'
 import { parseFilters, parseId } from '../../../../src/lib/request'
 import { FitRecommendation } from '../../../components/workspace/FitRecommendation'
 import { query } from '../../../components/workspace/helpers'
 import { ProfileRecommendation } from '../../../components/workspace/ProfileRecommendation'
 import { RequirementEvidenceMatrix } from '../../../components/workspace/RequirementEvidenceMatrix'
+import { ReviewReadiness } from '../../../components/workspace/ReviewReadiness'
+import { SkillGapPanel } from '../../../components/workspace/SkillGapPanel'
 
 function hasCurrentJobAnalysis(jobId: number) {
   return loadReviewData(jobId).jobAnalysisCurrent
 }
 
 function statusFragment(jobId: number, filters: ReturnType<typeof parseFilters>) {
+  const job = getApplication(jobId)
+  if (!job) return <div class="alert alert-error">Application not found.</div>
   const review = loadReviewData(jobId)
   const run = review.run
   const shouldPoll = run?.status === 'Queued' || run?.status === 'Processing'
@@ -94,16 +100,20 @@ function statusFragment(jobId: number, filters: ReturnType<typeof parseFilters>)
             profiles={review.profiles}
             oob
           />
-          <section
-            id="requirement-readiness"
-            class="rounded-box border border-base-300 p-4"
-            hx-swap-oob="outerHTML"
-          >
-            <h3 class="font-semibold">Document readiness</h3>
-            <p class="mt-2 text-sm text-base-content/60">
-              Confirm a generation profile and resolve any missing-skill decisions.
-            </p>
-          </section>
+          <SkillGapPanel
+            job={job}
+            filters={filters}
+            requirements={review.requirementSkills}
+            careerEvidence={careerSkillEvidenceMap()}
+            canDecide={review.state.state === 'current' && !!review.state.currentCompleted}
+            oob
+          />
+          <ReviewReadiness
+            jobId={jobId}
+            filters={filters}
+            readiness={getApplicationReadiness(jobId)}
+            oob
+          />
         </>
       ) : null}
     </>

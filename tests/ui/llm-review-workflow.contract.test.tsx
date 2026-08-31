@@ -34,9 +34,11 @@ describe('LLM analysis review HTMX boundaries', () => {
 
   contractTest('preserves the active Review tab and uses OOB updates for adjacent panels', () => {
     const route = readFileSync(resolve(routeRoot, 'analysis-runs.tsx'), 'utf8')
+    const skillPanel = readFileSync(resolve(componentRoot, 'SkillGapPanel.tsx'), 'utf8')
 
     expect(route).toContain('workspaceTab=review')
-    expect(route).toMatch(/hx-swap-oob|Oob|OutOfBand/)
+    expect(route).toMatch(/<SkillGapPanel[\s\S]*?\boob\b/)
+    expect(skillPanel).toContain("'hx-swap-oob': 'outerHTML'")
     expect(route).not.toMatch(/<AppShell|<html|<body/)
   })
 

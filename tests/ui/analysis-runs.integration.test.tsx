@@ -75,4 +75,38 @@ describe('candidate analysis run HTMX boundaries', () => {
     expect(recordsFor(html, 'analysis-run-status')).toHaveLength(1)
     expect(html).not.toMatch(/<AppShell|<html|<body/)
   })
+
+  test('updates the skill review and readiness boundaries when analysis completes', async () => {
+    mockGetApplication.mockReturnValue(mockJob)
+    mockLoadReviewData.mockReturnValue(
+      reviewDataFixture({
+        jobAnalysisCurrent: true,
+        run: {
+          id: 9,
+          status: 'Completed',
+          attempts: 1,
+          errorMessage: null,
+          model: 'test-model',
+        },
+        state: {
+          state: 'current',
+          currentCompleted: { id: 9 },
+          latest: { id: 9 },
+          latestCompleted: { id: 9 },
+        },
+      }),
+    )
+
+    const response = await (await analysisRunsHarness()).request('/applications/7/analysis-runs')
+    const html = await response.text()
+
+    expect(response.status).toBe(200)
+    expect(recordsFor(html, 'skill-review-panel')).toEqual([
+      expect.objectContaining({ id: 'skill-review-panel', oob: 'outerHTML' }),
+    ])
+    expect(recordsFor(html, 'requirement-readiness')).toEqual([
+      expect.objectContaining({ id: 'requirement-readiness', oob: 'outerHTML' }),
+    ])
+    mockLoadReviewData.mockReturnValue(reviewDataFixture())
+  })
 })
