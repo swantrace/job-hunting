@@ -61,7 +61,9 @@ describe('deterministic requirement evidence coverage', () => {
         requirementCoverageFromAssessments: (
           assessments: Array<{ jobRequirementId: number; evidenceStatus: string }>,
           importanceById: ReadonlyMap<number, string>,
-        ) => { directCoverage: { matchedWeight: number; totalWeight: number; percentage: number | null } }
+        ) => {
+          directCoverage: { matchedWeight: number; totalWeight: number; percentage: number | null }
+        }
       }
       // Two skills map to requirement 41, but the assessment list has exactly
       // one entry for that requirement, so its weight contributes once.

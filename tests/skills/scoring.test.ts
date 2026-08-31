@@ -37,19 +37,35 @@ describe('explainable skill scores', () => {
 
   test('counts a canonical skill mapped to multiple requirements once', async () => {
     const { calculateDeduplicatedSkillCoverage } = (await import('../../src/lib/skills/score')) as {
-      calculateDeduplicatedSkillCoverage: (rows: Array<{
-        skillId: number
-        analysisResult: string
-        importance: string
-        userDecision: string
-      }>) => {
+      calculateDeduplicatedSkillCoverage: (
+        rows: Array<{
+          skillId: number
+          analysisResult: string
+          importance: string
+          userDecision: string
+        }>,
+      ) => {
         canonicalMatch: { matchedWeight: number; totalWeight: number; percentage: number | null }
-        applicationCoverage: { matchedWeight: number; totalWeight: number; percentage: number | null }
+        applicationCoverage: {
+          matchedWeight: number
+          totalWeight: number
+          percentage: number | null
+        }
       }
     }
     const result = calculateDeduplicatedSkillCoverage([
-      { skillId: 5, analysisResult: 'proven-match', importance: 'required', userDecision: 'pending' },
-      { skillId: 5, analysisResult: 'proven-match', importance: 'required', userDecision: 'pending' },
+      {
+        skillId: 5,
+        analysisResult: 'proven-match',
+        importance: 'required',
+        userDecision: 'pending',
+      },
+      {
+        skillId: 5,
+        analysisResult: 'proven-match',
+        importance: 'required',
+        userDecision: 'pending',
+      },
       {
         skillId: 6,
         analysisResult: 'not-in-career-data',

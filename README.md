@@ -127,7 +127,7 @@ The Fly app defaults to `FLY_APP_NAME` and then the `app` value in `fly.toml`. F
 2. Review the draft. Add the job URL, source, company, and direction yourself, then save it as **Saved**.
 3. Move a role to **Apply Today** when it becomes a task. Complete the application workspace and select **Sent application** after applying.
 4. Record follow-ups and interviews in the workspace. These activities advance the visible pipeline without overwriting a more advanced status.
-5. In **Review**, confirm the recommended profile and resolve every missing skill: **Skip**, or **Include** with a truthful, application-specific reason. This creates the evidence selection used for generation.
+5. In **Review**, confirm the recommended profile and resolve every unverified skill: **Skip**, or **Include** with a truthful, application-specific reason. Confirm a resume strategy before generation.
 6. In **Documents**, explicitly generate the resume and cover letter. Review the frozen evidence snapshot and DOCX files; optionally request a semantic document review. A generated file is a draft until you decide it is suitable to use.
 7. Download approved documents or upload them to Google Drive when it is connected. Existing artifacts and Drive links remain available if a newer run later becomes outdated.
 8. Manage reusable companies, contacts, and skills from their dedicated pages under Career and Network. Export JSON periodically as a backup.
@@ -163,9 +163,12 @@ The dev server listens on all interfaces at port `5173`. If `http://localhost:51
 
 - A parsed job post produces structured skill requirements, each with a canonical name, category, importance, source excerpt, and confidence.
 - Requirements resolve against the SQLite taxonomy: proven matches reuse career skills; unknown concepts become pending skills only when the opportunity is saved.
-- The application workspace has a **Review** tab. Every `not-in-career-data` skill must be skipped or included with a reason before document generation is enabled.
-- Dual scores are shown: **canonical match** (proven matches only) and **application coverage** (proven matches plus user-confirmed includes). Skipped and pending requirements count as uncovered.
-- An include is application-only: it never changes career data or the canonical score, and its mandatory reason is the only allowed claim in generated documents.
+- Candidate analysis labels each semantic requirement with one evidence status: **direct** (career data directly supports it), **transferable** (an adjacent, honestly qualified claim), or **unverified in career data** (the supplied data cannot verify it). Unverified never means the candidate lacks the skill.
+- The application workspace has a **Review** tab. Every unverified skill must be resolved with a user decision before document generation is enabled: **Skip**, or **Include** with a required, application-specific reason.
+- Requirement-level scores are shown: **Direct evidence coverage** and **Supported evidence coverage** (direct plus transferable), weighted over required (3) and preferred (1) requirements. A secondary **Application skill coverage** counts proven skill mappings plus user Includes over deduplicated canonical skills.
+- An include is application-only: it never changes career data, and its mandatory reason is the only allowed claim in generated documents.
+- The Skills page derives a **Career data gaps** queue from unverified requirement-to-skill mappings and run-scoped decisions. It lists what the supplied career data cannot yet verify, with source links back to each application Review, without ever writing `career-data/`.
+- **Resume strategy** is a user-confirmed, run-scoped, deterministic artifact. It selects emphasis and de-emphasis among already-allowlisted evidence and is required before document generation; it never calls an LLM and never adds facts.
 
 ## LLM workflow and boundaries
 
@@ -173,7 +176,7 @@ The pipeline makes four distinct model calls, each with a separate trust boundar
 
 1. **Job-only analysis** (`OPENAI_MODEL_JOB_PARSER`) — receives only the raw job posting and the skill taxonomy. It never sees a resume, career data, profile contents, or candidate identity, and it never produces a fit score or a profile recommendation.
 2. **Candidate fit / evidence matrix** (`OPENAI_MODEL_CANDIDATE_FIT`) — an explicit, queued paid action. It receives a frozen canonical input snapshot (career data, profiles, and the reviewed job requirements) and returns a labelled `apply`/`apply-selectively`/`skip` recommendation, a profile recommendation, and a requirement-to-evidence matrix. Every evidence reference must resolve to a supplied canonical ID.
-3. **Resume and cover-letter generation** (`OPENAI_MODEL_RESUME`, `OPENAI_MODEL_COVER_LETTER`) — runs only from a frozen, validated evidence snapshot v2 and stores claim-level provenance so every material claim traces to a canonical or application-only source.
+3. **Resume and cover-letter generation** (`OPENAI_MODEL_RESUME`, `OPENAI_MODEL_COVER_LETTER`) — runs only from a frozen, validated evidence snapshot (v3 when a resume strategy is present, with compatibility readers for v1/v2) and stores claim-level provenance so every material claim traces to a canonical or application-only source. The model can emphasize allowlisted evidence and never reference de-emphasized IDs.
 4. **Optional semantic document review** (`OPENAI_MODEL_DOCUMENT_REVIEW`) — an explicit paid action that observes and reports findings (`blocking`/`important`/`optional`). It never rewrites documents and its findings never become career facts.
 
 Actions that incur a model call: parsing a job post, running candidate analysis, generating application documents, and requesting a semantic review. Saving an opportunity, confirming a profile, resolving a skill decision, and the deterministic keyword audit do **not** call a model.
@@ -184,7 +187,7 @@ Job Analysis, Candidate Analysis, and Documents are each append-only run histori
 
 - **Job Analysis** staleness is driven by the raw posting content hash, the skill-taxonomy hash, the parser/job-analysis prompt versions, and the job-analysis schema version. Model-only changes never make a completed analysis stale.
 - **Candidate Analysis** staleness is driven by the current completed Job Analysis, canonical career data, profiles, evidence, and candidate-fit contract versions. Skip/Include decisions, reasons, and the confirmed profile are deliberately excluded, so changing a decision never invalidates the candidate analysis itself.
-- **Documents** staleness additionally includes the confirmed profile, run-scoped decisions and reasons, canonical evidence, generation contract versions, and the configured resume/cover-letter models.
+- **Documents** staleness additionally includes the confirmed profile, run-scoped decisions and reasons, the confirmed resume strategy, canonical evidence, generation contract versions, and the configured resume/cover-letter models.
 
 Freshness is compared lazily on workspace/readiness load, so editing a `career-data/` or `profiles/` file is detected on the next page view without any background token spend. Nothing reruns automatically: stale stages show `Outdated` with the exact changed reason and an explicit rerun action. Old results, artifacts, Drive links, snapshots, audits, and semantic reviews remain accessible after they become stale, and a failed rerun never hides an older usable result.
 
@@ -192,7 +195,7 @@ Skill decisions are scoped to a Candidate Analysis run. A new run starts every m
 
 ### Canonical facts vs application-only decisions
 
-- **Canonical facts** come only from `career-data/` and `profiles/`. No LLM output or user decision ever writes back to those directories.
+- **Canonical facts** come only from `career-data/` and `profiles/`. No LLM output, user decision, gap-queue view, or resume strategy ever writes back to those directories. When you obtain real supporting evidence for an unverified item, you update the canonical JSON files yourself and the derived gap queue and freshness checks reflect that change on the next request.
 - **Application-only decisions** (`skip`/`include` with a reason) affect only the current application. An included skill may appear in generated documents only through the user-authored reason — never as fabricated professional experience.
 
 ### Metrics are transparent heuristics
@@ -222,6 +225,8 @@ Migrations are hand-written SQLite files in `drizzle/` with journal entries in `
 The canonical contract migration (`0021`) preserves companies, contacts, applications and their URLs, application-contact links, follow-ups, interviews, Job Post raw text/hash, canonical skills/categories/aliases, and the encrypted Drive connection. It intentionally resets derived AI history (Job Analysis, requirements, Candidate Analysis, decisions, generation and document-review history, and baseline history). After migrating, re-run Job Analysis for each application (the saved Job Post text is preserved), then Candidate Analysis and document generation as needed.
 
 The key-only identity migration (`0022`) removes the redundant `career_skill_id` column and intentionally clears the legacy skill rows plus application AI derivations. It preserves applications and immutable Job Post text/links. `bun run setup` then reloads taxonomy categories and canonical skills from `career-data/`, after which newly discovered JD skills continue accumulating in SQLite.
+
+The run-scoped resume strategy migration (`0023`) adds a forward-only one-to-one `analysis_run_resume_strategies` table with a unique run FK (cascade), JSON validity checks, and UTC operational timestamps. It preserves all existing runs, decisions, generation snapshots, artifacts, and Drive metadata.
 
 ## Useful commands
 
