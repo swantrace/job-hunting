@@ -13,6 +13,7 @@ import { getJobAnalysisState } from '../db/job-analysis-runs'
 import { getApplication } from '../db/queries'
 import { listRequirementSkillMappings } from '../db/skill-queries'
 import { type AnalysisRunState, classifyAnalysisRunState } from './analysis-run-state'
+import { retryCandidateFitOnValidationError } from './candidate-fit-retry'
 import { canonicalHash } from './canonical-hash'
 import { careerEvidenceIds, loadCareerData } from './career-data'
 import { todayISO } from './date'
@@ -352,11 +353,10 @@ export async function runCandidateAnalysis(runId: number) {
   const snapshot = candidateAnalysisInputSchema.parse(JSON.parse(run.inputSnapshotJson))
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.')
-  const result = await structuredCandidateFit({
-    apiKey,
-    model:
-      process.env.OPENAI_MODEL_CANDIDATE_FIT ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra',
-    input: snapshot,
-  })
-  return validateCandidateAnalysisResult(result, snapshot)
+  const model =
+    process.env.OPENAI_MODEL_CANDIDATE_FIT ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
+  return retryCandidateFitOnValidationError(
+    () => structuredCandidateFit({ apiKey, model, input: snapshot }),
+    (result) => validateCandidateAnalysisResult(result, snapshot),
+  )
 }
