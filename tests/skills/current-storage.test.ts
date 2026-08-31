@@ -51,7 +51,7 @@ describe('canonical skill storage', () => {
     }
   })
 
-  test('preserves canonical category keys and enforces the taxonomy foreign key', () => {
+  test('resets legacy skill rows and enforces the taxonomy foreign key for replacements', () => {
     const canonicalSkillFolder = createBaselineMigrationFolder(11)
     const sqlite = database(canonicalSkillFolder)
     try {
@@ -72,11 +72,18 @@ describe('canonical skill storage', () => {
         id: number
       }
       migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
-      expect(sqlite.query('SELECT category FROM skills WHERE id = ?').get(skill.id)).toEqual({
-        category: 'frontend',
-      })
+      expect(sqlite.query('SELECT category FROM skills WHERE id = ?').get(skill.id)).toBeNull()
+      const replacement = sqlite
+        .query(
+          `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
+           VALUES ('react', 'React', 'frontend', 'approved', 'career-data', '2026-08-28', '2026-08-28')
+           RETURNING id`,
+        )
+        .get() as { id: number }
       expect(() =>
-        sqlite.query('UPDATE skills SET category = ? WHERE id = ?').run('not-configured', skill.id),
+        sqlite
+          .query('UPDATE skills SET category = ? WHERE id = ?')
+          .run('not-configured', replacement.id),
       ).toThrow()
     } finally {
       sqlite.close()
@@ -84,7 +91,7 @@ describe('canonical skill storage', () => {
     }
   })
 
-  test('preserves merged skill relationships through the contract migration', () => {
+  test('clears merged skill redirects with the legacy skill taxonomy', () => {
     const canonicalSkillFolder = createBaselineMigrationFolder(11)
     const sqlite = database(canonicalSkillFolder)
     try {
@@ -105,7 +112,7 @@ describe('canonical skill storage', () => {
         ) as {
         id: number
       }
-      const merged = sqlite
+      sqlite
         .query(
           `INSERT INTO skills (key, name, category, review_status, origin, merged_into_skill_id, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
@@ -119,13 +126,9 @@ describe('canonical skill storage', () => {
           target.id,
           '2026-08-28',
           '2026-08-28',
-        ) as { id: number }
+        )
       migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
-      expect(
-        sqlite
-          .query('SELECT review_status, merged_into_skill_id FROM skills WHERE id = ?')
-          .get(merged.id),
-      ).toEqual({ review_status: 'merged', merged_into_skill_id: target.id })
+      expect(sqlite.query('SELECT count(*) AS count FROM skills').get()).toEqual({ count: 0 })
       expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
     } finally {
       sqlite.close()

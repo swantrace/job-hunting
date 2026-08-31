@@ -64,7 +64,7 @@ export function SkillsTable({
               <th>Category</th>
               <th>Status</th>
               <th>Origin</th>
-              <th>Career mapping</th>
+              <th>Key</th>
               <th>Aliases</th>
               <th>Applications</th>
               <th class="text-right">Actions</th>
@@ -81,7 +81,7 @@ export function SkillsTable({
                   <span class="badge badge-outline badge-sm">{skill.reviewStatus}</span>
                 </td>
                 <td>{skill.origin}</td>
-                <td>{skill.careerSkillId ?? '—'}</td>
+                <td class="font-mono text-xs">{skill.key}</td>
                 <td>{skill.aliasCount}</td>
                 <td>{skill.applicationCount}</td>
                 <td class="text-right">

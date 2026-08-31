@@ -141,12 +141,8 @@ export function SkillGapPanel({
                         </div>
                         {requirement.analysisResult === 'proven-match' ? (
                           <ProvenMatch
-                            careerSkillId={requirement.careerSkillId}
-                            evidence={
-                              requirement.careerSkillId
-                                ? (careerEvidence[requirement.careerSkillId] ?? [])
-                                : []
-                            }
+                            skillKey={requirement.skillKey}
+                            evidence={careerEvidence[requirement.skillKey] ?? []}
                           />
                         ) : (
                           <SkillDecisionForm
@@ -169,21 +165,15 @@ export function SkillGapPanel({
   )
 }
 
-function ProvenMatch({
-  careerSkillId,
-  evidence,
-}: {
-  careerSkillId: string | null
-  evidence: string[]
-}) {
+function ProvenMatch({ skillKey, evidence }: { skillKey: string; evidence: string[] }) {
   return (
     <div class="contents">
       <div class="col-start-2 row-start-1 self-start justify-self-end">
         <span class="badge badge-success whitespace-nowrap">Proven match</span>
       </div>
-      {careerSkillId || evidence.length > 0 ? (
+      {skillKey || evidence.length > 0 ? (
         <div class="col-span-2 row-start-2 space-y-1 text-left text-xs text-base-content/60">
-          {careerSkillId && <p>Linked to career skill “{careerSkillId}”</p>}
+          <p>Linked to career skill “{skillKey}”</p>
           {evidence.length > 0 && <p>Evidence: {evidence.join(', ')}</p>}
         </div>
       ) : null}

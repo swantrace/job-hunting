@@ -19,11 +19,11 @@ export function hasUsableEvidence(skill: Record<string, unknown>): boolean {
  * `not-in-career-data`.
  */
 export function determineMatchResult(
-  careerSkillId: string | null | undefined,
+  skillKey: string | null | undefined,
   careerData: Pick<CanonicalCareerData, 'skills'>,
 ): SkillMatchResult {
-  if (!careerSkillId) return 'not-in-career-data'
-  const careerSkill = careerData.skills.skills.find((skill) => skill.id === careerSkillId)
+  if (!skillKey) return 'not-in-career-data'
+  const careerSkill = careerData.skills.skills.find((skill) => skill.id === skillKey)
   if (!careerSkill) return 'not-in-career-data'
   return hasUsableEvidence(careerSkill as Record<string, unknown>)
     ? 'proven-match'

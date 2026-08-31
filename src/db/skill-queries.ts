@@ -7,7 +7,8 @@ import type {
   SkillOrigin,
   SkillReviewStatus,
 } from '../lib/skills/constants'
-import { normalizeSkillAlias } from '../lib/skills/normalize'
+import { canonicalSkillKey, normalizeSkillAlias } from '../lib/skills/normalize'
+import { careerSkillMatchResult } from '../lib/skills/runtime-career-skills'
 import type { SkillCategory } from '../lib/skills/taxonomy'
 import { jobPostingAnalysisIdForCandidateRun } from './analysis-lineage'
 import { db } from './client'
@@ -55,7 +56,6 @@ export function insertSkill(
     category?: SkillCategory | null
     reviewStatus?: SkillReviewStatus
     origin?: SkillOrigin
-    careerSkillId?: string | null
   },
 ): Skill {
   const date = todayISO()
@@ -63,12 +63,11 @@ export function insertSkill(
   const skill = tx
     .insert(skills)
     .values({
-      key: input.key ?? normalizeSkillAlias(input.name),
+      key: input.key ?? canonicalSkillKey(input.name),
       name: input.name,
       category: input.category ?? null,
       reviewStatus: input.reviewStatus ?? 'pending',
       origin,
-      careerSkillId: input.careerSkillId ?? null,
       createdAt: date,
       updatedAt: date,
     })
@@ -138,7 +137,6 @@ export type RequirementSkillMapping = {
   skillName: string
   skillKey: string
   category: SkillCategory | null
-  careerSkillId: string | null
   reviewStatus: SkillReviewStatus
   requirementId: number
   requirementSequence: number
@@ -164,7 +162,6 @@ export function listRequirementSkillMappings(
       skillName: skills.name,
       skillKey: skills.key,
       category: skills.category,
-      careerSkillId: skills.careerSkillId,
       reviewStatus: skills.reviewStatus,
       requirementId: jobRequirements.id,
       requirementSequence: jobRequirements.sequence,
@@ -251,7 +248,7 @@ export function listRunSkillReviews(runId: number, executor: DbExecutor = db): R
     const decision = decisionBySkill.get(mapping.skillId)
     return {
       ...mapping,
-      analysisResult: mapping.careerSkillId ? 'proven-match' : 'not-in-career-data',
+      analysisResult: careerSkillMatchResult(mapping.skillKey),
       decision: decision?.decision ?? 'pending',
       decisionReason: decision?.reason ?? null,
       aliases: aliasesBySkill.get(mapping.skillId) ?? [],

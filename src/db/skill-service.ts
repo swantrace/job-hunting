@@ -69,8 +69,7 @@ export function renameSkill(id: number, name: string, executor: SkillDb = db) {
   const date = todayISO()
   executor.transaction((tx) => {
     const skill = requireActiveSkill(tx, id)
-    const key = skill.careerSkillId ?? normalizeSkillAlias(name)
-    tx.update(skills).set({ name, key, updatedAt: date }).where(eq(skills.id, id)).run()
+    tx.update(skills).set({ name, updatedAt: date }).where(eq(skills.id, id)).run()
   })
 }
 

@@ -65,7 +65,7 @@ describe('planned career skill synchronization CLI contract', () => {
       const sqlite = new Database(fixture.databaseFile, { readonly: true })
       const skills = sqlite
         .query(
-          `SELECT key, name, category, review_status, career_skill_id
+          `SELECT key, name, category, review_status, origin
            FROM skills
            ORDER BY key`,
         )
@@ -77,7 +77,8 @@ describe('planned career skill synchronization CLI contract', () => {
       expect(skills).toHaveLength(2)
       expect(skills).toContainEqual(
         expect.objectContaining({
-          career_skill_id: 'typescript',
+          key: 'typescript',
+          origin: 'career-data',
           category: 'languages-web',
           name: 'TypeScript',
           review_status: 'approved',

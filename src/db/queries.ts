@@ -30,7 +30,7 @@ import {
   skillImportances,
   skillMatchResults,
 } from '../lib/skills/constants'
-import { normalizeSkillAlias } from '../lib/skills/normalize'
+import { canonicalSkillKey, normalizeSkillAlias } from '../lib/skills/normalize'
 import { hasSkillCategory, type SkillCategory } from '../lib/skills/taxonomy'
 import { advanceStatus } from '../lib/transitions'
 import {
@@ -495,10 +495,6 @@ export function mergeImport(payload: ImportPayload) {
     }
     const skillRows = tx.select().from(skills).all()
     const skillsByKey = new Map(skillRows.map((item) => [item.key, item]))
-    const skillsByCareerId = new Map(
-      skillRows.filter((item) => item.careerSkillId).map((item) => [item.careerSkillId, item]),
-    )
-    const skillsByName = new Map(skillRows.map((item) => [normalizeSkillAlias(item.name), item]))
     const reviewValues = new Set<string>(['pending', 'approved', 'rejected', 'merged'])
     const originValues = new Set<string>(['career-data', 'job-parser', 'manual', 'import'])
     const category = (value: unknown) =>
@@ -513,23 +509,21 @@ export function mergeImport(payload: ImportPayload) {
     for (const incoming of payload.skills) {
       const name = textValue(incoming.name)
       if (!name) continue
-      const careerSkillId = textValue(incoming.careerSkillId) || null
-      const incomingKey = textValue(incoming.key) || normalizeSkillAlias(name)
-      const existing =
-        (careerSkillId && skillsByCareerId.get(careerSkillId)) ||
-        skillsByKey.get(incomingKey) ||
-        skillsByName.get(normalizeSkillAlias(name))
+      const incomingKey = textValue(incoming.key) || canonicalSkillKey(name)
+      const existing = skillsByKey.get(incomingKey)
       if (existing) {
         tx.update(skills)
           .set({
-            key: existing.careerSkillId ? existing.key : incomingKey,
-            name,
-            category: category(incoming.category) ?? existing.category,
-            reviewStatus: existing.careerSkillId
-              ? existing.reviewStatus
-              : reviewStatus(incoming.reviewStatus),
-            origin: existing.careerSkillId ? existing.origin : origin(incoming.origin),
-            careerSkillId: careerSkillId ?? existing.careerSkillId,
+            name: existing.origin === 'career-data' ? existing.name : name,
+            category:
+              existing.origin === 'career-data'
+                ? existing.category
+                : (category(incoming.category) ?? existing.category),
+            reviewStatus:
+              existing.origin === 'career-data'
+                ? existing.reviewStatus
+                : reviewStatus(incoming.reviewStatus),
+            origin: existing.origin === 'career-data' ? existing.origin : origin(incoming.origin),
             updatedAt: todayISO(),
           })
           .where(eq(skills.id, existing.id))
@@ -542,7 +536,6 @@ export function mergeImport(payload: ImportPayload) {
           category: category(incoming.category),
           reviewStatus: reviewStatus(incoming.reviewStatus),
           origin: origin(incoming.origin),
-          careerSkillId,
         })
         skillsByKey.set(created.key, created)
         skillIds.set(Number(incoming.id), created.id)

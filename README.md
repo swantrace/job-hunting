@@ -69,9 +69,10 @@ bun run skills:sync --apply # write inside a transaction
 bun run skills:sync --check # non-zero exit when conflicts require manual review
 ```
 
-- Each career skill must declare a `category` key from the adjacent `career-data/skill-taxonomy.json` and may list `aliases` (alternative spellings resolved deterministically, never fuzzy-matched).
+- Each career skill must use a stable lowercase kebab-case `id`, declare a `category` from the adjacent `career-data/skill-taxonomy.json`, and may list aliases. That ID is copied directly to the immutable SQLite `skills.key`; labels and aliases are never used to guess identity.
+- Job-post and manually discovered skills accumulate in SQLite. When a later career-data skill uses the same key, synchronization promotes that row to the canonical career skill. Alias collisions are reported and can be resolved explicitly with **Merge skill** on `/skills`.
 - Taxonomy synchronization is idempotent. It upserts configured keys, labels, and sort order; categories no longer present in JSON are retained as orphaned database rows so historical skill records are not invalidated.
-- Sync matches by `career_skill_id` first, then by a unique normalized id, label, or alias. It links unambiguous pending skills, creates new approved skills, and reports conflicts without performing semantic merges.
+- Sync matches only the immutable career skill ID to `skills.key`. It updates an exact-key row or creates a new approved skill; labels and aliases never cause an automatic merge.
 - Evidence, levels, last-used dates, review notes, and directions are never copied into the taxonomy tables.
 - A missing optional `career-data/` directory can be skipped during startup with `bun run skills:sync --if-present`.
 
@@ -107,6 +108,18 @@ bun run skills:sync --apply
 ```
 
 Run `bun run taxonomy:sync --apply` before career skill sync whenever the JSON taxonomy changes. Use `bun run skills:sync --if-present` in startup scripts when career data may not be mounted yet; it exits cleanly instead of raising a runtime error, and startup never writes to the Git-tracked example data.
+
+To update the private career-data bundle on an existing Fly volume, use the repository CLI. With no selection it uploads every JSON file in both `career-data/` and `profiles/`; selected paths update only those files. Each file is uploaded to a unique temporary path and then moved over the destination, because Fly SFTP deliberately refuses to overwrite existing files. Uploading never deletes extra remote files.
+
+```sh
+bun run fly:sync-career-data
+bun run fly:sync-career-data -- career-data/skills.json
+bun run fly:sync-career-data -- profiles/fhir.profile.json
+bun run fly:sync-career-data -- career-data profiles
+bun run fly:sync-career-data -- --sync-db career-data/skills.json
+```
+
+The Fly app defaults to `FLY_APP_NAME` and then the `app` value in `fly.toml`. For a single-Machine app, the CLI resolves and starts that Machine before each transfer so Fly auto-stop cannot interrupt a long sync. Use `--app <name>` to override the app; an app with multiple Machines requires `--machine <id>` so every file reaches the same volume. `--sync-db` runs the production taxonomy and career-skill synchronization through `sh -lc` after all uploads succeed. The command requires an authenticated `fly` CLI and an existing `/data` volume.
 
 ## How to use the tracker
 
@@ -187,11 +200,13 @@ Skills, Companies, and Contacts are separate bookmarkable pages under the Career
 
 The JSON export (`/export`) is a **portable core-data export** — companies, contacts, applications, reviewed skill taxonomy/aliases, activities, application-contact links, and immutable Job Post raw-text versions. It deliberately omits derived AI history, generated artifacts, baseline history, and OAuth connections, and is not a full backup of `jobs.db` or the physical `artifacts/` directory.
 
-Back up `jobs.db` and the `artifacts/` directory before applying migrations or running synchronization commands in production. See `docs/migrations.md` for the migration, backup, and restore checklist. After restoring a backup, run `bun run taxonomy:sync --apply` and then `bun run skills:sync --apply` to re-link category and career mappings. `bun run artifacts:audit` lists physical artifact files no longer referenced by the database (preview only); it never deletes them unless you explicitly pass `--apply`.
+Back up `jobs.db` and the `artifacts/` directory before applying migrations or running synchronization commands in production. See `docs/migrations.md` for the migration, backup, and restore checklist. After restoring a backup, run `bun run taxonomy:sync --apply` and then `bun run skills:sync --apply` to restore the operational taxonomy from current career data. `bun run artifacts:audit` lists physical artifact files no longer referenced by the database (preview only); it never deletes them unless you explicitly pass `--apply`.
 
 Migrations are hand-written SQLite files in `drizzle/` with journal entries in `drizzle/meta/_journal.json`; `bun run db:migrate` applies them in order. They are tested against empty and populated temporary databases and must never invoke an LLM. To apply locally: `bun run db:migrate`. To apply on Fly without a local production copy, run the migration against an isolated copy first, then deploy the artifact and run `bun run db:migrate` in the app context (e.g. `fly ssh console` and execute the `start` command) — never run migration or sync commands directly against a live production SQLite file without a backup.
 
 The canonical contract migration (`0021`) preserves companies, contacts, applications and their URLs, application-contact links, follow-ups, interviews, Job Post raw text/hash, canonical skills/categories/aliases, and the encrypted Drive connection. It intentionally resets derived AI history (Job Analysis, requirements, Candidate Analysis, decisions, generation and document-review history, and baseline history). After migrating, re-run Job Analysis for each application (the saved Job Post text is preserved), then Candidate Analysis and document generation as needed.
+
+The key-only identity migration (`0022`) removes the redundant `career_skill_id` column and intentionally clears the legacy skill rows plus application AI derivations. It preserves applications and immutable Job Post text/links. `bun run setup` then reloads taxonomy categories and canonical skills from `career-data/`, after which newly discovered JD skills continue accumulating in SQLite.
 
 ## Useful commands
 

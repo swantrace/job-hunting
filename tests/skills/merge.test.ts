@@ -215,7 +215,7 @@ describe('transactional skill review and merge services', () => {
         key: string
       }
       expect(renamed.name).toBe('Vue.js')
-      expect(renamed.key).toBe('vue.js')
+      expect(renamed.key).toBe('vue')
     } finally {
       sqlite.close()
     }

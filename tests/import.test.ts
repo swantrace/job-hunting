@@ -46,7 +46,6 @@ describe('JSON import format', () => {
           category: 'messaging-async',
           reviewStatus: 'approved',
           origin: 'career-data',
-          careerSkillId: 'kafka',
         },
       ],
       skillAliases: [{ skillId: 1, alias: 'Apache Kafka', normalizedAlias: 'apache kafka' }],
@@ -62,7 +61,7 @@ describe('JSON import format', () => {
         },
       ],
     })
-    expect(parsed.skills[0]).toMatchObject({ key: 'kafka', careerSkillId: 'kafka' })
+    expect(parsed.skills[0]).toMatchObject({ key: 'kafka' })
     expect(parsed.skillAliases).toHaveLength(1)
     expect(parsed.applicationSkills[0]).toMatchObject({
       userDecision: 'include',

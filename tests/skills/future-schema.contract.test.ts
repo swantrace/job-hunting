@@ -20,8 +20,8 @@ function seedFutureSkill(sqlite: Database) {
   return sqlite
     .query(
       `INSERT INTO skills (
-        key, name, category, review_status, origin, career_skill_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+        key, name, category, review_status, origin, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     )
     .get(
       'nodejs',
@@ -29,7 +29,6 @@ function seedFutureSkill(sqlite: Database) {
       'backend-apis',
       'approved',
       'career-data',
-      'nodejs',
       '2026-08-28',
       '2026-08-28',
     ) as { id: number }
@@ -73,7 +72,6 @@ describe('planned SQLite skill taxonomy constraints', () => {
         'category',
         'review_status',
         'origin',
-        'career_skill_id',
         'merged_into_skill_id',
         'created_at',
         'updated_at',

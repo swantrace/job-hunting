@@ -3,16 +3,21 @@ import { skillReviewStatuses } from '../../../src/lib/skills/constants'
 import { skillCategoryDefinitions } from '../../../src/lib/skills/taxonomy'
 import type { FieldErrors } from '../../../src/lib/validation'
 import { InputField, SelectField } from '../ui/FormField'
+import { SkillMergeForm } from './SkillMergeForm'
 import type { SkillFilters } from './SkillsPage'
 
 export function SkillEditForm({
   skill,
   filters,
   errors,
+  mergeTargets,
+  mergeError,
 }: {
   skill: SkillOverview
   filters: SkillFilters
   errors?: FieldErrors
+  mergeTargets: SkillOverview[]
+  mergeError?: string
 }) {
   const query = new URLSearchParams(filters).toString()
   return (
@@ -72,6 +77,7 @@ export function SkillEditForm({
           <button class="btn btn-primary">Save changes</button>
         </div>
       </form>
+      <SkillMergeForm skill={skill} targets={mergeTargets} filters={filters} error={mergeError} />
     </section>
   )
 }

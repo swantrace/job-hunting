@@ -20,6 +20,7 @@ import { assertEveryRequirementAssessed, validateCandidateFitEvidence } from './
 import { currentJobAnalysisHash } from './job-analysis-input'
 import { parseJobAnalysisResult } from './job-analysis-result'
 import { listProfiles } from './profiles'
+import { careerSkillMatchResult } from './skills/runtime-career-skills'
 
 export const candidateAnalysisInputVersion = 2
 
@@ -184,7 +185,7 @@ export function buildCandidateAnalysisInput(
       importance: item.importance,
       rawLabel: item.rawLabel,
       confidence: item.confidence,
-      missing: item.careerSkillId === null,
+      missing: careerSkillMatchResult(item.skillKey) !== 'proven-match',
     })),
     profiles,
     careerData,
