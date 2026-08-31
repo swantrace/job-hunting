@@ -141,23 +141,31 @@ mock.module('../../../src/db/analysis', () => ({
   listAnalysisRuns: mockListAnalysisRuns,
 }))
 
-export const mockLoadReviewData = mock((): any => ({
-  job: mockJob,
-  jobAnalysis: null,
-  jobAnalysisCurrent: false,
-  run: null,
-  state: {
-    state: 'never-run',
-    latest: null,
-    latestCompleted: null,
-    currentCompleted: null,
-    staleCompleted: null,
-    reasons: [],
-  },
-  requirements: [],
-  requirementSkills: [],
-  profiles: [],
-}))
+const defaultReviewState = {
+  state: 'never-run',
+  latest: null,
+  latestCompleted: null,
+  currentCompleted: null,
+  staleCompleted: null,
+  reasons: [],
+}
+
+export function reviewDataFixture(overrides: Record<string, any> = {}) {
+  const { state, ...rest } = overrides
+  return {
+    job: mockJob,
+    jobAnalysis: null,
+    jobAnalysisCurrent: false,
+    run: null,
+    state: { ...defaultReviewState, ...(state ?? {}) },
+    requirements: [],
+    requirementSkills: [],
+    profiles: [],
+    ...rest,
+  }
+}
+
+export const mockLoadReviewData = mock((): any => reviewDataFixture())
 
 mock.module('../../../src/db/review-data', () => ({
   loadReviewData: mockLoadReviewData,

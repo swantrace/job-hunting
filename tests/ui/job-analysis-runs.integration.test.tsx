@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import { Hono } from 'hono'
 import { fragmentRecords, recordsFor } from './support/html-contract'
-import { mockGetApplication, mockJob, mockLoadReviewData } from './support/runtime-mocks'
+import {
+  mockGetApplication,
+  mockJob,
+  mockLoadReviewData,
+  reviewDataFixture,
+} from './support/runtime-mocks'
 
 /**
  * Run-status fragment integration contract. The existing candidate
@@ -22,15 +27,7 @@ async function createHarness() {
 describe('analysis run-status fragment', () => {
   test('returns one self-contained status fragment, never a nested document', async () => {
     mockGetApplication.mockReturnValue(mockJob)
-    mockLoadReviewData.mockReturnValue({
-      job: mockJob,
-      jobAnalysis: null,
-      jobAnalysisCurrent: false,
-      run: null,
-      state: { latest: null },
-      requirements: [],
-      profiles: [],
-    })
+    mockLoadReviewData.mockReturnValue(reviewDataFixture())
     const response = await (await createHarness()).request('/applications/7/analysis-runs')
     const html = await response.text()
 
@@ -46,15 +43,11 @@ describe('analysis run-status fragment', () => {
 
   test('polls only the active run-status fragment and preserves the review tab', async () => {
     mockGetApplication.mockReturnValue(mockJob)
-    mockLoadReviewData.mockReturnValue({
-      job: mockJob,
-      run: { id: 1, status: 'Queued', attempts: 0, errorMessage: null, model: null },
-      requirements: [],
-      profiles: [],
-      jobAnalysis: null,
-      jobAnalysisCurrent: false,
-      state: { latest: null },
-    })
+    mockLoadReviewData.mockReturnValue(
+      reviewDataFixture({
+        run: { id: 1, status: 'Queued', attempts: 0, errorMessage: null, model: null },
+      }),
+    )
     const response = await (await createHarness()).request(
       '/applications/7/analysis-runs?workspaceTab=review',
     )
@@ -66,15 +59,7 @@ describe('analysis run-status fragment', () => {
 
   test('rejects a forged run against an unreviewed application with a targeted 422', async () => {
     mockGetApplication.mockReturnValue(mockJob)
-    mockLoadReviewData.mockReturnValue({
-      job: mockJob,
-      jobAnalysis: null,
-      jobAnalysisCurrent: false,
-      run: null,
-      state: { latest: null },
-      requirements: [],
-      profiles: [],
-    })
+    mockLoadReviewData.mockReturnValue(reviewDataFixture())
     const response = await (await createHarness()).request('/applications/7/analysis-runs', {
       method: 'POST',
     })
