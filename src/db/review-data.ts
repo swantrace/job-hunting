@@ -26,6 +26,8 @@ export function loadReviewData(jobId: number) {
   const requirementSkills = reviewRunId ? listRunSkillReviews(reviewRunId) : []
   return {
     job,
+    jobAnalysis,
+    jobAnalysisCurrent: !!jobState?.currentCompleted,
     run: state.latest,
     state,
     requirements,

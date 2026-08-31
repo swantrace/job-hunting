@@ -8,8 +8,8 @@ import { query } from '../../../components/workspace/helpers'
 import { ProfileRecommendation } from '../../../components/workspace/ProfileRecommendation'
 import { RequirementEvidenceMatrix } from '../../../components/workspace/RequirementEvidenceMatrix'
 
-function hasReviewedAnalysis(jobId: number) {
-  return !!getApplication(jobId)?.jobPostingAnalysis?.schemaVersion
+function hasCurrentJobAnalysis(jobId: number) {
+  return loadReviewData(jobId).jobAnalysisCurrent
 }
 
 function statusFragment(jobId: number, filters: ReturnType<typeof parseFilters>) {
@@ -51,7 +51,7 @@ function statusFragment(jobId: number, filters: ReturnType<typeof parseFilters>)
             hx-swap="outerHTML"
             hx-disabled-elt="find button"
           >
-            <button class="btn btn-secondary btn-sm" disabled={!hasReviewedAnalysis(jobId)}>
+            <button class="btn btn-secondary btn-sm" disabled={!review.jobAnalysisCurrent}>
               <span class="loading loading-spinner loading-xs htmx-indicator" />
               {run?.status === 'Failed'
                 ? 'Re-analyze'
@@ -61,7 +61,7 @@ function statusFragment(jobId: number, filters: ReturnType<typeof parseFilters>)
             </button>
           </form>
         </div>
-        {!hasReviewedAnalysis(jobId) ? (
+        {!review.jobAnalysisCurrent ? (
           <div class="alert alert-warning mt-4 text-sm" role="alert">
             <span>Analyze the job post first before running candidate analysis.</span>
           </div>
@@ -117,7 +117,7 @@ export const POST = createRoute(async (c) => {
   if (!getApplication(id))
     return c.html(<div class="alert alert-error">Application not found.</div>, 404)
 
-  if (!hasReviewedAnalysis(id)) {
+  if (!hasCurrentJobAnalysis(id)) {
     c.header('HX-Retarget', '#analysis-run-status')
     return c.html(statusFragment(id, filters), 422)
   }

@@ -1,12 +1,21 @@
-import type { JobCardData } from '../../../src/db/queries'
+import type { JobAnalysisRun } from '../../../src/db/job-analysis-runs'
 import { parseJobAnalysisResult } from '../../../src/lib/job-analysis-result'
 
-export function JobAnalysisSummary({ job }: { job: JobCardData }) {
-  const analysis = job.jobPostingAnalysis
+export function JobAnalysisSummary({
+  analysis,
+  oob = false,
+}: {
+  analysis: JobAnalysisRun | null
+  oob?: boolean
+}) {
   const result = parseJobAnalysisResult(analysis?.resultJson ?? null)
   if (!analysis?.schemaVersion || !result) {
     return (
-      <section id="job-analysis-summary" class="rounded-box border border-base-300 p-4">
+      <section
+        id="job-analysis-summary"
+        class="rounded-box border border-base-300 p-4"
+        {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
+      >
         <h3 class="font-semibold">Job analysis</h3>
         <p class="mt-2 text-sm text-base-content/60">
           No structured job analysis yet. Analyze the job post first.
@@ -16,7 +25,11 @@ export function JobAnalysisSummary({ job }: { job: JobCardData }) {
   }
   const classification = result.classification
   return (
-    <section id="job-analysis-summary" class="rounded-box border border-base-300 p-4">
+    <section
+      id="job-analysis-summary"
+      class="rounded-box border border-base-300 p-4"
+      {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
+    >
       <h3 class="font-semibold">Job analysis</h3>
       <div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
         <span class="badge badge-neutral">{classification.roleType}</span>
