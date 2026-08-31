@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { evidenceRelevances, evidenceSourceTypes } from '../../lib/evidence/constants'
+import {
+  evidenceRelevances,
+  evidenceSourceTypes,
+  evidenceStatuses,
+} from '../../lib/evidence/constants'
 
 /**
  * Candidate-fit / evidence-matrix contract. This is the output of the combined
@@ -9,10 +13,9 @@ import { evidenceRelevances, evidenceSourceTypes } from '../../lib/evidence/cons
  * canonical input.
  */
 
-export const candidateFitSchemaVersion = '1.0.0'
+export const candidateFitSchemaVersion = '1.1.0'
 
 const fitRecommendations = ['apply', 'apply-selectively', 'skip'] as const
-const evidenceStatuses = ['direct', 'transferable', 'missing'] as const
 export const evidenceRefSchema = z
   .object({
     sourceType: z.enum(evidenceSourceTypes),
@@ -86,10 +89,10 @@ export const candidateFitSchema = z
           path: ['requirementAssessments', index, 'evidenceRefs'],
         })
 
-      if (assessment.evidenceStatus === 'missing' && assessment.evidenceRefs.length > 0)
+      if (assessment.evidenceStatus === 'unknown-evidence' && assessment.evidenceRefs.length > 0)
         ctx.addIssue({
           code: 'custom',
-          message: 'Missing assessments must not contain evidence references.',
+          message: 'Unknown-evidence assessments must not contain evidence references.',
           path: ['requirementAssessments', index, 'evidenceRefs'],
         })
 

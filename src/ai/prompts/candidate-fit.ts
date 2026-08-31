@@ -1,4 +1,4 @@
-export const candidateFitPromptVersion = '1.0.0'
+export const candidateFitPromptVersion = '1.1.0'
 
 /**
  * Candidate-fit / evidence-matrix boundary. The model receives a frozen
@@ -19,7 +19,8 @@ Boundary rules:
 
 Assessment rules:
 - Every supplied job requirement receives exactly one assessment by jobRequirementId.
-- evidenceStatus is direct, transferable, or missing. Direct or transferable requires at least one evidence reference; missing must have none.
+- Absence from the supplied career data means unverified evidence, not absence of candidate capability. Use unknown-evidence, not missing, and do not diagnose the candidate.
+- evidenceStatus is direct, transferable, or unknown-evidence. Direct or transferable requires at least one evidence reference; unknown-evidence must have none and its explanation says only what the supplied data cannot verify.
 - relevance is direct or transferable and describes how the referenced source supports the requirement.
 
 Return only the JSON object required by the schema.`

@@ -1,5 +1,7 @@
+import type { EvidenceStatus } from '../evidence/constants'
+
 export type RequirementImportance = 'required' | 'preferred' | 'mentioned'
-export type RequirementEvidenceStatus = 'direct' | 'transferable' | 'missing'
+export type RequirementEvidenceStatus = EvidenceStatus
 
 export type CoverageRequirement = {
   evidenceStatus: RequirementEvidenceStatus
@@ -60,4 +62,27 @@ export function calculateRequirementCoverage(requirements: CoverageRequirement[]
       percentage: percentage(supportedWeight, totalWeight),
     },
   }
+}
+
+export type RequirementAssessment = {
+  jobRequirementId: number
+  evidenceStatus: EvidenceStatus
+}
+
+/**
+ * Requirement-level coverage from the candidate-fit assessments plus the
+ * persisted requirement importance. The schema guarantees exactly one
+ * assessment per semantic `job_requirements` row, so a requirement mapped to
+ * several canonical skills still contributes its importance weight once.
+ */
+export function requirementCoverageFromAssessments(
+  assessments: RequirementAssessment[],
+  importanceById: ReadonlyMap<number, RequirementImportance>,
+) {
+  return calculateRequirementCoverage(
+    assessments.map((assessment) => ({
+      evidenceStatus: assessment.evidenceStatus,
+      importance: importanceById.get(assessment.jobRequirementId) ?? 'mentioned',
+    })),
+  )
 }

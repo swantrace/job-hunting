@@ -14,7 +14,7 @@ describe('application generation readiness', () => {
     expect(result.reasons).toContain('Analyze this application first.')
     expect(result.reasons).toContain('Confirm a generation profile first.')
     expect(result.reasons).toContain(
-      'Resolve every missing-skill decision before generating documents.',
+      'Resolve every unverified-skill decision before generating documents.',
     )
   })
 

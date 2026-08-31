@@ -1,6 +1,5 @@
 import { z } from 'zod'
 import { applicationGenerationPromptVersion } from '../ai/prompts/application-generation'
-import { candidateFitSchema } from '../ai/schemas/candidate-fit'
 import {
   type GenerationSource,
   getBaselineGenerationRun,
@@ -9,6 +8,7 @@ import {
 } from '../db/generation'
 import { loadCareerData } from './career-data'
 import { todayISO } from './date'
+import { parseCandidateFitResult } from './evidence/status'
 import { parseJobAnalysisResult } from './job-analysis-result'
 import { calculateRequirementCoverage } from './requirements/score'
 import { generationEligibleRequirements } from './skills/generation-eligibility'
@@ -254,10 +254,10 @@ export function buildEvidenceSelectionSnapshot(
   if (!analysisRun?.resultJson)
     return evidenceSelectionSnapshotV1Schema.parse({ ...base, version: 1 })
 
-  const fit = candidateFitSchema.safeParse(JSON.parse(analysisRun.resultJson))
-  if (!fit.success) return evidenceSelectionSnapshotV1Schema.parse({ ...base, version: 1 })
+  const fit = parseCandidateFitResult(analysisRun.resultJson)
+  if (!fit) return evidenceSelectionSnapshotV1Schema.parse({ ...base, version: 1 })
 
-  const assessments = fit.data.requirementAssessments
+  const assessments = fit.requirementAssessments
   const importanceById = new Map(source.jobRequirements.map((item) => [item.id, item.importance]))
   return evidenceSelectionSnapshotV2Schema.parse({
     ...base,
@@ -267,7 +267,7 @@ export function buildEvidenceSelectionSnapshot(
     jobAnalysisSchemaVersion: source.analysis?.schemaVersion ?? null,
     candidateFitPromptVersion: analysisRun.promptVersion ?? '',
     confirmedProfileId: analysisRun.confirmedProfileId,
-    fitRecommendation: fit.data.fitRecommendation,
+    fitRecommendation: fit.fitRecommendation,
     requirementAssessments: assessments,
     requirementCoverage: calculateRequirementCoverage(
       assessments.map((assessment) => ({

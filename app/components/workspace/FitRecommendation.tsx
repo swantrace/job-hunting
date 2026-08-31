@@ -1,14 +1,5 @@
-import { candidateFitSchema } from '../../../src/ai/schemas/candidate-fit'
 import type { ApplicationAnalysisRun } from '../../../src/db/analysis'
-
-function parseResult(run: ApplicationAnalysisRun | null) {
-  if (!run?.resultJson) return null
-  try {
-    return candidateFitSchema.parse(JSON.parse(run.resultJson))
-  } catch {
-    return null
-  }
-}
+import { parseCandidateFitResult } from '../../../src/lib/evidence/status'
 
 export function FitRecommendation({
   run,
@@ -17,7 +8,7 @@ export function FitRecommendation({
   run: ApplicationAnalysisRun | null
   oob?: boolean
 }) {
-  const result = parseResult(run)
+  const result = parseCandidateFitResult(run?.resultJson)
   if (!result) {
     return (
       <section

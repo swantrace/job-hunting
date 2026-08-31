@@ -45,7 +45,7 @@ export function assessApplicationReadiness(input: ApplicationReadinessInput): Ap
     reasons.push('Candidate analysis is stale — re-run it before generating documents.')
   if (!input.profileConfirmed) reasons.push('Confirm a generation profile first.')
   if (input.hasPendingSkillDecisions)
-    reasons.push('Resolve every missing-skill decision before generating documents.')
+    reasons.push('Resolve every unverified-skill decision before generating documents.')
   return { ready: reasons.length === 0, reasons }
 }
 
