@@ -12,7 +12,7 @@ import { evidenceRelevances, evidenceSourceTypes } from '../../lib/evidence/cons
 export const candidateFitSchemaVersion = '1.0.0'
 
 const fitRecommendations = ['apply', 'apply-selectively', 'skip'] as const
-const evidenceStatuses = ['direct', 'transferable', 'missing'] as const
+const evidenceStatuses = ['direct', 'transferable', 'unknown-evidence'] as const
 export const evidenceRefSchema = z
   .object({
     sourceType: z.enum(evidenceSourceTypes),
@@ -86,10 +86,10 @@ export const candidateFitSchema = z
           path: ['requirementAssessments', index, 'evidenceRefs'],
         })
 
-      if (assessment.evidenceStatus === 'missing' && assessment.evidenceRefs.length > 0)
+      if (assessment.evidenceStatus === 'unknown-evidence' && assessment.evidenceRefs.length > 0)
         ctx.addIssue({
           code: 'custom',
-          message: 'Missing assessments must not contain evidence references.',
+          message: 'Unknown-evidence assessments must not contain evidence references.',
           path: ['requirementAssessments', index, 'evidenceRefs'],
         })
 

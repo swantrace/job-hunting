@@ -11,8 +11,8 @@ describe('deterministic requirement evidence coverage', () => {
     const result = calculateRequirementCoverage([
       { evidenceStatus: 'direct', importance: 'required' },
       { evidenceStatus: 'transferable', importance: 'required' },
-      { evidenceStatus: 'missing', importance: 'preferred' },
-      { evidenceStatus: 'missing', importance: 'mentioned' },
+      { evidenceStatus: 'unknown-evidence', importance: 'preferred' },
+      { evidenceStatus: 'unknown-evidence', importance: 'mentioned' },
     ])
 
     expect(result.directCoverage).toEqual({
@@ -30,7 +30,7 @@ describe('deterministic requirement evidence coverage', () => {
   contractTest('excludes mentioned requirements from the denominator', async () => {
     const { calculateRequirementCoverage } = await import(scorePath)
     const result = calculateRequirementCoverage([
-      { evidenceStatus: 'missing', importance: 'mentioned' },
+      { evidenceStatus: 'unknown-evidence', importance: 'mentioned' },
     ])
 
     expect(result.directCoverage.percentage).toBeNull()
@@ -44,7 +44,7 @@ describe('deterministic requirement evidence coverage', () => {
       const result = calculateRequirementCoverage([
         { evidenceStatus: 'transferable', importance: 'required' },
         { evidenceStatus: 'transferable', importance: 'preferred' },
-        { evidenceStatus: 'missing', importance: 'required' },
+        { evidenceStatus: 'unknown-evidence', importance: 'required' },
       ])
 
       expect(result.directCoverage.matchedWeight).toBe(0)

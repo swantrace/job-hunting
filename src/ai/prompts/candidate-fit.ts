@@ -19,7 +19,8 @@ Boundary rules:
 
 Assessment rules:
 - Every supplied job requirement receives exactly one assessment by jobRequirementId.
-- evidenceStatus is direct, transferable, or missing. Direct or transferable requires at least one evidence reference; missing must have none.
+- evidenceStatus is direct, transferable, or unknown-evidence. Direct or transferable requires at least one evidence reference; unknown-evidence must have none.
+- unknown-evidence means supplied Career Data does not verify the requirement. It never proves the user lacks a skill.
 - relevance is direct or transferable and describes how the referenced source supports the requirement.
 
 Return only the JSON object required by the schema.`

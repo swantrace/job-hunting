@@ -9,6 +9,7 @@ import {
 const row = (overrides: Partial<CareerGrowthInputRow> = {}): CareerGrowthInputRow => ({
   skillKey: 'fhir',
   skillName: 'FHIR',
+  category: null,
   directionCount: 1,
   activeApplicationCount: 1,
   requiredCount: 0,

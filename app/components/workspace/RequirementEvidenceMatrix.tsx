@@ -1,25 +1,20 @@
-import { candidateFitSchema } from '../../../src/ai/schemas/candidate-fit'
 import type { ApplicationAnalysisRun } from '../../../src/db/analysis'
 import type { JobRequirement } from '../../../src/db/job-analysis'
+import { parseStoredCandidateFit } from '../../../src/lib/candidate-fit-result'
 
 function parseResult(run: ApplicationAnalysisRun | null) {
-  if (!run?.resultJson) return null
-  try {
-    return candidateFitSchema.parse(JSON.parse(run.resultJson))
-  } catch {
-    return null
-  }
+  return parseStoredCandidateFit(run?.resultJson ?? null)
 }
 
 const statusBadge = {
   direct: 'badge-success',
   transferable: 'badge-warning',
-  missing: 'badge-error',
+  'unknown-evidence': 'badge-neutral',
 } as const
 const statusLabel = {
   direct: 'Direct',
   transferable: 'Transferable',
-  missing: 'Missing',
+  'unknown-evidence': 'Unverified',
 } as const
 
 export function RequirementEvidenceMatrix({
@@ -58,6 +53,8 @@ export function RequirementEvidenceMatrix({
               <tr>
                 <th>#</th>
                 <th>Requirement</th>
+                <th>Importance</th>
+                <th>Source excerpt</th>
                 <th>Evidence</th>
                 <th>Status</th>
               </tr>
@@ -73,6 +70,10 @@ export function RequirementEvidenceMatrix({
                       {requirement.basis === 'inferred' ? (
                         <span class="badge badge-warning badge-sm ml-2">Inferred</span>
                       ) : null}
+                    </td>
+                    <td class="text-base-content/70">{requirement.importance}</td>
+                    <td class="min-w-40 max-w-64 text-xs italic text-base-content/60">
+                      {requirement.sourceText ?? '—'}
                     </td>
                     <td class="min-w-40 text-base-content/70">
                       {assessment?.evidenceRefs.length

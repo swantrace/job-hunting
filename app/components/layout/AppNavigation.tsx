@@ -16,6 +16,7 @@ const links = [
     label: 'Career documents',
     section: 'Career',
   },
+  { href: '/career-growth', icon: 'sparkle', label: 'Career growth', section: 'Career' },
   { href: '/skills', icon: 'tag', label: 'Skills', section: 'Career' },
   { href: '/companies', icon: 'building', label: 'Companies', section: 'Network' },
   { href: '/contacts', icon: 'users', label: 'Contacts', section: 'Network' },

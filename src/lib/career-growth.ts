@@ -18,6 +18,7 @@ export type CareerGrowthInputRow = {
   /** Canonical skill key (identity), never a display label. */
   skillKey: string
   skillName: string
+  category: string | null
   /** Distinct directions the skill appeared under. */
   directionCount: number
   /** Distinct active applications the skill appeared in. */
@@ -98,6 +99,7 @@ export function rankCareerGrowthOpportunities(
       continue
     }
     existing.skillName = existing.skillName || row.skillName
+    existing.category = existing.category ?? row.category
     existing.directionCount = Math.max(existing.directionCount, row.directionCount)
     existing.activeApplicationCount = Math.max(
       existing.activeApplicationCount,

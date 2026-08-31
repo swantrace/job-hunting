@@ -1,5 +1,5 @@
 export type RequirementImportance = 'required' | 'preferred' | 'mentioned'
-export type RequirementEvidenceStatus = 'direct' | 'transferable' | 'missing'
+export type RequirementEvidenceStatus = 'direct' | 'transferable' | 'unknown-evidence'
 
 export type CoverageRequirement = {
   evidenceStatus: RequirementEvidenceStatus
