@@ -44,12 +44,14 @@ export function SkillGapPanel({
   requirements,
   careerEvidence,
   canDecide = true,
+  oob = false,
 }: {
   job: JobCardData
   filters: Filters
   requirements: RunSkillReview[]
   careerEvidence: Record<string, string[]>
   canDecide?: boolean
+  oob?: boolean
 }) {
   const scores = calculateSkillScores(
     requirements.map((item) => ({
@@ -64,7 +66,7 @@ export function SkillGapPanel({
   const groups = groupRequirements(requirements)
 
   return (
-    <div id="skill-review-panel">
+    <div id="skill-review-panel" {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}>
       <section class="mb-4 grid gap-3 sm:grid-cols-3">
         <div id="skill-readiness" class="rounded-box border border-base-300 p-3">
           <p class="text-sm font-medium">Readiness</p>
