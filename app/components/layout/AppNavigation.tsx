@@ -5,6 +5,12 @@ const links = [
   { href: '/', icon: 'dashboard', label: 'Dashboard', section: 'Workspace' },
   { href: '/applications', icon: 'briefcase', label: 'Applications', section: 'Workspace' },
   {
+    href: '/applications/import',
+    icon: 'archive',
+    label: 'Import jobs',
+    section: 'Workspace',
+  },
+  {
     href: '/career-documents',
     icon: 'document',
     label: 'Career documents',

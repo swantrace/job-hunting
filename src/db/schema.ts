@@ -11,6 +11,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
 import { priorities, statuses } from '../lib/applications/constants'
+import { intakeItemKinds, jobIntakeItemStatuses } from '../lib/batch-intake'
 import { generatedArtifactTypes, runStatuses } from '../lib/generation/constants'
 import { persistedRequirementBases, requirementTypes } from '../lib/job-requirements/constants'
 import {
@@ -658,6 +659,52 @@ export const interviews = sqliteTable(
   (table) => [index('interviews_job_date_idx').on(table.jobApplicationId, table.interviewDate)],
 )
 
+export const jobIntakeBatches = sqliteTable(
+  'job_intake_batches',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [],
+)
+
+export const jobIntakeItems = sqliteTable(
+  'job_intake_items',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    batchId: integer('batch_id')
+      .notNull()
+      .references(() => jobIntakeBatches.id, { onDelete: 'cascade' }),
+    sequence: integer('sequence').notNull(),
+    kind: text('kind', { enum: intakeItemKinds }).notNull(),
+    raw: text('raw').notNull(),
+    normalizedUrl: text('normalized_url'),
+    extractedText: text('extracted_text'),
+    status: text('status', { enum: jobIntakeItemStatuses }).notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    errorMessage: text('error_message'),
+    jobApplicationId: integer('job_application_id').references(() => jobApplications.id, {
+      onDelete: 'set null',
+    }),
+    jobPostingId: integer('job_posting_id').references(() => jobPostings.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('job_intake_items_batch_sequence_unique_idx').on(table.batchId, table.sequence),
+    index('job_intake_items_batch_idx').on(table.batchId),
+    index('job_intake_items_status_idx').on(table.status),
+    check('job_intake_items_kind_check', sql`${table.kind} in ('url', 'text')`),
+    check(
+      'job_intake_items_status_check',
+      sql`${table.status} in ('pending', 'needs-pasted-text', 'ready', 'failed')`,
+    ),
+  ],
+)
+
 export type JobApplication = typeof jobApplications.$inferSelect
 export type Contact = typeof contacts.$inferSelect
 export type JobPosting = typeof jobPostings.$inferSelect
@@ -672,6 +719,8 @@ export type ApplicationAnalysisRun = typeof applicationAnalysisRuns.$inferSelect
 export type AnalysisRunDecision = typeof analysisRunDecisions.$inferSelect
 export type Skill = typeof skills.$inferSelect
 export type SkillAlias = typeof skillAliases.$inferSelect
+export type JobIntakeBatch = typeof jobIntakeBatches.$inferSelect
+export type JobIntakeItem = typeof jobIntakeItems.$inferSelect
 
 export type { JobStatus } from '../lib/applications/constants'
 export type { SkillDecision, SkillImportance, SkillOrigin, SkillReviewStatus }

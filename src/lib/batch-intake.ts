@@ -13,6 +13,10 @@ export type IntakeItemKind = (typeof intakeItemKinds)[number]
 export const intakeItemStates = ['pending', 'needs-pasted-text'] as const
 export type IntakeItemState = (typeof intakeItemStates)[number]
 
+/** Persisted runtime statuses for a batch intake item. */
+export const jobIntakeItemStatuses = ['pending', 'needs-pasted-text', 'ready', 'failed'] as const
+export type JobIntakeItemStatus = (typeof jobIntakeItemStatuses)[number]
+
 export type BatchIntakeItem = {
   /** 1-based position in the original input, preserved across validation. */
   index: number

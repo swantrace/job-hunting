@@ -7,6 +7,7 @@ import {
 } from '../src/lib/document-review-queue'
 import { recoverQueuedGenerationRuns, startGenerationWorker } from '../src/lib/generation-queue'
 import { recoverQueuedJobAnalysisRuns, startJobAnalysisWorker } from '../src/lib/job-analysis-queue'
+import { recoverPendingJobIntakeItems } from '../src/lib/job-intake-queue'
 
 console.log('run createApp')
 assertDatabaseReady()
@@ -25,5 +26,8 @@ void recoverQueuedJobAnalysisRuns().catch((error) =>
 )
 void recoverQueuedDocumentReviews().catch((error) =>
   console.error('Document review queue recovery failed', error),
+)
+void recoverPendingJobIntakeItems().catch((error) =>
+  console.error('Job intake recovery failed', error),
 )
 export default createApp()
