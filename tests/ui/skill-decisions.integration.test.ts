@@ -12,7 +12,6 @@ const requirement = {
   skillName: 'Kafka',
   skillKey: 'kafka',
   category: 'messaging-async',
-  careerSkillId: null,
   reviewStatus: 'pending',
   requirementId: 3,
   requirementSequence: 1,

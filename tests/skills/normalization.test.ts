@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { normalizeSkillAlias } from '../../src/lib/skills/normalize'
+import { canonicalSkillKey, normalizeSkillAlias } from '../../src/lib/skills/normalize'
 import {
   createBaselineMigrationFolder,
   migratedDatabase,
@@ -78,5 +78,14 @@ describe('shared skill alias normalization', () => {
     const cFamily = ['C', 'C++', 'C#'].map(normalizeSkillAlias)
     expect(new Set(cFamily).size).toBe(3)
     expect(normalizeSkillAlias('.NET')).not.toBe(normalizeSkillAlias('net'))
+  })
+})
+
+describe('canonical skill keys', () => {
+  test('creates predictable lowercase machine IDs without ambiguous punctuation', () => {
+    expect(canonicalSkillKey('Node.js')).toBe('nodejs')
+    expect(canonicalSkillKey('REST API')).toBe('rest-api')
+    expect(canonicalSkillKey('C++')).toBe('c-plus-plus')
+    expect(canonicalSkillKey('C#')).toBe('c-sharp')
   })
 })

@@ -24,7 +24,7 @@ function seedJdSkill(sqlite: ReturnType<typeof database>['sqlite'], key: string,
 }
 
 describe('career skill synchronization', () => {
-  test('links a later career skill to a JD-discovered pending skill', () => {
+  test('promotes the same immutable key when it later appears in career data', () => {
     const { sqlite, db } = database()
     try {
       const jdSkill = seedJdSkill(sqlite, 'kafka', 'Apache Kafka')
@@ -34,18 +34,18 @@ describe('career skill synchronization', () => {
         { apply: true },
       )
 
-      expect(report.linked).toBe(1)
+      expect(report.updated).toBe(1)
       expect(report.inserted).toBe(0)
       const row = sqlite
-        .query('SELECT career_skill_id, review_status, name, key FROM skills WHERE id = ?')
+        .query('SELECT review_status, origin, name, key FROM skills WHERE id = ?')
         .get(jdSkill.id) as {
-        career_skill_id: string | null
         review_status: string
+        origin: string
         name: string
         key: string
       }
-      expect(row.career_skill_id).toBe('kafka')
       expect(row.review_status).toBe('approved')
+      expect(row.origin).toBe('career-data')
       expect(row.name).toBe('Kafka')
       expect(row.key).toBe('kafka')
     } finally {
@@ -64,13 +64,11 @@ describe('career skill synchronization', () => {
       )
 
       const row = sqlite
-        .query('SELECT career_skill_id, review_status, origin FROM skills WHERE id = ?')
+        .query('SELECT review_status, origin FROM skills WHERE id = ?')
         .get(jenkins.id) as {
-        career_skill_id: string | null
         review_status: string
         origin: string
       }
-      expect(row.career_skill_id).toBeNull()
       expect(row.review_status).toBe('pending')
       expect(row.origin).toBe('job-parser')
     } finally {
@@ -89,7 +87,6 @@ describe('career skill synchronization', () => {
 
       expect(first.inserted).toBe(1)
       expect(second.inserted).toBe(0)
-      expect(second.linked).toBe(0)
       expect(second.updated).toBe(0)
       expect(second.unchanged).toBe(1)
       expect(
@@ -140,15 +137,15 @@ describe('career skill synchronization', () => {
 
       expect(report.conflicted).toBe(0)
       const mergedRow = sqlite
-        .query('SELECT review_status, career_skill_id FROM skills WHERE id = ?')
-        .get(source.id) as { review_status: string; career_skill_id: string | null }
+        .query('SELECT review_status FROM skills WHERE id = ?')
+        .get(source.id) as { review_status: string }
       expect(mergedRow.review_status).toBe('merged')
-      expect(mergedRow.career_skill_id).toBeNull()
 
       const targetRow = sqlite
-        .query('SELECT career_skill_id, review_status FROM skills WHERE id = ?')
-        .get(target.id) as { career_skill_id: string | null; review_status: string }
-      expect(targetRow.career_skill_id).toBe('react')
+        .query('SELECT key, origin, review_status FROM skills WHERE id = ?')
+        .get(target.id) as { key: string; origin: string; review_status: string }
+      expect(targetRow.key).toBe('react')
+      expect(targetRow.origin).toBe('career-data')
       expect(targetRow.review_status).toBe('approved')
     } finally {
       sqlite.close()

@@ -67,7 +67,6 @@ export const skills = sqliteTable(
     category: text('category').references(() => skillCategories.key, { onDelete: 'restrict' }),
     reviewStatus: text('review_status', { enum: skillReviewStatuses }).notNull().default('pending'),
     origin: text('origin', { enum: skillOrigins }).notNull().default('manual'),
-    careerSkillId: text('career_skill_id'),
     mergedIntoSkillId: integer('merged_into_skill_id').references(
       (): AnySQLiteColumn => skills.id,
       { onDelete: 'restrict' },
@@ -77,7 +76,6 @@ export const skills = sqliteTable(
   },
   (table) => [
     uniqueIndex('skills_key_unique_idx').on(table.key),
-    uniqueIndex('skills_career_skill_id_unique_idx').on(table.careerSkillId),
     index('skills_review_status_idx').on(table.reviewStatus),
     index('skills_category_idx').on(table.category),
     index('skills_origin_idx').on(table.origin),

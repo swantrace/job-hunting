@@ -21,7 +21,6 @@ function requirement(overrides: Record<string, unknown> = {}) {
     skillName: 'Kafka',
     skillKey: 'kafka',
     category: 'messaging-async',
-    careerSkillId: null,
     reviewStatus: 'pending',
     aliases: [],
     requirementId: 1,

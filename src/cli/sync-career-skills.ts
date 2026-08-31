@@ -58,7 +58,6 @@ function main() {
 
   const lines = [
     `inserted: ${report.inserted}`,
-    `linked: ${report.linked}`,
     `updated: ${report.updated}`,
     `unchanged: ${report.unchanged}`,
     `conflicted: ${report.conflicted}`,

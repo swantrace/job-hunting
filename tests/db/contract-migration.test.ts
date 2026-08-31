@@ -59,8 +59,8 @@ describe('destructive contract migration', () => {
       expect(posting.content_hash).toBe(fixture.preservedJobPostings[0].contentHash)
       expect(posting.version).toBe(1)
 
-      // Canonical skills and Drive connection preserved.
-      expect(sqlite.query('SELECT count(*) AS count FROM skills').get()).toEqual({ count: 4 })
+      // Legacy skills reset; Drive connection preserved.
+      expect(sqlite.query('SELECT count(*) AS count FROM skills').get()).toEqual({ count: 0 })
       expect(sqlite.query('SELECT count(*) AS count FROM google_drive_connections').get()).toEqual({
         count: 1,
       })

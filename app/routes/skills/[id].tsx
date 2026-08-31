@@ -24,6 +24,9 @@ function filters(c: Context): SkillFilters {
 function selected(id: number) {
   return listSkillsOverview().find((skill) => skill.id === id)
 }
+function mergeTargets(id: number) {
+  return listSkillsOverview().filter((skill) => skill.id !== id && skill.reviewStatus !== 'merged')
+}
 function results(value: SkillFilters) {
   return listSkillsOverview().filter(
     (skill) =>
@@ -36,7 +39,9 @@ function results(value: SkillFilters) {
 export const GET = createRoute((c) => {
   const skill = selected(Number(c.req.param('id')))
   return skill
-    ? c.html(<SkillEditForm skill={skill} filters={filters(c)} />)
+    ? c.html(
+        <SkillEditForm skill={skill} filters={filters(c)} mergeTargets={mergeTargets(skill.id)} />,
+      )
     : c.text('Not found.', 404)
 })
 
@@ -52,6 +57,7 @@ export const PUT = createRoute(async (c) => {
         skill={skill}
         filters={currentFilters}
         errors={parsed.error.flatten().fieldErrors}
+        mergeTargets={mergeTargets(id)}
       />,
       422,
     )
@@ -63,6 +69,7 @@ export const PUT = createRoute(async (c) => {
         skill={skill}
         filters={currentFilters}
         errors={{ name: ['Unable to save this skill.'] }}
+        mergeTargets={mergeTargets(id)}
       />,
       409,
     )
@@ -71,7 +78,7 @@ export const PUT = createRoute(async (c) => {
   if (!updated) return c.text('Not found.', 404)
   return c.html(
     <>
-      <SkillEditForm skill={updated} filters={currentFilters} />
+      <SkillEditForm skill={updated} filters={currentFilters} mergeTargets={mergeTargets(id)} />
       <SkillsTable skills={results(currentFilters)} filters={currentFilters} oob />
       <FlashMessage autoDismiss>Skill updated.</FlashMessage>
     </>,

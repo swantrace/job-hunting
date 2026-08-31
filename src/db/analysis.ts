@@ -1,5 +1,6 @@
-import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
+import { careerSkillKeys } from '../lib/skills/runtime-career-skills'
 import { seedPendingRunDecisions } from './analysis-decisions'
 import { db } from './client'
 import {
@@ -177,23 +178,20 @@ export function completeAnalysisRun(
     // explicit lineage seed no decisions.
     const jobPostingAnalysisId = run.jobPostingAnalysisId
     if (jobPostingAnalysisId !== null) {
+      const canonicalKeys = careerSkillKeys()
       const missingSkillIds = [
         ...new Set(
           tx
-            .select({ skillId: jobRequirementsToSkills.skillId })
+            .select({ skillId: jobRequirementsToSkills.skillId, skillKey: skills.key })
             .from(jobRequirementsToSkills)
             .innerJoin(
               jobRequirements,
               eq(jobRequirements.id, jobRequirementsToSkills.jobRequirementId),
             )
             .innerJoin(skills, eq(skills.id, jobRequirementsToSkills.skillId))
-            .where(
-              and(
-                eq(jobRequirements.jobPostingAnalysisId, jobPostingAnalysisId),
-                isNull(skills.careerSkillId),
-              ),
-            )
+            .where(eq(jobRequirements.jobPostingAnalysisId, jobPostingAnalysisId))
             .all()
+            .filter((row) => !canonicalKeys.has(row.skillKey))
             .map((row) => row.skillId),
         ),
       ]
