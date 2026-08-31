@@ -7,6 +7,7 @@ import { buildGenerationInput, generationStalenessReasons } from '../lib/generat
 import type { ApplicationAnalysisRun } from './analysis'
 import { db } from './client'
 import { listJobRequirements } from './job-analysis'
+import { getResumeStrategy, type ResumeStrategy } from './resume-strategy'
 import {
   applicationAnalysisRuns,
   type BaselineGenerationRun,
@@ -45,6 +46,7 @@ export type GenerationSource = {
   jobRequirements: ReturnType<typeof listJobRequirements>
   analysisRun: ApplicationAnalysisRun | null
   companyInterestNote: string | null
+  resumeStrategy: ResumeStrategy | null
 }
 
 export type CreateGenerationRunInput = {
@@ -417,6 +419,7 @@ export function getGenerationSource(runId: number): GenerationSource | null {
     jobRequirements,
     analysisRun: candidateRun ?? null,
     companyInterestNote: null,
+    resumeStrategy: candidateRun ? getResumeStrategy(candidateRun.id) : null,
   }
 }
 

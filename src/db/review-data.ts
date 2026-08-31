@@ -5,6 +5,11 @@ import { db } from './client'
 import { listJobRequirements } from './job-analysis'
 import { getJobAnalysisState } from './job-analysis-runs'
 import { getApplication } from './queries'
+import {
+  buildResumeStrategyDraft,
+  getResumeStrategy,
+  runEvidenceAllowlist,
+} from './resume-strategy'
 import { listRunSkillReviews } from './skill-queries'
 
 /**
@@ -24,6 +29,7 @@ export function loadReviewData(jobId: number) {
   const requirements = jobAnalysis ? listJobRequirements(jobAnalysis.id) : []
   const reviewRunId = state.currentCompleted?.id ?? state.latestCompleted?.id ?? null
   const requirementSkills = reviewRunId ? listRunSkillReviews(reviewRunId) : []
+  const currentRun = state.currentCompleted
   return {
     job,
     jobAnalysis,
@@ -33,5 +39,8 @@ export function loadReviewData(jobId: number) {
     requirements,
     requirementSkills,
     profiles: listProfiles(),
+    resumeStrategy: currentRun ? getResumeStrategy(currentRun.id) : null,
+    resumeStrategyDraft: currentRun ? buildResumeStrategyDraft(currentRun.id) : null,
+    resumeEvidenceAllowlist: currentRun ? [...runEvidenceAllowlist(currentRun)].sort() : [],
   }
 }

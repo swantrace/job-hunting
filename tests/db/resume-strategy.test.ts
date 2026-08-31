@@ -5,6 +5,7 @@ import {
   resumeStrategyContentSchema,
   runEvidenceAllowlist,
 } from '../../src/db/resume-strategy'
+import { buildGenerationEvidenceAllowlist } from '../../src/lib/generation-provenance'
 import { loadExampleCareerData } from '../support/career-data'
 
 function resultJson(assessments: Array<{ jobRequirementId: number; evidenceStatus: string }>) {
@@ -139,5 +140,27 @@ describe('resume strategy evidence allowlist and draft', () => {
     expect(
       buildResumeStrategyDraftFromRun(completedRun({ confirmedProfileId: null }), data),
     ).toBeNull()
+  })
+})
+
+describe('resume strategy generation allowlist', () => {
+  test('excludes de-emphasized evidence from the generation allowlist', () => {
+    const allowlist = buildGenerationEvidenceAllowlist({
+      selection: {
+        experienceIds: ['midato'],
+        achievementIds: ['midato-vite-ci'],
+        projectIds: [],
+        publicationIds: [],
+        storyIds: [],
+        preferredSkillIds: ['typescript'],
+        matchedConditionalSkillIds: [],
+      },
+      provenance: [],
+      resumeStrategy: { deemphasizeEvidenceIds: ['achievement:midato-vite-ci'] },
+    })
+
+    expect(allowlist.has('achievement:midato-vite-ci')).toBe(false)
+    expect(allowlist.has('experience:midato')).toBe(true)
+    expect(allowlist.has('skill:typescript')).toBe(true)
   })
 })

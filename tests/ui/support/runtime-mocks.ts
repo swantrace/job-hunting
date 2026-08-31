@@ -161,6 +161,9 @@ export function reviewDataFixture(overrides: Record<string, any> = {}) {
     requirements: [],
     requirementSkills: [],
     profiles: [],
+    resumeStrategy: null,
+    resumeStrategyDraft: null,
+    resumeEvidenceAllowlist: [],
     ...rest,
   }
 }
