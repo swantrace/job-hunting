@@ -1,5 +1,6 @@
 import { createRoute } from 'honox/factory'
 import { listBaselineGenerationRuns } from '../../../src/db/generation'
+import { baseResumesDirectory, loadApprovedBaseResume } from '../../../src/lib/base-resumes'
 import { enqueueBaselineGeneration } from '../../../src/lib/generation-queue'
 import { listProfiles } from '../../../src/lib/profiles'
 import { parseForm } from '../../../src/lib/request'
@@ -10,6 +11,21 @@ export default createRoute((c) =>
   c.html(<BaselineGenerationPanel runs={listBaselineGenerationRuns()} />),
 )
 
+function approvedBaseResumeError(direction: string): string | null {
+  try {
+    const resume = loadApprovedBaseResume(
+      baseResumesDirectory(),
+      direction,
+      new Set(listProfiles().map((profile) => profile.id)),
+    )
+    return resume
+      ? null
+      : `No approved Base Resume for direction "${direction}". Import one before generating a baseline.`
+  } catch (error) {
+    return error instanceof Error ? error.message : 'Base Resume is unavailable.'
+  }
+}
+
 export const POST = createRoute(async (c) => {
   const parsed = baselineGenerationSchema.safeParse(await parseForm(c))
   if (!parsed.success)
@@ -18,6 +34,12 @@ export const POST = createRoute(async (c) => {
         runs={listBaselineGenerationRuns()}
         error={parsed.error.issues.map((issue) => issue.message).join(' ')}
       />,
+      422,
+    )
+  const baseError = approvedBaseResumeError(parsed.data.direction)
+  if (baseError)
+    return c.html(
+      <BaselineGenerationPanel runs={listBaselineGenerationRuns()} error={baseError} />,
       422,
     )
   const keywords = (parsed.data.targetKeywords ?? '')

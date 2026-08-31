@@ -14,7 +14,7 @@ function panelFor(jobId: number, runId: number, filters: ReturnType<typeof parse
       runId={runId}
       filters={filters}
       review={review}
-      canReview={!!results?.resumeJson && !!results?.coverLetterJson}
+      canReview={!!results?.resumeMarkdown && !!results?.coverLetterMarkdown}
     />
   )
 }

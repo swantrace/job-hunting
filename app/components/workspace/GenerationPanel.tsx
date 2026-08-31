@@ -1,5 +1,9 @@
 import { applicationGenerationPromptVersion } from '../../../src/ai/prompts/application-generation'
-import type { GenerationRunWithArtifacts, GenerationState } from '../../../src/db/generation'
+import {
+  type GenerationRunWithArtifacts,
+  type GenerationState,
+  getGenerationRunResults,
+} from '../../../src/db/generation'
 import type { Filters } from '../../../src/db/queries'
 import type { ApplicationReadiness } from '../../../src/lib/application-readiness'
 import {
@@ -7,6 +11,7 @@ import {
   evidenceSelectionSnapshotSchema,
 } from '../../../src/lib/evidence-selection'
 import { ArtifactActions } from './ArtifactActions'
+import { DraftReview } from './DraftReview'
 import { query } from './helpers'
 
 function generationCopy(state?: GenerationState) {
@@ -80,6 +85,7 @@ export function GenerationPanel({
           : 'badge-info'
   const shouldPoll = latest?.status === 'Queued' || latest?.status === 'Processing'
   const snapshot = parseEvidenceSnapshot(evidenceSnapshot)
+  const results = usableCompleted ? getGenerationRunResults(usableCompleted.id) : null
   return (
     <section
       id="generation-panel"
@@ -159,6 +165,11 @@ export function GenerationPanel({
               ))}
             </div>
           ) : null}
+          <DraftReview
+            resumeMarkdown={results?.resumeMarkdown ?? null}
+            coverLetterMarkdown={results?.coverLetterMarkdown ?? null}
+            draftValidationJson={results?.draftValidationJson ?? null}
+          />
           {snapshot ? <EvidenceReview snapshot={snapshot} runId={usableCompleted.id} /> : null}
         </div>
       ) : latest ? (
