@@ -9,6 +9,7 @@ primary_region = 'yyz'
 [build]
 
 [env]
+  APP_AUTH_REQUIRED = "true"
   DB_FILE_NAME = "/data/jobs.db"
   QUEUE_FILE_NAME = "/data/bunqueue.db"
   ARTIFACTS_DIR = "/data/artifacts"

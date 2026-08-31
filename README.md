@@ -136,6 +136,21 @@ The Fly app defaults to `FLY_APP_NAME` and then the `app` value in `fly.toml`. F
 
 Copy `.env.example` to `.env` for local development. `OPENAI_API_KEY` is needed only for AI parsing, analysis, and document generation. Google OAuth variables are needed only for optional Drive uploads. `CAREER_DATA_DIR` and `CAREER_PROFILES_DIR` optionally point to the runtime fact directories; local defaults are `career-data` and `profiles`. The skill taxonomy is always loaded from `skill-taxonomy.json` inside `CAREER_DATA_DIR`. Each specialized model variable (`OPENAI_MODEL_JOB_PARSER`, `OPENAI_MODEL_CANDIDATE_FIT`, `OPENAI_MODEL_RESUME`, `OPENAI_MODEL_COVER_LETTER`, `OPENAI_MODEL_DOCUMENT_REVIEW`) falls back to `OPENAI_MODEL_DEFAULT`.
 
+### Private deployment authentication
+
+Fly deployment is fail-closed because `fly.toml` sets `APP_AUTH_REQUIRED=true`. Before deploying, generate a password, display it once, save it in a password manager, and set both credentials as Fly secrets:
+
+```sh
+APP_AUTH_PASSWORD="$(openssl rand -base64 32)"
+printf 'Job Tracker password: %s\n' "$APP_AUTH_PASSWORD"
+fly secrets set --app job-hunting \
+  APP_AUTH_USERNAME='fred' \
+  APP_AUTH_PASSWORD="$APP_AUTH_PASSWORD"
+unset APP_AUTH_PASSWORD
+```
+
+The browser presents its native Basic Auth prompt. Without both secrets, production returns `503` instead of exposing the application. Local development remains open while `APP_AUTH_REQUIRED=false`; set the username and password in the ignored `.env` file when local authentication testing is needed. Every application route also uses same-origin CSRF validation, security headers, and `Cache-Control: no-store`.
+
 ### GitHub Actions deployment
 
 The workflow in `.github/workflows/ci-cd.yml` runs formatting, typechecking, tests, and a production build for pull requests and pushes to `main`. It does not deploy automatically. To deploy, open **Actions**, select **CI and Fly Deploy**, choose **Run workflow** from `main`, and run it after CI passes. Add a repository secret named `FLY_API_TOKEN` before the first manual deployment.
