@@ -72,10 +72,10 @@ export function parseOptions(args: string[]): Options {
   return { app, machine, syncDb, selections }
 }
 
-function ensureAllowedPath(path: string) {
-  const absolute = resolve(projectRoot, path)
+function ensureAllowedPath(path: string, rootDirectory: string) {
+  const absolute = resolve(rootDirectory, path)
   const root = allowedRoots.find((candidate) => {
-    const absoluteRoot = resolve(projectRoot, candidate)
+    const absoluteRoot = resolve(rootDirectory, candidate)
     return absolute === absoluteRoot || absolute.startsWith(`${absoluteRoot}${sep}`)
   })
   if (!root) throw new Error(`Selection must be inside career-data/ or profiles/: ${path}`)
@@ -100,25 +100,29 @@ function jsonFiles(path: string): string[] {
     .sort()
 }
 
-export function selectedFiles(selections: string[]) {
+export function selectedFiles(selections: string[], rootDirectory = projectRoot) {
   const requested = selections.length ? selections : [...allowedRoots]
   const files = new Set<string>()
   for (const selection of requested) {
     const normalized = selection.replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/$/, '')
-    const { absolute } = ensureAllowedPath(normalized)
+    const { absolute } = ensureAllowedPath(normalized, rootDirectory)
     for (const file of jsonFiles(absolute)) files.add(file)
   }
   return [...files].sort()
 }
 
-function remotePath(localPath: string) {
-  const path = relative(projectRoot, localPath).split(sep).join('/')
+function remotePath(localPath: string, rootDirectory: string) {
+  const path = relative(rootDirectory, localPath).split(sep).join('/')
   return `/data/${path}`
 }
 
-export function remoteUploadPaths(localPath: string, uploadId: string) {
+export function remoteUploadPaths(
+  localPath: string,
+  uploadId: string,
+  rootDirectory = projectRoot,
+) {
   if (!/^[a-zA-Z0-9-]+$/.test(uploadId)) throw new Error('Invalid upload ID.')
-  const destination = remotePath(localPath)
+  const destination = remotePath(localPath, rootDirectory)
   return {
     destination,
     temporary: `${destination}.upload-${uploadId}`,
