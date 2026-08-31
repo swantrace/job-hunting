@@ -10,6 +10,7 @@ function snapshot(overrides: Record<string, unknown> = {}) {
     confirmedProfileId: 'fullstack',
     decisions: [{ skillId: 1, decision: 'skip' }],
     reasons: [],
+    strategy: null,
     evidenceHash: 'evidence-hash',
     generationPromptVersion: '2.1.0',
     generationSchemaVersion: '2.1.0',
@@ -49,6 +50,21 @@ describe('generation staleness reason codes', () => {
       }),
     )
     expect(reasons).toContain('skill-decisions-changed')
+  })
+
+  test('detects resume strategy changes', () => {
+    const reasons = generationStalenessReasons(
+      snapshot(),
+      snapshot({
+        strategy: {
+          positioning: 'Backend-leaning',
+          primaryThemes: ['API design'],
+          emphasizeEvidenceIds: ['skill:typescript'],
+          deemphasizeEvidenceIds: [],
+        },
+      }),
+    )
+    expect(reasons).toContain('resume-strategy-changed')
   })
 
   test('detects career evidence changes', () => {

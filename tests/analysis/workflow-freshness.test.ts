@@ -170,6 +170,7 @@ describe('documents input hash', () => {
     confirmedProfileId: 'fullstack',
     decisions: [],
     reasons: [],
+    strategy: null,
     evidenceHash: 'evidence-hash-a',
     generationPromptVersion: '2.1.0',
     generationSchemaVersion: '2.1.0',

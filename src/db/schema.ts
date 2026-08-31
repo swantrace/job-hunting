@@ -390,6 +390,41 @@ export const analysisRunDecisions = sqliteTable(
   ],
 )
 
+export const analysisRunResumeStrategies = sqliteTable(
+  'analysis_run_resume_strategies',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    applicationAnalysisRunId: integer('application_analysis_run_id')
+      .notNull()
+      .references(() => applicationAnalysisRuns.id, { onDelete: 'cascade' }),
+    positioning: text('positioning').notNull(),
+    primaryThemes: text('primary_themes').notNull(),
+    emphasizeEvidenceIds: text('emphasize_evidence_ids').notNull(),
+    deemphasizeEvidenceIds: text('deemphasize_evidence_ids').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('analysis_run_resume_strategies_run_unique_idx').on(table.applicationAnalysisRunId),
+    check(
+      'analysis_run_resume_strategies_positioning_check',
+      sql`trim(${table.positioning}) != ''`,
+    ),
+    check(
+      'analysis_run_resume_strategies_primary_themes_json_check',
+      sql`json_valid(${table.primaryThemes})`,
+    ),
+    check(
+      'analysis_run_resume_strategies_emphasize_json_check',
+      sql`json_valid(${table.emphasizeEvidenceIds})`,
+    ),
+    check(
+      'analysis_run_resume_strategies_deemphasize_json_check',
+      sql`json_valid(${table.deemphasizeEvidenceIds})`,
+    ),
+  ],
+)
+
 export const generationRuns = sqliteTable(
   'generation_runs',
   {
@@ -650,6 +685,7 @@ export type DocumentReview = typeof documentReviews.$inferSelect
 export type BaselineGenerationRun = typeof baselineGenerationRuns.$inferSelect
 export type ApplicationAnalysisRun = typeof applicationAnalysisRuns.$inferSelect
 export type AnalysisRunDecision = typeof analysisRunDecisions.$inferSelect
+export type AnalysisRunResumeStrategy = typeof analysisRunResumeStrategies.$inferSelect
 export type Skill = typeof skills.$inferSelect
 export type SkillAlias = typeof skillAliases.$inferSelect
 
