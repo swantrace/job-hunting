@@ -9,6 +9,7 @@ import { FitRecommendation } from '../../../components/workspace/FitRecommendati
 import { query } from '../../../components/workspace/helpers'
 import { ProfileRecommendation } from '../../../components/workspace/ProfileRecommendation'
 import { RequirementEvidenceMatrix } from '../../../components/workspace/RequirementEvidenceMatrix'
+import { ResumeStrategy } from '../../../components/workspace/ResumeStrategy'
 import { ReviewReadiness } from '../../../components/workspace/ReviewReadiness'
 import { SkillGapPanel } from '../../../components/workspace/SkillGapPanel'
 
@@ -106,6 +107,19 @@ function statusFragment(jobId: number, filters: ReturnType<typeof parseFilters>)
             requirements={review.requirementSkills}
             careerEvidence={careerSkillEvidenceMap()}
             canDecide={review.state.state === 'current' && !!review.state.currentCompleted}
+            oob
+          />
+          <ResumeStrategy
+            jobId={jobId}
+            filters={filters}
+            run={review.state.currentCompleted}
+            strategy={review.resumeStrategy}
+            draft={review.resumeStrategyDraft}
+            allowlist={review.resumeEvidenceAllowlist}
+            canEdit={
+              review.state.state === 'current' &&
+              !!review.state.currentCompleted?.confirmedProfileId
+            }
             oob
           />
           <ReviewReadiness

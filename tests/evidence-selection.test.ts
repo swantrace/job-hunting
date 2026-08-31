@@ -272,6 +272,7 @@ describe('documents freshness from frozen evidence', () => {
         confirmedProfileId: 'fullstack',
         decisions: [{ skillId: 2, decision: 'skip' }],
         reasons: [],
+        strategy: null,
         evidenceHash: 'evidence-hash',
         generationPromptVersion: '2.1.0',
         generationSchemaVersion: '2.1.0',

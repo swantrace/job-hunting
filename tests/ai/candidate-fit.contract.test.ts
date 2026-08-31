@@ -39,9 +39,9 @@ function validFitAnalysis() {
       },
       {
         jobRequirementId: 102,
-        evidenceStatus: 'missing',
+        evidenceStatus: 'unknown-evidence',
         evidenceRefs: [],
-        explanation: 'No verified mentoring evidence is available.',
+        explanation: 'No verified mentoring evidence is available in the supplied career data.',
         confidence: 0.91,
       },
     ],
@@ -75,7 +75,7 @@ describe('candidate fit and evidence-matrix contract', () => {
     expect(candidateFitSchema.safeParse(invalid).success).toBe(false)
   })
 
-  contractTest('forbids evidence references on a missing assessment', async () => {
+  contractTest('forbids evidence references on an unknown-evidence assessment', async () => {
     const { candidateFitSchema } = await import(schemaPath)
     const invalid = validFitAnalysis()
     invalid.requirementAssessments[1].evidenceRefs = [
@@ -83,6 +83,22 @@ describe('candidate fit and evidence-matrix contract', () => {
     ]
 
     expect(candidateFitSchema.safeParse(invalid).success).toBe(false)
+  })
+
+  contractTest('rejects the legacy missing status for new model output', async () => {
+    const { candidateFitSchema } = await import(schemaPath)
+    const legacy = validFitAnalysis()
+    legacy.requirementAssessments[1].evidenceStatus = 'missing'
+
+    expect(candidateFitSchema.safeParse(legacy).success).toBe(false)
+  })
+
+  contractTest('accepts unknown-evidence without evidence references', async () => {
+    const { candidateFitSchema } = await import(schemaPath)
+    const result = candidateFitSchema.parse(validFitAnalysis())
+
+    expect(result.requirementAssessments[1].evidenceStatus).toBe('unknown-evidence')
+    expect(result.requirementAssessments[1].evidenceRefs).toEqual([])
   })
 
   contractTest(

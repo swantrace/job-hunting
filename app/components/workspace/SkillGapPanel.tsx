@@ -1,6 +1,6 @@
 import type { Filters, JobCardData } from '../../../src/db/queries'
 import type { RunSkillReview } from '../../../src/db/skill-queries'
-import { calculateSkillScores } from '../../../src/lib/skills/score'
+import { calculateDeduplicatedSkillCoverage } from '../../../src/lib/skills/score'
 import { skillCategoryDefinitions, skillCategoryLabel } from '../../../src/lib/skills/taxonomy'
 import { query } from './helpers'
 import { SkillDecisionForm } from './SkillDecisionForm'
@@ -53,8 +53,9 @@ export function SkillGapPanel({
   canDecide?: boolean
   oob?: boolean
 }) {
-  const scores = calculateSkillScores(
+  const scores = calculateDeduplicatedSkillCoverage(
     requirements.map((item) => ({
+      skillId: item.skillId,
       analysisResult: item.analysisResult,
       importance: item.importance,
       userDecision: item.decision,
@@ -67,7 +68,7 @@ export function SkillGapPanel({
 
   return (
     <div id="skill-review-panel" {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}>
-      <section class="mb-4 grid gap-3 sm:grid-cols-3">
+      <section class="mb-4 grid gap-3 sm:grid-cols-2">
         <div id="skill-readiness" class="rounded-box border border-base-300 p-3">
           <p class="text-sm font-medium">Readiness</p>
           <p class="text-lg font-bold">
@@ -76,19 +77,8 @@ export function SkillGapPanel({
               : 'Ready'}
           </p>
         </div>
-        <div id="canonical-score" class="rounded-box border border-base-300 p-3">
-          <p class="text-sm font-medium">Canonical match</p>
-          <p class="text-lg font-bold">
-            {scores.canonicalMatch.percentage === null
-              ? 'Not enough requirements'
-              : `${scores.canonicalMatch.percentage.toFixed(1)}%`}
-          </p>
-          <p class="text-xs text-base-content/60">
-            {scores.canonicalMatch.matchedWeight}/{scores.canonicalMatch.totalWeight} weighted
-          </p>
-        </div>
-        <div id="application-coverage" class="rounded-box border border-base-300 p-3">
-          <p class="text-sm font-medium">Application coverage</p>
+        <div id="application-skill-coverage" class="rounded-box border border-base-300 p-3">
+          <p class="text-sm font-medium">Application skill coverage</p>
           <p class="text-lg font-bold">
             {scores.applicationCoverage.percentage === null
               ? 'Not enough requirements'
@@ -96,7 +86,7 @@ export function SkillGapPanel({
           </p>
           <p class="text-xs text-base-content/60">
             {scores.applicationCoverage.matchedWeight}/{scores.applicationCoverage.totalWeight}{' '}
-            weighted
+            weighted unique skills
           </p>
         </div>
       </section>

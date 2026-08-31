@@ -61,3 +61,25 @@ export function calculateSkillScores(requirements: ScoreRequirement[]): SkillSco
     },
   }
 }
+
+export type DeduplicatedScoreRequirement = ScoreRequirement & { skillId: number }
+
+/**
+ * Skill-level coverage over unique canonical skills. A skill mapped to several
+ * requirements contributes once, at its highest importance, so the denominator
+ * never double counts a multi-requirement skill.
+ */
+export function calculateDeduplicatedSkillCoverage(
+  requirements: DeduplicatedScoreRequirement[],
+): SkillScores {
+  const bySkill = new Map<number, DeduplicatedScoreRequirement>()
+  for (const requirement of requirements) {
+    const existing = bySkill.get(requirement.skillId)
+    if (
+      !existing ||
+      importanceWeight[requirement.importance] > importanceWeight[existing.importance]
+    )
+      bySkill.set(requirement.skillId, requirement)
+  }
+  return calculateSkillScores([...bySkill.values()])
+}

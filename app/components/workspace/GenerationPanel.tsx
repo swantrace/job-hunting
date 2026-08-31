@@ -56,6 +56,7 @@ export function GenerationPanel({
   googleDriveConnected,
   readiness = { ready: true, reasons: [] },
   state,
+  oob = false,
 }: {
   jobId: number
   filters: Filters
@@ -64,6 +65,7 @@ export function GenerationPanel({
   googleDriveConnected: boolean
   readiness?: ApplicationReadiness
   state?: GenerationState
+  oob?: boolean
 }) {
   const latest = runs[0]
   const usableCompleted = state?.latestCompleted
@@ -84,6 +86,7 @@ export function GenerationPanel({
     <section
       id="generation-panel"
       class="rounded-box border border-base-300 p-4"
+      {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
       {...(shouldPoll
         ? {
             'hx-get': `/applications/${jobId}/generation-runs?${query(filters)}`,

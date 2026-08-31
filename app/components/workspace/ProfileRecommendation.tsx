@@ -1,17 +1,8 @@
-import { candidateFitSchema } from '../../../src/ai/schemas/candidate-fit'
 import type { ApplicationAnalysisRun } from '../../../src/db/analysis'
 import type { Filters } from '../../../src/db/queries'
+import { parseCandidateFitResult } from '../../../src/lib/evidence/status'
 import type { ProfileOption } from '../../../src/lib/profiles'
 import { query } from './helpers'
-
-function parseResult(run: ApplicationAnalysisRun | null) {
-  if (!run?.resultJson) return null
-  try {
-    return candidateFitSchema.parse(JSON.parse(run.resultJson))
-  } catch {
-    return null
-  }
-}
 
 export function ProfileRecommendation({
   jobId,
@@ -28,7 +19,7 @@ export function ProfileRecommendation({
   oob?: boolean
   canConfirm?: boolean
 }) {
-  const result = parseResult(run)
+  const result = parseCandidateFitResult(run?.resultJson)
   const recommendation = result?.profileRecommendation ?? null
   const confirmedProfileId = run?.confirmedProfileId ?? null
   const label = (id: string) => profiles.find((profile) => profile.id === id)?.label ?? id

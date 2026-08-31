@@ -3,6 +3,7 @@ import { db } from '../../db/client'
 import { getGenerationState } from '../../db/generation'
 import { getJobAnalysisState } from '../../db/job-analysis-runs'
 import { getApplication } from '../../db/queries'
+import { getResumeStrategy } from '../../db/resume-strategy'
 import { getCandidateAnalysisState } from '../candidate-analysis'
 import { currentJobAnalysisHash } from '../job-analysis-input'
 import type { WorkspaceAvailability } from './state'
@@ -21,7 +22,10 @@ export function computeWorkspaceAvailability(jobId: number): WorkspaceAvailabili
   const generationState = getGenerationState(jobId)
   const current = candidateState.currentCompleted
   const reviewReady =
-    !!current && !!current.confirmedProfileId && !hasPendingRunDecisions(db, current.id)
+    !!current &&
+    !!current.confirmedProfileId &&
+    !hasPendingRunDecisions(db, current.id) &&
+    !!getResumeStrategy(current.id)
   return {
     jobAnalysisCurrent: !!jobState?.currentCompleted,
     reviewReady,

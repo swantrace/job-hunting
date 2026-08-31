@@ -2,11 +2,19 @@ import { applicationGenerationPromptVersion } from '../ai/prompts/application-ge
 import { applicationGenerationSchemaVersion } from '../ai/schemas/application-generation'
 import { listRunDecisions } from '../db/analysis-decisions'
 import { db } from '../db/client'
+import { getResumeStrategy } from '../db/resume-strategy'
 import { getCandidateAnalysisState } from './candidate-analysis'
 import { canonicalHash } from './canonical-hash'
 import { loadCareerData } from './career-data'
 
 export const generationInputVersion = 1
+
+export type GenerationStrategyInput = {
+  positioning: string
+  primaryThemes: string[]
+  emphasizeEvidenceIds: string[]
+  deemphasizeEvidenceIds: string[]
+}
 
 export type GenerationInputParts = {
   candidateAnalysisRunId: number
@@ -14,6 +22,7 @@ export type GenerationInputParts = {
   confirmedProfileId: string
   decisions: { skillId: number; decision: string }[]
   reasons: { skillId: number; reason: string }[]
+  strategy: GenerationStrategyInput | null
   evidenceHash: string
   generationPromptVersion: string
   generationSchemaVersion: string
@@ -55,6 +64,8 @@ export function buildGenerationInput(jobApplicationId: number) {
     .filter((decision) => decision.decision === 'skip' || decision.decision === 'include')
     .sort((left, right) => left.skillId - right.skillId)
 
+  const strategy = getResumeStrategy(current.id)
+
   const parts: GenerationInputParts = {
     candidateAnalysisRunId: current.id,
     candidateAnalysisInputHash: current.inputHash ?? '',
@@ -66,6 +77,14 @@ export function buildGenerationInput(jobApplicationId: number) {
     reasons: decisions
       .filter((decision) => decision.decision === 'include')
       .map((decision) => ({ skillId: decision.skillId, reason: decision.reason ?? '' })),
+    strategy: strategy
+      ? {
+          positioning: strategy.positioning,
+          primaryThemes: strategy.primaryThemes,
+          emphasizeEvidenceIds: strategy.emphasizeEvidenceIds,
+          deemphasizeEvidenceIds: strategy.deemphasizeEvidenceIds,
+        }
+      : null,
     evidenceHash: evidenceSourceHash(),
     generationPromptVersion: applicationGenerationPromptVersion,
     generationSchemaVersion: applicationGenerationSchemaVersion,
@@ -86,6 +105,7 @@ function generationSubHashes(snapshot: unknown) {
     candidateAnalysisInputHash: record.candidateAnalysisInputHash,
     confirmedProfileId: record.confirmedProfileId,
     decisions: canonicalHash(record.decisions ?? []),
+    strategy: canonicalHash(record.strategy ?? null),
     evidenceHash: record.evidenceHash,
     contract: canonicalHash({
       promptVersion: record.generationPromptVersion,
@@ -107,6 +127,7 @@ export function generationStalenessReasons(current: unknown, stored: unknown) {
   if (currentSub.confirmedProfileId !== storedSub.confirmedProfileId)
     reasons.push('profile-selection-changed')
   if (currentSub.decisions !== storedSub.decisions) reasons.push('skill-decisions-changed')
+  if (currentSub.strategy !== storedSub.strategy) reasons.push('resume-strategy-changed')
   if (currentSub.evidenceHash !== storedSub.evidenceHash) reasons.push('career-evidence-changed')
   if (currentSub.contract !== storedSub.contract) reasons.push('generation-contract-changed')
   if (currentSub.models !== storedSub.models) reasons.push('generation-model-changed')

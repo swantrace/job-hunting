@@ -8,13 +8,14 @@ describe('application generation readiness', () => {
       analysisStatus: 'none',
       profileConfirmed: false,
       hasPendingSkillDecisions: true,
+      hasResumeStrategy: false,
     })
 
     expect(result.ready).toBe(false)
     expect(result.reasons).toContain('Analyze this application first.')
     expect(result.reasons).toContain('Confirm a generation profile first.')
     expect(result.reasons).toContain(
-      'Resolve every missing-skill decision before generating documents.',
+      'Resolve every unverified-skill decision before generating documents.',
     )
   })
 
@@ -24,6 +25,7 @@ describe('application generation readiness', () => {
       analysisStatus: 'stale',
       profileConfirmed: true,
       hasPendingSkillDecisions: false,
+      hasResumeStrategy: true,
     })
 
     expect(result.ready).toBe(false)
@@ -37,6 +39,7 @@ describe('application generation readiness', () => {
         analysisStatus,
         profileConfirmed: true,
         hasPendingSkillDecisions: false,
+        hasResumeStrategy: true,
       })
 
       expect(result.ready).toBe(false)
@@ -50,6 +53,7 @@ describe('application generation readiness', () => {
       analysisStatus: 'failed',
       profileConfirmed: true,
       hasPendingSkillDecisions: false,
+      hasResumeStrategy: true,
     })
 
     expect(result.ready).toBe(false)
@@ -62,9 +66,23 @@ describe('application generation readiness', () => {
       analysisStatus: 'completed',
       profileConfirmed: true,
       hasPendingSkillDecisions: false,
+      hasResumeStrategy: true,
     })
 
     expect(result.ready).toBe(true)
     expect(result.reasons).toEqual([])
+  })
+
+  test('blocks generation until a resume strategy is confirmed', () => {
+    const result = assessApplicationReadiness({
+      hasReviewedAnalysis: true,
+      analysisStatus: 'completed',
+      profileConfirmed: true,
+      hasPendingSkillDecisions: false,
+      hasResumeStrategy: false,
+    })
+
+    expect(result.ready).toBe(false)
+    expect(result.reasons).toContain('Confirm a resume strategy in Review.')
   })
 })

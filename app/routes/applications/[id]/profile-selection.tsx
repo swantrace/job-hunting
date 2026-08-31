@@ -5,6 +5,7 @@ import {
   getAnalysisRun,
 } from '../../../../src/db/analysis'
 import { getApplication } from '../../../../src/db/queries'
+import { loadReviewData } from '../../../../src/db/review-data'
 import { getApplicationReadiness } from '../../../../src/lib/application-readiness'
 import { getCandidateAnalysisState } from '../../../../src/lib/candidate-analysis'
 import { listProfiles } from '../../../../src/lib/profiles'
@@ -13,6 +14,7 @@ import { profileSelectionSchema } from '../../../../src/lib/validation'
 import { computeWorkspaceAvailability } from '../../../../src/lib/workspace/availability'
 import { tabAvailability } from '../../../../src/lib/workspace/state'
 import { ProfileRecommendation } from '../../../components/workspace/ProfileRecommendation'
+import { ResumeStrategy } from '../../../components/workspace/ResumeStrategy'
 import { ReviewReadiness } from '../../../components/workspace/ReviewReadiness'
 import { WorkspaceTabs } from '../../../components/workspace/WorkspaceTabs'
 
@@ -29,10 +31,29 @@ function recommendationFor(jobId: number, filters: ReturnType<typeof parseFilter
   )
 }
 
+function strategyFragmentFor(jobId: number, filters: ReturnType<typeof parseFilters>) {
+  const review = loadReviewData(jobId)
+  return (
+    <ResumeStrategy
+      jobId={jobId}
+      filters={filters}
+      run={review.state.currentCompleted}
+      strategy={review.resumeStrategy}
+      draft={review.resumeStrategyDraft}
+      allowlist={review.resumeEvidenceAllowlist}
+      canEdit={
+        review.state.state === 'current' && !!review.state.currentCompleted?.confirmedProfileId
+      }
+      oob
+    />
+  )
+}
+
 function completedReviewFragments(jobId: number, filters: ReturnType<typeof parseFilters>) {
   return (
     <>
       {recommendationFor(jobId, filters)}
+      {strategyFragmentFor(jobId, filters)}
       <WorkspaceTabs
         activeTab="review"
         availability={tabAvailability(computeWorkspaceAvailability(jobId))}

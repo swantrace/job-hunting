@@ -1,26 +1,15 @@
-import { candidateFitSchema } from '../../../src/ai/schemas/candidate-fit'
 import type { ApplicationAnalysisRun } from '../../../src/db/analysis'
 import type { JobRequirement } from '../../../src/db/job-analysis'
+import {
+  evidenceStatusBadges,
+  evidenceStatusLabels,
+  parseCandidateFitResult,
+} from '../../../src/lib/evidence/status'
+import { requirementCoverageFromAssessments } from '../../../src/lib/requirements/score'
 
-function parseResult(run: ApplicationAnalysisRun | null) {
-  if (!run?.resultJson) return null
-  try {
-    return candidateFitSchema.parse(JSON.parse(run.resultJson))
-  } catch {
-    return null
-  }
+function percentage(value: number | null) {
+  return value === null ? 'Not enough requirements' : `${value.toFixed(1)}%`
 }
-
-const statusBadge = {
-  direct: 'badge-success',
-  transferable: 'badge-warning',
-  missing: 'badge-error',
-} as const
-const statusLabel = {
-  direct: 'Direct',
-  transferable: 'Transferable',
-  missing: 'Missing',
-} as const
 
 export function RequirementEvidenceMatrix({
   run,
@@ -31,13 +20,19 @@ export function RequirementEvidenceMatrix({
   requirements: JobRequirement[]
   oob?: boolean
 }) {
-  const result = parseResult(run)
+  const result = parseCandidateFitResult(run?.resultJson)
   const assessments = new Map(
     (result?.requirementAssessments ?? []).map((assessment) => [
       assessment.jobRequirementId,
       assessment,
     ]),
   )
+  const importanceById = new Map(
+    requirements.map((requirement) => [requirement.id, requirement.importance]),
+  )
+  const coverage = result
+    ? requirementCoverageFromAssessments(result.requirementAssessments, importanceById)
+    : null
   return (
     <section
       id="requirement-evidence-matrix"
@@ -46,6 +41,26 @@ export function RequirementEvidenceMatrix({
       {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
     >
       <h3 class="font-semibold">Requirement evidence matrix</h3>
+      {coverage ? (
+        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+          <div class="rounded-box border border-base-300 p-3">
+            <p class="text-sm font-medium">Direct evidence coverage</p>
+            <p class="text-lg font-bold">{percentage(coverage.directCoverage.percentage)}</p>
+            <p class="text-xs text-base-content/60">
+              {coverage.directCoverage.matchedWeight}/{coverage.directCoverage.totalWeight} weighted
+              requirements
+            </p>
+          </div>
+          <div class="rounded-box border border-base-300 p-3">
+            <p class="text-sm font-medium">Supported evidence coverage</p>
+            <p class="text-lg font-bold">{percentage(coverage.supportedCoverage.percentage)}</p>
+            <p class="text-xs text-base-content/60">
+              {coverage.supportedCoverage.matchedWeight}/{coverage.supportedCoverage.totalWeight}{' '}
+              weighted requirements
+            </p>
+          </div>
+        </div>
+      ) : null}
       {requirements.length === 0 ? (
         <p class="mt-2 text-sm text-base-content/60">
           No structured requirements are available for this application.
@@ -83,8 +98,8 @@ export function RequirementEvidenceMatrix({
                     </td>
                     <td>
                       {assessment ? (
-                        <span class={`badge ${statusBadge[assessment.evidenceStatus]}`}>
-                          {statusLabel[assessment.evidenceStatus]}
+                        <span class={`badge ${evidenceStatusBadges[assessment.evidenceStatus]}`}>
+                          {evidenceStatusLabels[assessment.evidenceStatus]}
                         </span>
                       ) : (
                         <span class="badge badge-ghost shrink-0 text-nowrap">Not assessed</span>

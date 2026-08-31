@@ -93,6 +93,9 @@ export function WorkspaceShell({
           readiness={readiness}
           jobAnalysis={review.jobAnalysis}
           jobAnalysisCurrent={review.jobAnalysisCurrent}
+          resumeStrategy={review.resumeStrategy}
+          resumeStrategyDraft={review.resumeStrategyDraft}
+          resumeEvidenceAllowlist={review.resumeEvidenceAllowlist}
         />
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { createRoute } from 'honox/factory'
+import { type GapQueueFilters, listCareerDataGaps } from '../../../src/db/gap-queue'
 import { listSkillsOverview } from '../../../src/db/resource-queries'
 import { skillReviewStatuses } from '../../../src/lib/skills/constants'
 import { hasSkillCategory } from '../../../src/lib/skills/taxonomy'
@@ -19,5 +20,13 @@ export default createRoute((c) => {
     if (filters.status && skill.reviewStatus !== filters.status) return false
     return true
   })
-  return c.render(<SkillsPage skills={skills} filters={filters} />)
+  const gapFilters: GapQueueFilters = { category: '', decision: '' }
+  return c.render(
+    <SkillsPage
+      skills={skills}
+      filters={filters}
+      gaps={listCareerDataGaps(gapFilters)}
+      gapFilters={gapFilters}
+    />,
+  )
 })

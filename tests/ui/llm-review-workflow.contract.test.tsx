@@ -51,6 +51,22 @@ describe('LLM analysis review HTMX boundaries', () => {
   })
 })
 
+describe('evidence-first copy contract', () => {
+  test('never frames unverified evidence as a missing skill or candidate lack', () => {
+    const readiness = readFileSync(
+      resolve(process.cwd(), 'src/lib/application-readiness.ts'),
+      'utf8',
+    )
+    const matrix = readFileSync(resolve(componentRoot, 'RequirementEvidenceMatrix.tsx'), 'utf8')
+    const gapPanel = readFileSync(resolve(componentRoot, 'SkillGapPanel.tsx'), 'utf8')
+
+    expect(readiness).not.toMatch(/missing-skill/i)
+    expect(matrix).not.toMatch(/Missing/)
+    for (const source of [readiness, matrix, gapPanel])
+      expect(source).not.toMatch(/candidate lacks|lacks the skill/i)
+  })
+})
+
 describe('legacy review copy contract', () => {
   test('presents a legacy analysis as outdated with a rerun action, never as never-analyzed', () => {
     const legacy = reviewGateCopy('legacy')

@@ -2,6 +2,7 @@ import { hasPendingRunDecisions } from '../db/analysis-decisions'
 import { db } from '../db/client'
 import { getJobAnalysisState } from '../db/job-analysis-runs'
 import { getApplication } from '../db/queries'
+import { getResumeStrategy } from '../db/resume-strategy'
 import { getCandidateAnalysisState } from './candidate-analysis'
 import { currentJobAnalysisHash } from './job-analysis-input'
 
@@ -23,6 +24,7 @@ export type ApplicationReadinessInput = {
   analysisStatus: AnalysisReadinessStatus
   profileConfirmed: boolean
   hasPendingSkillDecisions: boolean
+  hasResumeStrategy: boolean
 }
 
 /**
@@ -45,7 +47,8 @@ export function assessApplicationReadiness(input: ApplicationReadinessInput): Ap
     reasons.push('Candidate analysis is stale — re-run it before generating documents.')
   if (!input.profileConfirmed) reasons.push('Confirm a generation profile first.')
   if (input.hasPendingSkillDecisions)
-    reasons.push('Resolve every missing-skill decision before generating documents.')
+    reasons.push('Resolve every unverified-skill decision before generating documents.')
+  if (!input.hasResumeStrategy) reasons.push('Confirm a resume strategy in Review.')
   return { ready: reasons.length === 0, reasons }
 }
 
@@ -72,5 +75,6 @@ export function getApplicationReadiness(jobId: number): ApplicationReadiness {
     analysisStatus,
     profileConfirmed: !!current?.confirmedProfileId,
     hasPendingSkillDecisions: current ? hasPendingRunDecisions(db, current.id) : true,
+    hasResumeStrategy: current ? !!getResumeStrategy(current.id) : false,
   })
 }

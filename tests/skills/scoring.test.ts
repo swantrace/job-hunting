@@ -34,4 +34,50 @@ describe('explainable skill scores', () => {
     expect(result.canonicalMatch.matchedWeight).toBe(0)
     expect(result.applicationCoverage.matchedWeight).toBe(3)
   })
+
+  test('counts a canonical skill mapped to multiple requirements once', async () => {
+    const { calculateDeduplicatedSkillCoverage } = (await import('../../src/lib/skills/score')) as {
+      calculateDeduplicatedSkillCoverage: (
+        rows: Array<{
+          skillId: number
+          analysisResult: string
+          importance: string
+          userDecision: string
+        }>,
+      ) => {
+        canonicalMatch: { matchedWeight: number; totalWeight: number; percentage: number | null }
+        applicationCoverage: {
+          matchedWeight: number
+          totalWeight: number
+          percentage: number | null
+        }
+      }
+    }
+    const result = calculateDeduplicatedSkillCoverage([
+      {
+        skillId: 5,
+        analysisResult: 'proven-match',
+        importance: 'required',
+        userDecision: 'pending',
+      },
+      {
+        skillId: 5,
+        analysisResult: 'proven-match',
+        importance: 'required',
+        userDecision: 'pending',
+      },
+      {
+        skillId: 6,
+        analysisResult: 'not-in-career-data',
+        importance: 'preferred',
+        userDecision: 'skip',
+      },
+    ])
+
+    // Skill 5 appears on two rows but contributes its required weight once.
+    expect(result.canonicalMatch.totalWeight).toBe(4)
+    expect(result.canonicalMatch.matchedWeight).toBe(3)
+    expect(result.applicationCoverage.totalWeight).toBe(4)
+    expect(result.applicationCoverage.matchedWeight).toBe(3)
+  })
 })

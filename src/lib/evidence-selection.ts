@@ -1,6 +1,5 @@
 import { z } from 'zod'
 import { applicationGenerationPromptVersion } from '../ai/prompts/application-generation'
-import { candidateFitSchema } from '../ai/schemas/candidate-fit'
 import {
   type GenerationSource,
   getBaselineGenerationRun,
@@ -9,6 +8,7 @@ import {
 } from '../db/generation'
 import { loadCareerData } from './career-data'
 import { todayISO } from './date'
+import { parseCandidateFitResult } from './evidence/status'
 import { parseJobAnalysisResult } from './job-analysis-result'
 import { calculateRequirementCoverage } from './requirements/score'
 import { generationEligibleRequirements } from './skills/generation-eligibility'
@@ -112,13 +112,27 @@ export const evidenceSelectionSnapshotV2Schema = evidenceSelectionSnapshotBaseSc
   companyInterestNote: z.string().nullable(),
 })
 
+export const evidenceSelectionSnapshotV3Schema = evidenceSelectionSnapshotV2Schema.extend({
+  version: z.literal(3),
+  resumeStrategy: z
+    .object({
+      positioning: z.string(),
+      primaryThemes: z.array(z.string()),
+      emphasizeEvidenceIds: z.array(z.string()),
+      deemphasizeEvidenceIds: z.array(z.string()),
+    })
+    .nullable(),
+})
+
 export const evidenceSelectionSnapshotSchema = z.union([
   evidenceSelectionSnapshotV1Schema,
   evidenceSelectionSnapshotV2Schema,
+  evidenceSelectionSnapshotV3Schema,
 ])
 
 export type EvidenceSelectionSnapshot = z.infer<typeof evidenceSelectionSnapshotSchema>
 export type EvidenceSelectionSnapshotV2 = z.infer<typeof evidenceSelectionSnapshotV2Schema>
+export type EvidenceSelectionSnapshotV3 = z.infer<typeof evidenceSelectionSnapshotV3Schema>
 
 export const baselineEvidenceSelectionSnapshotSchema = evidenceSelectionSnapshotV1Schema
   .omit({ generationRunId: true, application: true })
@@ -254,20 +268,20 @@ export function buildEvidenceSelectionSnapshot(
   if (!analysisRun?.resultJson)
     return evidenceSelectionSnapshotV1Schema.parse({ ...base, version: 1 })
 
-  const fit = candidateFitSchema.safeParse(JSON.parse(analysisRun.resultJson))
-  if (!fit.success) return evidenceSelectionSnapshotV1Schema.parse({ ...base, version: 1 })
+  const fit = parseCandidateFitResult(analysisRun.resultJson)
+  if (!fit) return evidenceSelectionSnapshotV1Schema.parse({ ...base, version: 1 })
 
-  const assessments = fit.data.requirementAssessments
+  const assessments = fit.requirementAssessments
   const importanceById = new Map(source.jobRequirements.map((item) => [item.id, item.importance]))
-  return evidenceSelectionSnapshotV2Schema.parse({
+  const version2 = {
     ...base,
-    version: 2,
+    version: 2 as const,
     analysisRunId: analysisRun.id,
     analysisInputHash: analysisRun.inputHash ?? '',
     jobAnalysisSchemaVersion: source.analysis?.schemaVersion ?? null,
     candidateFitPromptVersion: analysisRun.promptVersion ?? '',
     confirmedProfileId: analysisRun.confirmedProfileId,
-    fitRecommendation: fit.data.fitRecommendation,
+    fitRecommendation: fit.fitRecommendation,
     requirementAssessments: assessments,
     requirementCoverage: calculateRequirementCoverage(
       assessments.map((assessment) => ({
@@ -287,7 +301,21 @@ export function buildEvidenceSelectionSnapshot(
       ]),
     ),
     companyInterestNote: source.companyInterestNote,
-  })
+  }
+
+  const strategy = source.resumeStrategy ?? null
+  if (strategy)
+    return evidenceSelectionSnapshotV3Schema.parse({
+      ...version2,
+      version: 3,
+      resumeStrategy: {
+        positioning: strategy.positioning,
+        primaryThemes: strategy.primaryThemes,
+        emphasizeEvidenceIds: strategy.emphasizeEvidenceIds,
+        deemphasizeEvidenceIds: strategy.deemphasizeEvidenceIds,
+      },
+    })
+  return evidenceSelectionSnapshotV2Schema.parse(version2)
 }
 
 export async function persistEvidenceSelectionSnapshot(source: GenerationSource) {

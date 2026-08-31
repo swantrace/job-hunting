@@ -36,6 +36,7 @@ type SnapshotSelection = {
 export function buildGenerationEvidenceAllowlist(snapshot: {
   selection: SnapshotSelection
   provenance: Array<{ source: string; skillName: string }>
+  resumeStrategy?: { deemphasizeEvidenceIds: string[] } | null
 }) {
   const allowed = new Set<string>()
   const selection = snapshot.selection
@@ -48,5 +49,7 @@ export function buildGenerationEvidenceAllowlist(snapshot: {
     allowed.add(`skill:${id}`)
   for (const provenance of snapshot.provenance)
     if (provenance.source === 'application-only') allowed.add(`skill:${provenance.skillName}`)
+  // The model can never reference de-emphasized evidence.
+  for (const id of snapshot.resumeStrategy?.deemphasizeEvidenceIds ?? []) allowed.delete(id)
   return allowed
 }
