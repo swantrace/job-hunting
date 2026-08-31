@@ -17,9 +17,10 @@ function usage() {
   return `Usage: bun run fly:sync-career-data -- [options] [selections...]
 
 Selections (default: career-data and profiles):
-  career-data                         Upload every JSON file in career-data/
+  career-data                         Upload every JSON and Base Resume Markdown file
   profiles                            Upload every JSON file in profiles/
   career-data/skills.json             Upload one career-data file
+  career-data/base-resumes            Upload the approved Base Resume Markdown and manifest
   profiles/fhir.profile.json          Upload one profile
 
 Options:
@@ -83,19 +84,18 @@ function ensureAllowedPath(path: string, rootDirectory: string) {
   return { absolute, root }
 }
 
-function jsonFiles(path: string): string[] {
+function syncFiles(path: string): string[] {
   if (statSync(path).isFile()) {
-    if (!path.endsWith('.json')) throw new Error(`Only JSON files can be synchronized: ${path}`)
+    if (!path.endsWith('.json') && !path.endsWith('.md'))
+      throw new Error(`Only JSON or Markdown files can be synchronized: ${path}`)
     return [path]
   }
   return readdirSync(path, { withFileTypes: true })
     .flatMap((entry) => {
       const child = resolve(path, entry.name)
-      return entry.isDirectory()
-        ? jsonFiles(child)
-        : entry.isFile() && child.endsWith('.json')
-          ? [child]
-          : []
+      if (entry.isDirectory()) return syncFiles(child)
+      if (entry.isFile() && (child.endsWith('.json') || child.endsWith('.md'))) return [child]
+      return []
     })
     .sort()
 }
@@ -106,7 +106,7 @@ export function selectedFiles(selections: string[], rootDirectory = projectRoot)
   for (const selection of requested) {
     const normalized = selection.replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/$/, '')
     const { absolute } = ensureAllowedPath(normalized, rootDirectory)
-    for (const file of jsonFiles(absolute)) files.add(file)
+    for (const file of syncFiles(absolute)) files.add(file)
   }
   return [...files].sort()
 }

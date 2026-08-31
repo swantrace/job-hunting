@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { cpSync, mkdtempSync, rmSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import {
@@ -19,6 +19,10 @@ beforeAll(() => {
   cpSync(resolve(process.cwd(), 'profiles.example'), resolve(fixtureRoot, 'profiles'), {
     recursive: true,
   })
+  const baseResumes = resolve(fixtureRoot, 'career-data', 'base-resumes')
+  mkdirSync(baseResumes, { recursive: true })
+  writeFileSync(resolve(baseResumes, 'manifest.json'), '{"schemaVersion":1}\n')
+  writeFileSync(resolve(baseResumes, 'fhir.md'), '# FHIR Base Resume\n')
 })
 
 afterAll(() => rmSync(fixtureRoot, { force: true, recursive: true }))
@@ -29,6 +33,20 @@ describe('Fly career data synchronization selection', () => {
     expect(files.some((file) => file.endsWith('/career-data/candidate.json'))).toBe(true)
     expect(files.some((file) => file.endsWith('/career-data/skill-taxonomy.json'))).toBe(true)
     expect(files.some((file) => file.endsWith('/profiles/fullstack.profile.json'))).toBe(true)
+  })
+
+  test('includes approved Base Resume Markdown and manifest with career data', () => {
+    const files = selectedFiles(['career-data'], fixtureRoot)
+    expect(files.some((file) => file.endsWith('/career-data/base-resumes/fhir.md'))).toBe(true)
+    expect(files.some((file) => file.endsWith('/career-data/base-resumes/manifest.json'))).toBe(
+      true,
+    )
+
+    const baseResumes = selectedFiles(['career-data/base-resumes'], fixtureRoot)
+    expect(baseResumes.map((file) => file.split('/').pop()).sort()).toEqual([
+      'fhir.md',
+      'manifest.json',
+    ])
   })
 
   test('allows one file or one bundle to be selected', () => {

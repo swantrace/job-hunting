@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { z } from 'zod'
-import { isISODate } from './date'
+import { isISODate, todayISO } from './date'
 
 /**
  * Sole authority for approved Base Resume Markdown. A Base Resume is a private
@@ -195,5 +195,68 @@ export function frozenBaseResumeSource(resume: ApprovedBaseResume): FrozenBaseRe
     approvedAt: resume.approvedAt,
     sha256: resume.sha256,
     text: resume.text,
+  }
+}
+
+function serializeManifest(manifest: BaseResumeManifest): string {
+  return `${JSON.stringify(manifest, null, 2)}\n`
+}
+
+/** Returns a copy of the manifest with `entry` upserted by direction. */
+export function upsertBaseResumeManifestEntry(
+  manifest: BaseResumeManifest,
+  entry: BaseResumeManifestEntry,
+): BaseResumeManifest {
+  const resumes = manifest.resumes.filter((item) => item.direction !== entry.direction)
+  resumes.push(entry)
+  resumes.sort((left, right) => left.direction.localeCompare(right.direction))
+  return { schemaVersion: 1, lastUpdated: entry.approvedAt, resumes }
+}
+
+/**
+ * Approves (imports) one Base Resume as the private Markdown source for a
+ * direction. This is the only write path into the Base Resume store; the
+ * production app never extracts PDFs. The normalized text is written to
+ * `<direction>.md` and the manifest entry records its hash and approval date.
+ */
+export function approveBaseResume(
+  directory: string,
+  direction: string,
+  text: string,
+  options: { version: string; approvedAt?: string; knownProfileIds?: ReadonlySet<string> },
+): ApprovedBaseResume {
+  const knownProfileIds = options.knownProfileIds ?? new Set()
+  if (knownProfileIds.size > 0 && !knownProfileIds.has(direction))
+    throw new Error(`Direction "${direction}" is not an existing profile.`)
+  const normalized = normalizeBaseResumeText(text)
+  if (isEmptyBaseResume(normalized))
+    throw new Error(`Base Resume for direction "${direction}" is empty.`)
+  const approvedAt = options.approvedAt ?? todayISO()
+  const entry: BaseResumeManifestEntry = {
+    direction,
+    fileName: `${direction}.md`,
+    version: options.version.trim(),
+    approvedAt,
+    sha256: baseResumeTextHash(normalized),
+  }
+  const manifest = loadBaseResumeManifest(directory, knownProfileIds) ?? {
+    schemaVersion: 1 as const,
+    lastUpdated: approvedAt,
+    resumes: [],
+  }
+  const updated = upsertBaseResumeManifestEntry(manifest, entry)
+  mkdirSync(directory, { recursive: true })
+  writeFileSync(resolve(directory, entry.fileName), `${normalized}\n`)
+  writeFileSync(resolve(directory, baseResumeManifestFileName), serializeManifest(updated))
+  return {
+    direction: entry.direction,
+    fileName: entry.fileName,
+    version: entry.version,
+    approvedAt: entry.approvedAt,
+    approvedSha256: entry.sha256,
+    text: normalized,
+    sha256: entry.sha256,
+    empty: false,
+    stale: false,
   }
 }

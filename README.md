@@ -44,6 +44,20 @@ Keep stable IDs when editing. Profiles select and order facts by ID; they should
 
 For a deployed Fly instance, persist these directories on the mounted `/data` volume, then set `CAREER_DATA_DIR=/data/career-data` and `CAREER_PROFILES_DIR=/data/profiles`.
 
+### Approved Base Resumes
+
+An approved Base Resume is a private Markdown file that serves as an editorial starting point for drafting, while canonical Career Data remains the factual authority. They live at `career-data/base-resumes/<direction>.md` with a private `manifest.json` that records each direction's version label, approval date, and normalized-text SHA-256 hash.
+
+```sh
+# Import a PDF, Markdown, or text file as the approved Base Resume for a direction.
+# PDF extraction uses Ghostscript locally; production never extracts PDFs.
+bun run resume:import -- --direction fhir --input ~/resumes/fhir.pdf --version v1
+```
+
+The import CLI validates that the direction matches an existing profile and refuses empty files. It writes the normalized Markdown and updates `manifest.json` in one step. Missing a Base Resume disables document generation only for that direction — the app never falls back to a blank resume.
+
+The production app reads the approved Markdown directly. Set `CAREER_BASE_RESUMES_DIR` to relocate the directory; it defaults to `CAREER_DATA_DIR/base-resumes`. The Base Resume Markdown and manifest travel with the private career-data bundle, so `bun run fly:sync-career-data` uploads them to `/data/career-data/base-resumes` alongside the fact JSON files.
+
 ## Run locally
 
 ```sh
