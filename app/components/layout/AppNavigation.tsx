@@ -25,7 +25,26 @@ const links = [
 
 const sections = ['Workspace', 'Career', 'Network', 'Tools'] as const
 
+/**
+ * Resolves the single active nav item by longest-prefix match. A link matches
+ * when the path equals its href or begins with `href + "/"`; the most specific
+ * link wins, so `/applications/import` highlights only "Import jobs" while
+ * `/applications/7` still highlights "Applications".
+ */
+function resolveActivePath(currentPath: string): string | null {
+  const matches = links
+    .filter(
+      (link) =>
+        link.href === currentPath || (link.href !== '/' && currentPath.startsWith(`${link.href}/`)),
+    )
+    .sort((left, right) => right.href.length - left.href.length)
+  return matches[0]?.href ?? null
+}
+
+export { resolveActivePath as resolveActiveNavPath }
+
 export function AppNavigation({ currentPath = '/' }: { currentPath?: string }) {
+  const activePath = resolveActivePath(currentPath)
   return (
     <nav class="flex h-full flex-col" aria-label="Primary navigation">
       <div class="mb-6 flex items-center justify-between gap-2">
@@ -52,9 +71,7 @@ export function AppNavigation({ currentPath = '/' }: { currentPath?: string }) {
             {links
               .filter((link) => link.section === section)
               .map((link) => {
-                const active =
-                  link.href === currentPath ||
-                  (link.href !== '/' && currentPath.startsWith(link.href))
+                const active = link.href === activePath
                 return (
                   <li>
                     <a href={link.href} class={active ? 'menu-active font-semibold' : undefined}>
