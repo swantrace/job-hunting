@@ -14,6 +14,7 @@ import {
 } from '../db/job-analysis-runs'
 import { jobPostings } from '../db/schema'
 import { parseJobDescription } from './ai'
+import { autoChainCandidateAnalysis } from './analysis-chain'
 import { buildJobAnalysisInput } from './job-analysis-input'
 
 type JobAnalysisQueueJob = { runId: number }
@@ -66,6 +67,9 @@ async function processJobAnalysis(
       posting.rawText,
     )
     completeJobAnalysisRun(db, run.id, parsed)
+    // Auto-chain the read-only Candidate Analysis. Profile confirmation and
+    // Include/Skip decisions remain explicit user actions.
+    await autoChainCandidateAnalysis(posting.jobApplicationId)
     await updateProgress(100, 'Complete')
     return { runId: run.id }
   } catch (error) {

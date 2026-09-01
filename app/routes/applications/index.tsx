@@ -28,9 +28,16 @@ export const POST = createRoute(async (c) => {
       />,
       422,
     )
-  // Saving an AI-parsed opportunity only persists the posting, analysis, and
+  // Saving an AI-parsed opportunity persists the posting, analysis, and
   // requirements. Document generation is explicit and starts from the review.
-  createApplication(parsed.data)
+  const applicationId = createApplication(parsed.data)
+  // Auto-chain the read-only Candidate Analysis so a pasted posting is analyzed
+  // end-to-end without a separate Review click. Profile confirmation and
+  // Include/Skip decisions remain explicit.
+  if (parsed.data.jobAnalysis) {
+    const { autoChainCandidateAnalysis } = await import('../../../src/lib/analysis-chain')
+    void autoChainCandidateAnalysis(applicationId)
+  }
   return c.html(
     <MutationResponse
       jobs={listApplications(filters)}
