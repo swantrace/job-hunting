@@ -37,20 +37,28 @@ export function BaseResumeStatus() {
           {profiles.map((profile) => {
             const resume = byDirection.get(profile.id)
             return (
-              <li class="flex flex-wrap items-center gap-2 rounded-box bg-base-200 p-3 text-sm">
-                <strong>{profile.label}</strong>
-                <span class="badge badge-outline badge-sm">{profile.id}</span>
-                {resume ? (
-                  <>
-                    <span class="badge badge-success badge-sm">version {resume.version}</span>
-                    <span class="text-base-content/60">approved {resume.approvedAt}</span>
-                    {resume.stale ? (
-                      <span class="badge badge-warning badge-sm">stale — file changed</span>
-                    ) : null}
-                  </>
-                ) : (
-                  <span class="badge badge-sm">Not approved</span>
-                )}
+              <li class="rounded-box bg-base-200 p-3 text-sm">
+                <div class="flex flex-wrap items-center gap-2">
+                  <strong>{profile.label}</strong>
+                  <span class="badge badge-outline badge-sm">{profile.id}</span>
+                  {resume ? (
+                    <>
+                      <span class="badge badge-success badge-sm">version {resume.version}</span>
+                      <span class="text-base-content/60">approved {resume.approvedAt}</span>
+                      {resume.stale ? (
+                        <span class="badge badge-warning badge-sm">stale — file changed</span>
+                      ) : null}
+                      <details class="mt-2 w-full">
+                        <summary class="cursor-pointer font-semibold">View content</summary>
+                        <pre class="mt-2 overflow-x-auto whitespace-pre-wrap text-xs leading-relaxed">
+                          {resume.text}
+                        </pre>
+                      </details>
+                    </>
+                  ) : (
+                    <span class="badge badge-sm">Not approved</span>
+                  )}
+                </div>
               </li>
             )
           })}
