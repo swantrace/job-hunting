@@ -34,6 +34,7 @@ export default createRoute((c) => {
           hx-get="/career-growth/list"
           hx-target="#career-growth-list"
           hx-swap="outerHTML"
+          hx-trigger="change"
         >
           <div class="card-body">
             <div>
