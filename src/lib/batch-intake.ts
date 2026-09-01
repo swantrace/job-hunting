@@ -33,6 +33,16 @@ export function classifyIntakeLine(line: string): IntakeItemKind {
   return urlLikePattern.test(line.trim()) ? 'url' : 'text'
 }
 
+/**
+ * Classifies one whole intake field (one job post). A field is a URL only when
+ * it is a single line beginning with a scheme; a pasted multi-line job
+ * description is always text.
+ */
+export function classifyIntakeField(value: string): IntakeItemKind {
+  const trimmed = value.trim()
+  return !trimmed.includes('\n') && urlLikePattern.test(trimmed) ? 'url' : 'text'
+}
+
 export type UrlSafety = { ok: boolean; reason?: string }
 
 const privateV4Pattern =

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { parseBatchIntake, validateIntakeUrl } from '../src/lib/batch-intake'
+import { classifyIntakeField, parseBatchIntake, validateIntakeUrl } from '../src/lib/batch-intake'
 
 describe('batch job post intake', () => {
   test('preserves input order and classifies URLs vs pasted text', () => {
@@ -37,5 +37,13 @@ describe('batch job post intake', () => {
     expect(items).toHaveLength(1)
     expect(items[0].raw).toBe('https://jobs.example.com')
     expect(items[0].url).toBe('https://jobs.example.com')
+  })
+
+  test('classifies a whole field as text when it is multi-line, even with a URL inside', () => {
+    expect(
+      classifyIntakeField('Full-Stack Engineer\nExample Co\nApply at https://jobs.example.com'),
+    ).toBe('text')
+    expect(classifyIntakeField('https://jobs.example.com/role')).toBe('url')
+    expect(classifyIntakeField('  https://jobs.example.com/role  ')).toBe('url')
   })
 })

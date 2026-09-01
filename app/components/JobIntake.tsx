@@ -61,22 +61,26 @@ export function JobIntakePanel({
           <div>
             <h2 class="card-title">Import job posts</h2>
             <p class="text-sm text-base-content/60">
-              Paste one <code class="kbd kbd-sm">https</code> URL or one full job description per
-              line. Blocked or failed links become “Needs pasted text” and are never analyzed.
+              Paste one full job description per box (multi-line is fine), or a single{' '}
+              <code class="kbd kbd-sm">https</code> URL. Blocked links become “Needs pasted text”
+              and are never analyzed.
             </p>
           </div>
-          <div class="form-control">
-            <label class="label" for="job-intake-input">
-              <span class="label-text">Job posts</span>
-            </label>
-            <textarea
-              id="job-intake-input"
-              name="input"
-              class="textarea textarea-bordered h-48"
-              placeholder={'https://jobs.example.com/role\n\nOr paste a full job description…'}
-            />
+          <div id="job-intake-items" class="space-y-3">
+            <JobIntakeField />
+            <JobIntakeField />
+            <JobIntakeField />
           </div>
-          <div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              class="btn btn-outline btn-sm"
+              hx-post="/applications/import/add-item"
+              hx-target="#job-intake-items"
+              hx-swap="beforeend"
+            >
+              Add another job
+            </button>
             <button class="btn btn-primary">
               <span class="loading loading-spinner loading-xs htmx-indicator" /> Import
             </button>
@@ -85,6 +89,16 @@ export function JobIntakePanel({
       </form>
       {batches.length ? <BatchList batches={batches} /> : null}
     </section>
+  )
+}
+
+export function JobIntakeField() {
+  return (
+    <textarea
+      name="items"
+      class="textarea textarea-bordered h-32 w-full"
+      placeholder={'Paste one full job description…\nor a single https URL'}
+    />
   )
 }
 
