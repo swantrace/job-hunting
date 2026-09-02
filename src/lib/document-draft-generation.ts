@@ -7,6 +7,10 @@ import {
   resumeDraftSystemPrompt,
 } from '../ai/prompts/document-draft'
 import {
+  documentMarkdownResponseSchema,
+  documentMarkdownSchema,
+} from '../ai/schemas/document-draft'
+import {
   getBaselineGenerationRun,
   getGenerationSource,
   saveBaselineGenerationEvidenceSnapshot,
@@ -22,6 +26,7 @@ import {
   buildDocumentDraftSnapshot,
   type DocumentDraftSnapshot,
 } from './document-draft-input'
+import { documentDraftPolicy } from './document-draft-policy'
 import { extractMetricClaims, validateDocumentDraft } from './document-draft-validation'
 import { renderCoverLetterDocx } from './docx/cover-letter-renderer'
 import { type DocumentIdentity } from './docx/render-common'
@@ -64,7 +69,15 @@ async function callMarkdown(args: {
         },
         { role: 'user', content: JSON.stringify(args.input) },
       ],
-      text: { format: { type: 'text' } },
+      text: {
+        verbosity: 'medium',
+        format: {
+          type: 'json_schema',
+          name: 'document_markdown',
+          strict: true,
+          schema: documentMarkdownResponseSchema,
+        },
+      },
     }),
   })
   if (!response.ok)
@@ -79,7 +92,8 @@ async function callMarkdown(args: {
     body.output_text ??
     body.output?.flatMap((item) => item.content ?? []).find((part) => part.text)?.text
   if (!output) throw new Error('OpenAI returned no document draft content.')
-  return stripMarkdownFence(output)
+  const parsed = documentMarkdownSchema.parse(JSON.parse(output))
+  return stripMarkdownFence(parsed.markdown)
 }
 
 function sectionText(draft: DocumentDraft, sectionId: string): string {
@@ -111,22 +125,38 @@ function educationEntries(snapshot: DocumentDraftSnapshot) {
   }))
 }
 
-function validateResumeDraft(draft: DocumentDraft, snapshot: DocumentDraftSnapshot, title: string) {
+function validateResumeDraft(draft: DocumentDraft, snapshot: DocumentDraftSnapshot) {
   return validateDocumentDraft(draft, {
-    targetTitle: title,
     education: educationEntries(snapshot),
-    title,
     supportedMetrics: supportedMetrics(snapshot),
     excludedSkills: snapshot.excludedSkills,
+    maxWords: documentDraftPolicy.resume.maxWords,
+    maxBullets: documentDraftPolicy.resume.maxBullets,
+    sectionContract: {
+      required: ['summary', 'skills', 'experience', 'education'],
+      order: ['summary', 'skills', 'experience', 'projects', 'publications', 'education'],
+    },
+    sectionWordBudgets: { summary: documentDraftPolicy.resume.summaryMaxWords },
   })
 }
 
 function validateCoverLetterDraft(draft: DocumentDraft, snapshot: DocumentDraftSnapshot) {
   return validateDocumentDraft(draft, {
     salutation: sectionText(draft, 'salutation'),
-    maxWords: 450,
+    maxWords: documentDraftPolicy.coverLetter.maxWords,
+    maxBullets: 0,
     supportedMetrics: supportedMetrics(snapshot),
     excludedSkills: snapshot.excludedSkills,
+    sectionContract: {
+      required: ['salutation', 'opening', 'evidence', 'company-interest', 'closing'],
+      order: ['salutation', 'opening', 'evidence', 'company-interest', 'authorization', 'closing'],
+    },
+    sectionBlockBudgets: {
+      evidence: {
+        min: documentDraftPolicy.coverLetter.minEvidenceParagraphs,
+        max: documentDraftPolicy.coverLetter.maxEvidenceParagraphs,
+      },
+    },
   })
 }
 
@@ -201,7 +231,7 @@ export async function generateApplicationDrafts(runId: number): Promise<Artifact
   const resumeDraft = parseDocumentDraft(resumeMarkdown, 'resume')
   const coverLetterDraft = parseDocumentDraft(coverLetterMarkdown, 'cover-letter')
   const validation = {
-    resume: validateResumeDraft(resumeDraft, snapshot, source.application.jobTitle),
+    resume: validateResumeDraft(resumeDraft, snapshot),
     coverLetter: validateCoverLetterDraft(coverLetterDraft, snapshot),
   }
   saveGenerationRunResults(runId, {
@@ -265,7 +295,7 @@ export async function generateBaselineDraft(runId: number) {
   })
   const draft = parseDocumentDraft(resumeMarkdown, 'resume')
   const validation = {
-    resume: validateResumeDraft(draft, snapshot, run.targetTitle),
+    resume: validateResumeDraft(draft, snapshot),
   }
   saveBaselineGenerationResults(runId, {
     resumeMarkdown,

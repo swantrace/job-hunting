@@ -8,6 +8,7 @@ import { canonicalHash } from './canonical-hash'
 import { type CanonicalCareerData, loadCareerData } from './career-data'
 import { todayISO } from './date'
 import { directionTargetTitles, listDirections } from './directions'
+import { documentDraftPolicy } from './document-draft-policy'
 import {
   generationEligibleRequirements,
   isGenerationEligible,
@@ -31,7 +32,7 @@ export type DocumentDraftRequirement = {
 }
 
 export type DocumentDraftSnapshot = {
-  version: 1
+  version: 2
   generatedAt: string
   kind: 'application' | 'baseline'
   direction: string
@@ -55,6 +56,7 @@ export type DocumentDraftSnapshot = {
   }>
   requirements: DocumentDraftRequirement[]
   excludedSkills: string[]
+  documentPolicy: typeof documentDraftPolicy
   careerData: ReturnType<typeof safeCareerData>
 }
 
@@ -132,7 +134,7 @@ export function buildDocumentDraftSnapshot(source: GenerationSourceLike): Docume
     .filter((item) => !isGenerationEligible(item))
     .map((item) => item.skillName)
   return {
-    version: 1,
+    version: 2,
     generatedAt: todayISO(),
     kind: 'application',
     direction: source.application.direction,
@@ -166,6 +168,7 @@ export function buildDocumentDraftSnapshot(source: GenerationSourceLike): Docume
       sourceText: item.requirementStatement ?? null,
     })),
     excludedSkills: [...new Set(excludedSkills)],
+    documentPolicy: documentDraftPolicy,
     careerData: safeCareerData(data),
   }
 }
@@ -181,7 +184,7 @@ export function buildBaselineDocumentDraftSnapshot(run: BaselineRunLike): Docume
   if (!baseResume) throw new Error(`No approved Base Resume for direction "${run.direction}".`)
   const configured = directionTargetTitles(run.direction)
   return {
-    version: 1,
+    version: 2,
     generatedAt: todayISO(),
     kind: 'baseline',
     direction: run.direction,
@@ -192,6 +195,7 @@ export function buildBaselineDocumentDraftSnapshot(run: BaselineRunLike): Docume
     jobRequirements: [],
     requirements: [],
     excludedSkills: [],
+    documentPolicy: documentDraftPolicy,
     careerData: safeCareerData(data),
   }
 }

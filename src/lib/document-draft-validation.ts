@@ -4,13 +4,14 @@ import {
   countDraftBullets,
   countDraftWords,
   type DocumentDraft,
+  type DocumentSectionId,
 } from './document-draft'
 
 /**
  * Deterministic completeness checks for validated document drafts. These are
- * advisory warnings, never rewrites: they surface exact-title omissions, missing
- * education entries, implausible dates, repeated titles/salutations, and page
- * budget overruns so the reviewer can fix the source or regenerate.
+ * advisory warnings, never rewrites: they surface section-contract problems,
+ * missing education entries, implausible dates, repeated titles/salutations,
+ * and page-budget overruns so the reviewer can fix the source or regenerate.
  */
 
 export type DraftValidationWarning = {
@@ -18,27 +19,93 @@ export type DraftValidationWarning = {
   message: string
 }
 
+export type SectionContract = {
+  required: DocumentSectionId[]
+  order: DocumentSectionId[]
+}
+
 const normalizeForComparison = (value: string) => value.replace(/\s+/g, ' ').trim().toLowerCase()
 
-/**
- * The exact target title must appear verbatim (whitespace- and case-insensitive)
- * in the document body. The renderer owns the displayed title, so this only
- * guards against the draft contradicting the user-confirmed application title.
- */
-export function validateExactTargetTitle(
+/** Ensures required sections are present, non-empty, and follow renderer order. */
+export function validateSectionContract(
   draft: DocumentDraft,
-  targetTitle: string,
+  contract: SectionContract,
 ): DraftValidationWarning[] {
-  const needle = normalizeForComparison(targetTitle)
-  if (!needle) return []
-  const haystack = normalizeForComparison(collectDraftText(draft))
-  if (haystack.includes(needle)) return []
-  return [
-    {
-      code: 'missing-target-title',
-      message: `The exact target title "${targetTitle.trim()}" does not appear in the document.`,
-    },
-  ]
+  const warnings: DraftValidationWarning[] = []
+  const sections = new Map(draft.sections.map((section) => [section.id, section]))
+  for (const id of contract.required) {
+    if (!sections.has(id))
+      warnings.push({ code: 'missing-section', message: `The required ${id} section is missing.` })
+  }
+  for (const section of draft.sections)
+    if (!section.blocks.some((block) => block.text.trim()))
+      warnings.push({ code: 'empty-section', message: `The ${section.id} section is empty.` })
+
+  const expectedIndex = new Map(contract.order.map((id, index) => [id, index]))
+  let previous = -1
+  for (const section of draft.sections) {
+    const current = expectedIndex.get(section.id)
+    if (current === undefined) continue
+    if (current < previous) {
+      warnings.push({
+        code: 'section-order',
+        message: `The ${section.id} section is out of order.`,
+      })
+      break
+    }
+    previous = current
+  }
+  return warnings
+}
+
+function sectionWordCount(draft: DocumentDraft, sectionId: DocumentSectionId): number {
+  const section = draft.sections.find((item) => item.id === sectionId)
+  if (!section) return 0
+  return (
+    section.blocks
+      .map((block) => block.text)
+      .join(' ')
+      .match(/[\p{L}\p{N}]+/gu) ?? []
+  ).length
+}
+
+export function validateSectionWordBudget(
+  draft: DocumentDraft,
+  sectionId: DocumentSectionId,
+  maxWords: number,
+): DraftValidationWarning[] {
+  const words = sectionWordCount(draft, sectionId)
+  return words > maxWords
+    ? [
+        {
+          code: 'over-section-word-budget',
+          message: `The ${sectionId} section has ${words} words (budget ${maxWords}).`,
+        },
+      ]
+    : []
+}
+
+export function validateSectionBlockCount(
+  draft: DocumentDraft,
+  sectionId: DocumentSectionId,
+  options: { min?: number; max?: number },
+): DraftValidationWarning[] {
+  const count = draft.sections.find((section) => section.id === sectionId)?.blocks.length ?? 0
+  if (options.min !== undefined && count < options.min)
+    return [
+      {
+        code: 'too-few-section-blocks',
+        message: `The ${sectionId} section has ${count} blocks (minimum ${options.min}).`,
+      },
+    ]
+  if (options.max !== undefined && count > options.max)
+    return [
+      {
+        code: 'too-many-section-blocks',
+        message: `The ${sectionId} section has ${count} blocks (maximum ${options.max}).`,
+      },
+    ]
+  return []
 }
 
 export type CanonicalEducationEntry = { degree?: string; school: string }
@@ -162,7 +229,6 @@ export function validatePageBudget(
 export function validateDocumentDraft(
   draft: DocumentDraft,
   options: {
-    targetTitle?: string
     education?: CanonicalEducationEntry[]
     title?: string
     salutation?: string
@@ -171,10 +237,19 @@ export function validateDocumentDraft(
     today?: string
     supportedMetrics?: string[]
     excludedSkills?: string[]
+    sectionContract?: SectionContract
+    sectionWordBudgets?: Partial<Record<DocumentSectionId, number>>
+    sectionBlockBudgets?: Partial<Record<DocumentSectionId, { min?: number; max?: number }>>
   } = {},
 ): DraftValidationWarning[] {
   return [
-    ...validateExactTargetTitle(draft, options.targetTitle ?? ''),
+    ...(options.sectionContract ? validateSectionContract(draft, options.sectionContract) : []),
+    ...Object.entries(options.sectionWordBudgets ?? {}).flatMap(([sectionId, maxWords]) =>
+      validateSectionWordBudget(draft, sectionId as DocumentSectionId, maxWords),
+    ),
+    ...Object.entries(options.sectionBlockBudgets ?? {}).flatMap(([sectionId, budget]) =>
+      validateSectionBlockCount(draft, sectionId as DocumentSectionId, budget),
+    ),
     ...validateEducationCoverage(draft, options.education ?? []),
     ...validateDateBounds(draft, options.today),
     ...validateRepeatedTitleOrSalutation(draft, {
