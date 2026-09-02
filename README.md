@@ -8,7 +8,7 @@ A local-first, server-rendered job pipeline built with Bun, HonoX, htmx, Drizzle
 flowchart LR
   Browser[Browser] <-->|Server-rendered HTML + htmx| App[HonoX application]
   App <--> DB[(SQLite<br/>jobs.db)]
-  App <--> Career[Canonical career data<br/>and profiles]
+  App <--> Career[Canonical career data<br/>and directions]
   App <--> Base[Approved Base Resumes<br/>career-data/base-resumes]
 
   App --> Intake[Batch job post intake<br/>https URLs or pasted text]
@@ -40,16 +40,15 @@ The application persists each requested operation as an append-only run in SQLit
 
 ## Career data setup
 
-The repository ships with `career-data.example/` and `profiles.example/`: a small, valid dataset that lets a fresh clone start and run tests. To generate your own documents, initialize the runtime directories from those examples and replace the placeholders with accurate, interview-defensible facts:
+The repository ships with `career-data.example/`: a small, valid dataset that lets a fresh clone start and run tests. To generate your own documents, initialize the runtime directories from those examples and replace the placeholders with accurate, interview-defensible facts:
 
 ```sh
 cp -R career-data.example career-data
-cp -R profiles.example profiles
 ```
 
-Keep stable IDs when editing. Profiles select and order facts by ID; they should not duplicate the underlying experience, achievement, project, or skill records. The runtime uses `career-data/` and `profiles/` when present, and falls back to the examples otherwise.
+Keep stable IDs when editing. Directions are defined in `preferences.json` `directionDefinitions`; each fact file references those direction IDs. The runtime uses `career-data/` when present, and falls back to the examples otherwise.
 
-For a deployed Fly instance, persist these directories on the mounted `/data` volume, then set `CAREER_DATA_DIR=/data/career-data` and `CAREER_PROFILES_DIR=/data/profiles`.
+For a deployed Fly instance, persist these directories on the mounted `/data` volume, then set `CAREER_DATA_DIR=/data/career-data` and ``.
 
 ### Approved Base Resumes
 
@@ -61,7 +60,7 @@ An approved Base Resume is a private Markdown file that serves as an editorial s
 bun run resume:import -- --direction fhir --input ~/resumes/fhir.pdf --version v1
 ```
 
-The import CLI validates that the direction matches an existing profile and refuses empty files. It writes the normalized Markdown and updates `manifest.json` in one step. Missing a Base Resume disables document generation only for that direction — the app never falls back to a blank resume.
+The import CLI validates that the direction is defined in `preferences.directionDefinitions` and refuses empty files. It writes the normalized Markdown and updates `manifest.json` in one step. Missing a Base Resume disables document generation only for that direction — the app never falls back to a blank resume.
 
 The production app reads the approved Markdown directly. Set `CAREER_BASE_RESUMES_DIR` to relocate the directory; it defaults to `CAREER_DATA_DIR/base-resumes`. The Base Resume Markdown and manifest travel with the private career-data bundle, so `bun run fly:sync-career-data` uploads them to `/data/career-data/base-resumes` alongside the fact JSON files.
 
@@ -99,15 +98,15 @@ bun run skills:sync --check # non-zero exit when conflicts require manual review
 
 ## Career data and document generation
 
-`career-data/` is the canonical, factual source used to generate documents. Keep stable IDs in those files: profiles refer to the IDs rather than copying experience or skill details.
+`career-data/` is the canonical, factual source used to generate documents. Keep stable IDs in those files: direction IDs refer to the underlying experience, achievement, project, or skill records.
 
 - `candidate.json`, `experiences.json`, `achievements.json`, `publications.json`, `projects.json`, `skills.json`, and `stories.json` hold reusable facts. `skill-taxonomy.json` defines the candidate-specific category vocabulary used by `skills.json`. Publications keep a display-ready citation and structured authors, including an `isCandidate` marker.
 - `preferences.json` and `portfolio-content.json` remain canonical planning data.
-- `profiles/<direction>.profile.json` contains only direction-specific selection and ordering rules. Its `id` must match its filename.
+- `preferences.json` `directionDefinitions` defines each direction's `id`, `label`, and `targetTitles`.
 
 Every generation run records an immutable evidence-selection snapshot in the database and writes a matching JSON file beneath `ARTIFACTS_DIR/run-<id>/`. The workspace’s **Evidence selection & generation record** section shows the exact selected IDs and schema/prompt versions, and lets you download that snapshot. This makes a generated resume or letter reviewable even after career data changes.
 
-Do not use the old `profiles/candidate.profile.json`, `CANDIDATE_PROFILE_FILE`, or `CANDIDATE_PROFILE_JSON` configuration: candidate facts now come only from `career-data/candidate.json`.
+Do not use the old `CANDIDATE_PROFILE_FILE` or `CANDIDATE_PROFILE_JSON` configuration: candidate facts now come only from `career-data/candidate.json`.
 
 For Fly.io deployment, `fly.toml` mounts a persistent volume at `/data` and sets `DB_FILE_NAME=/data/jobs.db`. The machine is configured to stop when idle and start automatically on the next HTTP request. Create the volume once before deploying:
 
@@ -120,7 +119,7 @@ Set `ARTIFACTS_DIR=/data/artifacts` and `QUEUE_FILE_NAME=/data/bunqueue.db` in F
 
 The production start command runs Drizzle migrations before starting the server. Keep one Fly machine for this SQLite deployment because Fly volumes are attached to a single machine.
 
-Fly production reads career data—including `skill-taxonomy.json`—from its persistent volume through `CAREER_DATA_DIR=/data/career-data` (and `CAREER_PROFILES_DIR=/data/profiles`). Upload the complete career-data directory rather than individual fact files, then synchronize it without copying private data into the image or Git:
+Fly production reads career data—including `skill-taxonomy.json`—from its persistent volume through `CAREER_DATA_DIR=/data/career-data` (and ``). Upload the complete career-data directory rather than individual fact files, then synchronize it without copying private data into the image or Git:
 
 ```sh
 fly ssh console
@@ -130,13 +129,13 @@ bun run skills:sync --apply
 
 Run `bun run taxonomy:sync --apply` before career skill sync whenever the JSON taxonomy changes. Use `bun run skills:sync --if-present` in startup scripts when career data may not be mounted yet; it exits cleanly instead of raising a runtime error, and startup never writes to the Git-tracked example data.
 
-To update the private career-data bundle on an existing Fly volume, use the repository CLI. With no selection it uploads every JSON file in both `career-data/` and `profiles/`; selected paths update only those files. Each file is uploaded to a unique temporary path and then moved over the destination, because Fly SFTP deliberately refuses to overwrite existing files. Uploading never deletes extra remote files.
+To update the private career-data bundle on an existing Fly volume, use the repository CLI. With no selection it uploads every JSON file in both `career-data/`; selected paths update only those files. Each file is uploaded to a unique temporary path and then moved over the destination, because Fly SFTP deliberately refuses to overwrite existing files. Uploading never deletes extra remote files.
 
 ```sh
 bun run fly:sync-career-data
 bun run fly:sync-career-data -- career-data/skills.json
-bun run fly:sync-career-data -- profiles/fhir.profile.json
-bun run fly:sync-career-data -- career-data profiles
+bun run fly:sync-career-data
+bun run fly:sync-career-data
 bun run fly:sync-career-data -- --sync-db career-data/skills.json
 ```
 
@@ -146,10 +145,10 @@ The Fly app defaults to `FLY_APP_NAME` and then the `app` value in `fly.toml`. F
 
 Documents are drafted from an **approved Base Resume** (editorial prior) plus **complete safe canonical Career Data** (factual authority), and a reviewed Job Description when generating for a specific application. The model writes Markdown using a controlled section vocabulary; a safe parser produces a typed document model, deterministic checks report omissions, dates, and unsupported claims, and code renders the DOCX. The renderer owns the title, contact line, and layout — the model never overwrites user-confirmed metadata.
 
-- With a JD: a targeted resume and cover letter grounded in the reviewed JD, resolved Include/Skip decisions, and profile ranking hints. Profiles rank facts; they never hide all other safe career facts.
+- With a JD: a targeted resume and cover letter grounded in the reviewed JD, resolved Include/Skip decisions. The full safe career data is always supplied; direction selects the Base Resume and target titles only.
 - Without a JD (baseline): a reusable direction baseline from the Base Resume and Career Data only. It never invents an employer or claims JD alignment.
 
-Generation freshness covers the Base Resume, Career Data, JD, decisions, profile, prompt, model, and draft/render contract, so prior documents become visibly stale when their true inputs change.
+Generation freshness covers the Base Resume, Career Data, JD, decisions, direction, prompt, model, and draft/render contract, so prior documents become visibly stale when their true inputs change.
 
 ## Batch job post intake
 
@@ -166,14 +165,14 @@ Generation freshness covers the Base Resume, Career Data, JD, decisions, profile
 2. Review the draft. Add the job URL, source, company, and direction yourself, then save it as **Saved**.
 3. Move a role to **Apply Today** when it becomes a task. Complete the application workspace and select **Sent application** after applying.
 4. Record follow-ups and interviews in the workspace. These activities advance the visible pipeline without overwriting a more advanced status.
-5. In **Review**, confirm the recommended profile and resolve every missing skill: **Skip**, or **Include** with a truthful, application-specific reason. This creates the evidence selection used for generation.
+5. In **Review**, resolve every missing skill: **Skip**, or **Include** with a truthful, application-specific reason. This creates the evidence selection used for generation.
 6. In **Documents**, explicitly generate the resume and cover letter. Review the reviewed Markdown draft, deterministic warnings, and DOCX files; optionally request a semantic document review. A generated file is a draft until you decide it is suitable to use.
 7. Download approved documents or upload them to Google Drive when it is connected. Existing artifacts and Drive links remain available if a newer run later becomes outdated.
 8. Manage reusable companies, contacts, and skills from their dedicated pages under Career and Network. Export JSON periodically as a backup.
 
 ### Configuration
 
-Copy `.env.example` to `.env` for local development. `OPENAI_API_KEY` is needed only for AI parsing, analysis, and document generation. Google OAuth variables are needed only for optional Drive uploads. `CAREER_DATA_DIR` and `CAREER_PROFILES_DIR` optionally point to the runtime fact directories; local defaults are `career-data` and `profiles`. `CAREER_BASE_RESUMES_DIR` optionally relocates the approved Base Resume Markdown directory; it defaults to `CAREER_DATA_DIR/base-resumes`. The skill taxonomy is always loaded from `skill-taxonomy.json` inside `CAREER_DATA_DIR`. Each specialized model variable (`OPENAI_MODEL_JOB_PARSER`, `OPENAI_MODEL_CANDIDATE_FIT`, `OPENAI_MODEL_RESUME`, `OPENAI_MODEL_COVER_LETTER`, `OPENAI_MODEL_DOCUMENT_REVIEW`) falls back to `OPENAI_MODEL_DEFAULT`.
+Copy `.env.example` to `.env` for local development. `OPENAI_API_KEY` is needed only for AI parsing, analysis, and document generation. Google OAuth variables are needed only for optional Drive uploads. `CAREER_DATA_DIR` optionally point to the runtime fact directories; local default is `career-data`. `CAREER_BASE_RESUMES_DIR` optionally relocates the approved Base Resume Markdown directory; it defaults to `CAREER_DATA_DIR/base-resumes`. The skill taxonomy is always loaded from `skill-taxonomy.json` inside `CAREER_DATA_DIR`. Each specialized model variable (`OPENAI_MODEL_JOB_PARSER`, `OPENAI_MODEL_CANDIDATE_FIT`, `OPENAI_MODEL_RESUME`, `OPENAI_MODEL_COVER_LETTER`, `OPENAI_MODEL_DOCUMENT_REVIEW`) falls back to `OPENAI_MODEL_DEFAULT`.
 
 ### Private deployment authentication
 
@@ -210,28 +209,28 @@ The dev server listens on all interfaces at port `5173`. If `http://localhost:51
 
 The pipeline makes four distinct model calls, each with a separate trust boundary. Every prompt, response schema, and frozen input records a version, and every run records the selected model in SQLite.
 
-1. **Job-only analysis** (`OPENAI_MODEL_JOB_PARSER`) — receives only the raw job posting and the skill taxonomy. It never sees a resume, career data, profile contents, or candidate identity, and it never produces a fit score or a profile recommendation.
-2. **Candidate fit / evidence matrix** (`OPENAI_MODEL_CANDIDATE_FIT`) — an explicit, queued paid action. It receives a frozen canonical input snapshot (career data, profiles, and the reviewed job requirements) and returns a labelled `apply`/`apply-selectively`/`skip` recommendation, a profile recommendation, and a requirement-to-evidence matrix. Every evidence reference must resolve to a supplied canonical ID.
+1. **Job-only analysis** (`OPENAI_MODEL_JOB_PARSER`) — receives only the raw job posting and the skill taxonomy. It never sees a resume, career data, or candidate identity, and it never produces a fit score. It proposes a direction from the supplied direction definitions.
+2. **Candidate fit / evidence matrix** (`OPENAI_MODEL_CANDIDATE_FIT`) — an explicit, queued paid action. It receives a frozen canonical input snapshot (career data and the reviewed job requirements) and returns a labelled `apply`/`apply-selectively`/`skip` recommendation and a requirement-to-evidence matrix. Every evidence reference must resolve to a supplied canonical ID.
 3. **Resume and cover-letter generation** (`OPENAI_MODEL_RESUME`, `OPENAI_MODEL_COVER_LETTER`) — runs only from a frozen, validated evidence snapshot v2 and stores claim-level provenance so every material claim traces to a canonical or application-only source.
 4. **Optional semantic document review** (`OPENAI_MODEL_DOCUMENT_REVIEW`) — an explicit paid action that observes and reports findings (`blocking`/`important`/`optional`). It never rewrites documents and its findings never become career facts.
 
-Actions that incur a model call: parsing a job post, running candidate analysis, generating application documents, and requesting a semantic review. Saving an opportunity, confirming a profile, resolving a skill decision, and the deterministic keyword audit do **not** call a model.
+Actions that incur a model call: parsing a job post, running candidate analysis, generating application documents, and requesting a semantic review. Saving an opportunity, resolving a skill decision, and the deterministic keyword audit do **not** call a model.
 
 ### Versioned analysis, reruns, and freshness
 
 Job Analysis, Candidate Analysis, and Documents are each append-only run histories in SQLite. Reruns never overwrite history; every run records its frozen input hash and, on completion, its result. "Stale" is always derived by comparing the current inputs against a run's frozen input — it is never a persisted status.
 
 - **Job Analysis** staleness is driven by the raw posting content hash, the skill-taxonomy hash, the parser/job-analysis prompt versions, and the job-analysis schema version. Model-only changes never make a completed analysis stale.
-- **Candidate Analysis** staleness is driven by the current completed Job Analysis, canonical career data, profiles, evidence, and candidate-fit contract versions. Skip/Include decisions, reasons, and the confirmed profile are deliberately excluded, so changing a decision never invalidates the candidate analysis itself.
-- **Documents** staleness additionally includes the confirmed profile, run-scoped decisions and reasons, canonical evidence, generation contract versions, and the configured resume/cover-letter models.
+- **Candidate Analysis** staleness is driven by the current completed Job Analysis, canonical career data, evidence, and candidate-fit contract versions. Skip/Include decisions and reasons are deliberately excluded, so changing a decision never invalidates the candidate analysis itself.
+- **Documents** staleness additionally includes the direction, run-scoped decisions and reasons, canonical evidence, generation contract versions, and the configured resume/cover-letter models.
 
-Freshness is compared lazily on workspace/readiness load, so editing a `career-data/` or `profiles/` file is detected on the next page view without any background token spend. Nothing reruns automatically: stale stages show `Outdated` with the exact changed reason and an explicit rerun action. Old results, artifacts, Drive links, snapshots, audits, and semantic reviews remain accessible after they become stale, and a failed rerun never hides an older usable result.
+Freshness is compared lazily on workspace/readiness load, so editing a `career-data/` file is detected on the next page view without any background token spend. Nothing reruns automatically: stale stages show `Outdated` with the exact changed reason and an explicit rerun action. Old results, artifacts, Drive links, snapshots, audits, and semantic reviews remain accessible after they become stale, and a failed rerun never hides an older usable result.
 
-Skill decisions are scoped to a Candidate Analysis run. A new run starts every missing skill as `pending`; the previous run's decision is only a suggestion and must be reconfirmed. Profile confirmation is likewise per-run.
+Skill decisions are scoped to a Candidate Analysis run. A new run starts every missing skill as `pending`; the previous run's decision is only a suggestion and must be reconfirmed.
 
 ### Canonical facts vs application-only decisions
 
-- **Canonical facts** come only from `career-data/` and `profiles/`. No LLM output or user decision ever writes back to those directories.
+- **Canonical facts** come only from `career-data/`. No LLM output or user decision ever writes back to those directories.
 - **Application-only decisions** (`skip`/`include` with a reason) affect only the current application. An included skill may appear in generated documents only through the user-authored reason — never as fabricated professional experience.
 
 ### Metrics are transparent heuristics
