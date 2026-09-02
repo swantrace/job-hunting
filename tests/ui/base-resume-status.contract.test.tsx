@@ -8,7 +8,6 @@ import { baseResumeTextHash } from '../../src/lib/base-resumes'
 
 let fixtureRoot = ''
 const previous = {
-  profiles: process.env.CAREER_PROFILES_DIR,
   base: process.env.CAREER_BASE_RESUMES_DIR,
 }
 
@@ -16,7 +15,6 @@ beforeAll(() => {
   fixtureRoot = mkdtempSync(resolve(tmpdir(), 'job-tracker-base-status-'))
   const baseDir = resolve(fixtureRoot, 'base-resumes')
   mkdirSync(baseDir, { recursive: true })
-  process.env.CAREER_PROFILES_DIR = resolve(process.cwd(), 'profiles.example')
   process.env.CAREER_BASE_RESUMES_DIR = baseDir
   const text = '# Fred\n\n## Summary\n\nScript-free <markup> summary.\n'
   writeFileSync(
@@ -40,8 +38,6 @@ beforeAll(() => {
 
 afterAll(() => {
   rmSync(fixtureRoot, { force: true, recursive: true })
-  if (previous.profiles === undefined) delete process.env.CAREER_PROFILES_DIR
-  else process.env.CAREER_PROFILES_DIR = previous.profiles
   if (previous.base === undefined) delete process.env.CAREER_BASE_RESUMES_DIR
   else process.env.CAREER_BASE_RESUMES_DIR = previous.base
 })

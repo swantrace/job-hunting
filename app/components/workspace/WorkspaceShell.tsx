@@ -1,5 +1,4 @@
 import {
-  getGenerationEvidenceSnapshot,
   getGenerationState,
   getGoogleDriveConnection,
   listGenerationRuns,
@@ -40,9 +39,6 @@ export function WorkspaceShell({
 }) {
   const generationRuns = listGenerationRuns(job.id)
   const generationState = getGenerationState(job.id)
-  const latestEvidenceSnapshot = generationRuns[0]
-    ? getGenerationEvidenceSnapshot(generationRuns[0].id)
-    : null
   const googleDriveConnected = !!getGoogleDriveConnection()
   const review = loadReviewData(job.id)
   const readiness = getApplicationReadiness(job.id)
@@ -69,7 +65,6 @@ export function WorkspaceShell({
         jobId={job.id}
         filters={filters}
         runs={generationRuns}
-        evidenceSnapshot={latestEvidenceSnapshot?.snapshotJson ?? null}
         googleDriveConnected={googleDriveConnected}
         readiness={readiness}
         state={generationState}
@@ -89,7 +84,6 @@ export function WorkspaceShell({
           careerEvidence={careerEvidence}
           state={review.state}
           jobRequirements={review.requirements}
-          profiles={review.profiles}
           readiness={readiness}
           jobAnalysis={review.jobAnalysis}
           jobAnalysisCurrent={review.jobAnalysisCurrent}

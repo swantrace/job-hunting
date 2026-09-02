@@ -115,26 +115,6 @@ const portfolioSchema = documentSchema
   })
   .loose()
 
-export const careerProfileSchema = documentSchema
-  .extend({
-    id: idSchema,
-    label: z.string().min(1),
-    targetTitles: z.array(z.string().min(1)).min(1),
-    preferredSkillIds: referenceIdsSchema,
-    conditionalSkillIds: referenceIdsSchema,
-    excludeUntilUpgraded: referenceIdsSchema,
-    preferredAchievementIds: referenceIdsSchema,
-    preferredProjectIds: referenceIdsSchema,
-    preferredPublicationIds: referenceIdsSchema.default([]),
-    experienceSelection: z.object({
-      requiredIds: referenceIdsSchema,
-      priorityOrder: referenceIdsSchema,
-      maxBulletsByExperience: z.record(idSchema, z.number().int().min(0).max(10)),
-    }),
-    coverLetterStrategy: z.looseObject({ preferredStoryIds: referenceIdsSchema }),
-  })
-  .loose()
-
 export type CanonicalCareerData = {
   candidate: z.infer<typeof candidateSchema>
   experiences: z.infer<typeof experiencesSchema>
@@ -145,22 +125,19 @@ export type CanonicalCareerData = {
   stories: z.infer<typeof storiesSchema>
   preferences: z.infer<typeof preferencesSchema>
   portfolio: z.infer<typeof portfolioSchema>
-  profiles: z.infer<typeof careerProfileSchema>[]
 }
 
-function directory(name: 'career-data' | 'profiles') {
-  const exampleName = `${name}.example`
-  const configuredPath =
-    process.env[name === 'career-data' ? 'CAREER_DATA_DIR' : 'CAREER_PROFILES_DIR']?.trim()
+function directory() {
+  const configuredPath = process.env.CAREER_DATA_DIR?.trim()
   const paths = [
     configuredPath,
-    resolve(process.cwd(), name),
-    resolve(process.cwd(), '..', name),
-    resolve(process.cwd(), exampleName),
-    resolve(process.cwd(), '..', exampleName),
+    resolve(process.cwd(), 'career-data'),
+    resolve(process.cwd(), '..', 'career-data'),
+    resolve(process.cwd(), 'career-data.example'),
+    resolve(process.cwd(), '..', 'career-data.example'),
   ]
   const path = paths.filter((candidate): candidate is string => Boolean(candidate)).find(existsSync)
-  if (!path) throw new Error(`${name} directory was not found.`)
+  if (!path) throw new Error('career-data directory was not found.')
   return path
 }
 
@@ -291,54 +268,13 @@ export function validateCareerData(data: CanonicalCareerData) {
     assertReferences(`portfolio topic ${item.id} projects`, item.projects, projectIds)
     assertReferences(`portfolio topic ${item.id} directions`, item.directions, directionIds)
   }
-  assertUnique(
-    'profiles',
-    data.profiles.map((profile) => profile.id),
-  )
-  for (const profile of data.profiles) {
-    if (!directionIds.has(profile.id))
-      throw new Error(`Profile "${profile.id}" has no preference direction definition.`)
-    assertReferences(
-      `profile ${profile.id} skills`,
-      [
-        ...profile.preferredSkillIds,
-        ...profile.conditionalSkillIds,
-        ...profile.excludeUntilUpgraded,
-      ],
-      skillIds,
-    )
-    assertReferences(
-      `profile ${profile.id} achievements`,
-      profile.preferredAchievementIds,
-      achievementIds,
-    )
-    assertReferences(`profile ${profile.id} projects`, profile.preferredProjectIds, projectIds)
-    assertReferences(
-      `profile ${profile.id} publications`,
-      profile.preferredPublicationIds,
-      publicationIds,
-    )
-    assertReferences(
-      `profile ${profile.id} experiences`,
-      [
-        ...profile.experienceSelection.requiredIds,
-        ...profile.experienceSelection.priorityOrder,
-        ...Object.keys(profile.experienceSelection.maxBulletsByExperience),
-      ],
-      experienceIds,
-    )
-    assertReferences(
-      `profile ${profile.id} stories`,
-      profile.coverLetterStrategy.preferredStoryIds,
-      storyIds,
-    )
-  }
+  if (directionIds.size === 0)
+    throw new Error('preferences.directionDefinitions must define at least one direction.')
   return data
 }
 
 export function loadCareerData(): CanonicalCareerData {
-  const careerData = directory('career-data')
-  const profiles = directory('profiles')
+  const careerData = directory()
   const parsed: CanonicalCareerData = {
     candidate: candidateSchema.parse(readJson(resolve(careerData, 'candidate.json'))),
     experiences: experiencesSchema.parse(readJson(resolve(careerData, 'experiences.json'))),
@@ -353,12 +289,6 @@ export function loadCareerData(): CanonicalCareerData {
     stories: storiesSchema.parse(readJson(resolve(careerData, 'stories.json'))),
     preferences: preferencesSchema.parse(readJson(resolve(careerData, 'preferences.json'))),
     portfolio: portfolioSchema.parse(readJson(resolve(careerData, 'portfolio-content.json'))),
-    profiles: ['fullstack', 'frontend', 'fhir'].map((id) => {
-      const profile = careerProfileSchema.parse(readJson(resolve(profiles, `${id}.profile.json`)))
-      if (profile.id !== id)
-        throw new Error(`Profile ID "${profile.id}" must match filename "${id}".`)
-      return profile
-    }),
   }
   return validateCareerData(parsed)
 }

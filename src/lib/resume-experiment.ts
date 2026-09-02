@@ -161,8 +161,8 @@ export function buildResumeExperimentRequest(
 }
 
 export function canonicalCareerContext(data: CanonicalCareerData, direction: string) {
-  const profile = data.profiles.find((item) => item.id === direction)
-  if (!profile) throw new Error(`No career profile exists for direction "${direction}".`)
+  const definition = data.preferences.directionDefinitions[direction]
+  if (!definition) throw new Error(`No direction definition exists for "${direction}".`)
   return JSON.stringify(
     {
       candidate: data.candidate,
@@ -179,7 +179,7 @@ export function canonicalCareerContext(data: CanonicalCareerData, direction: str
       skills: data.skills,
       stories: data.stories,
       preferences: data.preferences,
-      profile,
+      direction: { id: direction, ...definition },
     },
     null,
     2,

@@ -127,7 +127,6 @@ export const mockEnqueueCandidateAnalysis = mock(
 )
 export const mockListAnalysisRuns = mock((): any => [])
 export const mockGetAnalysisRun = mock((): any => null)
-export const mockConfirmProfileSelection = mock(() => true)
 export const mockCurrentCandidateAnalysisHash = mock(() => 'current-hash')
 
 mock.module('../../../src/lib/analysis-queue', () => ({
@@ -136,7 +135,6 @@ mock.module('../../../src/lib/analysis-queue', () => ({
 
 mock.module('../../../src/db/analysis', () => ({
   analysisRunBelongsToApplication: mock(() => true),
-  confirmProfileSelection: mockConfirmProfileSelection,
   getAnalysisRun: mockGetAnalysisRun,
   listAnalysisRuns: mockListAnalysisRuns,
 }))
@@ -160,7 +158,6 @@ export function reviewDataFixture(overrides: Record<string, any> = {}) {
     state: { ...defaultReviewState, ...(state ?? {}) },
     requirements: [],
     requirementSkills: [],
-    profiles: [],
     ...rest,
   }
 }
@@ -223,14 +220,8 @@ mock.module('../../../src/db/analysis-decision-service', () => ({
   decideRunSkill: mockDecideRunSkill,
 }))
 
-mock.module('../../../src/lib/profiles', () => ({
-  listProfiles: () => [{ id: 'fullstack', label: 'Full Stack' }],
-}))
-
-mock.module('../../../src/lib/evidence-selection', () => ({
-  evidenceSelectionSnapshotSchema: {
-    safeParse: () => ({ success: false }),
-  },
+mock.module('../../../src/lib/directions', () => ({
+  listDirections: () => [{ id: 'fullstack', label: 'Full Stack', targetTitles: [] }],
 }))
 
 mock.module('../../../src/lib/request', () => ({

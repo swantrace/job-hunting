@@ -3,16 +3,16 @@ import {
   baseResumesDirectory,
   listApprovedBaseResumes,
 } from '../../src/lib/base-resumes'
-import { listProfiles } from '../../src/lib/profiles'
+import { listDirections } from '../../src/lib/directions'
 
 export function BaseResumeStatus() {
-  const profiles = listProfiles()
+  const directions = listDirections()
   let approved: ApprovedBaseResume[] = []
   let error: string | null = null
   try {
     approved = listApprovedBaseResumes(
       baseResumesDirectory(),
-      new Set(profiles.map((profile) => profile.id)),
+      new Set(directions.map((direction) => direction.id)),
     )
   } catch (cause) {
     error = cause instanceof Error ? cause.message : 'Unable to read Base Resumes.'
@@ -34,13 +34,13 @@ export function BaseResumeStatus() {
           </div>
         ) : null}
         <ul class="mt-2 space-y-2">
-          {profiles.map((profile) => {
-            const resume = byDirection.get(profile.id)
+          {directions.map((direction) => {
+            const resume = byDirection.get(direction.id)
             return (
               <li class="rounded-box bg-base-200 p-3 text-sm">
                 <div class="flex flex-wrap items-center gap-2">
-                  <strong>{profile.label}</strong>
-                  <span class="badge badge-outline badge-sm">{profile.id}</span>
+                  <strong>{direction.label}</strong>
+                  <span class="badge badge-outline badge-sm">{direction.id}</span>
                   {resume ? (
                     <>
                       <span class="badge badge-success badge-sm">version {resume.version}</span>

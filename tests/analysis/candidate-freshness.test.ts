@@ -6,7 +6,6 @@ function snapshot(overrides: Record<string, unknown> = {}) {
     version: 2,
     jobAnalysis: { runId: 1, summary: {}, classification: {}, requirements: [] },
     careerData: { candidate: { name: 'Ada' } },
-    profiles: [{ id: 'fullstack' }],
     ...overrides,
   }
 }
@@ -30,14 +29,6 @@ describe('candidate staleness reason codes', () => {
     expect(reasons).toContain('career-data-changed')
   })
 
-  test('detects profile changes', () => {
-    const reasons = candidateStalenessReasons(
-      snapshot(),
-      snapshot({ profiles: [{ id: 'frontend' }] }),
-    )
-    expect(reasons).toContain('profiles-changed')
-  })
-
   test('detects contract version changes', () => {
     const reasons = candidateStalenessReasons(snapshot(), snapshot({ version: 1 }))
     expect(reasons).toContain('candidate-contract-changed')
@@ -50,14 +41,12 @@ describe('candidate staleness reason codes', () => {
         version: 1,
         jobAnalysis: { runId: 3 },
         careerData: { candidate: { name: 'Grace' } },
-        profiles: [{ id: 'frontend' }],
       }),
     )
     expect(reasons).toEqual(
       expect.arrayContaining([
         'job-analysis-changed',
         'career-data-changed',
-        'profiles-changed',
         'candidate-contract-changed',
       ]),
     )

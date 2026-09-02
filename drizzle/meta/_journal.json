@@ -176,6 +176,13 @@
       "when": 1788300000000,
       "tag": "0024_job_intake",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1788400000000,
+      "tag": "0025_drop_profile_selection",
+      "breakpoints": true
     }
   ]
 }

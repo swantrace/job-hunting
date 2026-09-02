@@ -11,7 +11,7 @@ import {
   statuses,
 } from '../../src/lib/applications/constants'
 import { formatDisplayDate, todayISO } from '../../src/lib/date'
-import { listProfiles } from '../../src/lib/profiles'
+import { listDirections } from '../../src/lib/directions'
 import {
   type ApplicationAttribute,
   applicationAttributeLabels,
@@ -173,7 +173,7 @@ export function QuickCollect({
 }) {
   const query = enc(filters)
   const { companies } = listManagementData()
-  const profiles = listProfiles()
+  const directions = listDirections()
   return (
     <form
       id={formId}
@@ -213,9 +213,9 @@ export function QuickCollect({
             error={error(errors, 'direction')}
           >
             <option value="">Choose a direction</option>
-            {profiles.map((profile) => (
-              <option value={profile.id} selected={values.direction === profile.id}>
-                {profile.label}
+            {directions.map((direction) => (
+              <option value={direction.id} selected={values.direction === direction.id}>
+                {direction.label}
               </option>
             ))}
           </SelectField>

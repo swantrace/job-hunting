@@ -11,17 +11,14 @@ const syncTest = existsSync(cliPath) ? test : test.todo
 type SyncFixture = {
   careerDataDir: string
   databaseFile: string
-  profilesDir: string
   root: string
 }
 
 function createFixture(): SyncFixture {
   const root = mkdtempSync(resolve(tmpdir(), 'job-tracker-skill-sync-'))
   const careerDataDir = resolve(root, 'career-data')
-  const profilesDir = resolve(root, 'profiles')
   const databaseFile = resolve(root, 'jobs.db')
   cpSync(resolve(projectRoot, 'career-data.example'), careerDataDir, { recursive: true })
-  cpSync(resolve(projectRoot, 'profiles.example'), profilesDir, { recursive: true })
 
   const skillsPath = resolve(careerDataDir, 'skills.json')
   const skills = JSON.parse(readFileSync(skillsPath, 'utf8')) as {
@@ -32,7 +29,7 @@ function createFixture(): SyncFixture {
     skill.aliases = skill.id === 'fhir' ? ['HL7 FHIR'] : ['TS']
   }
   writeFileSync(skillsPath, `${JSON.stringify(skills, null, 2)}\n`)
-  return { careerDataDir, databaseFile, profilesDir, root }
+  return { careerDataDir, databaseFile, root }
 }
 
 function run(command: string[], fixture: SyncFixture) {
@@ -42,7 +39,6 @@ function run(command: string[], fixture: SyncFixture) {
     env: {
       ...process.env,
       CAREER_DATA_DIR: fixture.careerDataDir,
-      CAREER_PROFILES_DIR: fixture.profilesDir,
       DB_FILE_NAME: fixture.databaseFile,
     },
     stderr: 'pipe',

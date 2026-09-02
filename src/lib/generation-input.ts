@@ -2,18 +2,19 @@ import { documentDraftPromptVersion } from '../ai/prompts/document-draft'
 import { documentDraftSchemaVersion } from '../ai/schemas/document-draft'
 import { listRunDecisions } from '../db/analysis-decisions'
 import { db } from '../db/client'
+import { getApplication } from '../db/queries'
 import { getCandidateAnalysisState } from './candidate-analysis'
 import { canonicalHash } from './canonical-hash'
 import { loadCareerData } from './career-data'
 import { baseResumeIdentity } from './document-draft-input'
 import { docxRendererVersion } from './docx/styles'
 
-export const generationInputVersion = 2
+export const generationInputVersion = 3
 
 export type GenerationInputParts = {
   candidateAnalysisRunId: number
   candidateAnalysisInputHash: string
-  confirmedProfileId: string
+  direction: string
   decisions: { skillId: number; decision: string }[]
   reasons: { skillId: number; reason: string }[]
   evidenceHash: string
@@ -48,13 +49,15 @@ function evidenceSourceHash() {
 
 /**
  * Builds the frozen generation input identity from the current Review: current
- * completed Candidate Analysis, confirmed profile, run-scoped decisions, and
- * canonical evidence plus the configured generation contract and models.
+ * completed Candidate Analysis, the application's direction, run-scoped
+ * decisions, and canonical evidence plus the configured generation contract and
+ * models.
  */
 export function buildGenerationInput(jobApplicationId: number) {
   const state = getCandidateAnalysisState(jobApplicationId)
   const current = state.currentCompleted
-  if (!current || !current.confirmedProfileId) return null
+  const job = getApplication(jobApplicationId)
+  if (!current || !job) return null
 
   const decisions = listRunDecisions(db, current.id)
     .filter((decision) => decision.decision === 'skip' || decision.decision === 'include')
@@ -63,7 +66,7 @@ export function buildGenerationInput(jobApplicationId: number) {
   const parts: GenerationInputParts = {
     candidateAnalysisRunId: current.id,
     candidateAnalysisInputHash: current.inputHash ?? '',
-    confirmedProfileId: current.confirmedProfileId,
+    direction: job.direction,
     decisions: decisions.map((decision) => ({
       skillId: decision.skillId,
       decision: decision.decision,
@@ -72,7 +75,7 @@ export function buildGenerationInput(jobApplicationId: number) {
       .filter((decision) => decision.decision === 'include')
       .map((decision) => ({ skillId: decision.skillId, reason: decision.reason ?? '' })),
     evidenceHash: evidenceSourceHash(),
-    ...baseResumeIdentity(current.confirmedProfileId),
+    ...baseResumeIdentity(job.direction),
     generationPromptVersion: documentDraftPromptVersion,
     generationSchemaVersion: documentDraftSchemaVersion,
     rendererVersion: docxRendererVersion,
@@ -91,7 +94,7 @@ function generationSubHashes(snapshot: unknown) {
   const record = (snapshot ?? {}) as Record<string, unknown>
   return {
     candidateAnalysisInputHash: record.candidateAnalysisInputHash,
-    confirmedProfileId: record.confirmedProfileId,
+    direction: record.direction,
     decisions: canonicalHash(record.decisions ?? []),
     evidenceHash: record.evidenceHash,
     baseResume: canonicalHash({
@@ -116,8 +119,7 @@ export function generationStalenessReasons(current: unknown, stored: unknown) {
   const reasons: string[] = []
   if (currentSub.candidateAnalysisInputHash !== storedSub.candidateAnalysisInputHash)
     reasons.push('candidate-analysis-changed')
-  if (currentSub.confirmedProfileId !== storedSub.confirmedProfileId)
-    reasons.push('profile-selection-changed')
+  if (currentSub.direction !== storedSub.direction) reasons.push('direction-changed')
   if (currentSub.decisions !== storedSub.decisions) reasons.push('skill-decisions-changed')
   if (currentSub.evidenceHash !== storedSub.evidenceHash) reasons.push('career-evidence-changed')
   if (currentSub.baseResume !== storedSub.baseResume) reasons.push('base-resume-changed')

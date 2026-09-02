@@ -7,7 +7,7 @@ import {
 import { canonicalHash } from './canonical-hash'
 import { type CanonicalCareerData, loadCareerData } from './career-data'
 import { todayISO } from './date'
-import { listProfiles } from './profiles'
+import { directionTargetTitles, listDirections } from './directions'
 import {
   generationEligibleRequirements,
   isGenerationEligible,
@@ -17,8 +17,7 @@ import {
  * Builds the frozen drafting input: approved Base Resume (editorial prior),
  * complete safe canonical Career Data (factual authority), the reviewed Job
  * Description, user-confirmed application metadata, and resolved Include/Skip
- * decisions plus profile ranking hints. Profiles rank facts; they never
- * hard-filter all other safe career facts from the prompt.
+ * decisions plus the direction's target titles.
  */
 
 export type DocumentDraftRequirement = {
@@ -36,6 +35,7 @@ export type DocumentDraftSnapshot = {
   generatedAt: string
   kind: 'application' | 'baseline'
   direction: string
+  targetTitles: string[]
   baseResume: FrozenBaseResumeSource | null
   application: {
     id: number
@@ -55,17 +55,6 @@ export type DocumentDraftSnapshot = {
   }>
   requirements: DocumentDraftRequirement[]
   excludedSkills: string[]
-  profile: {
-    id: string
-    targetTitles: string[]
-    preferredSkillIds: string[]
-    conditionalSkillIds: string[]
-    preferredAchievementIds: string[]
-    preferredProjectIds: string[]
-    preferredPublicationIds: string[]
-    experiencePriorityOrder: string[]
-    preferredStoryIds: string[]
-  }
   careerData: ReturnType<typeof safeCareerData>
 }
 
@@ -81,29 +70,13 @@ export function safeCareerData(data: CanonicalCareerData) {
   }
 }
 
-function profileRanking(data: CanonicalCareerData, direction: string) {
-  const profile = data.profiles.find((item) => item.id === direction)
-  if (!profile) throw new Error(`No canonical profile exists for direction "${direction}".`)
-  return {
-    id: profile.id,
-    targetTitles: profile.targetTitles,
-    preferredSkillIds: profile.preferredSkillIds,
-    conditionalSkillIds: profile.conditionalSkillIds,
-    preferredAchievementIds: profile.preferredAchievementIds,
-    preferredProjectIds: profile.preferredProjectIds,
-    preferredPublicationIds: profile.preferredPublicationIds,
-    experiencePriorityOrder: profile.experienceSelection.priorityOrder,
-    preferredStoryIds: profile.coverLetterStrategy.preferredStoryIds,
-  }
-}
-
-function knownProfileIds() {
-  return new Set(listProfiles().map((profile) => profile.id))
+function knownDirectionIds() {
+  return new Set(listDirections().map((direction) => direction.id))
 }
 
 /** Loads the frozen approved Base Resume for a direction, or null when absent. */
 export function baseResumeSourceFor(direction: string): FrozenBaseResumeSource | null {
-  const resume = loadApprovedBaseResume(baseResumesDirectory(), direction, knownProfileIds())
+  const resume = loadApprovedBaseResume(baseResumesDirectory(), direction, knownDirectionIds())
   return resume ? frozenBaseResumeSource(resume) : null
 }
 
@@ -163,6 +136,7 @@ export function buildDocumentDraftSnapshot(source: GenerationSourceLike): Docume
     generatedAt: todayISO(),
     kind: 'application',
     direction: source.application.direction,
+    targetTitles: directionTargetTitles(source.application.direction),
     baseResume,
     application: {
       id: source.application.id,
@@ -192,7 +166,6 @@ export function buildDocumentDraftSnapshot(source: GenerationSourceLike): Docume
       sourceText: item.requirementStatement ?? null,
     })),
     excludedSkills: [...new Set(excludedSkills)],
-    profile: profileRanking(data, source.application.direction),
     careerData: safeCareerData(data),
   }
 }
@@ -206,26 +179,19 @@ export function buildBaselineDocumentDraftSnapshot(run: BaselineRunLike): Docume
   const data = loadCareerData()
   const baseResume = baseResumeSourceFor(run.direction)
   if (!baseResume) throw new Error(`No approved Base Resume for direction "${run.direction}".`)
-  const profile = profileRanking(data, run.direction)
+  const configured = directionTargetTitles(run.direction)
   return {
     version: 1,
     generatedAt: todayISO(),
     kind: 'baseline',
     direction: run.direction,
+    targetTitles: configured.length ? configured : run.targetTitle ? [run.targetTitle] : [],
     baseResume,
     application: null,
     jobPosting: null,
     jobRequirements: [],
     requirements: [],
     excludedSkills: [],
-    profile: {
-      ...profile,
-      targetTitles: profile.targetTitles.length
-        ? profile.targetTitles
-        : run.targetTitle
-          ? [run.targetTitle]
-          : [],
-    },
     careerData: safeCareerData(data),
   }
 }

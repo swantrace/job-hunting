@@ -1,7 +1,7 @@
 import { createRoute } from 'honox/factory'
 import { listCareerGrowthRows } from '../../../src/db/career-growth'
 import { rankCareerGrowthOpportunities } from '../../../src/lib/career-growth'
-import { listProfiles } from '../../../src/lib/profiles'
+import { listDirections } from '../../../src/lib/directions'
 import { skillCategoryDefinitions } from '../../../src/lib/skills/taxonomy'
 import { CareerGrowthList } from '../../components/CareerGrowth'
 import { AppShell } from '../../components/layout/AppShell'
@@ -14,8 +14,7 @@ function categoryFilter(value: string | undefined) {
 }
 
 function directionFilter(value: string | undefined) {
-  const profiles = listProfiles()
-  return value && profiles.some((profile) => profile.id === value) ? value : undefined
+  return value && listDirections().some((direction) => direction.id === value) ? value : undefined
 }
 
 export default createRoute((c) => {
@@ -24,7 +23,7 @@ export default createRoute((c) => {
   const rows = listCareerGrowthRows({ direction })
   const ranked = rankCareerGrowthOpportunities(rows).slice(0, MAX_ROWS)
   const opportunities = category ? ranked.filter((item) => item.category === category) : ranked
-  const profiles = listProfiles()
+  const directions = listDirections()
   const categories = skillCategoryDefinitions()
   return c.render(
     <AppShell title="Career growth" currentPath="/career-growth">
@@ -52,9 +51,9 @@ export default createRoute((c) => {
                 </span>
                 <select name="direction" class="select select-bordered">
                   <option value="">All directions</option>
-                  {profiles.map((profile) => (
-                    <option value={profile.id} selected={profile.id === direction}>
-                      {profile.label}
+                  {directions.map((item) => (
+                    <option value={item.id} selected={item.id === direction}>
+                      {item.label}
                     </option>
                   ))}
                 </select>

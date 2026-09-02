@@ -6,13 +6,11 @@ describe('application generation readiness', () => {
     const result = assessApplicationReadiness({
       hasReviewedAnalysis: false,
       analysisStatus: 'none',
-      profileConfirmed: false,
       hasPendingSkillDecisions: true,
     })
 
     expect(result.ready).toBe(false)
     expect(result.reasons).toContain('Analyze this application first.')
-    expect(result.reasons).toContain('Confirm a generation profile first.')
     expect(result.reasons).toContain(
       'Resolve every missing-skill decision before generating documents.',
     )
@@ -22,7 +20,6 @@ describe('application generation readiness', () => {
     const result = assessApplicationReadiness({
       hasReviewedAnalysis: true,
       analysisStatus: 'stale',
-      profileConfirmed: true,
       hasPendingSkillDecisions: false,
     })
 
@@ -35,7 +32,6 @@ describe('application generation readiness', () => {
       const result = assessApplicationReadiness({
         hasReviewedAnalysis: true,
         analysisStatus,
-        profileConfirmed: true,
         hasPendingSkillDecisions: false,
       })
 
@@ -48,7 +44,6 @@ describe('application generation readiness', () => {
     const result = assessApplicationReadiness({
       hasReviewedAnalysis: true,
       analysisStatus: 'failed',
-      profileConfirmed: true,
       hasPendingSkillDecisions: false,
     })
 
@@ -60,7 +55,6 @@ describe('application generation readiness', () => {
     const result = assessApplicationReadiness({
       hasReviewedAnalysis: true,
       analysisStatus: 'completed',
-      profileConfirmed: true,
       hasPendingSkillDecisions: false,
     })
 

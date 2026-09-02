@@ -146,11 +146,7 @@ export function markAnalysisRunProcessing(runId: number) {
     .run()
 }
 
-export function completeAnalysisRun(
-  runId: number,
-  resultJson: string,
-  recommendedProfileId: string | null,
-) {
+export function completeAnalysisRun(runId: number, resultJson: string) {
   const date = todayISO()
   return db.transaction((tx) => {
     const run = tx
@@ -163,7 +159,6 @@ export function completeAnalysisRun(
       .set({
         status: 'Completed',
         resultJson,
-        recommendedProfileId,
         errorMessage: null,
         completedAt: date,
         updatedAt: date,
@@ -206,29 +201,6 @@ export function failAnalysisRun(runId: number, error: unknown) {
     .set({ status: 'Failed', errorMessage: message.slice(0, 2000), updatedAt: todayISO() })
     .where(eq(applicationAnalysisRuns.id, runId))
     .run()
-}
-
-export function confirmProfileSelection(runId: number, profileId: string) {
-  const date = todayISO()
-  return db.transaction((tx) => {
-    const run = tx
-      .select()
-      .from(applicationAnalysisRuns)
-      .where(eq(applicationAnalysisRuns.id, runId))
-      .get()
-    if (!run || run.status !== 'Completed') return false
-    tx.update(applicationAnalysisRuns)
-      .set({ confirmedProfileId: profileId, profileConfirmedAt: date, updatedAt: date })
-      .where(eq(applicationAnalysisRuns.id, runId))
-      .run()
-    const jobApplicationId = applicationIdForAnalysisRun(runId)
-    if (jobApplicationId !== null)
-      tx.update(jobApplications)
-        .set({ direction: profileId, updatedAt: date })
-        .where(eq(jobApplications.id, jobApplicationId))
-        .run()
-    return true
-  })
 }
 
 export function analysisRunBelongsToApplication(runId: number, jobApplicationId: number) {

@@ -31,24 +31,10 @@ const requirementAssessmentSchema = z
   })
   .strict()
 
-const alternativeSchema = z
-  .object({
-    profileId: z.string().trim().min(1).max(80),
-    rationale: z.string().trim().min(1).max(2000),
-  })
-  .strict()
-
 export const candidateFitSchema = z
   .object({
     fitRecommendation: z.enum(fitRecommendations),
     recommendationRationale: z.string().trim().min(1).max(3000),
-    profileRecommendation: z
-      .object({
-        recommendedProfileId: z.string().trim().min(1).max(80),
-        rationale: z.string().trim().min(1).max(2000),
-        alternatives: z.array(alternativeSchema).max(10),
-      })
-      .strict(),
     requirementAssessments: z.array(requirementAssessmentSchema).min(1).max(80),
     strengths: z.array(z.string().trim().min(1).max(2000)).max(30),
     concerns: z.array(z.string().trim().min(1).max(2000)).max(30),
@@ -134,24 +120,6 @@ export const candidateFitResponseSchema = {
       description: 'apply, apply-selectively, or skip. Never a numeric score.',
     },
     recommendationRationale: stringSchema,
-    profileRecommendation: {
-      type: 'object',
-      additionalProperties: false,
-      properties: {
-        recommendedProfileId: stringSchema,
-        rationale: stringSchema,
-        alternatives: {
-          type: 'array',
-          items: {
-            type: 'object',
-            additionalProperties: false,
-            properties: { profileId: stringSchema, rationale: stringSchema },
-            required: ['profileId', 'rationale'],
-          },
-        },
-      },
-      required: ['recommendedProfileId', 'rationale', 'alternatives'],
-    },
     requirementAssessments: {
       type: 'array',
       items: {
@@ -189,7 +157,6 @@ export const candidateFitResponseSchema = {
   required: [
     'fitRecommendation',
     'recommendationRationale',
-    'profileRecommendation',
     'requirementAssessments',
     'strengths',
     'concerns',

@@ -1,6 +1,5 @@
 import { createRoute } from 'honox/factory'
 import {
-  getGenerationEvidenceSnapshot,
   getGenerationState,
   getGoogleDriveConnection,
   listGenerationRuns,
@@ -21,7 +20,6 @@ export const POST = createRoute(async (c) => {
         jobId={id}
         filters={parseFilters(c)}
         runs={listGenerationRuns(id)}
-        evidenceSnapshot={null}
         googleDriveConnected={!!getGoogleDriveConnection()}
         readiness={readiness}
         state={state}
@@ -34,15 +32,11 @@ export const POST = createRoute(async (c) => {
   } catch (error) {
     console.error('Unable to enqueue document generation', error)
   }
-  const runs = listGenerationRuns(id)
   return c.html(
     <GenerationPanel
       jobId={id}
       filters={parseFilters(c)}
-      runs={runs}
-      evidenceSnapshot={
-        runs[0] ? (getGenerationEvidenceSnapshot(runs[0].id)?.snapshotJson ?? null) : null
-      }
+      runs={listGenerationRuns(id)}
       googleDriveConnected={!!getGoogleDriveConnection()}
       readiness={readiness}
       state={getGenerationState(id)}
@@ -53,15 +47,11 @@ export const POST = createRoute(async (c) => {
 export const GET = createRoute((c) => {
   const id = parseId(c.req.param('id'))
   if (!id) return c.html(<div class="alert alert-error">Application not found.</div>, 404)
-  const runs = listGenerationRuns(id)
   return c.html(
     <GenerationPanel
       jobId={id}
       filters={parseFilters(c)}
-      runs={runs}
-      evidenceSnapshot={
-        runs[0] ? (getGenerationEvidenceSnapshot(runs[0].id)?.snapshotJson ?? null) : null
-      }
+      runs={listGenerationRuns(id)}
       googleDriveConnected={!!getGoogleDriveConnection()}
       readiness={getApplicationReadiness(id)}
       state={getGenerationState(id)}

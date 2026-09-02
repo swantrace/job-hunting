@@ -1,5 +1,5 @@
 import type { BaselineGenerationRunWithArtifacts } from '../../src/db/generation'
-import { listProfiles } from '../../src/lib/profiles'
+import { listDirections } from '../../src/lib/directions'
 import { InputField, SelectField } from './ui/FormField'
 
 export function BaselineGenerationPanel({
@@ -9,7 +9,7 @@ export function BaselineGenerationPanel({
   runs: BaselineGenerationRunWithArtifacts[]
   error?: string
 }) {
-  const profiles = listProfiles()
+  const directions = listDirections()
   const latest = runs[0]
   const polling = latest?.status === 'Queued' || latest?.status === 'Processing'
   return (
@@ -33,8 +33,8 @@ export function BaselineGenerationPanel({
         <div>
           <h2 class="card-title">Generate baseline resume</h2>
           <p class="text-sm text-base-content/60">
-            Uses the selected profile’s verified career data. No job, company, or cover letter is
-            created.
+            Uses the selected direction’s approved Base Resume and complete career data. No job,
+            company, or cover letter is created.
           </p>
         </div>
         <form
@@ -46,8 +46,8 @@ export function BaselineGenerationPanel({
           novalidate
         >
           <SelectField name="direction" label="Direction">
-            {profiles.map((profile) => (
-              <option value={profile.id}>{profile.label}</option>
+            {directions.map((direction) => (
+              <option value={direction.id}>{direction.label}</option>
             ))}
           </SelectField>
           <InputField
@@ -60,7 +60,7 @@ export function BaselineGenerationPanel({
               name="targetKeywords"
               label="Optional keywords"
               placeholder="FHIR, SMART on FHIR, interoperability"
-              help="Comma-separated; only profile-allowed conditional skills may be added."
+              help="Comma-separated; used as ranking hints when present."
             />
           </div>
           <div class="md:col-span-2">

@@ -9,7 +9,7 @@ import {
   priorities,
 } from './applications/constants'
 import { isISODate, isISOTimestamp } from './date'
-import { hasProfile } from './profiles'
+import { hasDirection } from './directions'
 import { skillReviewStatuses } from './skills/constants'
 import { hasSkillCategory } from './skills/taxonomy'
 import { workspaceTabs } from './workspace/constants'
@@ -31,7 +31,7 @@ const direction = z
   .trim()
   .min(1, 'Direction is required')
   .max(80)
-  .refine(hasProfile, 'Choose a valid direction')
+  .refine(hasDirection, 'Choose a valid direction')
 
 function parseJsonField(value: unknown) {
   if (typeof value !== 'string' || value.trim() === '') return undefined
@@ -123,15 +123,6 @@ export const skillDecisionSchema = z
         path: ['reason'],
       })
   })
-export const profileSelectionSchema = z.object({
-  runId: z.coerce.number().int().positive(),
-  profileId: z
-    .string()
-    .trim()
-    .min(1, 'Choose a valid profile')
-    .max(80)
-    .refine(hasProfile, 'Choose a valid profile'),
-})
 export const companySchema = z.object({
   name: z.string().trim().min(1).max(200),
   website: optionalUrl,

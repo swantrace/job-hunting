@@ -1,6 +1,5 @@
 import { getCandidateAnalysisState } from '../lib/candidate-analysis'
 import { currentJobAnalysisHash } from '../lib/job-analysis-input'
-import { listProfiles } from '../lib/profiles'
 import { db } from './client'
 import { listJobRequirements } from './job-analysis'
 import { getJobAnalysisState } from './job-analysis-runs'
@@ -9,10 +8,9 @@ import { listRunSkillReviews } from './skill-queries'
 
 /**
  * Single loader for the review workspace. Returns the full candidate-analysis
- * state (latest attempt, latest completed, current completed, stale completed,
- * and reason codes), normalized job requirements from the current Job Analysis
- * run, run-scoped skill reviews, and available profiles so the ReviewPanel and
- * the analysis-runs fragment route render the same data.
+ * state, normalized job requirements from the current Job Analysis run, and
+ * run-scoped skill reviews so the ReviewPanel and the analysis-runs fragment
+ * route render the same data.
  */
 export function loadReviewData(jobId: number) {
   const job = getApplication(jobId)
@@ -32,6 +30,5 @@ export function loadReviewData(jobId: number) {
     state,
     requirements,
     requirementSkills,
-    profiles: listProfiles(),
   }
 }

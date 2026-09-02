@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, relative, resolve, sep } from 'node:path'
 
 const projectRoot = resolve(import.meta.dir, '../..')
-const allowedRoots = ['career-data', 'profiles'] as const
+const allowedRoots = ['career-data'] as const
 
 type Options = {
   app: string
@@ -16,12 +16,10 @@ type FlyMachine = { id?: string; state?: string }
 function usage() {
   return `Usage: bun run fly:sync-career-data -- [options] [selections...]
 
-Selections (default: career-data and profiles):
+Selections (default: career-data):
   career-data                         Upload every JSON and Base Resume Markdown file
-  profiles                            Upload every JSON file in profiles/
   career-data/skills.json             Upload one career-data file
   career-data/base-resumes            Upload the approved Base Resume Markdown and manifest
-  profiles/fhir.profile.json          Upload one profile
 
 Options:
   --app <name>                         Fly app (default: FLY_APP_NAME or fly.toml)
@@ -79,7 +77,7 @@ function ensureAllowedPath(path: string, rootDirectory: string) {
     const absoluteRoot = resolve(rootDirectory, candidate)
     return absolute === absoluteRoot || absolute.startsWith(`${absoluteRoot}${sep}`)
   })
-  if (!root) throw new Error(`Selection must be inside career-data/ or profiles/: ${path}`)
+  if (!root) throw new Error(`Selection must be inside career-data/: ${path}`)
   if (!existsSync(absolute)) throw new Error(`Selection does not exist: ${path}`)
   return { absolute, root }
 }

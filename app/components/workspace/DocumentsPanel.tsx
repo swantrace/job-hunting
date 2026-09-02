@@ -9,7 +9,6 @@ export function DocumentsPanel({
   jobId,
   filters,
   runs,
-  evidenceSnapshot,
   googleDriveConnected,
   readiness = { ready: true, reasons: [] },
   state,
@@ -18,7 +17,6 @@ export function DocumentsPanel({
   jobId: number
   filters: Filters
   runs: GenerationRunWithArtifacts[]
-  evidenceSnapshot: string | null
   googleDriveConnected: boolean
   readiness?: ApplicationReadiness
   state?: GenerationState
@@ -37,7 +35,6 @@ export function DocumentsPanel({
         jobId={jobId}
         filters={filters}
         runs={runs}
-        evidenceSnapshot={evidenceSnapshot}
         googleDriveConnected={googleDriveConnected}
         readiness={readiness}
         state={state}

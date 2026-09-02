@@ -20,8 +20,7 @@ export function computeWorkspaceAvailability(jobId: number): WorkspaceAvailabili
   const candidateState = getCandidateAnalysisState(jobId)
   const generationState = getGenerationState(jobId)
   const current = candidateState.currentCompleted
-  const reviewReady =
-    !!current && !!current.confirmedProfileId && !hasPendingRunDecisions(db, current.id)
+  const reviewReady = !!current && !hasPendingRunDecisions(db, current.id)
   return {
     jobAnalysisCurrent: !!jobState?.currentCompleted,
     reviewReady,

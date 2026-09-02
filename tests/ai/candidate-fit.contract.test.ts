@@ -13,16 +13,6 @@ function validFitAnalysis() {
     fitRecommendation: 'apply',
     recommendationRationale:
       'The core stack and product-engineering responsibilities have direct evidence.',
-    profileRecommendation: {
-      recommendedProfileId: 'fullstack',
-      rationale: 'The role balances React and Node.js responsibilities.',
-      alternatives: [
-        {
-          profileId: 'frontend',
-          rationale: 'React is important, but this profile would understate backend evidence.',
-        },
-      ],
-    },
     requirementAssessments: [
       {
         jobRequirementId: 101,
@@ -108,28 +98,24 @@ describe('candidate fit and evidence-matrix contract', () => {
     expect(parsed?.requirementAssessments[1].evidenceStatus).toBe('unknown-evidence')
   })
 
-  contractTest(
-    'rejects unknown profile and career evidence IDs at the service boundary',
-    async () => {
-      const { validateCandidateFitEvidence } = await import(validationPath)
-      const result = validFitAnalysis()
-      result.profileRecommendation.recommendedProfileId = 'invented-profile'
+  contractTest('rejects unknown career evidence IDs at the service boundary', async () => {
+    const { validateCandidateFitEvidence } = await import(validationPath)
+    const result = validFitAnalysis()
+    result.requirementAssessments[0].evidenceRefs[0].sourceId = 'invented-metric'
 
-      expect(() =>
-        validateCandidateFitEvidence(result, {
-          profileIds: ['fullstack', 'frontend', 'fhir'],
-          evidence: {
-            achievement: new Set(['midato-vite-ci']),
-            experience: new Set<string>(),
-            project: new Set<string>(),
-            publication: new Set<string>(),
-            skill: new Set<string>(),
-            story: new Set<string>(),
-          },
-        }),
-      ).toThrow()
-    },
-  )
+    expect(() =>
+      validateCandidateFitEvidence(result, {
+        evidence: {
+          achievement: new Set(['midato-vite-ci']),
+          experience: new Set<string>(),
+          project: new Set<string>(),
+          publication: new Set<string>(),
+          skill: new Set<string>(),
+          story: new Set<string>(),
+        },
+      }),
+    ).toThrow()
+  })
 
   contractTest(
     'uses canonical career data rather than a static resume as its factual source',
@@ -139,7 +125,7 @@ describe('candidate fit and evidence-matrix contract', () => {
 
       expect(prompt).toMatch(/canonical career|evidence snapshot/)
       expect(prompt).toMatch(/never invent|do not invent/)
-      expect(prompt).toMatch(/profile.*recommend/)
+      expect(prompt).toMatch(/apply, apply-selectively, or skip/)
     },
   )
 })

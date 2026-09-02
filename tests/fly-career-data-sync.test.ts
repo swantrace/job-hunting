@@ -16,9 +16,6 @@ beforeAll(() => {
   cpSync(resolve(process.cwd(), 'career-data.example'), resolve(fixtureRoot, 'career-data'), {
     recursive: true,
   })
-  cpSync(resolve(process.cwd(), 'profiles.example'), resolve(fixtureRoot, 'profiles'), {
-    recursive: true,
-  })
   const baseResumes = resolve(fixtureRoot, 'career-data', 'base-resumes')
   mkdirSync(baseResumes, { recursive: true })
   writeFileSync(resolve(baseResumes, 'manifest.json'), '{"schemaVersion":1}\n')
@@ -28,11 +25,10 @@ beforeAll(() => {
 afterAll(() => rmSync(fixtureRoot, { force: true, recursive: true }))
 
 describe('Fly career data synchronization selection', () => {
-  test('uploads both private data bundles by default', () => {
+  test('uploads the private career-data bundle by default', () => {
     const files = selectedFiles([], fixtureRoot)
     expect(files.some((file) => file.endsWith('/career-data/candidate.json'))).toBe(true)
     expect(files.some((file) => file.endsWith('/career-data/skill-taxonomy.json'))).toBe(true)
-    expect(files.some((file) => file.endsWith('/profiles/fullstack.profile.json'))).toBe(true)
   })
 
   test('includes approved Base Resume Markdown and manifest with career data', () => {
@@ -53,13 +49,9 @@ describe('Fly career data synchronization selection', () => {
     const one = selectedFiles(['career-data/skills.json'], fixtureRoot)
     expect(one).toHaveLength(1)
     expect(one[0]).toEndWith('/career-data/skills.json')
-
-    const profiles = selectedFiles(['profiles'], fixtureRoot)
-    expect(profiles.length).toBeGreaterThanOrEqual(3)
-    expect(profiles.every((file) => file.includes('/profiles/'))).toBe(true)
   })
 
-  test('rejects files outside the private data bundles', () => {
+  test('rejects files outside the private career-data bundle', () => {
     expect(() => selectedFiles(['package.json'], fixtureRoot)).toThrow('must be inside')
   })
 

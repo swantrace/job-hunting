@@ -19,7 +19,6 @@ import { todayISO } from './date'
 import { assertEveryRequirementAssessed, validateCandidateFitEvidence } from './fit-analysis'
 import { currentJobAnalysisHash } from './job-analysis-input'
 import { parseJobAnalysisResult } from './job-analysis-result'
-import { listProfiles } from './profiles'
 import { careerSkillMatchResult } from './skills/runtime-career-skills'
 
 export const candidateAnalysisInputVersion = 2
@@ -70,7 +69,6 @@ export const candidateAnalysisInputSchema = z.object({
       missing: z.boolean(),
     }),
   ),
-  profiles: z.array(z.unknown()),
   careerData: z.unknown(),
   sourceVersions: z.record(z.string(), z.number()),
   inputHash: z.string(),
@@ -84,16 +82,15 @@ export type CandidateAnalysisInputResult = {
 }
 
 /**
- * The candidate-fit identity inputs. Decisions, reasons, and the confirmed
- * profile are intentionally excluded; only the completed Job Analysis, career
- * data, profiles, evidence, and contract versions determine freshness.
+ * The candidate-fit identity inputs. Decisions and reasons are intentionally
+ * excluded; only the completed Job Analysis, career data, evidence, and contract
+ * versions determine freshness.
  */
 export type CandidateAnalysisInputParts = {
   jobAnalysisRunId: number
   jobAnalysisResult: unknown
   requirements: unknown
   careerData: unknown
-  profiles: unknown
   evidence: unknown
   candidateFitPromptVersion: string
   candidateFitSchemaVersion: string
@@ -123,10 +120,6 @@ export function buildCandidateAnalysisInput(
   const requirements = listJobRequirements(currentJobAnalysis.id)
   const requirementSkills = listRequirementSkillMappings(currentJobAnalysis.id)
   const parsedAnalysis = parseJobAnalysisResult(currentJobAnalysis.resultJson)
-  const profiles = listProfiles().map((profile) => {
-    const canonical = data.profiles.find((item) => item.id === profile.id)
-    return { ...profile, ...(canonical ?? {}) }
-  })
   const sourceVersions = {
     candidate: data.candidate.schemaVersion,
     experiences: data.experiences.schemaVersion,
@@ -135,7 +128,6 @@ export function buildCandidateAnalysisInput(
     projects: data.projects.schemaVersion,
     skills: data.skills.schemaVersion,
     stories: data.stories.schemaVersion,
-    profile: data.profiles[0]?.schemaVersion ?? 1,
   }
   const careerData = {
     candidate: data.candidate,
@@ -187,7 +179,6 @@ export function buildCandidateAnalysisInput(
       confidence: item.confidence,
       missing: careerSkillMatchResult(item.skillKey) !== 'proven-match',
     })),
-    profiles,
     careerData,
     sourceVersions,
   }
@@ -217,7 +208,6 @@ function snapshotSubHashes(snapshot: unknown) {
   return {
     jobAnalysis: canonicalHash(record.jobAnalysis ?? null),
     careerData: canonicalHash(record.careerData ?? null),
-    profiles: canonicalHash(record.profiles ?? null),
     version: record.version,
   }
 }
@@ -237,7 +227,6 @@ export function candidateStalenessReasons(current: unknown, stored: unknown) {
   const reasons: string[] = []
   if (currentSub.jobAnalysis !== storedSub.jobAnalysis) reasons.push('job-analysis-changed')
   if (currentSub.careerData !== storedSub.careerData) reasons.push('career-data-changed')
-  if (currentSub.profiles !== storedSub.profiles) reasons.push('profiles-changed')
   if (currentSub.version !== storedSub.version) reasons.push('candidate-contract-changed')
   return reasons
 }
@@ -288,10 +277,7 @@ export function validateCandidateAnalysisResult(
   const data = loadCareerData()
   const evidence = careerEvidenceIds(data)
   const requirementIds = snapshot.jobAnalysis.requirements.map((item) => item.id)
-  const profileIds = snapshot.profiles
-    .map((profile) => (profile as { id?: string }).id)
-    .filter((id): id is string => typeof id === 'string')
-  validateCandidateFitEvidence(result, { profileIds, evidence })
+  validateCandidateFitEvidence(result, { evidence })
   assertEveryRequirementAssessed(requirementIds, result)
   return result
 }

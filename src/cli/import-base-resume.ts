@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { approveBaseResume, baseResumesDirectory } from '../lib/base-resumes'
 import { todayISO } from '../lib/date'
+import { listDirections } from '../lib/directions'
 import { readImportDocument } from '../lib/pdf-text'
-import { listProfiles } from '../lib/profiles'
 
 const projectRoot = resolve(import.meta.dir, '../..')
 
@@ -81,14 +81,16 @@ export function parseOptions(
 
 export async function main(args = process.argv.slice(2)) {
   const options = parseOptions(args)
-  const profiles = listProfiles()
-  if (!profiles.some((profile) => profile.id === options.direction))
-    throw new Error(`Direction "${options.direction}" is not an existing profile.`)
+  const directions = listDirections()
+  if (!directions.some((direction) => direction.id === options.direction))
+    throw new Error(
+      `Direction "${options.direction}" is not defined in preferences.directionDefinitions.`,
+    )
   const text = await readImportDocument(options.inputPath)
   const version = options.version || todayISO()
   const resume = approveBaseResume(options.outputDirectory, options.direction, text, {
     version,
-    knownProfileIds: new Set(profiles.map((profile) => profile.id)),
+    knownProfileIds: new Set(directions.map((direction) => direction.id)),
   })
   console.log(
     `Imported Base Resume "${resume.direction}" (${resume.version}) to ${resume.fileName}.`,

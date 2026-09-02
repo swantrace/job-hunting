@@ -7,7 +7,6 @@ import { careerSkillEvidenceMap } from '../../../../src/lib/career-data'
 import { parseFilters, parseId } from '../../../../src/lib/request'
 import { FitRecommendation } from '../../../components/workspace/FitRecommendation'
 import { query } from '../../../components/workspace/helpers'
-import { ProfileRecommendation } from '../../../components/workspace/ProfileRecommendation'
 import { RequirementEvidenceMatrix } from '../../../components/workspace/RequirementEvidenceMatrix'
 import { ReviewReadiness } from '../../../components/workspace/ReviewReadiness'
 import { SkillGapPanel } from '../../../components/workspace/SkillGapPanel'
@@ -93,13 +92,6 @@ function statusFragment(jobId: number, filters: ReturnType<typeof parseFilters>)
         <>
           <FitRecommendation run={run} oob />
           <RequirementEvidenceMatrix run={run} requirements={review.requirements} oob />
-          <ProfileRecommendation
-            jobId={jobId}
-            filters={filters}
-            run={run}
-            profiles={review.profiles}
-            oob
-          />
           <SkillGapPanel
             job={job}
             filters={filters}

@@ -16,7 +16,6 @@ let fixtureRoot = ''
 let baseResumesDir = ''
 const previous = {
   data: process.env.CAREER_DATA_DIR,
-  profiles: process.env.CAREER_PROFILES_DIR,
   base: process.env.CAREER_BASE_RESUMES_DIR,
 }
 
@@ -24,7 +23,6 @@ beforeAll(() => {
   fixtureRoot = mkdtempSync(resolve(tmpdir(), 'job-tracker-draft-input-'))
   baseResumesDir = resolve(fixtureRoot, 'base-resumes')
   process.env.CAREER_DATA_DIR = resolve(process.cwd(), 'career-data.example')
-  process.env.CAREER_PROFILES_DIR = resolve(process.cwd(), 'profiles.example')
   process.env.CAREER_BASE_RESUMES_DIR = baseResumesDir
   mkdirSync(baseResumesDir, { recursive: true })
   writeFileSync(
@@ -49,7 +47,6 @@ beforeAll(() => {
 afterAll(() => {
   rmSync(fixtureRoot, { force: true, recursive: true })
   restoreEnv('CAREER_DATA_DIR', previous.data)
-  restoreEnv('CAREER_PROFILES_DIR', previous.profiles)
   restoreEnv('CAREER_BASE_RESUMES_DIR', previous.base)
 })
 
@@ -118,7 +115,7 @@ describe('base-grounded document draft input', () => {
     expect(snapshot.jobPosting?.rawText).toContain('FHIR')
     expect(snapshot.requirements.map((item) => item.skillName)).toEqual(['TypeScript'])
     expect(snapshot.excludedSkills).toContain('Kafka')
-    expect(snapshot.profile.id).toBe('fullstack')
+    expect(snapshot.direction).toBe('fullstack')
     expect(snapshot.careerData.experiences.length).toBeGreaterThan(0)
     expect(snapshot.careerData.skills.length).toBeGreaterThan(0)
   })

@@ -1,7 +1,7 @@
 import { type Filters, type JobCardData, listManagementData } from '../../../src/db/queries'
 import { priorities } from '../../../src/lib/applications/constants'
 import { todayISO } from '../../../src/lib/date'
-import { listProfiles } from '../../../src/lib/profiles'
+import { listDirections } from '../../../src/lib/directions'
 import type { FieldErrors } from '../../../src/lib/validation'
 import { InputField, SelectField, TextareaField } from '../ui/FormField'
 import { err, query } from './helpers'
@@ -18,7 +18,7 @@ export function ApplicationForm({
   companies?: { name: string }[]
 }) {
   const companyOptions = companies ?? listManagementData().companies
-  const profiles = listProfiles()
+  const directions = listDirections()
   return (
     <form
       id="application-form"
@@ -47,9 +47,9 @@ export function ApplicationForm({
         />
         <InputField label="Location" name="location" value={job.location} />
         <SelectField name="direction" label="Direction">
-          {profiles.map((profile) => (
-            <option value={profile.id} selected={job.direction === profile.id}>
-              {profile.label}
+          {directions.map((direction) => (
+            <option value={direction.id} selected={job.direction === direction.id}>
+              {direction.label}
             </option>
           ))}
         </SelectField>

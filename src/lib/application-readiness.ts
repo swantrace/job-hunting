@@ -21,7 +21,6 @@ export type ApplicationReadiness = {
 export type ApplicationReadinessInput = {
   hasReviewedAnalysis: boolean
   analysisStatus: AnalysisReadinessStatus
-  profileConfirmed: boolean
   hasPendingSkillDecisions: boolean
 }
 
@@ -43,7 +42,6 @@ export function assessApplicationReadiness(input: ApplicationReadinessInput): Ap
     reasons.push('Run candidate analysis to completion first.')
   if (input.analysisStatus === 'stale')
     reasons.push('Candidate analysis is stale — re-run it before generating documents.')
-  if (!input.profileConfirmed) reasons.push('Confirm a generation profile first.')
   if (input.hasPendingSkillDecisions)
     reasons.push('Resolve every missing-skill decision before generating documents.')
   return { ready: reasons.length === 0, reasons }
@@ -70,7 +68,6 @@ export function getApplicationReadiness(jobId: number): ApplicationReadiness {
   return assessApplicationReadiness({
     hasReviewedAnalysis,
     analysisStatus,
-    profileConfirmed: !!current?.confirmedProfileId,
     hasPendingSkillDecisions: current ? hasPendingRunDecisions(db, current.id) : true,
   })
 }

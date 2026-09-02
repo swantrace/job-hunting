@@ -93,11 +93,6 @@ function candidateResult(assessments: Array<{ id: number; status: string }>) {
   return JSON.stringify({
     fitRecommendation: 'apply',
     recommendationRationale: 'Reasonable fit.',
-    profileRecommendation: {
-      recommendedProfileId: 'fullstack',
-      rationale: 'Full-stack.',
-      alternatives: [],
-    },
     requirementAssessments: assessments.map((assessment) => ({
       jobRequirementId: assessment.id,
       evidenceStatus: assessment.status,

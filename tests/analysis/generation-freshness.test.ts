@@ -7,7 +7,7 @@ function snapshot(overrides: Record<string, unknown> = {}) {
     version: 1,
     candidateAnalysisRunId: 1,
     candidateAnalysisInputHash: 'candidate-hash',
-    confirmedProfileId: 'fullstack',
+    direction: 'fullstack',
     decisions: [{ skillId: 1, decision: 'skip' }],
     reasons: [],
     evidenceHash: 'evidence-hash',
@@ -32,12 +32,9 @@ describe('generation staleness reason codes', () => {
     expect(reasons).toContain('candidate-analysis-changed')
   })
 
-  test('detects profile selection changes', () => {
-    const reasons = generationStalenessReasons(
-      snapshot(),
-      snapshot({ confirmedProfileId: 'frontend' }),
-    )
-    expect(reasons).toContain('profile-selection-changed')
+  test('detects direction changes', () => {
+    const reasons = generationStalenessReasons(snapshot(), snapshot({ direction: 'frontend' }))
+    expect(reasons).toContain('direction-changed')
   })
 
   test('detects skill decision changes', () => {

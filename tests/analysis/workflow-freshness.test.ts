@@ -120,9 +120,10 @@ describe('candidate analysis input hash', () => {
     expect(keys).not.toContain('decisionReason')
   })
 
-  candidateHashTest('excludes the confirmed profile from the input', async () => {
+  candidateHashTest('excludes profile selection from the input', async () => {
     const { candidateAnalysisInputSchema } = await import(candidateAnalysisPath)
     expect(Object.keys(candidateAnalysisInputSchema.shape)).not.toContain('confirmedProfileId')
+    expect(Object.keys(candidateAnalysisInputSchema.shape)).not.toContain('profiles')
   })
 
   candidateHashTest('changes when the current job analysis changes', async () => {
@@ -132,7 +133,6 @@ describe('candidate analysis input hash', () => {
       jobAnalysisResult: 'result-a',
       requirements: [],
       careerData: 'career-a',
-      profiles: 'profile-a',
       evidence: 'evidence-a',
       candidateFitPromptVersion: '1.0.0',
       candidateFitSchemaVersion: '1.0.0',
@@ -142,22 +142,18 @@ describe('candidate analysis input hash', () => {
     ).not.toBe(canonicalCandidateAnalysisInputHash(base))
   })
 
-  candidateHashTest('changes when career data or profiles change', async () => {
+  candidateHashTest('changes when career data changes', async () => {
     const { canonicalCandidateAnalysisInputHash } = await import(candidateAnalysisPath)
     const base = {
       jobAnalysisRunId: 1,
       jobAnalysisResult: 'result-a',
       requirements: [],
       careerData: 'career-a',
-      profiles: 'profile-a',
       evidence: 'evidence-a',
       candidateFitPromptVersion: '1.0.0',
       candidateFitSchemaVersion: '1.0.0',
     }
     expect(canonicalCandidateAnalysisInputHash({ ...base, careerData: 'career-b' })).not.toBe(
-      canonicalCandidateAnalysisInputHash(base),
-    )
-    expect(canonicalCandidateAnalysisInputHash({ ...base, profiles: 'profile-b' })).not.toBe(
       canonicalCandidateAnalysisInputHash(base),
     )
   })
@@ -167,7 +163,7 @@ describe('documents input hash', () => {
   const fixture = {
     candidateAnalysisRunId: 1,
     candidateAnalysisInputHash: 'candidate-hash-a',
-    confirmedProfileId: 'fullstack',
+    direction: 'fullstack',
     decisions: [],
     reasons: [],
     evidenceHash: 'evidence-hash-a',
@@ -184,9 +180,9 @@ describe('documents input hash', () => {
     ).not.toBe(canonicalGenerationInputHash(fixture))
   })
 
-  generationHashTest('changes when the confirmed profile changes', async () => {
+  generationHashTest('changes when the direction changes', async () => {
     const { canonicalGenerationInputHash } = await import(generationInputPath)
-    expect(canonicalGenerationInputHash({ ...fixture, confirmedProfileId: 'frontend' })).not.toBe(
+    expect(canonicalGenerationInputHash({ ...fixture, direction: 'frontend' })).not.toBe(
       canonicalGenerationInputHash(fixture),
     )
   })

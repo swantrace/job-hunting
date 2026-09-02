@@ -1,8 +1,8 @@
 import { createRoute } from 'honox/factory'
 import { listBaselineGenerationRuns } from '../../../src/db/generation'
 import { baseResumesDirectory, loadApprovedBaseResume } from '../../../src/lib/base-resumes'
+import { directionLabel, listDirections } from '../../../src/lib/directions'
 import { enqueueBaselineGeneration } from '../../../src/lib/generation-queue'
-import { listProfiles } from '../../../src/lib/profiles'
 import { parseForm } from '../../../src/lib/request'
 import { baselineGenerationSchema } from '../../../src/lib/validation'
 import { BaselineGenerationPanel } from '../../components/BaselineGenerationPanel'
@@ -16,7 +16,7 @@ function approvedBaseResumeError(direction: string): string | null {
     const resume = loadApprovedBaseResume(
       baseResumesDirectory(),
       direction,
-      new Set(listProfiles().map((profile) => profile.id)),
+      new Set(listDirections().map((item) => item.id)),
     )
     return resume
       ? null
@@ -46,10 +46,10 @@ export const POST = createRoute(async (c) => {
     .split(',')
     .map((keyword) => keyword.trim())
     .filter(Boolean)
-  const profile = listProfiles().find((item) => item.id === parsed.data.direction)
   await enqueueBaselineGeneration({
     direction: parsed.data.direction,
-    targetTitle: parsed.data.targetTitle ?? profile?.label ?? parsed.data.direction,
+    targetTitle:
+      parsed.data.targetTitle ?? directionLabel(parsed.data.direction) ?? parsed.data.direction,
     targetKeywords: [...new Set(keywords)],
   })
   return c.html(<BaselineGenerationPanel runs={listBaselineGenerationRuns()} />)

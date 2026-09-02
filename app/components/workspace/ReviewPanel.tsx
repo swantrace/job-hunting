@@ -3,11 +3,9 @@ import type { Filters, JobCardData } from '../../../src/db/queries'
 import type { RunSkillReview } from '../../../src/db/skill-queries'
 import type { ApplicationReadiness } from '../../../src/lib/application-readiness'
 import type { CandidateAnalysisState } from '../../../src/lib/candidate-analysis'
-import type { ProfileOption } from '../../../src/lib/profiles'
 import { AnalysisRunStatus } from './AnalysisRunStatus'
 import { FitRecommendation } from './FitRecommendation'
 import { JobAnalysisSummary } from './JobAnalysisSummary'
-import { ProfileRecommendation } from './ProfileRecommendation'
 import { RequirementEvidenceMatrix } from './RequirementEvidenceMatrix'
 import { ReviewReadiness } from './ReviewReadiness'
 import { SkillGapPanel } from './SkillGapPanel'
@@ -19,7 +17,6 @@ export function ReviewPanel({
   careerEvidence,
   state,
   jobRequirements,
-  profiles,
   readiness,
   jobAnalysis,
   jobAnalysisCurrent,
@@ -30,7 +27,6 @@ export function ReviewPanel({
   careerEvidence: Record<string, string[]>
   state: CandidateAnalysisState
   jobRequirements: JobRequirement[]
-  profiles: ProfileOption[]
   readiness: ApplicationReadiness
   jobAnalysis: import('../../../src/db/job-analysis-runs').JobAnalysisRun | null
   jobAnalysisCurrent: boolean
@@ -48,13 +44,6 @@ export function ReviewPanel({
       />
       <JobAnalysisSummary analysis={jobAnalysis} />
       <FitRecommendation run={displayRun} />
-      <ProfileRecommendation
-        jobId={job.id}
-        filters={filters}
-        run={displayRun}
-        profiles={profiles}
-        canConfirm={canAct}
-      />
       <RequirementEvidenceMatrix run={displayRun} requirements={jobRequirements} />
       <SkillGapPanel
         job={job}

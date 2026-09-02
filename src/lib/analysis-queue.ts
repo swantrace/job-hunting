@@ -56,11 +56,7 @@ async function processAnalysis(
   try {
     const { runCandidateAnalysis } = await import('./candidate-analysis')
     const result = await runCandidateAnalysis(run.id)
-    completeAnalysisRun(
-      run.id,
-      JSON.stringify(result),
-      result.profileRecommendation.recommendedProfileId,
-    )
+    completeAnalysisRun(run.id, JSON.stringify(result))
     await updateProgress(100, 'Complete')
     return { runId: run.id }
   } catch (error) {

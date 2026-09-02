@@ -11,7 +11,6 @@ import type { EvidenceSourceType } from './evidence/constants'
 export type EvidenceAllowlist = Record<EvidenceSourceType, Set<string>>
 
 export type CandidateFitValidationInput = {
-  profileIds: string[]
   evidence: EvidenceAllowlist
 }
 
@@ -22,24 +21,15 @@ export function evidenceRefKey(ref: EvidenceRef) {
 }
 
 /**
- * Service-level validation for candidate-fit output. Rejects invented profile
- * IDs and any evidence ID that is not present in the frozen canonical input.
- * Zod validates shape and cross-field rules first; this boundary enforces that
- * every reference resolves to a real, eligible canonical source.
+ * Service-level validation for candidate-fit output. Rejects any evidence ID
+ * that is not present in the frozen canonical input. Zod validates shape and
+ * cross-field rules first; this boundary enforces that every reference resolves
+ * to a real, eligible canonical source.
  */
 export function validateCandidateFitEvidence(
   result: CandidateFit,
   input: CandidateFitValidationInput,
 ): CandidateFit {
-  const profileIds = new Set(input.profileIds)
-  const referencedProfileIds = [
-    result.profileRecommendation.recommendedProfileId,
-    ...result.profileRecommendation.alternatives.map((alternative) => alternative.profileId),
-  ]
-  for (const profileId of referencedProfileIds)
-    if (!profileIds.has(profileId))
-      throw new CandidateFitValidationError(`Unknown profile ID "${profileId}".`)
-
   for (const assessment of result.requirementAssessments) {
     for (const ref of assessment.evidenceRefs) {
       const allowed = input.evidence[ref.sourceType]

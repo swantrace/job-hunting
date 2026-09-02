@@ -4,25 +4,20 @@ import { hasSkillCategory } from '../src/lib/skills/taxonomy'
 import { loadExampleCareerData } from './support/career-data'
 
 describe('canonical career data', () => {
-  test('validates the checked-in fact files and profile references', () => {
+  test('validates the checked-in fact files and direction definitions', () => {
     const data = loadExampleCareerData()
-    expect(data.profiles.map((profile) => profile.id).sort()).toEqual([
+    expect(Object.keys(data.preferences.directionDefinitions).sort()).toEqual([
       'fhir',
       'frontend',
       'fullstack',
     ])
   })
 
-  test('rejects a missing cross-file skill reference', () => {
+  test('rejects a career skill alias that collides with another skill label', () => {
     const data = loadExampleCareerData()
-    data.profiles[0].preferredSkillIds.push('missing-skill')
-    expect(() => validateCareerData(data)).toThrow('unknown ID "missing-skill"')
-  })
-
-  test('rejects a profile publication reference that does not exist', () => {
-    const data = loadExampleCareerData()
-    data.profiles[0].preferredPublicationIds.push('missing-publication')
-    expect(() => validateCareerData(data)).toThrow('unknown ID "missing-publication"')
+    data.skills.skills[0].label = 'Distinctive Label'
+    data.skills.skills[1].aliases = ['distinctive label']
+    expect(() => validateCareerData(data)).toThrow(/label/i)
   })
 
   test('keeps the current career skill shape: stable id, label, and directions', () => {
