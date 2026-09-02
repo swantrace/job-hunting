@@ -20,6 +20,7 @@ export function CompaniesTable({
         hx-target="#companies-results"
         hx-swap="outerHTML"
         hx-push-url="true"
+        hx-trigger="input changed delay:350ms from:input[name='q']"
       >
         <div class="card-body gap-3 p-4">
           <input

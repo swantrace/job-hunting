@@ -22,6 +22,7 @@ export function SkillsTable({
         hx-target="#skills-results"
         hx-swap="outerHTML"
         hx-push-url="true"
+        hx-trigger="input changed delay:350ms from:input[name='q'], change from:select[name='category'], change from:select[name='status']"
       >
         <div class="card-body gap-3 p-4">
           <div class="grid gap-3 sm:grid-cols-3">
@@ -48,9 +49,6 @@ export function SkillsTable({
                 </option>
               ))}
             </select>
-          </div>
-          <div class="flex justify-end">
-            <button class="btn btn-sm">Filter</button>
           </div>
         </div>
       </form>
