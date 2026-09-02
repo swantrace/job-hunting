@@ -18,6 +18,11 @@ const severityClass = {
   optional: 'badge-info',
 } as const
 
+const verdictClass = {
+  approve: 'badge-success',
+  revise: 'badge-warning',
+} as const
+
 export function DocumentReviewPanel({
   jobId,
   runId,
@@ -90,16 +95,24 @@ export function DocumentReviewPanel({
       ) : null}
       {result ? (
         <div class="mt-3 space-y-3">
-          <p class="text-sm text-base-content/70">{result.summary}</p>
+          <div class="flex flex-wrap items-start gap-2">
+            <span class={`badge capitalize ${verdictClass[result.verdict]}`}>{result.verdict}</span>
+            <p class="min-w-0 flex-1 text-sm text-base-content/70">{result.summary}</p>
+          </div>
           <ul class="space-y-2">
             {result.findings.map((finding) => (
               <li class="rounded-box border border-base-300 p-3 text-sm">
                 <div class="flex flex-wrap items-center gap-2">
                   <span class={`badge ${severityClass[finding.severity]}`}>{finding.severity}</span>
+                  <span class="badge badge-outline">{finding.document}</span>
+                  <span class="badge badge-ghost">{finding.category}</span>
                   <span class="font-mono text-xs text-base-content/60">{finding.section}</span>
                 </div>
                 <p class="mt-1 italic text-base-content/70">“{finding.claim}”</p>
                 <p class="mt-1">{finding.message}</p>
+                <p class="mt-2 text-base-content/80">
+                  <span class="font-semibold">Recommended action:</span> {finding.recommendedAction}
+                </p>
               </li>
             ))}
           </ul>

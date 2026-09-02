@@ -4,20 +4,14 @@ import {
   validateDateBounds,
   validateDocumentDraft,
   validateEducationCoverage,
-  validateExactTargetTitle,
   validatePageBudget,
   validateRepeatedTitleOrSalutation,
+  validateSectionBlockCount,
+  validateSectionContract,
+  validateSectionWordBudget,
 } from '../src/lib/document-draft-validation'
 
 describe('deterministic document draft validation', () => {
-  test('flags a missing exact target title', () => {
-    const draft = parseDocumentDraft('## Summary\n\nBackend engineer.\n', 'resume')
-    expect(validateExactTargetTitle(draft, 'FHIR Software Engineer')).toEqual([
-      expect.objectContaining({ code: 'missing-target-title' }),
-    ])
-    expect(validateExactTargetTitle(draft, 'Backend Engineer')).toEqual([])
-  })
-
   test('flags omitted education entries', () => {
     const draft = parseDocumentDraft(
       '## Education\n\n- MSc Computer Science, Example University\n',
@@ -65,14 +59,71 @@ describe('deterministic document draft validation', () => {
     expect(validatePageBudget(draft, { maxWords: 1000, maxBullets: 100 })).toEqual([])
   })
 
+  test('validates required, non-empty, ordered sections while allowing optional sections', () => {
+    const valid = parseDocumentDraft(
+      '## Summary\n\nSummary.\n## Skills\n\nSkills.\n## Experience\n\nExperience.\n## Education\n\nEducation.\n',
+      'resume',
+    )
+    const contract = {
+      required: ['summary', 'skills', 'experience', 'education'] as const,
+      order: ['summary', 'skills', 'experience', 'projects', 'publications', 'education'] as const,
+    }
+    expect(
+      validateSectionContract(valid, {
+        required: [...contract.required],
+        order: [...contract.order],
+      }),
+    ).toEqual([])
+
+    const invalid = parseDocumentDraft(
+      '## Experience\n\nExperience.\n## Summary\n\nSummary.\n',
+      'resume',
+    )
+    const codes = validateSectionContract(invalid, {
+      required: [...contract.required],
+      order: [...contract.order],
+    }).map((warning) => warning.code)
+    expect(codes).toContain('missing-section')
+    expect(codes).toContain('section-order')
+
+    const emptyOptional = parseDocumentDraft(
+      '## Summary\n\nSummary.\n## Skills\n\nSkills.\n## Experience\n\nExperience.\n## Projects\n## Education\n\nEducation.\n',
+      'resume',
+    )
+    expect(
+      validateSectionContract(emptyOptional, {
+        required: [...contract.required],
+        order: [...contract.order],
+      }),
+    ).toContainEqual(expect.objectContaining({ code: 'empty-section' }))
+  })
+
+  test('validates section-specific word and block budgets', () => {
+    const resume = parseDocumentDraft('## Summary\n\n' + 'word '.repeat(10), 'resume')
+    expect(validateSectionWordBudget(resume, 'summary', 5)).toEqual([
+      expect.objectContaining({ code: 'over-section-word-budget' }),
+    ])
+    const letter = parseDocumentDraft(
+      '## Evidence\n\nFirst example.\n\nSecond example.\n',
+      'cover-letter',
+    )
+    expect(validateSectionBlockCount(letter, 'evidence', { min: 2, max: 3 })).toEqual([])
+    expect(validateSectionBlockCount(letter, 'evidence', { min: 3 })).toEqual([
+      expect.objectContaining({ code: 'too-few-section-blocks' }),
+    ])
+  })
+
   test('aggregates all checks deterministically', () => {
     const draft = parseDocumentDraft('## Summary\n\nBackend engineer.\n', 'resume')
     const warnings = validateDocumentDraft(draft, {
-      targetTitle: 'FHIR Software Engineer',
       education: [{ school: 'Example University' }],
+      sectionContract: {
+        required: ['summary', 'skills', 'experience', 'education'],
+        order: ['summary', 'skills', 'experience', 'projects', 'publications', 'education'],
+      },
     })
     const codes = warnings.map((warning) => warning.code)
-    expect(codes).toContain('missing-target-title')
+    expect(codes).toContain('missing-section')
     expect(codes).toContain('missing-education')
   })
 })

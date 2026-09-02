@@ -28,14 +28,14 @@ describe('grounded draft review display', () => {
       resumeMarkdown: '## Summary\n\nA draft.\n',
       coverLetterMarkdown: null,
       draftValidationJson: JSON.stringify({
-        resume: [{ code: 'missing-target-title', message: 'The exact target title is missing.' }],
+        resume: [{ code: 'missing-section', message: 'The Skills section is missing.' }],
         coverLetter: [{ code: 'repeated-salutation', message: 'The salutation appears twice.' }],
       }),
     })
     const html = await response.text()
 
     expect(html).toContain('Deterministic completeness checks')
-    expect(html).toContain('missing-target-title')
+    expect(html).toContain('missing-section')
     expect(html).toContain('repeated-salutation')
   })
 

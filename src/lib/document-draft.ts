@@ -50,7 +50,7 @@ export type DocumentDraft = {
   sections: DocumentSection[]
 }
 
-export const draftSchemaVersion = '1.0.0'
+export const draftSchemaVersion = '2.0.0'
 
 const headingToSection: Record<DocumentKind, Record<string, DocumentSectionId>> = {
   resume: {
