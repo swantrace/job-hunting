@@ -11,8 +11,10 @@ describe('AI job parser output', () => {
       location: null,
       postedDate: null,
       salary: null,
+      direction: 'fullstack',
     })
     expect(result.jobTitle).toBe('Backend Engineer')
+    expect(result.direction).toBe('fullstack')
   })
 
   test('keeps a versioned, field-specific prompt contract', () => {
@@ -21,8 +23,11 @@ describe('AI job parser output', () => {
     expect(jobParserSystemPrompt).toContain('job URL')
     expect(jobParserSystemPrompt).toContain('application source')
     expect(jobParserSystemPrompt).toContain('postedDate')
-    // The parser no longer publishes a parallel top-level skills list.
-    expect(jobParserResponseSchema.properties).not.toHaveProperty('skills')
+    // The parser no longer publishes a parallel top-level skills list, and the
+    // direction field is constrained to the supplied direction ids.
+    const parserSchema = jobParserResponseSchema(['fullstack', 'frontend'])
+    expect(parserSchema.properties).not.toHaveProperty('skills')
+    expect(parserSchema.properties.direction.enum).toEqual(['fullstack', 'frontend'])
   })
 
   test('rejects malformed skill confidence and source excerpts', () => {

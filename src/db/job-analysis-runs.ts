@@ -6,7 +6,7 @@ import { type AnalysisRunState, classifyAnalysisRunState } from '../lib/analysis
 import { nowISO, todayISO } from '../lib/date'
 import type { db } from './client'
 import { persistJobRequirements } from './job-analysis'
-import { type JobPostingAnalysis, jobPostingAnalyses, jobPostings } from './schema'
+import { type JobPostingAnalysis, jobApplications, jobPostingAnalyses, jobPostings } from './schema'
 import { type DbExecutor } from './skill-queries'
 
 export type JobAnalysisDb = Pick<
@@ -136,6 +136,13 @@ export function completeJobAnalysisRun(db: JobAnalysisDb, runId: number, parsed:
         updatedAt: date,
       })
       .where(eq(jobPostingAnalyses.id, runId))
+      .run()
+
+    // Apply the model-proposed direction to the application. The user can
+    // change it afterwards; the model only proposes it.
+    tx.update(jobApplications)
+      .set({ direction: parsed.direction, updatedAt: date })
+      .where(eq(jobApplications.id, posting.jobApplicationId))
       .run()
 
     persistJobRequirements(tx, runId, analysis.requirements, date)

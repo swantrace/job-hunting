@@ -29,6 +29,7 @@ export function ParsedJobDraft({
           postedDate: parsed.postedDate ?? todayISO(),
           skills: '',
           salary: parsed.salary ?? '',
+          direction: parsed.direction,
           parserModel: parsed.parserModel,
           parserPromptVersion: parsed.parserPromptVersion,
           analysisSchemaVersion: parsed.analysisPromptVersion,

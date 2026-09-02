@@ -9,6 +9,7 @@ import {
   markJobIntakeItemReady,
 } from '../db/job-intake'
 import { validateIntakeUrl } from './batch-intake'
+import { listDirections } from './directions'
 import { fetchJobPostingText } from './job-intake-fetch'
 
 function companyNameFor(item: { kind: string; normalizedUrl: string | null }): string {
@@ -59,7 +60,7 @@ export async function processJobIntakeItem(itemId: number) {
     const { applicationId, postingId } = createIntakeApplication({
       companyName: companyNameFor(item),
       jobTitle: 'Imported job',
-      direction: 'fullstack',
+      direction: listDirections()[0]?.id ?? 'fullstack',
       url: item.normalizedUrl,
       rawText: text,
     })

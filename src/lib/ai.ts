@@ -8,6 +8,7 @@ import {
   parsedJobSchema,
   parsedJobWithAnalysisSchema,
 } from '../ai/schemas/job-parser'
+import { listDirections } from './directions'
 
 export { type JobAnalysis, type ParsedJob, type ParsedJobWithAnalysis, parsedJobSchema }
 export type ParsedJobResult = ParsedJobWithAnalysis & {
@@ -77,6 +78,11 @@ export async function parseJobDescription(
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured')
   const model = env.OPENAI_MODEL_JOB_PARSER ?? env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
   const timeoutMs = parserTimeoutMs(env)
+  const directions = listDirections()
+  const directionIds = directions.map((direction) => direction.id)
+  const directionsHint = directions
+    .map((direction) => `${direction.id} (${direction.label})`)
+    .join(', ')
   let response: Response
   try {
     response = await fetch('https://api.openai.com/v1/responses', {
@@ -92,7 +98,7 @@ export async function parseJobDescription(
         input: [
           {
             role: 'system',
-            content: `${jobParserSystemPrompt}\n\n${jobAnalysisSystemPrompt}\nPrompt version: ${jobAnalysisPromptVersion}`,
+            content: `${jobParserSystemPrompt}\n\n${jobAnalysisSystemPrompt}\nPrompt version: ${jobAnalysisPromptVersion}\n\nAvailable directions: ${directionsHint}`,
           },
           { role: 'user', content: description },
         ],
@@ -101,7 +107,7 @@ export async function parseJobDescription(
             type: 'json_schema',
             name: 'job_posting',
             strict: true,
-            schema: jobAnalysisCombinedResponseSchema,
+            schema: jobAnalysisCombinedResponseSchema(directionIds),
           },
         },
       }),
@@ -134,6 +140,8 @@ export async function parseJobDescription(
     body.output?.flatMap((item) => item.content ?? []).find((part) => part.text)?.text
   if (!output) throw new Error('OpenAI returned no structured result')
   const parsed = parsedJobWithAnalysisSchema.parse(limitParserArrays(JSON.parse(output)))
+  if (!directionIds.includes(parsed.direction))
+    throw new Error(`The model returned an unknown direction "${parsed.direction}".`)
   const nullString = (value: string | null) =>
     value?.trim().toLocaleLowerCase() === 'null' ? null : value
   const cleanList = (values: string[]) => [

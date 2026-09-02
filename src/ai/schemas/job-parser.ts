@@ -2,13 +2,12 @@ import { z } from 'zod'
 import { type JobAnalysis, jobAnalysisResponseSchema, jobAnalysisSchema } from './job-analysis'
 
 /**
- * The combined job-analysis call parses only the application facts that are
- * model-extractable: job title, location, posted date, and salary. Company,
- * URL, application source, and direction are deliberately user-provided and
- * never part of this schema. All other content (skills, requirements,
- * responsibilities, pain points, culture, red flags, success metrics,
- * benefits, notes, and interview questions) lives inside the nested structured
- * `analysis` object.
+ * The combined job-analysis call parses the application facts that are
+ * model-extractable: job title, location, posted date, salary, and a proposed
+ * direction. Company, URL, and application source remain user-provided. All
+ * other content (skills, requirements, responsibilities, pain points, culture,
+ * red flags, success metrics, benefits, notes, and interview questions) lives
+ * inside the nested structured `analysis` object.
  */
 export const parsedJobSchema = z.object({
   jobTitle: z.string().trim().max(200),
@@ -19,6 +18,7 @@ export const parsedJobSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable(),
   salary: z.string().trim().max(150).nullable(),
+  direction: z.string().trim().min(1).max(80),
 })
 
 export type ParsedJob = z.infer<typeof parsedJobSchema>
@@ -34,29 +34,36 @@ export const parsedJobWithAnalysisSchema = parsedJobSchema.extend({
 export type ParsedJobWithAnalysis = z.infer<typeof parsedJobWithAnalysisSchema>
 export type { JobAnalysis }
 
-export const jobParserResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    jobTitle: {
-      type: 'string',
-      description: 'Official position title, without the company name.',
+export function jobParserResponseSchema(directionIds: string[]) {
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      jobTitle: {
+        type: 'string',
+        description: 'Official position title, without the company name.',
+      },
+      location: {
+        type: ['string', 'null'],
+        description: 'City, region, remote, hybrid, or onsite arrangement, or null if unknown.',
+      },
+      postedDate: {
+        type: ['string', 'null'],
+        description: 'Explicit posting date in YYYY-MM-DD format, or null if unknown.',
+      },
+      salary: {
+        type: ['string', 'null'],
+        description: 'Salary or compensation text exactly as stated, or null.',
+      },
+      direction: {
+        type: 'string',
+        enum: directionIds,
+        description: 'The single best-fit direction id from the supplied available directions.',
+      },
     },
-    location: {
-      type: ['string', 'null'],
-      description: 'City, region, remote, hybrid, or onsite arrangement, or null if unknown.',
-    },
-    postedDate: {
-      type: ['string', 'null'],
-      description: 'Explicit posting date in YYYY-MM-DD format, or null if unknown.',
-    },
-    salary: {
-      type: ['string', 'null'],
-      description: 'Salary or compensation text exactly as stated, or null.',
-    },
-  },
-  required: ['jobTitle', 'location', 'postedDate', 'salary'],
-} as const
+    required: ['jobTitle', 'location', 'postedDate', 'salary', 'direction'],
+  } as const
+}
 
 /**
  * Provider JSON schema for the single combined job-analysis call. It reuses the
@@ -64,12 +71,15 @@ export const jobParserResponseSchema = {
  * OpenAI JSON schema and the Zod schema describe the same required fields and
  * enums.
  */
-export const jobAnalysisCombinedResponseSchema = {
-  type: 'object',
-  additionalProperties: false,
-  properties: {
-    ...jobParserResponseSchema.properties,
-    analysis: jobAnalysisResponseSchema,
-  },
-  required: [...jobParserResponseSchema.required, 'analysis'],
-} as const
+export function jobAnalysisCombinedResponseSchema(directionIds: string[]) {
+  const parserSchema = jobParserResponseSchema(directionIds)
+  return {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      ...parserSchema.properties,
+      analysis: jobAnalysisResponseSchema,
+    },
+    required: [...parserSchema.required, 'analysis'],
+  } as const
+}

@@ -232,6 +232,7 @@ describe('canonical requirement-skill persistence', () => {
         location: null,
         postedDate: null,
         salary: null,
+        direction: 'fullstack',
         analysis: {
           summary: { rolePurpose: 'Build services.', idealCandidate: 'An engineer.' },
           classification: {
