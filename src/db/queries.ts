@@ -173,7 +173,7 @@ export function updateApplication(id: number, input: z.infer<typeof applicationS
         url: input.url,
         postedDate: input.postedDate,
         priority: input.priority,
-        appliedDate: input.appliedDate ?? date,
+        appliedDate: input.appliedDate,
         applicationSource: input.applicationSource,
         salary: input.salary,
         notes: input.notes,
