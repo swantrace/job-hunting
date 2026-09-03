@@ -48,7 +48,7 @@ cp -R career-data.example career-data
 
 Keep stable IDs when editing. Directions are defined in `preferences.json` `directionDefinitions`; each fact file references those direction IDs. The runtime uses `career-data/` when present, and falls back to the examples otherwise.
 
-For a deployed Fly instance, persist these directories on the mounted `/data` volume, then set `CAREER_DATA_DIR=/data/career-data` and ``.
+For a deployed Fly instance, persist these directories on the mounted `/data` volume, then set `CAREER_DATA_DIR=/data/career-data`.
 
 ### Approved Base Resumes
 
@@ -106,9 +106,9 @@ bun run skills:sync --check # non-zero exit when conflicts require manual review
 
 Every generation run records an immutable evidence-selection snapshot in the database and writes a matching JSON file beneath `ARTIFACTS_DIR/run-<id>/`. The workspace’s **Evidence selection & generation record** section shows the exact selected IDs and schema/prompt versions, and lets you download that snapshot. This makes a generated resume or letter reviewable even after career data changes.
 
-Do not use the old `CANDIDATE_PROFILE_FILE` or `CANDIDATE_PROFILE_JSON` configuration: candidate facts now come only from `career-data/candidate.json`.
+Do not use the removed `CANDIDATE_PROFILE_FILE` or `CANDIDATE_PROFILE_JSON` configuration; candidate facts come only from `career-data/candidate.json`.
 
-For Fly.io deployment, `fly.toml` mounts a persistent volume at `/data` and sets `DB_FILE_NAME=/data/jobs.db`. The machine is configured to stop when idle and start automatically on the next HTTP request. Create the volume once before deploying:
+For Fly.io deployment, `fly.toml` mounts a persistent volume at `/data` and sets `DB_FILE_NAME=/data/jobs.db`. The machine is configured to stay running (`auto_stop_machines = 'off'`, `min_machines_running = 1`). Create the volume once before deploying:
 
 ```sh
 fly volumes create data --region yyz --size 1
@@ -119,7 +119,7 @@ Set `ARTIFACTS_DIR=/data/artifacts` and `QUEUE_FILE_NAME=/data/bunqueue.db` in F
 
 The production start command runs Drizzle migrations before starting the server. Keep one Fly machine for this SQLite deployment because Fly volumes are attached to a single machine.
 
-Fly production reads career data—including `skill-taxonomy.json`—from its persistent volume through `CAREER_DATA_DIR=/data/career-data` (and ``). Upload the complete career-data directory rather than individual fact files, then synchronize it without copying private data into the image or Git:
+Fly production reads career data—including `skill-taxonomy.json`—from its persistent volume through `CAREER_DATA_DIR=/data/career-data`. Upload the complete career-data directory rather than individual fact files, then synchronize it without copying private data into the image or Git:
 
 ```sh
 fly ssh console
@@ -152,7 +152,7 @@ Generation freshness covers the Base Resume, Career Data, JD, decisions, directi
 
 ## Batch job post intake
 
-**Import jobs** (`/applications/import`) accepts one `https` URL or one pasted job description per line, preserving input order. URLs are validated before any fetch: `https` only, no credentials, no localhost/private/reserved addresses, bounded redirects/bytes/time, and scripts/styles are stripped. A blocked or failed link keeps its URL and becomes **Needs pasted text** — blank or error HTML is never sent to the model. Successful text is analyzed through the existing Job Analysis, and the created application appears in Review with placeholder metadata for you to confirm. First drafts are generated only for explicitly selected, Documents-ready applications.
+**Import jobs** (`/applications/import`) accepts one `https` URL or one pasted job description per box (multi-line is fine), preserving input order. URLs are validated before any fetch: `https` only, no credentials, no localhost/private/reserved addresses, bounded redirects/bytes/time, and scripts/styles are stripped. A blocked or failed link keeps its URL and becomes **Needs pasted text** — blank or error HTML is never sent to the model. Successful text is analyzed through the existing Job Analysis, and the created application appears in Review with placeholder metadata for you to confirm. First drafts are generated only for explicitly selected, Documents-ready applications.
 
 ## Gap report and Career growth
 
@@ -207,7 +207,7 @@ The dev server listens on all interfaces at port `5173`. If `http://localhost:51
 
 ## LLM workflow and boundaries
 
-The pipeline makes four distinct model calls, each with a separate trust boundary. Every prompt, response schema, and frozen input records a version, and every run records the selected model in SQLite.
+The pipeline makes five distinct model calls, each with a separate trust boundary. Every prompt, response schema, and frozen input records a version, and every run records the selected model in SQLite.
 
 1. **Job-only analysis** (`OPENAI_MODEL_JOB_PARSER`) — receives only the raw job posting and the skill taxonomy. It never sees a resume, career data, or candidate identity, and it never produces a fit score. It proposes a direction from the supplied direction definitions.
 2. **Candidate fit / evidence matrix** (`OPENAI_MODEL_CANDIDATE_FIT`) — an explicit, queued paid action. It receives a frozen canonical input snapshot (career data and the reviewed job requirements) and returns a labelled `apply`/`apply-selectively`/`skip` recommendation and a requirement-to-evidence matrix. Every evidence reference must resolve to a supplied canonical ID.
@@ -239,7 +239,7 @@ Fit, requirement coverage, and keyword coverage are deterministic calculations o
 
 ### Stale analysis and regeneration
 
-A completed analysis becomes stale when its frozen input hash no longer matches the current inputs. Stale results are never deleted — they remain auditable history, labelled `Outdated` with the exact changed reason. A stale review blocks new application-specific generation, but existing artifacts remain downloadable, and direction-only baseline generation is independent of application analysis. The JSON export is schema version 3 and carries Job Analysis run metadata, run-scoped decisions, and generation input identity; older exports import through explicit adapters.
+A completed analysis becomes stale when its frozen input hash no longer matches the current inputs. Stale results are never deleted — they remain auditable history, labelled `Outdated` with the exact changed reason. A stale review blocks new application-specific generation, but existing artifacts remain downloadable, and direction-only baseline generation is independent of application analysis. The JSON export is schema version 4 and carries Job Analysis run metadata, run-scoped decisions, and generation input identity; older exports import through explicit adapters.
 
 ## Resource pages
 
