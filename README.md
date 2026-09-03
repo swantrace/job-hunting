@@ -48,6 +48,14 @@ cp -R career-data.example career-data
 
 Keep stable IDs when editing. Directions are defined in `preferences.json` `directionDefinitions`; each fact file references those direction IDs. The runtime uses `career-data/` when present, and falls back to the examples otherwise.
 
+Career Data can also live in a separate private repository. Point the ignored local `.env` at that repository while leaving `.env.example` on its portable default:
+
+```ini
+CAREER_DATA_DIR=../career-profile-private
+```
+
+The private repository root should contain the same JSON files and `base-resumes/` directory that would otherwise live under `career-data/`. Keeping source code and personal career facts separate lets this application remain reusable without duplicating private data.
+
 For a deployed Fly instance, persist these directories on the mounted `/data` volume, then set `CAREER_DATA_DIR=/data/career-data`.
 
 ### Approved Base Resumes
@@ -63,6 +71,21 @@ bun run resume:import -- --direction fhir --input ~/resumes/fhir.pdf --version v
 The import CLI validates that the direction is defined in `preferences.directionDefinitions` and refuses empty files. It writes the normalized Markdown and updates `manifest.json` in one step. Missing a Base Resume disables document generation only for that direction — the app never falls back to a blank resume.
 
 The production app reads the approved Markdown directly. Set `CAREER_BASE_RESUMES_DIR` to relocate the directory; it defaults to `CAREER_DATA_DIR/base-resumes`. The Base Resume Markdown and manifest travel with the private career-data bundle, so `bun run fly:sync-career-data` uploads them to `/data/career-data/base-resumes` alongside the fact JSON files.
+
+### ChatGPT career context
+
+Generate one self-contained Markdown context for each career direction before using the private repository in ChatGPT:
+
+```sh
+# Export every direction to <CAREER_DATA_DIR>/chatgpt-context
+bun run career:export-chatgpt-context
+
+# Export only selected directions
+bun run career:export-chatgpt-context -- --direction fullstack
+bun run career:export-chatgpt-context -- --direction frontend --direction fhir
+```
+
+Each generated file combines the direction's approved Base Resume with safe canonical Career Data and explicit source-authority rules. The JSON files remain the source of truth; regenerate the Markdown after changing Career Data or importing a new Base Resume. When asking ChatGPT to tailor a resume, attach or reference the direction file from `chatgpt-context/` together with the job description.
 
 ## Run locally
 

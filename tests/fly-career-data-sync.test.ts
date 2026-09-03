@@ -26,9 +26,15 @@ afterAll(() => rmSync(fixtureRoot, { force: true, recursive: true }))
 
 describe('Fly career data synchronization selection', () => {
   test('uploads the private career-data bundle by default', () => {
+    mkdirSync(resolve(fixtureRoot, 'career-data', 'chatgpt-context'), { recursive: true })
+    writeFileSync(
+      resolve(fixtureRoot, 'career-data', 'chatgpt-context', 'fullstack.md'),
+      '# Derived context\n',
+    )
     const files = selectedFiles([], fixtureRoot)
     expect(files.some((file) => file.endsWith('/career-data/candidate.json'))).toBe(true)
     expect(files.some((file) => file.endsWith('/career-data/skill-taxonomy.json'))).toBe(true)
+    expect(files.some((file) => file.includes('/chatgpt-context/'))).toBe(false)
   })
 
   test('includes approved Base Resume Markdown and manifest with career data', () => {
@@ -60,6 +66,19 @@ describe('Fly career data synchronization selection', () => {
     expect(remoteUploadPaths(file, 'test-upload', fixtureRoot)).toEqual({
       destination: '/data/career-data/skills.json',
       temporary: '/data/career-data/skills.json.upload-test-upload',
+    })
+  })
+
+  test('maps logical career-data selections from an external configured directory', () => {
+    const externalRoot = resolve(fixtureRoot, 'private-career-profile')
+    mkdirSync(externalRoot, { recursive: true })
+    writeFileSync(resolve(externalRoot, 'skills.json'), '{}\n')
+
+    const file = selectedFiles(['career-data/skills.json'], fixtureRoot, externalRoot)[0]
+    expect(file).toBe(resolve(externalRoot, 'skills.json'))
+    expect(remoteUploadPaths(file, 'external', fixtureRoot, externalRoot)).toEqual({
+      destination: '/data/career-data/skills.json',
+      temporary: '/data/career-data/skills.json.upload-external',
     })
   })
 

@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, relative, resolve, sep } from 'node:path'
+import { careerDataDirectory } from '../lib/career-data'
 
 const projectRoot = resolve(import.meta.dir, '../..')
 const allowedRoots = ['career-data'] as const
@@ -17,7 +18,7 @@ function usage() {
   return `Usage: bun run fly:sync-career-data -- [options] [selections...]
 
 Selections (default: career-data):
-  career-data                         Upload every JSON and Base Resume Markdown file
+  career-data                         Upload runtime JSON and Base Resume files from CAREER_DATA_DIR
   career-data/skills.json             Upload one career-data file
   career-data/base-resumes            Upload the approved Base Resume Markdown and manifest
 
@@ -71,18 +72,20 @@ export function parseOptions(args: string[]): Options {
   return { app, machine, syncDb, selections }
 }
 
-function ensureAllowedPath(path: string, rootDirectory: string) {
-  const absolute = resolve(rootDirectory, path)
-  const root = allowedRoots.find((candidate) => {
-    const absoluteRoot = resolve(rootDirectory, candidate)
-    return absolute === absoluteRoot || absolute.startsWith(`${absoluteRoot}${sep}`)
-  })
+function ensureAllowedPath(path: string, careerDataRoot: string) {
+  const root = allowedRoots.find(
+    (candidate) => path === candidate || path.startsWith(`${candidate}/`),
+  )
   if (!root) throw new Error(`Selection must be inside career-data/: ${path}`)
+  const suffix = path === root ? '' : path.slice(root.length + 1)
+  const absolute = resolve(careerDataRoot, suffix)
+  if (absolute !== careerDataRoot && !absolute.startsWith(`${careerDataRoot}${sep}`))
+    throw new Error(`Selection must be inside career-data/: ${path}`)
   if (!existsSync(absolute)) throw new Error(`Selection does not exist: ${path}`)
   return { absolute, root }
 }
 
-function syncFiles(path: string): string[] {
+function syncFiles(path: string, careerDataRoot: string): string[] {
   if (statSync(path).isFile()) {
     if (!path.endsWith('.json') && !path.endsWith('.md'))
       throw new Error(`Only JSON or Markdown files can be synchronized: ${path}`)
@@ -91,36 +94,44 @@ function syncFiles(path: string): string[] {
   return readdirSync(path, { withFileTypes: true })
     .flatMap((entry) => {
       const child = resolve(path, entry.name)
-      if (entry.isDirectory()) return syncFiles(child)
+      if (entry.isDirectory()) {
+        if (path === careerDataRoot && entry.name !== 'base-resumes') return []
+        return syncFiles(child, careerDataRoot)
+      }
       if (entry.isFile() && (child.endsWith('.json') || child.endsWith('.md'))) return [child]
       return []
     })
     .sort()
 }
 
-export function selectedFiles(selections: string[], rootDirectory = projectRoot) {
+export function selectedFiles(
+  selections: string[],
+  rootDirectory = projectRoot,
+  careerDataRoot = resolve(rootDirectory, 'career-data'),
+) {
   const requested = selections.length ? selections : [...allowedRoots]
   const files = new Set<string>()
   for (const selection of requested) {
     const normalized = selection.replaceAll('\\', '/').replace(/^\.\//, '').replace(/\/$/, '')
-    const { absolute } = ensureAllowedPath(normalized, rootDirectory)
-    for (const file of syncFiles(absolute)) files.add(file)
+    const { absolute } = ensureAllowedPath(normalized, careerDataRoot)
+    for (const file of syncFiles(absolute, careerDataRoot)) files.add(file)
   }
   return [...files].sort()
 }
 
-function remotePath(localPath: string, rootDirectory: string) {
-  const path = relative(rootDirectory, localPath).split(sep).join('/')
-  return `/data/${path}`
+function remotePath(localPath: string, careerDataRoot: string) {
+  const path = relative(careerDataRoot, localPath).split(sep).join('/')
+  return `/data/career-data/${path}`
 }
 
 export function remoteUploadPaths(
   localPath: string,
   uploadId: string,
   rootDirectory = projectRoot,
+  careerDataRoot = resolve(rootDirectory, 'career-data'),
 ) {
   if (!/^[a-zA-Z0-9-]+$/.test(uploadId)) throw new Error('Invalid upload ID.')
-  const destination = remotePath(localPath, rootDirectory)
+  const destination = remotePath(localPath, careerDataRoot)
   return {
     destination,
     temporary: `${destination}.upload-${uploadId}`,
@@ -193,18 +204,22 @@ async function runRemote(options: Options, script: string) {
 export async function main(args = process.argv.slice(2)) {
   const parsedOptions = parseOptions(args)
   const options = { ...parsedOptions, machine: await resolveMachine(parsedOptions) }
-  const files = selectedFiles(options.selections)
+  const sourceRoot = careerDataDirectory()
+  const files = selectedFiles(options.selections, projectRoot, sourceRoot)
   if (!files.length) throw new Error('No JSON files were selected.')
 
   const uploadId = crypto.randomUUID()
-  const uploads = files.map((file) => ({ file, ...remoteUploadPaths(file, uploadId) }))
+  const uploads = files.map((file) => ({
+    file,
+    ...remoteUploadPaths(file, uploadId, projectRoot, sourceRoot),
+  }))
   const remoteDirectories = [...new Set(uploads.map(({ destination }) => dirname(destination)))]
 
   console.log(`Uploading ${files.length} file(s) to Fly app "${options.app}"...`)
   console.log(`Using Fly Machine ${options.machine}.`)
   await runRemote(options, `mkdir -p -- ${remoteDirectories.map(shellQuote).join(' ')}`)
   for (const { file, temporary, destination } of uploads) {
-    console.log(`${relative(projectRoot, file)} -> ${destination}`)
+    console.log(`career-data/${relative(sourceRoot, file)} -> ${destination}`)
     await ensureMachineStarted(options)
     await run(['fly', 'sftp', 'put', file, temporary, ...flyArgs(options)])
     await runRemote(options, `mv -f -- ${shellQuote(temporary)} ${shellQuote(destination)}`)
