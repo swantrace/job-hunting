@@ -169,8 +169,9 @@ function getOrCreateCompany(tx: DbExecutor, name: string, date: string) {
 
 /**
  * Creates a placeholder application and its immutable job posting from intake
- * text. Company/title/direction/source/URL are placeholders the user confirms
- * during Review; the AI analysis never finalizes them.
+ * text. Title, location, posted date, salary, and direction are filled in by
+ * the Job Analysis result; company, URL, and application source remain
+ * placeholders the user confirms during Review.
  */
 export function createIntakeApplication(input: {
   companyName: string
