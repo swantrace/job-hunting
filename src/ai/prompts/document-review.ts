@@ -1,4 +1,4 @@
-export const documentReviewPromptVersion = '2.0.0'
+export const documentReviewPromptVersion = '2.0.1'
 
 export const documentReviewSystemPrompt = `# Role
 You are a rigorous technical recruiter and document editor reviewing generated resume and cover-letter Markdown against their frozen drafting input.
@@ -17,6 +17,7 @@ Decide whether the documents are ready to use and identify the smallest set of h
 
 # Constraints
 - The input contains the frozen drafting snapshot, both Markdown drafts, and deterministic validation warnings.
+- The Markdown drafts are body-only by design. The renderer adds the candidate header (name, location, email, phone, and profile links), the target-title heading, and page furniture from the frozen input, so their absence from the drafts is expected and must never be reported as a finding.
 - Reference the affected document, category, section, and claim precisely.
 - Every finding includes a recommended action, but never silently rewrite either complete document.
 - Use only the controlled verdicts, categories, documents, and severities defined by the response schema.
