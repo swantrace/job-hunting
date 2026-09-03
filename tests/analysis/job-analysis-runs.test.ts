@@ -278,71 +278,76 @@ describe('job analysis completion transaction', () => {
     },
   )
 
-  runServiceTest('applies extracted application facts without clearing unknown fields', async () => {
-    const sqlite = migratedDatabase()
-    try {
-      const db = drizzle({ client: sqlite, schema })
-      const company = sqlite
-        .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
-        .get('Example Company', '2026-08-28', '2026-08-28') as { id: number }
-      const application = sqlite
-        .query(
-          `INSERT INTO job_applications (
+  runServiceTest(
+    'applies extracted application facts without clearing unknown fields',
+    async () => {
+      const sqlite = migratedDatabase()
+      try {
+        const db = drizzle({ client: sqlite, schema })
+        const company = sqlite
+          .query(
+            'INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id',
+          )
+          .get('Example Company', '2026-08-28', '2026-08-28') as { id: number }
+        const application = sqlite
+          .query(
+            `INSERT INTO job_applications (
              company_id, job_title, direction, location, posted_date, salary,
              priority, status, created_at, updated_at
            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-        )
-        .get(
-          company.id,
-          'Imported job',
-          'fullstack',
-          'Existing location',
-          '2026-08-28',
-          'Existing salary',
-          'B',
-          'Saved',
-          '2026-08-28',
-          '2026-08-28',
-        ) as { id: number }
-      const posting = sqlite
-        .query(
-          `INSERT INTO job_postings (job_application_id, raw_text, captured_at, content_hash)
+          )
+          .get(
+            company.id,
+            'Imported job',
+            'fullstack',
+            'Existing location',
+            '2026-08-28',
+            'Existing salary',
+            'B',
+            'Saved',
+            '2026-08-28',
+            '2026-08-28',
+          ) as { id: number }
+        const posting = sqlite
+          .query(
+            `INSERT INTO job_postings (job_application_id, raw_text, captured_at, content_hash)
            VALUES (?, ?, ?, ?) RETURNING id`,
-        )
-        .get(application.id, 'Senior Platform Engineer role', '2026-08-28', 'posting-hash') as {
-        id: number
+          )
+          .get(application.id, 'Senior Platform Engineer role', '2026-08-28', 'posting-hash') as {
+          id: number
+        }
+        const { completeJobAnalysisRun, createJobAnalysisRun } = await import(jobAnalysisRunsPath)
+        const run = createJobAnalysisRun(db, {
+          jobPostingId: posting.id,
+          inputHash: 'input-hash',
+          frozenInputJson: '{}',
+          model: 'gpt-test',
+          promptVersion: '2.2.0',
+          schemaVersion: '3.0.0',
+        })
+
+        completeJobAnalysisRun(db, run.id, {
+          ...minimalParsedResult(),
+          jobTitle: 'Senior Platform Engineer',
+          location: null,
+          postedDate: '2026-08-15',
+          salary: null,
+        })
+
+        const updated = db
+          .select()
+          .from(schema.jobApplications)
+          .where(eq(schema.jobApplications.id, application.id))
+          .get()
+        expect(updated?.jobTitle).toBe('Senior Platform Engineer')
+        expect(updated?.location).toBe('Existing location')
+        expect(updated?.postedDate).toBe('2026-08-15')
+        expect(updated?.salary).toBe('Existing salary')
+      } finally {
+        sqlite.close()
       }
-      const { completeJobAnalysisRun, createJobAnalysisRun } = await import(jobAnalysisRunsPath)
-      const run = createJobAnalysisRun(db, {
-        jobPostingId: posting.id,
-        inputHash: 'input-hash',
-        frozenInputJson: '{}',
-        model: 'gpt-test',
-        promptVersion: '2.2.0',
-        schemaVersion: '3.0.0',
-      })
-
-      completeJobAnalysisRun(db, run.id, {
-        ...minimalParsedResult(),
-        jobTitle: 'Senior Platform Engineer',
-        location: null,
-        postedDate: '2026-08-15',
-        salary: null,
-      })
-
-      const updated = db
-        .select()
-        .from(schema.jobApplications)
-        .where(eq(schema.jobApplications.id, application.id))
-        .get()
-      expect(updated?.jobTitle).toBe('Senior Platform Engineer')
-      expect(updated?.location).toBe('Existing location')
-      expect(updated?.postedDate).toBe('2026-08-15')
-      expect(updated?.salary).toBe('Existing salary')
-    } finally {
-      sqlite.close()
-    }
-  })
+    },
+  )
 })
 
 function seedPosting(sqlite: ReturnType<typeof migratedDatabase>) {

@@ -4,8 +4,8 @@ import { careerSkillEvidenceMap } from '../../../../src/lib/career-data'
 import { parseFilters, parseId, parseWorkspaceTab } from '../../../../src/lib/request'
 import { computeWorkspaceAvailability } from '../../../../src/lib/workspace/availability'
 import { resolveWorkspaceTab, tabAvailability } from '../../../../src/lib/workspace/state'
-import { Workspace } from '../../../components/Workspace'
 import { AppShell } from '../../../components/layout/AppShell'
+import { Workspace } from '../../../components/Workspace'
 
 export default createRoute((c) => {
   const id = parseId(c.req.param('id'))
