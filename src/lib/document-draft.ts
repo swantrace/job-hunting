@@ -86,7 +86,6 @@ export class DocumentDraftParseError extends Error {
 }
 
 const rawHtmlPattern = /<\/?[a-z][a-z0-9-]*(?:\s[^<>]*)?>/i
-const unsafeSchemePattern = /(?:^|\s|\()(?:javascript|data|vbscript|file|about):/i
 const markdownLinkPattern = /\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+["'][^"']*["'])?\s*\)/g
 const headingPattern = /^(#{1,6})\s+(.+)$/
 const bulletPattern = /^\s*[-*+]\s+/
@@ -105,11 +104,6 @@ export function isSafeLinkUrl(url: string): boolean {
 function assertSafeLine(line: string, lineNumber: number) {
   if (rawHtmlPattern.test(line))
     throw new DocumentDraftParseError('Raw HTML is not allowed in document drafts.', lineNumber)
-  if (unsafeSchemePattern.test(line))
-    throw new DocumentDraftParseError(
-      'Executable or unsafe link schemes are not allowed in document drafts.',
-      lineNumber,
-    )
   if (line.startsWith('!['))
     throw new DocumentDraftParseError('Images are not allowed in document drafts.', lineNumber)
   for (const match of line.matchAll(markdownLinkPattern)) {
