@@ -52,6 +52,14 @@ export function listQueuedDocumentReviews() {
     .all()
 }
 
+/** Resets reviews orphaned mid-flight by a crashed worker back to Queued. */
+export function resetStaleProcessingDocumentReviews() {
+  db.update(documentReviews)
+    .set({ status: 'Queued', errorMessage: null, updatedAt: todayISO() })
+    .where(eq(documentReviews.status, 'Processing'))
+    .run()
+}
+
 export function markDocumentReviewProcessing(reviewId: number) {
   const date = todayISO()
   db.update(documentReviews)

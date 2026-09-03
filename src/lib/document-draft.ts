@@ -86,10 +86,15 @@ export class DocumentDraftParseError extends Error {
 }
 
 const rawHtmlPattern = /<\/?[a-z][a-z0-9-]*(?:\s[^<>]*)?>/i
-const unsafeSchemePattern = /(?:^|\s|\()(?:javascript|data|vbscript|file|about):/i
 const markdownLinkPattern = /\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+["'][^"']*["'])?\s*\)/g
 const headingPattern = /^(#{1,6})\s+(.+)$/
 const bulletPattern = /^\s*[-*+]\s+/
+const emphasisPattern = /(\*\*|__)([^*_]+)\1/g
+
+/** Strips `**bold**`/`__bold__` markers the model emits despite the plain-text rule. */
+function stripMarkdownEmphasis(text: string): string {
+  return text.replace(emphasisPattern, '$2').trim()
+}
 
 /** Only `http(s)` links are safe document content. */
 export function isSafeLinkUrl(url: string): boolean {
@@ -105,11 +110,6 @@ export function isSafeLinkUrl(url: string): boolean {
 function assertSafeLine(line: string, lineNumber: number) {
   if (rawHtmlPattern.test(line))
     throw new DocumentDraftParseError('Raw HTML is not allowed in document drafts.', lineNumber)
-  if (unsafeSchemePattern.test(line))
-    throw new DocumentDraftParseError(
-      'Executable or unsafe link schemes are not allowed in document drafts.',
-      lineNumber,
-    )
   if (line.startsWith('!['))
     throw new DocumentDraftParseError('Images are not allowed in document drafts.', lineNumber)
   for (const match of line.matchAll(markdownLinkPattern)) {
@@ -173,14 +173,15 @@ export function parseDocumentDraft(markdown: string, kind: DocumentKind): Docume
       )
 
     if (bulletPattern.test(line)) {
-      const text = line.replace(bulletPattern, '').trim()
+      const text = stripMarkdownEmphasis(line.replace(bulletPattern, ''))
       if (text.length > MAX_TEXT_LENGTH)
         throw new DocumentDraftParseError('Bullet text is too long.', lineNumber)
       current.blocks.push({ kind: 'bullet', text })
     } else {
-      if (line.length > MAX_TEXT_LENGTH)
+      const text = stripMarkdownEmphasis(line)
+      if (text.length > MAX_TEXT_LENGTH)
         throw new DocumentDraftParseError('Paragraph text is too long.', lineNumber)
-      current.blocks.push({ kind: 'paragraph', text: line })
+      current.blocks.push({ kind: 'paragraph', text })
     }
   }
 

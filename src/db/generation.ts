@@ -194,6 +194,14 @@ export function listQueuedBaselineGenerationRuns() {
     .all()
 }
 
+/** Resets baseline runs orphaned mid-flight by a crashed worker back to Queued. */
+export function resetStaleProcessingBaselineGenerationRuns() {
+  db.update(baselineGenerationRuns)
+    .set({ status: 'Queued', errorMessage: null, updatedAt: todayISO() })
+    .where(eq(baselineGenerationRuns.status, 'Processing'))
+    .run()
+}
+
 export function saveBaselineGenerationEvidenceSnapshot(runId: number, snapshotJson: string) {
   const date = todayISO()
   return db
@@ -357,6 +365,14 @@ export function listQueuedGenerationRuns() {
     .where(eq(generationRuns.status, 'Queued'))
     .orderBy(generationRuns.id)
     .all()
+}
+
+/** Resets generation runs orphaned mid-flight by a crashed worker back to Queued. */
+export function resetStaleProcessingGenerationRuns() {
+  db.update(generationRuns)
+    .set({ status: 'Queued', errorMessage: null, updatedAt: todayISO() })
+    .where(eq(generationRuns.status, 'Processing'))
+    .run()
 }
 
 export function getGenerationRun(runId: number) {

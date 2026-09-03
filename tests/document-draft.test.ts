@@ -53,6 +53,30 @@ describe('safe Markdown document parsing', () => {
     ).toThrow(/nsafe/)
   })
 
+  test('accepts normal text containing colons and safe-scheme-like words', () => {
+    // "data:", "file:", "about:" etc. are ordinary prose, not links; only markdown
+    // link URLs are scheme-checked.
+    const draft = parseDocumentDraft(
+      '## Summary\n\nData: built ETL pipelines. About: see file: section.\n',
+      'resume',
+    )
+    expect(draft.sections[0].blocks[0]).toEqual({
+      kind: 'paragraph',
+      text: 'Data: built ETL pipelines. About: see file: section.',
+    })
+  })
+
+  test('strips markdown bold markers from block text', () => {
+    const draft = parseDocumentDraft(
+      '## Experience\n\n**Lead Engineer — Acme | 2024**\n- Built **the portal** with **React**.\n',
+      'resume',
+    )
+    expect(draft.sections[0].blocks).toEqual([
+      { kind: 'paragraph', text: 'Lead Engineer — Acme | 2024' },
+      { kind: 'bullet', text: 'Built the portal with React.' },
+    ])
+  })
+
   test('rejects raw HTML, images, and executable schemes', () => {
     expect(() => parseDocumentDraft('## Summary\n\n<div>hi</div>\n', 'resume')).toThrow('Raw HTML')
     expect(() => parseDocumentDraft('## Summary\n\n<script>alert(1)</script>\n', 'resume')).toThrow(

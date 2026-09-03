@@ -43,6 +43,7 @@ export function SkillDecisionForm({
           hx-target="#skill-review-panel"
           hx-swap="outerHTML"
           hx-disabled-elt="find button"
+          novalidate
         >
           <input type="hidden" name="skillId" value={requirement.skillId} />
           <input type="hidden" name="action" value="skip" />
@@ -58,7 +59,7 @@ export function SkillDecisionForm({
         >
           Include
         </button>
-        <div id={modalId} class="modal" popover="auto">
+        <div id={modalId} class="modal" popover="auto" {...(error ? { open: true } : {})}>
           <div class="modal-box">
             <h3 class="text-lg font-bold">Include {requirement.skillName}</h3>
             <p class="mt-1 text-sm text-base-content/60">
@@ -71,6 +72,7 @@ export function SkillDecisionForm({
               hx-target="#skill-review-panel"
               hx-swap="outerHTML"
               hx-disabled-elt="find button"
+              novalidate
             >
               <input type="hidden" name="skillId" value={requirement.skillId} />
               <input type="hidden" name="action" value="include" />

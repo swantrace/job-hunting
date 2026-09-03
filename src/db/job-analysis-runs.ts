@@ -46,6 +46,14 @@ export function listQueuedJobAnalysisRuns(db: JobAnalysisDb): JobAnalysisRun[] {
     .all()
 }
 
+/** Resets runs orphaned mid-flight by a crashed worker back to Queued. */
+export function resetStaleProcessingJobAnalysisRuns(db: JobAnalysisDb) {
+  db.update(jobPostingAnalyses)
+    .set({ status: 'Queued', errorMessage: null, updatedAt: todayISO() })
+    .where(eq(jobPostingAnalyses.status, 'Processing'))
+    .run()
+}
+
 export function createJobAnalysisRun(db: JobAnalysisDb, input: CreateJobAnalysisRunInput) {
   const date = todayISO()
   return db
@@ -138,10 +146,21 @@ export function completeJobAnalysisRun(db: JobAnalysisDb, runId: number, parsed:
       .where(eq(jobPostingAnalyses.id, runId))
       .run()
 
-    // Apply the model-proposed direction to the application. The user can
-    // change it afterwards; the model only proposes it.
+    // Apply the model-extracted facts (title, location, posted date, salary) and
+    // the model-proposed direction to the application. The user can change any
+    // of them afterwards; the model only proposes. Unknown parser values never
+    // overwrite an existing field, so batch-import placeholders keep working
+    // while re-analysis never clears confirmed user data.
+    const applicationUpdates: Partial<typeof jobApplications.$inferInsert> = {
+      direction: parsed.direction,
+      updatedAt: date,
+    }
+    if (parsed.jobTitle) applicationUpdates.jobTitle = parsed.jobTitle
+    if (parsed.location) applicationUpdates.location = parsed.location
+    if (parsed.postedDate) applicationUpdates.postedDate = parsed.postedDate
+    if (parsed.salary) applicationUpdates.salary = parsed.salary
     tx.update(jobApplications)
-      .set({ direction: parsed.direction, updatedAt: date })
+      .set(applicationUpdates)
       .where(eq(jobApplications.id, posting.jobApplicationId))
       .run()
 

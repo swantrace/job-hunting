@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { z } from 'zod'
 import { normalizeSkillAlias } from './skills/normalize'
@@ -273,24 +273,67 @@ export function validateCareerData(data: CanonicalCareerData) {
   return data
 }
 
-export function loadCareerData(): CanonicalCareerData {
-  const careerData = directory()
+const careerDataFiles = [
+  'candidate.json',
+  'experiences.json',
+  'achievements.json',
+  'publications.json',
+  'projects.json',
+  'skills.json',
+  'stories.json',
+  'preferences.json',
+  'portfolio-content.json',
+] as const
+
+let careerDataCache: { signature: string; data: CanonicalCareerData } | null = null
+
+function careerDataSignature(dir: string): string {
+  return careerDataFiles
+    .map((file) => {
+      const filePath = resolve(dir, file)
+      if (!existsSync(filePath)) return ''
+      try {
+        return statSync(filePath).mtimeMs
+      } catch {
+        return ''
+      }
+    })
+    .join('|')
+}
+
+function readCareerData(dir: string): CanonicalCareerData {
   const parsed: CanonicalCareerData = {
-    candidate: candidateSchema.parse(readJson(resolve(careerData, 'candidate.json'))),
-    experiences: experiencesSchema.parse(readJson(resolve(careerData, 'experiences.json'))),
-    achievements: achievementsSchema.parse(readJson(resolve(careerData, 'achievements.json'))),
+    candidate: candidateSchema.parse(readJson(resolve(dir, 'candidate.json'))),
+    experiences: experiencesSchema.parse(readJson(resolve(dir, 'experiences.json'))),
+    achievements: achievementsSchema.parse(readJson(resolve(dir, 'achievements.json'))),
     publications: publicationsSchema.parse(
-      existsSync(resolve(careerData, 'publications.json'))
-        ? readJson(resolve(careerData, 'publications.json'))
+      existsSync(resolve(dir, 'publications.json'))
+        ? readJson(resolve(dir, 'publications.json'))
         : { schemaVersion: 1, lastUpdated: '1970-01-01', publications: [] },
     ),
-    projects: projectsSchema.parse(readJson(resolve(careerData, 'projects.json'))),
-    skills: skillsSchema.parse(readJson(resolve(careerData, 'skills.json'))),
-    stories: storiesSchema.parse(readJson(resolve(careerData, 'stories.json'))),
-    preferences: preferencesSchema.parse(readJson(resolve(careerData, 'preferences.json'))),
-    portfolio: portfolioSchema.parse(readJson(resolve(careerData, 'portfolio-content.json'))),
+    projects: projectsSchema.parse(readJson(resolve(dir, 'projects.json'))),
+    skills: skillsSchema.parse(readJson(resolve(dir, 'skills.json'))),
+    stories: storiesSchema.parse(readJson(resolve(dir, 'stories.json'))),
+    preferences: preferencesSchema.parse(readJson(resolve(dir, 'preferences.json'))),
+    portfolio: portfolioSchema.parse(readJson(resolve(dir, 'portfolio-content.json'))),
   }
   return validateCareerData(parsed)
+}
+
+/**
+ * Reads, parses, and validates the canonical career data once, then caches the
+ * result until any source file's mtime changes. `loadCareerData` is called many
+ * times per request (availability, review data, readiness, evidence) and the
+ * parse + cross-reference validation is the dominant synchronous cost of the
+ * workspace route, so the cache keeps repeated loads cheap.
+ */
+export function loadCareerData(): CanonicalCareerData {
+  const dir = directory()
+  const signature = careerDataSignature(dir)
+  if (careerDataCache && careerDataCache.signature === signature) return careerDataCache.data
+  const data = readCareerData(dir)
+  careerDataCache = { signature, data }
+  return data
 }
 
 export function careerSkillEvidenceMap(): Record<string, string[]> {

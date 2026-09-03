@@ -40,7 +40,7 @@ export type WorkspaceBoundaryId = (typeof workspaceBoundaryIds)[number]
 export type WorkspaceAvailability = {
   /** A current structured Job Analysis has completed. */
   jobAnalysisCurrent: boolean
-  /** The current Review is ready: current Candidate Analysis, confirmed profile, all decisions. */
+  /** The current Review is ready: current Candidate Analysis and all decisions. */
   reviewReady: boolean
   /** A historical (stale/legacy) Candidate Analysis exists and stays viewable. */
   hasHistoricalReview: boolean

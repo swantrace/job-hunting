@@ -1,6 +1,5 @@
 import { type Filters, type JobCardData, listManagementData } from '../../../src/db/queries'
 import { priorities } from '../../../src/lib/applications/constants'
-import { todayISO } from '../../../src/lib/date'
 import { listDirections } from '../../../src/lib/directions'
 import type { FieldErrors } from '../../../src/lib/validation'
 import { InputField, SelectField, TextareaField } from '../ui/FormField'
@@ -73,7 +72,7 @@ export function ApplicationForm({
           label="Applied date"
           name="appliedDate"
           type="date"
-          value={job.appliedDate ?? todayISO()}
+          value={job.appliedDate ?? ''}
           error={err(errors, 'appliedDate')}
         />
         <SelectField name="priority" label="Priority">

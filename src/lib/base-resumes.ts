@@ -77,12 +77,12 @@ export function isEmptyBaseResume(text: string): boolean {
 
 /**
  * Validates manifest shape plus cross-field rules: directions are unique, the
- * file name matches `<direction>.md`, and every direction is an existing
- * profile (when a known-profile set is supplied).
+ * file name matches `<direction>.md`, and every direction is defined in
+ * preferences.directionDefinitions (when a known direction set is supplied).
  */
 export function validateBaseResumeManifest(
   manifest: BaseResumeManifest,
-  knownProfileIds: ReadonlySet<string> = new Set(),
+  knownDirectionIds: ReadonlySet<string> = new Set(),
 ): BaseResumeManifest {
   const seen = new Set<string>()
   for (const entry of manifest.resumes) {
@@ -93,26 +93,28 @@ export function validateBaseResumeManifest(
       throw new Error(
         `Base Resume "${entry.direction}" file name must be "${entry.direction}.md", received "${entry.fileName}".`,
       )
-    if (knownProfileIds.size > 0 && !knownProfileIds.has(entry.direction))
-      throw new Error(`Base Resume direction "${entry.direction}" is not an existing profile.`)
+    if (knownDirectionIds.size > 0 && !knownDirectionIds.has(entry.direction))
+      throw new Error(
+        `Base Resume direction "${entry.direction}" is not defined in preferences.directionDefinitions.`,
+      )
   }
   return manifest
 }
 
 export function parseBaseResumeManifest(
   json: unknown,
-  knownProfileIds: ReadonlySet<string> = new Set(),
+  knownDirectionIds: ReadonlySet<string> = new Set(),
 ): BaseResumeManifest {
-  return validateBaseResumeManifest(baseResumeManifestSchema.parse(json), knownProfileIds)
+  return validateBaseResumeManifest(baseResumeManifestSchema.parse(json), knownDirectionIds)
 }
 
 export function loadBaseResumeManifest(
   directory: string,
-  knownProfileIds: ReadonlySet<string> = new Set(),
+  knownDirectionIds: ReadonlySet<string> = new Set(),
 ): BaseResumeManifest | null {
   const path = resolve(directory, baseResumeManifestFileName)
   if (!existsSync(path)) return null
-  return parseBaseResumeManifest(JSON.parse(readFileSync(path, 'utf8')), knownProfileIds)
+  return parseBaseResumeManifest(JSON.parse(readFileSync(path, 'utf8')), knownDirectionIds)
 }
 
 export type ApprovedBaseResume = {
@@ -139,9 +141,9 @@ export type ApprovedBaseResume = {
 export function loadApprovedBaseResume(
   directory: string,
   direction: string,
-  knownProfileIds: ReadonlySet<string> = new Set(),
+  knownDirectionIds: ReadonlySet<string> = new Set(),
 ): ApprovedBaseResume | null {
-  const manifest = loadBaseResumeManifest(directory, knownProfileIds)
+  const manifest = loadBaseResumeManifest(directory, knownDirectionIds)
   if (!manifest) return null
   const entry = manifest.resumes.find((item) => item.direction === direction)
   if (!entry) return null
@@ -167,12 +169,12 @@ export function loadApprovedBaseResume(
 
 export function listApprovedBaseResumes(
   directory: string,
-  knownProfileIds: ReadonlySet<string> = new Set(),
+  knownDirectionIds: ReadonlySet<string> = new Set(),
 ): ApprovedBaseResume[] {
-  const manifest = loadBaseResumeManifest(directory, knownProfileIds)
+  const manifest = loadBaseResumeManifest(directory, knownDirectionIds)
   if (!manifest) return []
   return manifest.resumes
-    .map((entry) => loadApprovedBaseResume(directory, entry.direction, knownProfileIds))
+    .map((entry) => loadApprovedBaseResume(directory, entry.direction, knownDirectionIds))
     .filter((resume): resume is ApprovedBaseResume => resume !== null)
 }
 
@@ -223,11 +225,11 @@ export function approveBaseResume(
   directory: string,
   direction: string,
   text: string,
-  options: { version: string; approvedAt?: string; knownProfileIds?: ReadonlySet<string> },
+  options: { version: string; approvedAt?: string; knownDirectionIds?: ReadonlySet<string> },
 ): ApprovedBaseResume {
-  const knownProfileIds = options.knownProfileIds ?? new Set()
-  if (knownProfileIds.size > 0 && !knownProfileIds.has(direction))
-    throw new Error(`Direction "${direction}" is not an existing profile.`)
+  const knownDirectionIds = options.knownDirectionIds ?? new Set()
+  if (knownDirectionIds.size > 0 && !knownDirectionIds.has(direction))
+    throw new Error(`Direction "${direction}" is not defined in preferences.directionDefinitions.`)
   const normalized = normalizeBaseResumeText(text)
   if (isEmptyBaseResume(normalized))
     throw new Error(`Base Resume for direction "${direction}" is empty.`)
@@ -239,7 +241,7 @@ export function approveBaseResume(
     approvedAt,
     sha256: baseResumeTextHash(normalized),
   }
-  const manifest = loadBaseResumeManifest(directory, knownProfileIds) ?? {
+  const manifest = loadBaseResumeManifest(directory, knownDirectionIds) ?? {
     schemaVersion: 1 as const,
     lastUpdated: approvedAt,
     resumes: [],

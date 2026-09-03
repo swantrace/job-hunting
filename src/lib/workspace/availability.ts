@@ -9,7 +9,7 @@ import type { WorkspaceAvailability } from './state'
 
 /**
  * Computes the current workspace progression state from live run history.
- * Current inputs are compared lazily here so career-data/profile file updates
+ * Current inputs are compared lazily here so career-data file updates
  * are detected on every workspace/readiness load.
  */
 export function computeWorkspaceAvailability(jobId: number): WorkspaceAvailability {

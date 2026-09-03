@@ -89,6 +89,14 @@ export function listQueuedAnalysisRuns() {
     .all()
 }
 
+/** Resets runs orphaned mid-flight by a crashed worker back to Queued. */
+export function resetStaleProcessingAnalysisRuns() {
+  db.update(applicationAnalysisRuns)
+    .set({ status: 'Queued', errorMessage: null, updatedAt: todayISO() })
+    .where(eq(applicationAnalysisRuns.status, 'Processing'))
+    .run()
+}
+
 export function findReusableAnalysisRun(jobApplicationId: number, inputHash: string) {
   return (
     db

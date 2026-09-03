@@ -41,7 +41,7 @@ Required:
 Options:
   --jd <path>                  Job description text file. When omitted, runs the
                                the three baseline methods only.
-  --direction <id>             Career profile direction (default: fullstack)
+  --direction <id>             Career direction (default: fullstack)
   --methods <csv>              Methods to run (default: all)
                                ${resumeExperimentMethods.join(', ')}
   --model <id>                 Model (default: RESUME_EXPERIMENT_MODEL,
