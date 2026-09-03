@@ -7,7 +7,7 @@
 
 import { documentDraftPolicy } from '../../lib/document-draft-policy'
 
-export const documentDraftPromptVersion = '2.0.0'
+export const documentDraftPromptVersion = '2.0.1'
 
 const sourceRules = `# Source authority
 1. Canonical Career Data is the factual authority.
@@ -25,7 +25,7 @@ const sourceRules = `# Source authority
 
 const markdownRules = `
 - Use only the allowed "##" section headings, in the stated order, and never use any other heading level or heading text.
-- Use plain text and bullet lists ("- "). Safe http(s) links are allowed; never use raw HTML, images, or unsafe link schemes.
+- Use plain text and bullet lists ("- "). Safe http(s) links are allowed; never use raw HTML, images, unsafe link schemes, or markdown emphasis such as asterisks or underscores for bold or italic.
 - Keep each prose paragraph on one Markdown line; do not hard-wrap paragraphs.
 - Do not write a document title, subject line, address block, signature, or placeholders; the renderer owns application metadata and document chrome.
 `

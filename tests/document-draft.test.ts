@@ -66,6 +66,17 @@ describe('safe Markdown document parsing', () => {
     })
   })
 
+  test('strips markdown bold markers from block text', () => {
+    const draft = parseDocumentDraft(
+      '## Experience\n\n**Lead Engineer — Acme | 2024**\n- Built **the portal** with **React**.\n',
+      'resume',
+    )
+    expect(draft.sections[0].blocks).toEqual([
+      { kind: 'paragraph', text: 'Lead Engineer — Acme | 2024' },
+      { kind: 'bullet', text: 'Built the portal with React.' },
+    ])
+  })
+
   test('rejects raw HTML, images, and executable schemes', () => {
     expect(() => parseDocumentDraft('## Summary\n\n<div>hi</div>\n', 'resume')).toThrow('Raw HTML')
     expect(() => parseDocumentDraft('## Summary\n\n<script>alert(1)</script>\n', 'resume')).toThrow(
