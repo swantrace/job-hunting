@@ -132,7 +132,7 @@ function BatchList({ batches }: { batches: JobIntakeBatchView[] }) {
                   {item.status === 'ready' && item.jobApplicationId ? (
                     <a
                       class="btn btn-outline btn-xs"
-                      href={`/applications/${item.jobApplicationId}`}
+                      href={`/applications/${item.jobApplicationId}/workspace`}
                     >
                       Review
                     </a>
