@@ -63,7 +63,7 @@ describe('approveBaseResume', () => {
     const dir = tempDir()
     const resume = approveBaseResume(dir, 'fhir', '# Fred\n\n## Summary\n\nEngineer.\n', {
       version: 'v1',
-      knownProfileIds: knownProfiles,
+      knownDirectionIds: knownProfiles,
     })
     expect(resume.stale).toBe(false)
     expect(resume.empty).toBe(false)
@@ -78,10 +78,10 @@ describe('approveBaseResume', () => {
 
   test('upserts an existing manifest entry and sorts by direction', () => {
     const dir = tempDir()
-    approveBaseResume(dir, 'fhir', '# FHIR\n', { version: 'v1', knownProfileIds: knownProfiles })
+    approveBaseResume(dir, 'fhir', '# FHIR\n', { version: 'v1', knownDirectionIds: knownProfiles })
     const updated = approveBaseResume(dir, 'fhir', '# FHIR v2\n', {
       version: 'v2',
-      knownProfileIds: knownProfiles,
+      knownDirectionIds: knownProfiles,
     })
     expect(updated.version).toBe('v2')
     const manifest = loadBaseResumeManifest(dir, knownProfiles)
@@ -92,19 +92,19 @@ describe('approveBaseResume', () => {
   test('rejects an empty resume and an unknown direction', () => {
     const dir = tempDir()
     expect(() =>
-      approveBaseResume(dir, 'fhir', '  \n', { version: 'v1', knownProfileIds: knownProfiles }),
+      approveBaseResume(dir, 'fhir', '  \n', { version: 'v1', knownDirectionIds: knownProfiles }),
     ).toThrow('is empty')
     expect(() =>
       approveBaseResume(dir, 'unknown', '# Hi\n', {
         version: 'v1',
-        knownProfileIds: knownProfiles,
+        knownDirectionIds: knownProfiles,
       }),
-    ).toThrow('not an existing profile')
+    ).toThrow('not defined in preferences.directionDefinitions')
   })
 
   test('records the manifest JSON with a trailing newline', () => {
     const dir = tempDir()
-    approveBaseResume(dir, 'fhir', '# FHIR\n', { version: 'v1', knownProfileIds: knownProfiles })
+    approveBaseResume(dir, 'fhir', '# FHIR\n', { version: 'v1', knownDirectionIds: knownProfiles })
     const raw = readFileSync(resolve(dir, baseResumeManifestFileName), 'utf8')
     expect(raw.endsWith('\n')).toBe(true)
     expect(JSON.parse(raw).resumes[0].direction).toBe('fhir')

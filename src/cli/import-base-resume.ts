@@ -23,7 +23,7 @@ updates manifest.json. PDF extraction runs locally via Ghostscript; production
 never extracts PDFs.
 
 Required:
-  --direction <id>     Career profile direction (e.g. fullstack, fhir)
+  --direction <id>     Career direction (e.g. fullstack, fhir)
   --input <path>       PDF, Markdown, or text file
 
 Options:
@@ -90,7 +90,7 @@ export async function main(args = process.argv.slice(2)) {
   const version = options.version || todayISO()
   const resume = approveBaseResume(options.outputDirectory, options.direction, text, {
     version,
-    knownProfileIds: new Set(directions.map((direction) => direction.id)),
+    knownDirectionIds: new Set(directions.map((direction) => direction.id)),
   })
   console.log(
     `Imported Base Resume "${resume.direction}" (${resume.version}) to ${resume.fileName}.`,

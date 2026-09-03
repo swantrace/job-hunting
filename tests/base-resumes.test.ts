@@ -67,7 +67,7 @@ describe('Base Resume source authority', () => {
         },
         knownProfiles,
       ),
-    ).toThrow('not an existing profile')
+    ).toThrow('not defined in preferences.directionDefinitions')
   })
 
   test('rejects manifest file-name/direction mismatch and duplicate directions', () => {
