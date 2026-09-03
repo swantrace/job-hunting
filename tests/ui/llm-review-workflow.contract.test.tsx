@@ -8,7 +8,7 @@ const routeRoot = resolve(process.cwd(), 'app/routes/applications/[id]')
 const requiredFiles = [
   resolve(componentRoot, 'JobAnalysisSummary.tsx'),
   resolve(componentRoot, 'RequirementEvidenceMatrix.tsx'),
-  resolve(componentRoot, 'ProfileRecommendation.tsx'),
+  resolve(componentRoot, 'FitRecommendation.tsx'),
   resolve(routeRoot, 'analysis-runs.tsx'),
 ]
 const contractTest = requiredFiles.every(existsSync) ? test : test.todo
@@ -20,7 +20,7 @@ describe('LLM analysis review HTMX boundaries', () => {
 
     expect(sources).toContain('job-analysis-summary')
     expect(sources).toContain('requirement-evidence-matrix')
-    expect(sources).toContain('profile-recommendation')
+    expect(sources).toContain('fit-recommendation')
     expect(workspace).toContain('workspace-review-panel')
   })
 
