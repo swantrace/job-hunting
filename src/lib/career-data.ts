@@ -127,8 +127,8 @@ export type CanonicalCareerData = {
   portfolio: z.infer<typeof portfolioSchema>
 }
 
-function directory() {
-  const configuredPath = process.env.CAREER_DATA_DIR?.trim()
+export function careerDataDirectory(env: Record<string, string | undefined> = process.env) {
+  const configuredPath = env.CAREER_DATA_DIR?.trim()
   const paths = [
     configuredPath,
     resolve(process.cwd(), 'career-data'),
@@ -328,7 +328,7 @@ function readCareerData(dir: string): CanonicalCareerData {
  * workspace route, so the cache keeps repeated loads cheap.
  */
 export function loadCareerData(): CanonicalCareerData {
-  const dir = directory()
+  const dir = careerDataDirectory()
   const signature = careerDataSignature(dir)
   if (careerDataCache && careerDataCache.signature === signature) return careerDataCache.data
   const data = readCareerData(dir)

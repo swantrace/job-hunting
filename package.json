@@ -20,6 +20,7 @@
     "artifacts:audit": "bun run src/cli/audit-orphan-artifacts.ts",
     "taxonomy:sync": "bun run src/cli/sync-skill-taxonomy.ts",
     "skills:sync": "bun run src/cli/sync-career-skills.ts",
+    "career:export-chatgpt-context": "bun run src/cli/export-chatgpt-career-context.ts",
     "resume:experiment": "bun run src/cli/run-resume-experiment.ts",
     "resume:import": "bun run src/cli/import-base-resume.ts",
     "fly:sync-career-data": "bun run src/cli/sync-career-data-to-fly.ts",
