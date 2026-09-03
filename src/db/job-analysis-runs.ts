@@ -46,6 +46,14 @@ export function listQueuedJobAnalysisRuns(db: JobAnalysisDb): JobAnalysisRun[] {
     .all()
 }
 
+/** Resets runs orphaned mid-flight by a crashed worker back to Queued. */
+export function resetStaleProcessingJobAnalysisRuns(db: JobAnalysisDb) {
+  db.update(jobPostingAnalyses)
+    .set({ status: 'Queued', errorMessage: null, updatedAt: todayISO() })
+    .where(eq(jobPostingAnalyses.status, 'Processing'))
+    .run()
+}
+
 export function createJobAnalysisRun(db: JobAnalysisDb, input: CreateJobAnalysisRunInput) {
   const date = todayISO()
   return db

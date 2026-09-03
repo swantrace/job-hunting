@@ -8,6 +8,7 @@ import {
   getDocumentReview,
   listQueuedDocumentReviews,
   markDocumentReviewProcessing,
+  resetStaleProcessingDocumentReviews,
 } from '../db/document-review'
 import { documentReviewInputHash } from './document-review'
 
@@ -112,6 +113,7 @@ export async function enqueueDocumentReview(
 }
 
 export async function recoverQueuedDocumentReviews() {
+  resetStaleProcessingDocumentReviews()
   const queued = listQueuedDocumentReviews()
   const persistentQueue = await getQueue()
   for (const review of queued) {

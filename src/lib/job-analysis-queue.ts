@@ -11,6 +11,7 @@ import {
   getJobAnalysisRun,
   listQueuedJobAnalysisRuns,
   markJobAnalysisRunProcessing,
+  resetStaleProcessingJobAnalysisRuns,
 } from '../db/job-analysis-runs'
 import { jobPostings } from '../db/schema'
 import { parseJobDescription } from './ai'
@@ -142,6 +143,7 @@ export async function enqueueJobAnalysis(jobPostingId: number): Promise<EnqueueJ
 }
 
 export async function recoverQueuedJobAnalysisRuns() {
+  resetStaleProcessingJobAnalysisRuns(db)
   const queued = listQueuedJobAnalysisRuns(db)
   const persistentQueue = await getQueue()
   for (const run of queued) {

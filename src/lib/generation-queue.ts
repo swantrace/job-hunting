@@ -15,6 +15,8 @@ import {
   markArtifactUploadFailed,
   markBaselineGenerationRunProcessing,
   markGenerationRunProcessing,
+  resetStaleProcessingBaselineGenerationRuns,
+  resetStaleProcessingGenerationRuns,
 } from '../db/generation'
 import { buildGenerationInput } from './generation-input'
 
@@ -164,6 +166,8 @@ export async function enqueueBaselineGeneration(input: {
 }
 
 export async function recoverQueuedGenerationRuns() {
+  resetStaleProcessingGenerationRuns()
+  resetStaleProcessingBaselineGenerationRuns()
   const queued = listQueuedGenerationRuns()
   const persistentQueue = await getQueue()
   for (const run of queued) {

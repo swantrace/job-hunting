@@ -9,6 +9,7 @@ import {
   getAnalysisRun,
   listQueuedAnalysisRuns,
   markAnalysisRunProcessing,
+  resetStaleProcessingAnalysisRuns,
 } from '../db/analysis'
 
 type AnalysisQueueJob = { runId: number }
@@ -130,6 +131,7 @@ export async function enqueueCandidateAnalysis(
 }
 
 export async function recoverQueuedAnalysisRuns() {
+  resetStaleProcessingAnalysisRuns()
   const queued = listQueuedAnalysisRuns()
   const persistentQueue = await getQueue()
   for (const run of queued) {
