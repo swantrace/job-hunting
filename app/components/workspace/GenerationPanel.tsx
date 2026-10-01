@@ -150,7 +150,7 @@ export function GenerationPanel({
               hx-swap="outerHTML"
               hx-disabled-elt="find button"
             >
-              <button class="btn btn-outline btn-sm">Upload all pending files</button>
+              <button class="btn btn-outline btn-sm text-nowrap">Upload all pending files</button>
             </form>
           ) : null}
         </div>
