@@ -10,6 +10,25 @@ import { getArtifactsRoot } from './artifact-storage'
 
 const scope = 'https://www.googleapis.com/auth/drive.file'
 const tokenUrl = 'https://oauth2.googleapis.com/token'
+const verifiedStatusTtlMs = 5 * 60 * 1000
+const unavailableStatusTtlMs = 30 * 1000
+const tokenRequestTimeoutMs = 5_000
+type Fetcher = (input: string, init?: RequestInit) => Promise<Response>
+
+export type GoogleDriveConnectionStatus =
+  | { state: 'not-connected' }
+  | { state: 'connected' }
+  | { state: 'reconnect-required'; message: string }
+  | { state: 'unavailable'; message: string }
+
+let cachedConnectionStatus: { expiresAt: number; status: GoogleDriveConnectionStatus } | undefined
+
+class GoogleDriveReconnectRequiredError extends Error {}
+
+function cacheConnectionStatus(status: GoogleDriveConnectionStatus, ttlMs: number) {
+  cachedConnectionStatus = { status, expiresAt: Date.now() + ttlMs }
+  return status
+}
 
 function config() {
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
@@ -33,14 +52,21 @@ export function encryptGoogleRefreshToken(token: string) {
 }
 
 function decryptGoogleRefreshToken(value: string) {
-  const [iv, tag, data] = value.split('.')
-  if (!iv || !tag || !data) throw new Error('Stored Google Drive credentials are invalid.')
-  const decipher = createDecipheriv('aes-256-gcm', key(), Buffer.from(iv, 'base64url'))
-  decipher.setAuthTag(Buffer.from(tag, 'base64url'))
-  return Buffer.concat([
-    decipher.update(Buffer.from(data, 'base64url')),
-    decipher.final(),
-  ]).toString('utf8')
+  const encryptionKey = key()
+  try {
+    const [iv, tag, data] = value.split('.')
+    if (!iv || !tag || !data) throw new Error()
+    const decipher = createDecipheriv('aes-256-gcm', encryptionKey, Buffer.from(iv, 'base64url'))
+    decipher.setAuthTag(Buffer.from(tag, 'base64url'))
+    return Buffer.concat([
+      decipher.update(Buffer.from(data, 'base64url')),
+      decipher.final(),
+    ]).toString('utf8')
+  } catch {
+    throw new GoogleDriveReconnectRequiredError(
+      'Stored Google Drive authorization is invalid. Connect Google Drive again.',
+    )
+  }
 }
 
 export function googleAuthorizationUrl(state: string) {
@@ -78,9 +104,10 @@ export async function exchangeGoogleCode(code: string) {
   return payload.refresh_token
 }
 
-async function accessToken() {
-  const connection = getGoogleDriveConnection()
-  if (!connection) throw new Error('Google Drive is not connected.')
+async function refreshAccessToken(
+  connection: NonNullable<ReturnType<typeof getGoogleDriveConnection>>,
+  fetcher: Fetcher = fetch,
+) {
   const { clientId, clientSecret } = config()
   const body = new URLSearchParams({
     client_id: clientId,
@@ -88,24 +115,89 @@ async function accessToken() {
     refresh_token: decryptGoogleRefreshToken(connection.refreshTokenEncrypted),
     grant_type: 'refresh_token',
   })
-  const response = await fetch(tokenUrl, {
+  const response = await fetcher(tokenUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
+    signal: AbortSignal.timeout(tokenRequestTimeoutMs),
   })
   const payload = (await response.json()) as {
     access_token?: string
     error?: string
     error_description?: string
   }
-  if (!response.ok || !payload.access_token)
-    throw new Error(
+  if (!response.ok || !payload.access_token) {
+    if (
       payload.error_description === 'Token has been expired or revoked.' ||
-        payload.error === 'invalid_grant'
-        ? 'Google Drive authorization expired or was revoked. Connect Google Drive again.'
-        : (payload.error_description ?? 'Unable to refresh Google Drive access.'),
+      payload.error === 'invalid_grant'
     )
-  return { token: payload.access_token, folderId: connection.folderId }
+      throw new GoogleDriveReconnectRequiredError(
+        'Google Drive authorization expired or was revoked.',
+      )
+    throw new Error(payload.error_description ?? 'Unable to refresh Google Drive access.')
+  }
+  return payload.access_token
+}
+
+export async function verifyGoogleDriveConnection(
+  connection: NonNullable<ReturnType<typeof getGoogleDriveConnection>>,
+  fetcher: Fetcher = fetch,
+): Promise<GoogleDriveConnectionStatus> {
+  try {
+    await refreshAccessToken(connection, fetcher)
+    return { state: 'connected' }
+  } catch (error) {
+    if (error instanceof GoogleDriveReconnectRequiredError)
+      return { state: 'reconnect-required', message: error.message }
+    return {
+      state: 'unavailable',
+      message: error instanceof Error ? error.message : 'Unable to verify Google Drive access.',
+    }
+  }
+}
+
+export async function getGoogleDriveConnectionStatus(
+  force = false,
+): Promise<GoogleDriveConnectionStatus> {
+  if (!force && cachedConnectionStatus && cachedConnectionStatus.expiresAt > Date.now())
+    return cachedConnectionStatus.status
+
+  const connection = getGoogleDriveConnection()
+  if (!connection) return cacheConnectionStatus({ state: 'not-connected' }, verifiedStatusTtlMs)
+
+  const status = await verifyGoogleDriveConnection(connection)
+  return cacheConnectionStatus(
+    status,
+    status.state === 'unavailable' ? unavailableStatusTtlMs : verifiedStatusTtlMs,
+  )
+}
+
+async function accessToken() {
+  const connection = getGoogleDriveConnection()
+  if (!connection) {
+    cacheConnectionStatus({ state: 'not-connected' }, verifiedStatusTtlMs)
+    throw new Error('Google Drive is not connected.')
+  }
+  try {
+    const token = await refreshAccessToken(connection)
+    cacheConnectionStatus({ state: 'connected' }, verifiedStatusTtlMs)
+    return { token, folderId: connection.folderId }
+  } catch (error) {
+    if (error instanceof GoogleDriveReconnectRequiredError)
+      cacheConnectionStatus(
+        { state: 'reconnect-required', message: error.message },
+        verifiedStatusTtlMs,
+      )
+    else
+      cacheConnectionStatus(
+        {
+          state: 'unavailable',
+          message: error instanceof Error ? error.message : 'Unable to verify Google Drive access.',
+        },
+        unavailableStatusTtlMs,
+      )
+    throw error
+  }
 }
 
 async function createFolder(token: string) {
@@ -156,6 +248,7 @@ export async function connectGoogleDrive(code: string) {
   if (!response.ok || !token) throw new Error('Unable to verify Google Drive access.')
   const folderId = existingConnection?.folderId ?? (await createFolder(token))
   saveGoogleDriveConnection(encryptGoogleRefreshToken(refreshToken), folderId)
+  cachedConnectionStatus = undefined
 }
 
 export async function uploadArtifactToGoogleDrive(artifact: {
