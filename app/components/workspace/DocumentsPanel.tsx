@@ -2,6 +2,7 @@ import { listDocumentReviews } from '../../../src/db/document-review'
 import type { GenerationRunWithArtifacts, GenerationState } from '../../../src/db/generation'
 import type { Filters } from '../../../src/db/queries'
 import type { ApplicationReadiness } from '../../../src/lib/application-readiness'
+import type { GoogleDriveConnectionStatus } from '../../../src/lib/google-drive'
 import { DocumentReviewPanel } from './DocumentReview'
 import { GenerationPanel } from './GenerationPanel'
 
@@ -9,7 +10,7 @@ export function DocumentsPanel({
   jobId,
   filters,
   runs,
-  googleDriveConnected,
+  googleDriveStatus,
   readiness = { ready: true, reasons: [] },
   state,
   active = false,
@@ -17,7 +18,7 @@ export function DocumentsPanel({
   jobId: number
   filters: Filters
   runs: GenerationRunWithArtifacts[]
-  googleDriveConnected: boolean
+  googleDriveStatus: GoogleDriveConnectionStatus
   readiness?: ApplicationReadiness
   state?: GenerationState
   active?: boolean
@@ -35,7 +36,7 @@ export function DocumentsPanel({
         jobId={jobId}
         filters={filters}
         runs={runs}
-        googleDriveConnected={googleDriveConnected}
+        googleDriveStatus={googleDriveStatus}
         readiness={readiness}
         state={state}
       />

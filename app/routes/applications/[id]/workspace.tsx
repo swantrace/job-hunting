@@ -1,18 +1,20 @@
 import { createRoute } from 'honox/factory'
 import { getActivity, getApplication } from '../../../../src/db/queries'
 import { careerSkillEvidenceMap } from '../../../../src/lib/career-data'
+import { getGoogleDriveConnectionStatus } from '../../../../src/lib/google-drive'
 import { parseFilters, parseId, parseWorkspaceTab } from '../../../../src/lib/request'
 import { computeWorkspaceAvailability } from '../../../../src/lib/workspace/availability'
 import { resolveWorkspaceTab, tabAvailability } from '../../../../src/lib/workspace/state'
 import { AppShell } from '../../../components/layout/AppShell'
 import { Workspace } from '../../../components/Workspace'
 
-export default createRoute((c) => {
+export default createRoute(async (c) => {
   const id = parseId(c.req.param('id'))
   const job = id ? getApplication(id) : null
   if (!job || !id) return c.html(<div class="alert alert-error">Application not found.</div>, 404)
   const availabilityState = computeWorkspaceAvailability(id)
   const activeTab = resolveWorkspaceTab(parseWorkspaceTab(c), availabilityState)
+  const googleDriveStatus = await getGoogleDriveConnectionStatus()
   const workspace = (
     <Workspace
       job={job}
@@ -21,6 +23,7 @@ export default createRoute((c) => {
       careerEvidence={careerSkillEvidenceMap()}
       activeTab={activeTab}
       availability={tabAvailability(availabilityState)}
+      googleDriveStatus={googleDriveStatus}
     />
   )
   // Fragment for the drawer swap; a full page for direct navigation such as the
