@@ -1,11 +1,8 @@
-import {
-  getGenerationState,
-  getGoogleDriveConnection,
-  listGenerationRuns,
-} from '../../../src/db/generation'
+import { getGenerationState, listGenerationRuns } from '../../../src/db/generation'
 import type { Filters, JobCardData } from '../../../src/db/queries'
 import { loadReviewData } from '../../../src/db/review-data'
 import { getApplicationReadiness } from '../../../src/lib/application-readiness'
+import type { GoogleDriveConnectionStatus } from '../../../src/lib/google-drive'
 import type { FieldErrors } from '../../../src/lib/validation'
 import type { WorkspaceTab } from '../../../src/lib/workspace/constants'
 import type { TabAvailability } from '../../../src/lib/workspace/state'
@@ -25,6 +22,7 @@ export function WorkspaceShell({
   careerEvidence = {},
   activeTab = 'application',
   availability,
+  googleDriveStatus,
   errors,
   errorForm,
 }: {
@@ -34,12 +32,12 @@ export function WorkspaceShell({
   careerEvidence?: Record<string, string[]>
   activeTab?: WorkspaceTab
   availability: TabAvailability[]
+  googleDriveStatus: GoogleDriveConnectionStatus
   errors?: FieldErrors
   errorForm?: WorkspaceErrorForm
 }) {
   const generationRuns = listGenerationRuns(job.id)
   const generationState = getGenerationState(job.id)
-  const googleDriveConnected = !!getGoogleDriveConnection()
   const review = loadReviewData(job.id)
   const readiness = getApplicationReadiness(job.id)
   return (
@@ -65,7 +63,7 @@ export function WorkspaceShell({
         jobId={job.id}
         filters={filters}
         runs={generationRuns}
-        googleDriveConnected={googleDriveConnected}
+        googleDriveStatus={googleDriveStatus}
         readiness={readiness}
         state={generationState}
         active={activeTab === 'documents'}

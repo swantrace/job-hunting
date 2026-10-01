@@ -100,14 +100,28 @@ export const mockGetGenerationState = mock((): any => ({
   staleCompleted: null,
   reasons: [],
 }))
-
+export const mockListGenerationRuns = mock((): any => [])
+export const mockMarkArtifactUploadFailed = mock(() => undefined)
 mock.module('../../../src/db/generation', () => ({
   getGenerationEvidenceSnapshot: () => null,
   getGenerationRunResults: () => null,
   getGenerationState: mockGetGenerationState,
   getGoogleDriveConnection: () => null,
   listBaselineGenerationRuns: () => [],
-  listGenerationRuns: () => [],
+  listGenerationRuns: mockListGenerationRuns,
+  markArtifactUploadFailed: mockMarkArtifactUploadFailed,
+}))
+
+export const mockGetGoogleDriveConnectionStatus = mock(
+  async (): Promise<any> => ({
+    state: 'not-connected',
+  }),
+)
+export const mockUploadArtifactToGoogleDrive = mock(async (_artifact: any) => undefined)
+
+mock.module('../../../src/lib/google-drive', () => ({
+  getGoogleDriveConnectionStatus: mockGetGoogleDriveConnectionStatus,
+  uploadArtifactToGoogleDrive: mockUploadArtifactToGoogleDrive,
 }))
 
 export const mockEnqueueGeneration = mock(async () => ({ id: 1 }))

@@ -5,6 +5,7 @@ import {
 } from '../../../src/db/generation'
 import type { Filters } from '../../../src/db/queries'
 import type { ApplicationReadiness } from '../../../src/lib/application-readiness'
+import type { GoogleDriveConnectionStatus } from '../../../src/lib/google-drive'
 import { ArtifactActions } from './ArtifactActions'
 import { DraftReview } from './DraftReview'
 import { query } from './helpers'
@@ -52,14 +53,16 @@ export function GenerationPanel({
   jobId,
   filters,
   runs,
-  googleDriveConnected,
+  googleDriveStatus,
+  uploadSummary,
   readiness = { ready: true, reasons: [] },
   state,
 }: {
   jobId: number
   filters: Filters
   runs: GenerationRunWithArtifacts[]
-  googleDriveConnected: boolean
+  googleDriveStatus: GoogleDriveConnectionStatus
+  uploadSummary?: { uploaded: number; failed: number }
   readiness?: ApplicationReadiness
   state?: GenerationState
 }) {
@@ -78,6 +81,9 @@ export function GenerationPanel({
           : 'badge-info'
   const shouldPoll = latest?.status === 'Queued' || latest?.status === 'Processing'
   const results = usableCompleted ? getGenerationRunResults(usableCompleted.id) : null
+  const pendingArtifactCount = runs
+    .flatMap((run) => run.artifacts)
+    .filter((artifact) => !artifact.googleDriveFileId).length
   return (
     <section
       id="generation-panel"
@@ -119,21 +125,64 @@ export function GenerationPanel({
           </ul>
         </div>
       ) : null}
-      {!googleDriveConnected ? (
+      {googleDriveStatus.state === 'not-connected' ? (
         <div class="alert mt-4 text-sm">
           <span>Connect Google Drive to upload generated documents automatically.</span>
           <a class="btn btn-outline btn-sm" href="/auth/google/start">
             Connect Google Drive
           </a>
         </div>
-      ) : (
-        <div class="mt-4 flex items-center justify-between gap-3 rounded-box bg-base-200 p-3 text-sm">
+      ) : googleDriveStatus.state === 'connected' ? (
+        <div class="alert mt-4 text-sm sm:alert-horizontal">
           <span class="flex items-center gap-2">
             <span class="badge badge-success">Connected</span>
-            <span>Google Drive is connected.</span>
+            <span>
+              Google Drive connection verified.
+              {pendingArtifactCount
+                ? ` ${pendingArtifactCount} ${pendingArtifactCount === 1 ? 'file is' : 'files are'} ready to upload.`
+                : ''}
+            </span>
           </span>
+          {pendingArtifactCount ? (
+            <form
+              hx-post={`/applications/${jobId}/artifacts/upload-pending?${query(filters)}`}
+              hx-target="#generation-panel"
+              hx-swap="outerHTML"
+              hx-disabled-elt="find button"
+            >
+              <button class="btn btn-outline btn-sm">Upload all pending files</button>
+            </form>
+          ) : null}
+        </div>
+      ) : googleDriveStatus.state === 'reconnect-required' ? (
+        <div class="alert alert-warning mt-4 text-sm" role="alert">
+          <span class="flex items-center gap-2">
+            <span class="badge badge-warning">Action required</span>
+            <span>{googleDriveStatus.message}</span>
+          </span>
+          <a class="btn btn-outline btn-sm" href="/auth/google/start">
+            Reconnect Google Drive
+          </a>
+        </div>
+      ) : (
+        <div class="alert alert-warning mt-4 text-sm" role="status">
+          <span class="badge badge-warning">Unverified</span>
+          <span>Google Drive could not be verified right now. {googleDriveStatus.message}</span>
         </div>
       )}
+      {uploadSummary ? (
+        <div
+          class={`alert mt-4 text-sm ${uploadSummary.failed ? 'alert-warning' : 'alert-success'}`}
+          role="status"
+        >
+          <span>
+            Uploaded {uploadSummary.uploaded} {uploadSummary.uploaded === 1 ? 'file' : 'files'}.
+            {uploadSummary.failed
+              ? ` ${uploadSummary.failed} ${uploadSummary.failed === 1 ? 'file needs' : 'files need'} attention.`
+              : ''}
+          </span>
+        </div>
+      ) : null}
       {latest && latest.id !== usableCompleted?.id ? (
         <div class="mt-4 flex flex-wrap items-center gap-2 text-sm">
           <span class="text-base-content/60">Latest attempt:</span>

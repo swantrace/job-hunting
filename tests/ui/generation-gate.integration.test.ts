@@ -4,7 +4,43 @@ import {
   mockEnqueueGeneration,
   mockGetApplicationReadiness,
   mockGetGenerationState,
+  mockGetGoogleDriveConnectionStatus,
+  mockListGenerationRuns,
+  mockUploadArtifactToGoogleDrive,
 } from './support/runtime-mocks'
+
+const pendingArtifacts = [
+  {
+    id: 101,
+    generationRunId: 10,
+    type: 'resume',
+    fileName: 'resume.docx',
+    filePath: 'resume.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    googleDriveFileId: null,
+    googleDriveUrl: null,
+    googleDriveUploadedAt: null,
+    googleDriveError: null,
+    createdAt: '2026-09-30',
+  },
+  {
+    id: 102,
+    generationRunId: 10,
+    type: 'cover_letter',
+    fileName: 'cover-letter.docx',
+    filePath: 'cover-letter.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    googleDriveFileId: null,
+    googleDriveUrl: null,
+    googleDriveUploadedAt: null,
+    googleDriveError: null,
+    createdAt: '2026-09-30',
+  },
+]
+
+function runsWith(artifacts: typeof pendingArtifacts) {
+  return [{ id: 10, status: 'Completed', attempts: 1, artifacts }]
+}
 
 async function applicationsHarness() {
   const { POST } = (await import('../../app/routes/applications/index')) as Record<string, unknown>
@@ -86,5 +122,74 @@ describe('generation readiness gate', () => {
       staleCompleted: null,
       reasons: [],
     })
+  })
+
+  test('offers reconnection only when Google rejects the stored authorization', async () => {
+    mockGetGoogleDriveConnectionStatus.mockResolvedValue({
+      state: 'reconnect-required',
+      message: 'Google Drive authorization expired or was revoked.',
+    })
+    const { GET } = (await import('../../app/routes/applications/[id]/generation-runs')) as Record<
+      string,
+      unknown
+    >
+    const app = new Hono()
+    app.get('/applications/:id/generation-runs', GET as never)
+    const response = await app.request('/applications/7/generation-runs')
+    const html = await response.text()
+
+    expect(html).toContain('Google Drive authorization expired or was revoked.')
+    expect(html).toContain('href="/auth/google/start"')
+    expect(html).toContain('Reconnect Google Drive')
+    expect(html).not.toContain('Google Drive connection verified.')
+    mockGetGoogleDriveConnectionStatus.mockResolvedValue({ state: 'not-connected' })
+  })
+
+  test('does not show reconnect after Google verifies the connection', async () => {
+    mockGetGoogleDriveConnectionStatus.mockResolvedValue({ state: 'connected' })
+    mockListGenerationRuns.mockReturnValue(runsWith(pendingArtifacts))
+    const { GET } = (await import('../../app/routes/applications/[id]/generation-runs')) as Record<
+      string,
+      unknown
+    >
+    const app = new Hono()
+    app.get('/applications/:id/generation-runs', GET as never)
+    const response = await app.request('/applications/7/generation-runs')
+    const html = await response.text()
+
+    expect(html).toContain('Google Drive connection verified.')
+    expect(html).toContain('2 files are ready to upload.')
+    expect(html).toContain('Upload all pending files')
+    expect(html).toContain('/applications/7/artifacts/upload-pending')
+    expect(html).not.toContain('Reconnect Google Drive')
+    mockGetGoogleDriveConnectionStatus.mockResolvedValue({ state: 'not-connected' })
+    mockListGenerationRuns.mockReturnValue([])
+  })
+
+  test('uploads every pending artifact for only the current application', async () => {
+    const artifacts = structuredClone(pendingArtifacts)
+    mockListGenerationRuns.mockReturnValue(runsWith(artifacts))
+    mockGetGoogleDriveConnectionStatus.mockResolvedValue({ state: 'connected' })
+    mockUploadArtifactToGoogleDrive.mockClear()
+    mockUploadArtifactToGoogleDrive.mockImplementation(async (artifact) => {
+      artifact.googleDriveFileId = `drive-${artifact.id}`
+    })
+    const { POST } = (await import(
+      '../../app/routes/applications/[id]/artifacts/upload-pending'
+    )) as Record<string, unknown>
+    const app = new Hono()
+    app.post('/applications/:id/artifacts/upload-pending', POST as never)
+    const response = await app.request('/applications/7/artifacts/upload-pending', {
+      method: 'POST',
+    })
+    const html = await response.text()
+
+    expect(response.status).toBe(200)
+    expect(mockUploadArtifactToGoogleDrive).toHaveBeenCalledTimes(2)
+    expect(html).toContain('Uploaded 2 files.')
+    expect(html).not.toContain('Upload all pending files')
+    mockUploadArtifactToGoogleDrive.mockImplementation(async () => undefined)
+    mockGetGoogleDriveConnectionStatus.mockResolvedValue({ state: 'not-connected' })
+    mockListGenerationRuns.mockReturnValue([])
   })
 })

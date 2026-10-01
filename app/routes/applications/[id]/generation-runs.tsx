@@ -1,11 +1,8 @@
 import { createRoute } from 'honox/factory'
-import {
-  getGenerationState,
-  getGoogleDriveConnection,
-  listGenerationRuns,
-} from '../../../../src/db/generation'
+import { getGenerationState, listGenerationRuns } from '../../../../src/db/generation'
 import { getApplicationReadiness } from '../../../../src/lib/application-readiness'
 import { enqueueGeneration } from '../../../../src/lib/generation-queue'
+import { getGoogleDriveConnectionStatus } from '../../../../src/lib/google-drive'
 import { parseFilters, parseId } from '../../../../src/lib/request'
 import { GenerationPanel } from '../../../components/Workspace'
 
@@ -20,7 +17,7 @@ export const POST = createRoute(async (c) => {
         jobId={id}
         filters={parseFilters(c)}
         runs={listGenerationRuns(id)}
-        googleDriveConnected={!!getGoogleDriveConnection()}
+        googleDriveStatus={await getGoogleDriveConnectionStatus()}
         readiness={readiness}
         state={state}
       />,
@@ -37,14 +34,14 @@ export const POST = createRoute(async (c) => {
       jobId={id}
       filters={parseFilters(c)}
       runs={listGenerationRuns(id)}
-      googleDriveConnected={!!getGoogleDriveConnection()}
+      googleDriveStatus={await getGoogleDriveConnectionStatus()}
       readiness={readiness}
       state={getGenerationState(id)}
     />,
   )
 })
 
-export const GET = createRoute((c) => {
+export const GET = createRoute(async (c) => {
   const id = parseId(c.req.param('id'))
   if (!id) return c.html(<div class="alert alert-error">Application not found.</div>, 404)
   return c.html(
@@ -52,7 +49,7 @@ export const GET = createRoute((c) => {
       jobId={id}
       filters={parseFilters(c)}
       runs={listGenerationRuns(id)}
-      googleDriveConnected={!!getGoogleDriveConnection()}
+      googleDriveStatus={await getGoogleDriveConnectionStatus()}
       readiness={getApplicationReadiness(id)}
       state={getGenerationState(id)}
     />,
