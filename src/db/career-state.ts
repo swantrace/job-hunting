@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto'
 import { eq } from 'drizzle-orm'
+import { z } from 'zod'
+import { jsonValueSchema, parseJsonColumn, serializeJsonColumn } from '../lib/career/json-schemas'
 import { nowISO } from '../lib/date'
 import { db } from './client'
 import { careerState } from './schema'
@@ -107,4 +109,101 @@ export function assertExpectedRevision(
   if (expected !== undefined && expected !== actual) {
     throw new CareerRevisionConflictError(entity, id, expected, actual)
   }
+}
+
+// ---------------------------------------------------------------------------
+// Career state documents (legacy JSON versions and extension metadata)
+// ---------------------------------------------------------------------------
+
+/**
+ * Per-record extension fields that have no relational column, keyed by record
+ * kind and stable key. The import stores anything the current schema cannot
+ * express here, and the export reads it back, so unknown author fields survive.
+ */
+export type CareerStateExtensionRecords = Record<string, Record<string, unknown>>
+
+export type CareerStateDocuments = {
+  revision: number
+  contentHash: string
+  /** Raw legacy source documents (`candidate.json`, taxonomy, Base Resume entries). */
+  legacyDocuments: unknown
+  /** Document-level extension metadata carried by a dataset. */
+  extensions: Record<string, unknown>
+  /** Fields with no relational column, by `kind -> stableKey -> fields`. */
+  records: CareerStateExtensionRecords
+}
+
+const stateDocumentStoreSchema = z.looseObject({
+  extensions: z.record(z.string(), z.unknown()).optional(),
+  records: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
+})
+
+function normalizedStore(store: z.infer<typeof stateDocumentStoreSchema>) {
+  const extensions = store.extensions ?? {}
+  const records = store.records ?? {}
+  if (Object.keys(extensions).length === 0 && Object.keys(records).length === 0) return null
+  return { extensions, records }
+}
+
+export function readCareerStateDocuments(executor: DbExecutor = db): CareerStateDocuments {
+  const row = requireCareerState(executor)
+  const store = parseJsonColumn(
+    row.extensionJson,
+    stateDocumentStoreSchema,
+    {},
+    'career_state.extension_json',
+  )
+  const normalized = normalizedStore(store)
+  return {
+    revision: row.revision,
+    contentHash: row.contentHash,
+    legacyDocuments: parseJsonColumn(
+      row.legacyDocumentsJson,
+      jsonValueSchema,
+      null,
+      'career_state.legacy_documents_json',
+    ),
+    extensions: normalized?.extensions ?? {},
+    records: normalized?.records ?? {},
+  }
+}
+
+/**
+ * Persists the legacy documents and extension metadata. Returns `true` only when
+ * the stored value really changed; an identical write is invisible and does not
+ * bump `career_state.revision`.
+ */
+export function writeCareerStateDocuments(
+  executor: DbExecutor,
+  input: {
+    legacyDocuments?: unknown
+    extensions?: Record<string, unknown>
+    records?: CareerStateExtensionRecords
+  },
+): boolean {
+  requireCareerState(executor)
+  const current = readCareerStateDocuments(executor)
+  const legacy =
+    input.legacyDocuments === undefined ? current.legacyDocuments : (input.legacyDocuments ?? null)
+  const extensions = input.extensions === undefined ? current.extensions : input.extensions
+  const records = input.records === undefined ? current.records : input.records
+  const store = normalizedStore({ extensions, records })
+  const currentStore = normalizedStore({ extensions: current.extensions, records: current.records })
+  if (
+    stableFingerprint(current.legacyDocuments) === stableFingerprint(legacy) &&
+    stableFingerprint(currentStore) === stableFingerprint(store)
+  ) {
+    return false
+  }
+  executor
+    .update(careerState)
+    .set({
+      legacyDocumentsJson: legacy === null ? null : serializeJsonColumn(legacy),
+      extensionJson: store === null ? null : serializeJsonColumn(store),
+      updatedAt: nowISO(),
+    })
+    .where(eq(careerState.id, 1))
+    .run()
+  recordCareerChange(executor, stableFingerprint({ legacy, store }))
+  return true
 }

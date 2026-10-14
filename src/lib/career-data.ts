@@ -21,7 +21,9 @@ const candidateSchema = documentSchema
   .extend({
     identity: z.looseObject({ fullName: z.string().min(1), email: z.email().min(1) }),
     education: z.array(
-      z.object({ id: idSchema, degree: z.string().min(1), school: z.string().min(1) }),
+      // Loose on purpose: education rows carry authored extension fields such as
+      // `datePrecision` and `coursework`. A strict object silently stripped them.
+      z.looseObject({ id: idSchema, degree: z.string().min(1), school: z.string().min(1) }),
     ),
   })
   .loose()
@@ -318,6 +320,30 @@ function readCareerData(dir: string): CanonicalCareerData {
     portfolio: portfolioSchema.parse(readJson(resolve(dir, 'portfolio-content.json'))),
   }
   return validateCareerData(parsed)
+}
+
+/**
+ * Reads the nine career documents as raw parsed JSON, without any zod coercion
+ * or stripping. The explicit importer uses this so every original fact and
+ * authored extension field survives the write into SQLite; `loadCareerData`
+ * stays the validating reader the runtime continues to use.
+ *
+ * `publications.json` is optional (matching the loader) and falls back to the
+ * empty versioned document.
+ */
+export function readCareerDocuments(directory: string): Record<string, unknown> {
+  return Object.fromEntries(
+    careerDataFiles.map((file) => {
+      const path = resolve(directory, file)
+      if (!existsSync(path)) {
+        if (file === 'publications.json') {
+          return [file, { schemaVersion: 1, lastUpdated: '1970-01-01', publications: [] }]
+        }
+        throw new Error(`Career data document "${file}" was not found in ${directory}.`)
+      }
+      return [file, readJson(path)]
+    }),
+  )
 }
 
 /**

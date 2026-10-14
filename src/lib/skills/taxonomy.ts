@@ -87,8 +87,12 @@ function taxonomyPath() {
   return path
 }
 
+export function parseSkillTaxonomy(json: unknown): SkillTaxonomy {
+  return taxonomySchema.parse(json)
+}
+
 export function loadSkillTaxonomy(): SkillTaxonomy {
-  return taxonomySchema.parse(JSON.parse(readFileSync(taxonomyPath(), 'utf8')))
+  return parseSkillTaxonomy(JSON.parse(readFileSync(taxonomyPath(), 'utf8')))
 }
 
 export function skillCategoryDefinitions(): SkillCategoryDefinition[] {
