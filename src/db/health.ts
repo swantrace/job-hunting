@@ -6,6 +6,32 @@ const requiredTables = [
   'job_requirements_to_skills',
   'job_postings',
   'generation_runs',
+  // Database-owned career facts and requirement-owned skill mentions
+  // (migration 0026). A partially-applied migration must fail at boot.
+  'career_candidate',
+  'career_preferences',
+  'career_state',
+  'career_directions',
+  'career_education',
+  'career_experiences',
+  'career_achievements',
+  'career_projects',
+  'career_stories',
+  'career_publications',
+  'career_skills',
+  'career_portfolio_topics',
+  'career_base_resumes',
+  'career_achievement_skills',
+  'career_project_skills',
+  'career_publication_projects',
+  'career_achievement_publications',
+  'career_portfolio_topic_projects',
+  'career_achievement_directions',
+  'career_project_directions',
+  'career_story_directions',
+  'career_publication_directions',
+  'career_portfolio_topic_directions',
+  'job_requirement_skill_mentions',
 ]
 
 // Columns added to existing tables by later migrations. Checked here so a

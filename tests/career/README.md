@@ -39,8 +39,8 @@ rejects an increased todo count).
 | Fixture realism, editable field coverage, catalog versus personal facts, ambiguous alias conflict, same-day hashes, draft/approved separation | Step 1 (now) | `fixtures.test.ts` |
 | Requirement mapping cannot express possession, catalog provenance preserved, Include requires a reason, one decision per skill per run | Step 1 (now) | `skill-catalog.contract.test.ts` |
 | Approved Base Resume frozen by value, stale digest detection, enqueue snapshot columns | Step 1 (now) | `career-documents.contract.test.ts` |
-| Relational career tables, junctions, stable-key uniqueness, merge redirects, mention storage, revision counters, duplicate rejection, fresh/populated migration, lossless analyses/artifacts/OAuth metadata | Step 2 | extend this directory |
-| Import idempotence/no-op, conflict rollback, stable ID remapping, full fact and extension roundtrip, dataset export scope and roundtrip | Step 3 | extend this directory |
+| Relational career tables, junctions, stable-key uniqueness, merge redirects, mention storage, revision counters, duplicate rejection, fresh/populated migration, lossless analyses/artifacts/OAuth metadata | Step 2 (now) | `career-schema.migration.test.ts`, `repositories.test.ts` |
+| Import idempotence/no-op, conflict rollback, stable ID remapping, full fact and extension roundtrip, dataset export scope and roundtrip | Step 3 | import/export suites to add here; singleton fact/extension roundtrip is already exercised by `repositories.test.ts` |
 | Database runtime reads, snapshots/content identities, no filesystem fallback, frozen queued inputs, legacy snapshot readability | Step 4 | extend this directory |
 | Catalog-bounded resolution: alias first, unknown/ambiguous stay pending, composite split, deduped occurrences, per-canonical-skill grouping, empty catalog safe | Step 5 | extend this directory |
 | Mapping UI: Create new, explicit Skip, Remember alias, forged IDs, remap/unskip, readiness chaining | Step 6 | `tests/ui/*` mapping boundaries |
