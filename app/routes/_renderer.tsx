@@ -82,15 +82,20 @@ htmx.config.responseHandling = [
     };
     const requirements = [];
     root.querySelectorAll('[data-ja-requirement]').forEach(function (row) {
-      const skillReferences = [];
-      row.querySelectorAll('[data-ja-skill-ref]').forEach(function (reference) {
-        skillReferences.push({
-          rawLabel: reference.querySelector('[data-ja-skill-raw]').value,
-          canonicalLabel: reference.querySelector('[data-ja-skill-canonical]').value,
-          category: reference.querySelector('[data-ja-skill-category]').value,
-          confidence: Number(reference.querySelector('[data-ja-skill-confidence]').value) || 0,
-        });
-      });
+      const terms = [];
+      const termField = row.querySelector('[data-ja-terms]');
+      if (termField && termField.value) {
+        try {
+          const parsed = JSON.parse(termField.value);
+          if (Array.isArray(parsed)) {
+            parsed.forEach(function (term) {
+              if (term && typeof term.term === 'string' && term.term.trim()) terms.push(term);
+            });
+          }
+        } catch {
+          terms.length = 0;
+        }
+      }
       requirements.push({
         type: row.querySelector('[data-ja-type]').value,
         importance: row.querySelector('[data-ja-importance]').value,
@@ -100,7 +105,7 @@ htmx.config.responseHandling = [
         inferenceRationale: row.querySelector('[data-ja-inference]')
           ? row.querySelector('[data-ja-inference]').value.trim() || null
           : null,
-        skillReferences: skillReferences,
+        terms: terms,
       });
     });
     const notes = value('[data-ja-notes]').trim();

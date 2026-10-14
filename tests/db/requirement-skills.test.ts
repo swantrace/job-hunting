@@ -1,18 +1,30 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
+import { jobAnalysisSchemaVersion } from '../../src/ai/schemas/job-analysis'
 import { persistJobRequirements } from '../../src/db/job-analysis'
 import { completeJobAnalysisRun, createJobAnalysisRun } from '../../src/db/job-analysis-runs'
 import * as schema from '../../src/db/schema'
+import { countPendingMentions, listRequirementMentions } from '../../src/db/skill-mentions'
 import { listRequirementSkillMappings } from '../../src/db/skill-queries'
+import { jobAnalysisInputFromContent } from '../../src/lib/job-analysis-input'
+import type { CatalogContextEntry } from '../../src/lib/skills/catalog-context'
 import { migratedDatabase } from '../support/sqlite'
 
 /**
- * Canonical requirement-skill persistence contract: requirement-owned skill
- * references are persisted into `job_requirements_to_skills` with raw labels
- * and confidence, and application skill summaries derive from the current Job
- * Analysis requirements rather than `job_applications_to_skills`.
+ * Canonical requirement-term persistence contract (Step 5): requirement-owned
+ * raw terms are stored as mentions, a verified catalog match writes the
+ * `job_requirements_to_skills` junction through `mapMention`, and persistence
+ * never creates a catalog skill, alias or category.
  */
+
+/** The raw posting the run is frozen against; retrieval reads only this text. */
+const postingText = 'Platform engineer role with Kafka.'
+
+/** The bounded catalog a run supplies for this posting. */
+const suppliedCatalog: CatalogContextEntry[] = [
+  { key: 'kafka', name: 'Kafka', category: 'messaging-async', aliases: [] },
+]
 
 function seedPosting(sqlite: Database): { postingId: number; applicationId: number } {
   const company = sqlite
@@ -30,7 +42,7 @@ function seedPosting(sqlite: Database): { postingId: number; applicationId: numb
       `INSERT INTO job_postings (job_application_id, raw_text, captured_at, content_hash)
        VALUES (?, ?, '2026-08-28', ?) RETURNING id`,
     )
-    .get(application.id, 'Platform engineer role.', 'posting-hash') as { id: number }
+    .get(application.id, postingText, 'posting-hash') as { id: number }
   return { postingId: posting.id, applicationId: application.id }
 }
 
@@ -43,61 +55,70 @@ function seedAnalysis(sqlite: Database, postingId: number): number {
   return analysis.id
 }
 
-describe('canonical requirement-skill persistence', () => {
-  test('persists junction rows with raw label and confidence and creates pending skills', () => {
+function seedApprovedKafka(sqlite: Database): number {
+  return (
+    sqlite
+      .query(
+        `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
+         VALUES ('kafka', 'Kafka', 'messaging-async', 'approved', 'career-data', '2026-08-28', '2026-08-28')
+         RETURNING id`,
+      )
+      .get() as { id: number }
+  ).id
+}
+
+function requirement(statement: string, term: string, confidence: number) {
+  return {
+    type: 'skill' as const,
+    importance: 'required' as const,
+    basis: 'explicit' as const,
+    statement,
+    sourceText: statement,
+    inferenceRationale: null,
+    terms: [{ term, sourceText: statement, confidence, key: null }],
+  }
+}
+
+describe('canonical requirement-term persistence', () => {
+  test('stores an unknown term as a pending mention and creates no catalog record', () => {
     const sqlite = migratedDatabase()
     try {
-      const db = drizzle({ client: sqlite })
+      const db = drizzle({ client: sqlite, schema })
       const { postingId } = seedPosting(sqlite)
       const analysisId = seedAnalysis(sqlite, postingId)
 
       persistJobRequirements(
         db,
         analysisId,
-        [
-          {
-            type: 'skill',
-            importance: 'required',
-            basis: 'explicit',
-            statement: 'Experience with Apache Kafka.',
-            sourceText: 'Experience with Apache Kafka',
-            inferenceRationale: null,
-            skillReferences: [
-              {
-                rawLabel: 'Apache Kafka',
-                canonicalLabel: 'Kafka',
-                category: 'messaging-async',
-                confidence: 0.96,
-              },
-            ],
-          },
-        ],
+        [requirement('Experience with Apache Kafka.', 'Apache Kafka', 0.96)],
         '2026-08-28',
+        suppliedCatalog,
       )
 
-      const links = sqlite
-        .query(
-          `SELECT r.statement, s.name, s.review_status, s.origin, j.raw_label, j.confidence
-           FROM job_requirements_to_skills AS j
-           JOIN job_requirements AS r ON r.id = j.job_requirement_id
-           JOIN skills AS s ON s.id = j.skill_id`,
-        )
-        .all() as Array<{
-        statement: string
-        name: string
-        review_status: string
-        origin: string
-        raw_label: string
-        confidence: number
-      }>
-      expect(links).toHaveLength(1)
-      expect(links[0]).toMatchObject({
-        statement: 'Experience with Apache Kafka.',
-        name: 'Kafka',
-        review_status: 'pending',
-        origin: 'job-parser',
-        raw_label: 'Apache Kafka',
+      expect(listRequirementSkillMappings(analysisId, db)).toEqual([])
+      expect(countPendingMentions(db, analysisId)).toBe(1)
+      const [mention] = listRequirementMentions(
+        db,
+        (sqlite.query('SELECT id FROM job_requirements').get() as { id: number }).id,
+      )
+      expect(mention).toMatchObject({
+        rawTerm: 'Apache Kafka',
+        normalizedTerm: 'apache kafka',
+        mappingState: 'pending',
+        resolvedSkillId: null,
+      })
+      expect(mention.occurrences[0]).toMatchObject({
+        source: 'job-analysis',
+        provenance: 'job-parser',
+        context: 'Experience with Apache Kafka.',
         confidence: 0.96,
+      })
+      expect(sqlite.query('SELECT count(*) AS count FROM skills').get()).toEqual({ count: 0 })
+      expect(sqlite.query('SELECT count(*) AS count FROM skill_aliases').get()).toEqual({
+        count: 0,
+      })
+      expect(sqlite.query('SELECT count(*) AS count FROM career_skills').get()).toEqual({
+        count: 0,
       })
       expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
     } finally {
@@ -105,99 +126,59 @@ describe('canonical requirement-skill persistence', () => {
     }
   })
 
-  test('maps one skill to multiple requirements without losing requirement context', () => {
+  test('maps one verified skill to multiple requirements without losing requirement context', () => {
     const sqlite = migratedDatabase()
     try {
-      const db = drizzle({ client: sqlite })
+      const db = drizzle({ client: sqlite, schema })
       const { postingId } = seedPosting(sqlite)
       const analysisId = seedAnalysis(sqlite, postingId)
+      seedApprovedKafka(sqlite)
 
       persistJobRequirements(
         db,
         analysisId,
         [
           {
-            type: 'skill',
-            importance: 'required',
-            basis: 'explicit',
-            statement: 'Strong Kafka experience.',
-            sourceText: 'Strong Kafka experience',
-            inferenceRationale: null,
-            skillReferences: [
-              {
-                rawLabel: 'Kafka',
-                canonicalLabel: 'Kafka',
-                category: 'messaging-async',
-                confidence: 0.9,
-              },
-            ],
+            ...requirement('Strong Kafka experience.', 'Kafka', 0.9),
+            importance: 'required' as const,
           },
           {
-            type: 'experience',
-            importance: 'preferred',
-            basis: 'explicit',
-            statement: 'Operated Kafka at scale.',
-            sourceText: 'Operated Kafka at scale',
-            inferenceRationale: null,
-            skillReferences: [
-              {
-                rawLabel: 'Kafka',
-                canonicalLabel: 'Kafka',
-                category: 'messaging-async',
-                confidence: 0.8,
-              },
-            ],
+            ...requirement('Operated Kafka at scale.', 'Kafka', 0.8),
+            type: 'experience' as const,
+            importance: 'preferred' as const,
           },
         ],
         '2026-08-28',
+        suppliedCatalog,
       )
 
       const mappings = listRequirementSkillMappings(analysisId, db)
       expect(mappings).toHaveLength(2)
       expect(new Set(mappings.map((item) => item.skillId)).size).toBe(1)
       expect(mappings.map((item) => item.importance).sort()).toEqual(['preferred', 'required'])
+      expect(mappings.map((item) => item.rawLabel)).toEqual(['Kafka', 'Kafka'])
       expect(mappings.every((item) => item.requirementStatement !== '')).toBe(true)
+      expect(countPendingMentions(db, analysisId)).toBe(0)
       expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
     } finally {
       sqlite.close()
     }
   })
 
-  test('reuses an approved skill instead of creating a duplicate', () => {
+  test('reuses an approved catalog skill instead of creating a duplicate', () => {
     const sqlite = migratedDatabase()
     try {
-      const db = drizzle({ client: sqlite })
+      const db = drizzle({ client: sqlite, schema })
       const { postingId } = seedPosting(sqlite)
       const analysisId = seedAnalysis(sqlite, postingId)
-      sqlite
-        .query(
-          `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
-           VALUES ('kafka', 'Kafka', 'messaging-async', 'approved', 'career-data', '2026-08-28', '2026-08-28')`,
-        )
-        .run()
+      seedApprovedKafka(sqlite)
 
       persistJobRequirements(
         db,
         analysisId,
-        [
-          {
-            type: 'skill',
-            importance: 'required',
-            basis: 'explicit',
-            statement: 'Kafka experience.',
-            sourceText: 'Kafka experience',
-            inferenceRationale: null,
-            skillReferences: [
-              {
-                rawLabel: 'Kafka',
-                canonicalLabel: 'Kafka',
-                category: 'messaging-async',
-                confidence: 0.95,
-              },
-            ],
-          },
-        ],
+        [requirement('Kafka experience.', 'Kafka', 0.95)],
         '2026-08-28',
+        suppliedCatalog,
       )
 
       const count = sqlite
@@ -207,24 +188,26 @@ describe('canonical requirement-skill persistence', () => {
       }
       expect(count.count).toBe(1)
       const mappings = listRequirementSkillMappings(analysisId, db)
-      expect(mappings[0].reviewStatus).toBe('approved')
+      expect(mappings[0]).toMatchObject({ reviewStatus: 'approved', confidence: 0.95 })
     } finally {
       sqlite.close()
     }
   })
 
-  test('completes a run transactionally with junction rows and no application-skill table writes', () => {
+  test('completes a run transactionally with mappings and no application-skill table writes', () => {
     const sqlite = migratedDatabase()
     try {
       const db = drizzle({ client: sqlite, schema })
       const { postingId, applicationId } = seedPosting(sqlite)
+      seedApprovedKafka(sqlite)
+      const identity = jobAnalysisInputFromContent('posting-hash', postingText, db)
       const run = createJobAnalysisRun(db, {
         jobPostingId: postingId,
-        inputHash: 'input-hash',
-        frozenInputJson: '{}',
+        inputHash: identity.inputHash,
+        frozenInputJson: JSON.stringify(identity.snapshot),
         model: 'gpt-test',
-        promptVersion: '3.0.0',
-        schemaVersion: '4.0.0',
+        promptVersion: '4.0.0',
+        schemaVersion: jobAnalysisSchemaVersion,
       })
 
       completeJobAnalysisRun(db, run.id, {
@@ -256,12 +239,23 @@ describe('canonical requirement-skill persistence', () => {
               statement: 'Kafka experience.',
               sourceText: 'Kafka experience',
               inferenceRationale: null,
-              skillReferences: [
+              terms: [
+                { term: 'Kafka', sourceText: 'Kafka experience', confidence: 0.95, key: null },
+              ],
+            },
+            {
+              type: 'skill',
+              importance: 'mentioned',
+              basis: 'explicit',
+              statement: 'Kubernetes exposure.',
+              sourceText: 'Kubernetes exposure',
+              inferenceRationale: null,
+              terms: [
                 {
-                  rawLabel: 'Kafka',
-                  canonicalLabel: 'Kafka',
-                  category: 'messaging-async',
-                  confidence: 0.95,
+                  term: 'Kubernetes',
+                  sourceText: 'Kubernetes exposure',
+                  confidence: null,
+                  key: 'kubernetes',
                 },
               ],
             },
@@ -275,18 +269,24 @@ describe('canonical requirement-skill persistence', () => {
           interviewQuestions: [],
         },
         parserModel: 'gpt-test',
-        parserPromptVersion: '3.0.0',
-        analysisPromptVersion: '4.0.0',
+        parserPromptVersion: '4.0.0',
+        analysisPromptVersion: '5.0.0',
       })
 
       const completed = sqlite
         .query('SELECT result_json, schema_version FROM job_posting_analyses WHERE id = ?')
         .get(run.id) as { result_json: string | null; schema_version: string | null }
       expect(completed.result_json).toContain('Kafka')
-      expect(completed.schema_version).toBe('4.0.0')
+      expect(completed.schema_version).toBe(jobAnalysisSchemaVersion)
 
       const mappings = listRequirementSkillMappings(run.id, db)
       expect(mappings).toHaveLength(1)
+      expect(mappings[0].skillKey).toBe('kafka')
+      // The forged Kubernetes key created no catalog record and stays pending.
+      expect(countPendingMentions(db, run.id)).toBe(1)
+      expect(
+        sqlite.query("SELECT count(*) AS count FROM skills WHERE key = 'kubernetes'").get(),
+      ).toEqual({ count: 0 })
 
       // The legacy application-skill table no longer exists.
       const tables = sqlite
@@ -294,6 +294,7 @@ describe('canonical requirement-skill persistence', () => {
         .all()
         .map((row) => String((row as { name: string }).name))
       expect(tables).not.toContain('job_applications_to_skills')
+      expect(applicationId).toBeGreaterThan(0)
       expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
     } finally {
       sqlite.close()

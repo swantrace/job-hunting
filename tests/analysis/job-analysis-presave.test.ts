@@ -60,7 +60,11 @@ describe('pre-save Quick Collect job analysis identity', () => {
     try {
       const db = drizzle({ client: sqlite, schema })
       const jobPostingId = seedPosting(sqlite)
-      const identity = jobAnalysisInputFromContent('posting-hash')
+      const identity = jobAnalysisInputFromContent(
+        'posting-hash',
+        'We need a frontend developer.',
+        db,
+      )
       const run = persistCompletedJobAnalysis(db, {
         jobPostingId,
         inputHash: identity.inputHash,
@@ -93,12 +97,12 @@ describe('pre-save Quick Collect job analysis identity', () => {
               statement: 'React experience.',
               sourceText: 'React experience.',
               inferenceRationale: null,
-              skillReferences: [
+              terms: [
                 {
-                  rawLabel: 'React',
-                  canonicalLabel: 'React',
-                  category: 'frontend',
+                  term: 'React',
+                  sourceText: 'React experience.',
                   confidence: 0.95,
+                  key: null,
                 },
               ],
             },

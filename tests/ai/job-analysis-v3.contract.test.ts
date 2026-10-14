@@ -35,12 +35,12 @@ function validAnalysis() {
         sourceText:
           'At least 3 years of experience building commercial SaaS applications using Node.js, TypeScript, and React.',
         inferenceRationale: null,
-        skillReferences: [
+        terms: [
           {
-            rawLabel: 'React',
-            canonicalLabel: 'React',
-            category: 'frontend',
+            term: 'React',
+            sourceText: 'At least 3 years of experience building commercial SaaS applications.',
             confidence: 0.95,
+            key: null,
           },
         ],
       },
@@ -51,7 +51,7 @@ function validAnalysis() {
         statement: 'Operate with strong-mid autonomy.',
         sourceText: 'Develop and deliver software features with minimal supervision.',
         inferenceRationale: 'Minimal supervision indicates meaningful independent ownership.',
-        skillReferences: [],
+        terms: [],
       },
     ],
     painPoints: [],

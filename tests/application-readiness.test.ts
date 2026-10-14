@@ -61,4 +61,18 @@ describe('application generation readiness', () => {
     expect(result.ready).toBe(true)
     expect(result.reasons).toEqual([])
   })
+
+  test('blocks generation while requirement terms are still unresolved', () => {
+    const result = assessApplicationReadiness({
+      hasReviewedAnalysis: true,
+      analysisStatus: 'completed',
+      hasPendingSkillDecisions: false,
+      hasPendingSkillMentions: true,
+    })
+
+    expect(result.ready).toBe(false)
+    expect(result.reasons).toContain(
+      'Resolve every unresolved job-skill term before generating documents.',
+    )
+  })
 })

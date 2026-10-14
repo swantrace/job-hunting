@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
+import { jobAnalysisSchemaVersion } from '../../src/ai/schemas/job-analysis'
 import * as schema from '../../src/db/schema'
 import { type AnalysisRunSummary, classifyAnalysisRunState } from '../../src/lib/analysis-run-state'
 import { migratedDatabase } from '../support/sqlite'
@@ -196,7 +197,7 @@ describe('job analysis run-state queries', () => {
           jobPostingId: applicationId,
           status: 'Completed',
           inputHash: 'current-hash',
-          schemaVersion: '4.0.0',
+          schemaVersion: jobAnalysisSchemaVersion,
           createdAt: '2026-08-02',
           updatedAt: '2026-08-02',
           completedAt: '2026-08-02',
@@ -218,7 +219,7 @@ describe('job analysis run-state queries', () => {
           jobPostingId: applicationId,
           status: 'Failed',
           inputHash: 'current-hash',
-          schemaVersion: '4.0.0',
+          schemaVersion: jobAnalysisSchemaVersion,
           errorMessage: 'boom',
           createdAt: '2026-08-03',
           updatedAt: '2026-08-03',
@@ -260,7 +261,7 @@ describe('job analysis completion transaction', () => {
           .where(eq(schema.jobPostingAnalyses.id, run.id))
           .get()
         expect(completed?.status).toBe('Completed')
-        expect(completed?.schemaVersion).toBe('4.0.0')
+        expect(completed?.schemaVersion).toBe(jobAnalysisSchemaVersion)
         expect(completed?.completedAt).toBeTruthy()
         expect(completed?.resultJson).toContain('Build software.')
 
@@ -390,7 +391,7 @@ function minimalParsedResult() {
           statement: 'Senior engineering experience.',
           sourceText: 'Senior engineering experience.',
           inferenceRationale: null,
-          skillReferences: [],
+          terms: [],
         },
       ],
       painPoints: [],

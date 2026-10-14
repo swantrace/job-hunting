@@ -63,6 +63,8 @@ export type PendingMentionInput = {
   rawTerm: string
   normalizedTerm: string
   occurrences: SourceOccurrence[]
+  /** Audit date shared with the owning requirement row; defaults to now. */
+  date?: string
 }
 
 const importanceRank: Record<SkillImportance, number> = {
@@ -275,7 +277,7 @@ export function upsertPendingMention(
         return record
       }
       const revision = existing.revision + 1
-      const updatedAt = nowISO()
+      const updatedAt = input.date ?? nowISO()
       tx.update(jobRequirementSkillMentions)
         .set({
           rawTerm,
@@ -287,7 +289,7 @@ export function upsertPendingMention(
         .run()
       return { ...record, rawTerm, occurrences: merged, revision, updatedAt }
     }
-    const now = nowISO()
+    const now = input.date ?? nowISO()
     const inserted = tx
       .insert(jobRequirementSkillMentions)
       .values({
@@ -312,7 +314,12 @@ export function upsertPendingMention(
  * preserving an existing confidence. It never creates a catalog skill and never
  * creates a personal `career_skills` row.
  */
-export function mapMention(executor: CareerDb, mentionId: number, skillId: number): MentionRecord {
+export function mapMention(
+  executor: CareerDb,
+  mentionId: number,
+  skillId: number,
+  date?: string,
+): MentionRecord {
   return executor.transaction((tx) => {
     const mention = requireMention(tx, mentionId)
     const skill = tx.select().from(skills).where(eq(skills.id, skillId)).get()
@@ -362,7 +369,7 @@ export function mapMention(executor: CareerDb, mentionId: number, skillId: numbe
     }
     if (mention.mappingState === 'mapped' && mention.resolvedSkillId === skillId) return record
     const revision = mention.revision + 1
-    const updatedAt = nowISO()
+    const updatedAt = date ?? nowISO()
     tx.update(jobRequirementSkillMentions)
       .set({ mappingState: 'mapped', resolvedSkillId: skillId, revision, updatedAt })
       .where(eq(jobRequirementSkillMentions.id, mentionId))

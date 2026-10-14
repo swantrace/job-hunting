@@ -4,7 +4,7 @@ import {
   requirementImportances,
   requirementTypes,
 } from '../../lib/job-requirements/constants'
-import { hasSkillCategory, skillCategoryKeys } from '../../lib/skills/taxonomy'
+import { normalizeSkillAlias } from '../../lib/skills/normalize'
 
 /**
  * Candidate-independent structured job analysis. This schema is the single
@@ -14,9 +14,10 @@ import { hasSkillCategory, skillCategoryKeys } from '../../lib/skills/taxonomy'
  * smuggle a fabricated fit score back into a stored analysis.
  *
  * Requirements own their importance and grounding; each requirement carries
- * zero or more structured skill references so the parser never emits a
- * parallel top-level skill list that must later be fuzzy-matched back to a
- * requirement.
+ * zero or more raw skill *terms* with their source context. The model may
+ * propose a catalog key, but the server only honours a key that exists in the
+ * bounded catalog snapshot supplied for the run, and it never lets the model
+ * create a catalog record.
  */
 
 export const roleTypes = [
@@ -48,135 +49,181 @@ const functionalEmphasisSchema = z
   })
   .strict()
 
-export const skillReferenceSchema = z
+/**
+ * One raw requirement term with its own source context. `key` is a
+ * *proposal*: the server honours it only when it names an entry of the frozen
+ * bounded catalog snapshot, so an unknown or hallucinated key can never bypass
+ * validation.
+ */
+export const requirementTermSchema = z
+  .object({
+    term: z.string().trim().min(1).max(120),
+    sourceText: z.string().trim().min(1).max(500).nullable().optional(),
+    confidence: z.number().min(0).max(1).nullable().optional(),
+    key: z.string().trim().min(1).max(120).nullable().optional(),
+  })
+  .strict()
+
+export type RequirementTerm = z.infer<typeof requirementTermSchema>
+
+/** Legacy v4 model output. Kept so already-stored analyses stay readable. */
+const legacySkillReferenceSchema = z
   .object({
     rawLabel: z.string().trim().min(1).max(120),
     canonicalLabel: z.string().trim().min(1).max(120),
-    category: z.string().trim().min(1).refine(hasSkillCategory),
+    category: z.string().trim().min(1),
     confidence: z.number().min(0).max(1),
   })
   .strict()
 
-export type SkillReference = z.infer<typeof skillReferenceSchema>
+const requirementBaseFields = {
+  type: z.enum(requirementTypes),
+  importance: z.enum(requirementImportances),
+  basis: z.enum(analysisRequirementBases),
+  statement: z.string().trim().min(1).max(1000),
+  sourceText: z.string().trim().min(1).max(2000),
+  inferenceRationale: z.string().trim().min(1).max(2000).nullable(),
+}
 
 export const jobRequirementSchema = z
-  .object({
-    type: z.enum(requirementTypes),
-    importance: z.enum(requirementImportances),
-    basis: z.enum(analysisRequirementBases),
-    statement: z.string().trim().min(1).max(1000),
-    sourceText: z.string().trim().min(1).max(2000),
-    inferenceRationale: z.string().trim().min(1).max(2000).nullable(),
-    skillReferences: z.array(skillReferenceSchema).max(20),
-  })
+  .object({ ...requirementBaseFields, terms: z.array(requirementTermSchema).max(20) })
   .strict()
   .superRefine((requirement, ctx) => {
     const seen = new Set<string>()
-    for (const [index, reference] of requirement.skillReferences.entries()) {
-      const key = reference.canonicalLabel.trim().toLocaleLowerCase()
+    for (const [index, term] of requirement.terms.entries()) {
+      const key = normalizeSkillAlias(term.term)
       if (seen.has(key))
         ctx.addIssue({
           code: 'custom',
-          message: `Duplicate skill reference "${reference.canonicalLabel}".`,
-          path: ['skillReferences', index, 'canonicalLabel'],
+          message: `Duplicate skill term "${term.term}".`,
+          path: ['terms', index, 'term'],
         })
       seen.add(key)
     }
   })
 
+const legacyJobRequirementSchema = z
+  .object({
+    ...requirementBaseFields,
+    skillReferences: z.array(legacySkillReferenceSchema).max(20),
+  })
+  .strict()
+
 const analysisText = z.string().trim().min(1).max(1000)
 const analysisTextList = z.array(analysisText).max(20)
 
-export const jobAnalysisSchema = z
-  .object({
-    summary: z
-      .object({
-        rolePurpose: z.string().trim().min(1).max(2000),
-        idealCandidate: z.string().trim().min(1).max(2000),
-      })
-      .strict(),
-    classification: z
-      .object({
-        roleType: z.enum(roleTypes),
-        advertisedSeniority: z.enum(seniorities),
-        practicalSeniority: z.enum(seniorities),
-        rationale: z.string().trim().min(1).max(2000),
-        functionalEmphasis: functionalEmphasisSchema,
-      })
-      .strict(),
-    requirements: z.array(jobRequirementSchema).min(1).max(40),
-    painPoints: analysisTextList,
-    culture: analysisTextList,
-    redFlags: analysisTextList,
-    successMetrics: analysisTextList,
-    benefits: analysisTextList,
-    notes: z.string().trim().max(5000).nullable(),
-    interviewQuestions: z.array(analysisText).max(20),
-  })
-  .strict()
-  .superRefine((analysis, ctx) => {
-    const emphasis = analysis.classification.functionalEmphasis
-    const total =
-      emphasis.frontend +
-      emphasis.backend +
-      emphasis.testingQuality +
-      emphasis.devopsInfrastructure +
-      emphasis.collaborationOwnership
-    if (total !== 100)
+const analysisCoreFields = {
+  summary: z
+    .object({
+      rolePurpose: z.string().trim().min(1).max(2000),
+      idealCandidate: z.string().trim().min(1).max(2000),
+    })
+    .strict(),
+  classification: z
+    .object({
+      roleType: z.enum(roleTypes),
+      advertisedSeniority: z.enum(seniorities),
+      practicalSeniority: z.enum(seniorities),
+      rationale: z.string().trim().min(1).max(2000),
+      functionalEmphasis: functionalEmphasisSchema,
+    })
+    .strict(),
+  painPoints: analysisTextList,
+  culture: analysisTextList,
+  redFlags: analysisTextList,
+  successMetrics: analysisTextList,
+  benefits: analysisTextList,
+  notes: z.string().trim().max(5000).nullable(),
+  interviewQuestions: z.array(analysisText).max(20),
+}
+
+type AnalysisCore = {
+  classification: { functionalEmphasis: z.infer<typeof functionalEmphasisSchema> }
+  requirements: Array<{ basis: string; inferenceRationale: string | null }>
+}
+
+function refineAnalysis(analysis: AnalysisCore, ctx: z.RefinementCtx) {
+  const emphasis = analysis.classification.functionalEmphasis
+  const total =
+    emphasis.frontend +
+    emphasis.backend +
+    emphasis.testingQuality +
+    emphasis.devopsInfrastructure +
+    emphasis.collaborationOwnership
+  if (total !== 100)
+    ctx.addIssue({
+      code: 'custom',
+      message: `Functional emphasis percentages must total exactly 100 (received ${total}).`,
+      path: ['classification', 'functionalEmphasis'],
+    })
+
+  for (const [index, requirement] of analysis.requirements.entries()) {
+    if (requirement.basis === 'inferred' && !requirement.inferenceRationale)
       ctx.addIssue({
         code: 'custom',
-        message: `Functional emphasis percentages must total exactly 100 (received ${total}).`,
-        path: ['classification', 'functionalEmphasis'],
+        message: 'An inferred requirement requires a concise inference rationale.',
+        path: ['requirements', index, 'inferenceRationale'],
       })
+    if (requirement.basis === 'explicit' && requirement.inferenceRationale !== null)
+      ctx.addIssue({
+        code: 'custom',
+        message: 'An explicit requirement must not carry an inference rationale.',
+        path: ['requirements', index, 'inferenceRationale'],
+      })
+  }
+}
 
-    for (const [index, requirement] of analysis.requirements.entries()) {
-      if (requirement.basis === 'inferred' && !requirement.inferenceRationale)
-        ctx.addIssue({
-          code: 'custom',
-          message: 'An inferred requirement requires a concise inference rationale.',
-          path: ['requirements', index, 'inferenceRationale'],
-        })
-      if (requirement.basis === 'explicit' && requirement.inferenceRationale !== null)
-        ctx.addIssue({
-          code: 'custom',
-          message: 'An explicit requirement must not carry an inference rationale.',
-          path: ['requirements', index, 'inferenceRationale'],
-        })
-    }
+export const jobAnalysisSchema = z
+  .object({
+    ...analysisCoreFields,
+    requirements: z.array(jobRequirementSchema).min(1).max(40),
   })
+  .strict()
+  .superRefine(refineAnalysis)
+
+/**
+ * The stored v4 contract. A run saved before Step 5 still parses so historical
+ * results stay readable and never crash a downstream projection.
+ */
+export const legacyJobAnalysisSchema = z
+  .object({
+    ...analysisCoreFields,
+    requirements: z.array(legacyJobRequirementSchema).min(1).max(40),
+  })
+  .strict()
+  .superRefine(refineAnalysis)
 
 export type JobAnalysis = z.infer<typeof jobAnalysisSchema>
 export type JobAnalysisRequirement = z.infer<typeof jobRequirementSchema>
 
-export const jobAnalysisSchemaVersion = '4.0.0'
+export const jobAnalysisSchemaVersion = '5.0.0'
 
 const stringSchema = { type: 'string' } as const
 const nullableStringSchema = { type: ['string', 'null'] } as const
 
-const skillReferenceJsonSchema = {
+const requirementTermJsonSchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    rawLabel: {
+    term: {
       type: 'string',
       description: 'The exact or tightly bounded skill wording used in the job posting.',
     },
-    canonicalLabel: {
-      type: 'string',
-      description:
-        'A concise canonical name for the skill. Server-side alias resolution is authoritative.',
-    },
-    category: {
-      type: 'string',
-      enum: [...skillCategoryKeys()],
-      description: 'One controlled taxonomy category for this skill.',
+    sourceText: {
+      ...nullableStringSchema,
+      description: 'A short exact excerpt from the posting that grounds this term, or null.',
     },
     confidence: {
-      type: 'number',
-      description: 'Parser confidence between 0 and 1.',
+      type: ['number', 'null'],
+      description: 'Parser confidence between 0 and 1, or null when not estimated.',
+    },
+    key: {
+      ...nullableStringSchema,
+      description:
+        'A catalog key from the supplied bounded catalog snapshot, or null. Never invent a key.',
     },
   },
-  required: ['rawLabel', 'canonicalLabel', 'category', 'confidence'],
+  required: ['term', 'sourceText', 'confidence', 'key'],
 }
 
 const requirementJsonSchema = {
@@ -212,12 +259,12 @@ const requirementJsonSchema = {
       description:
         'Required and non-null for inferred requirements; must be null for explicit requirements.',
     },
-    skillReferences: {
+    terms: {
       type: 'array',
-      items: skillReferenceJsonSchema,
+      items: requirementTermJsonSchema,
       maxItems: 20,
       description:
-        'Skills this specific requirement maps to. Empty when the requirement is not a skill requirement.',
+        'Raw skill terms this specific requirement states, each with its own source context. Empty when the requirement is not about a specific skill. Raw terms are authoritative; the server resolves them against the curated catalog.',
     },
   },
   required: [
@@ -227,7 +274,7 @@ const requirementJsonSchema = {
     'statement',
     'sourceText',
     'inferenceRationale',
-    'skillReferences',
+    'terms',
   ],
 }
 

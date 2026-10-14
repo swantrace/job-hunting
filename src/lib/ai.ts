@@ -1,4 +1,9 @@
-import { jobAnalysisPromptVersion, jobAnalysisSystemPrompt } from '../ai/prompts/job-analysis'
+import {
+  type CatalogPromptEntry,
+  jobAnalysisCatalogBlock,
+  jobAnalysisPromptVersion,
+  jobAnalysisSystemPrompt,
+} from '../ai/prompts/job-analysis'
 import { jobParserPromptVersion, jobParserSystemPrompt } from '../ai/prompts/job-parser'
 import type { JobAnalysis } from '../ai/schemas/job-analysis'
 import {
@@ -70,9 +75,16 @@ function parserTimeoutMs(env: Record<string, string | undefined>) {
   return Math.min(Math.max(configured, 10_000), 300_000)
 }
 
+/**
+ * One paid job-analysis call. `catalog` is the bounded approved catalog frozen
+ * for this run; it is the only source of the keys the model may propose, and it
+ * is rendered as an explicit block so the model never assumes the full catalog
+ * is available.
+ */
 export async function parseJobDescription(
   env: Record<string, string | undefined>,
   description: string,
+  catalog: readonly CatalogPromptEntry[] = [],
 ): Promise<ParsedJobResult> {
   const apiKey = env.OPENAI_API_KEY
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured')
@@ -98,7 +110,7 @@ export async function parseJobDescription(
         input: [
           {
             role: 'system',
-            content: `${jobParserSystemPrompt}\n\n${jobAnalysisSystemPrompt}\nPrompt version: ${jobAnalysisPromptVersion}\n\nAvailable directions: ${directionsHint}`,
+            content: `${jobParserSystemPrompt}\n\n${jobAnalysisSystemPrompt}\nPrompt version: ${jobAnalysisPromptVersion}\n\nAvailable directions: ${directionsHint}\n\n${jobAnalysisCatalogBlock(catalog)}`,
           },
           { role: 'user', content: description },
         ],

@@ -28,12 +28,12 @@ const analysis: JobAnalysis = {
       statement: 'Experience building event-driven systems with Kafka.',
       sourceText: 'Experience building event-driven systems with Kafka',
       inferenceRationale: null,
-      skillReferences: [
+      terms: [
         {
-          rawLabel: 'Apache Kafka',
-          canonicalLabel: 'Kafka',
-          category: 'messaging-async',
+          term: 'Apache Kafka',
+          sourceText: 'Experience building event-driven systems with Kafka',
           confidence: 0.96,
+          key: null,
         },
       ],
     },
@@ -57,21 +57,23 @@ async function renderDraft() {
   )
 }
 
-describe('requirement-owned skill references draft', () => {
-  test('renders skill references inside the requirement, not as a separate region', async () => {
+describe('requirement-owned raw skill terms draft', () => {
+  test('renders raw terms inside the requirement, not as a separate mapping region', async () => {
     const html = await renderDraft()
 
     expect(html).toContain('data-ja-requirement')
-    expect(html).toContain('data-ja-skill-ref')
-    expect(html).toContain('data-ja-skill-raw')
-    expect(html).toContain('data-ja-skill-canonical')
-    expect(html).toContain('data-ja-skill-category')
-    expect(html).toContain('data-ja-skill-confidence')
+    expect(html).toContain('data-ja-terms')
+    expect(html).toContain('data-ja-term')
+    // Step 5 removes the model-owned canonical/category editor; Step 6 adds the
+    // reviewed mapping UI, so no parser-side mapping control may reappear here.
+    expect(html).not.toContain('data-ja-skill-canonical')
+    expect(html).not.toContain('data-ja-skill-category')
+    expect(html).not.toContain('data-ja-skill-confidence')
     // No parallel top-level skillRequirements editor remains.
     expect(html).not.toContain('name="skillRequirements"')
   })
 
-  test('preserves raw label and confidence in the authoritative draft', async () => {
+  test('preserves the raw term and confidence in the authoritative draft', async () => {
     const html = await renderDraft()
 
     expect(html).toContain('Apache Kafka')

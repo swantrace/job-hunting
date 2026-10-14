@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { canonicalHash, canonicalSerialize } from '../../src/lib/canonical-hash'
+import { createCareerTestDatabase } from '../support/career-db'
 
 /**
  * Versioned-workflow freshness contracts.
@@ -67,9 +68,11 @@ describe('canonical hashing', () => {
 })
 
 describe('job analysis input hash', () => {
+  // Step 5: the catalog is not an extraction input. Resolution runs over the
+  // stored raw terms against the separately frozen resolution fingerprint, so a
+  // catalog edit can be remapped without another paid JD parse.
   const fixture = {
     contentHash: 'content-hash-a',
-    taxonomyHash: 'taxonomy-hash-1',
     parserPromptVersion: '2.2.0',
     jobAnalysisPromptVersion: '3.0.0',
     jobAnalysisSchemaVersion: '3.0.0',
@@ -82,11 +85,58 @@ describe('job analysis input hash', () => {
     )
   })
 
-  jobAnalysisHashTest('changes when the supplied skill-taxonomy content changes', async () => {
-    const { canonicalJobAnalysisInputHash } = await import(jobAnalysisInputPath)
-    expect(canonicalJobAnalysisInputHash({ ...fixture, taxonomyHash: 'taxonomy-hash-2' })).not.toBe(
-      canonicalJobAnalysisInputHash(fixture),
-    )
+  jobAnalysisHashTest(
+    'keeps the extraction hash independent of the frozen supplied catalog',
+    async () => {
+      const {
+        catalogFingerprint,
+        frozenResolutionFingerprint,
+        frozenSuppliedCatalog,
+        jobAnalysisInputFromContent,
+      } = await import(jobAnalysisInputPath)
+      // A dedicated temporary database: this test must not depend on what other
+      // suites have seeded into the shared test database.
+      const target = createCareerTestDatabase({ seed: false })
+      const rawText = 'We need TypeScript and Kubernetes experience.'
+      try {
+        const before = jobAnalysisInputFromContent('content-hash-a', rawText, target.executor)
+        expect(frozenResolutionFingerprint(JSON.stringify(before.snapshot))).toBe(
+          catalogFingerprint(target.executor),
+        )
+        // The bounded supplied set is frozen with its own fingerprint, and an
+        // empty catalog is a valid frozen set (nothing was retrieved here).
+        expect(before.snapshot.suppliedCatalog.entries).toEqual([])
+        expect(before.snapshot.suppliedCatalog.fingerprint).toHaveLength(64)
+        expect(frozenSuppliedCatalog(JSON.stringify(before.snapshot))).toEqual([])
+
+        target.sqlite
+          .query(
+            `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
+             VALUES ('typescript', 'TypeScript', NULL, 'approved', 'career-data', '2026-10-14', '2026-10-14')`,
+          )
+          .run()
+        const after = jobAnalysisInputFromContent('content-hash-a', rawText, target.executor)
+
+        // A catalog edit is a new resolution/supplied identity, not a new paid
+        // extraction: the same raw text now retrieves the new entry.
+        expect(frozenResolutionFingerprint(JSON.stringify(after.snapshot))).not.toBe(
+          frozenResolutionFingerprint(JSON.stringify(before.snapshot)),
+        )
+        expect(frozenSuppliedCatalog(JSON.stringify(after.snapshot))).toEqual([
+          { key: 'typescript', name: 'TypeScript', category: null, aliases: [] },
+        ])
+        expect(after.inputHash).toBe(before.inputHash)
+      } finally {
+        target.cleanup()
+      }
+    },
+  )
+
+  jobAnalysisHashTest('reads an empty catalog from a legacy frozen snapshot', async () => {
+    const { frozenSuppliedCatalog } = await import(jobAnalysisInputPath)
+    expect(frozenSuppliedCatalog('{"version":1}')).toEqual([])
+    expect(frozenSuppliedCatalog(null)).toEqual([])
+    expect(frozenSuppliedCatalog('not json')).toEqual([])
   })
 
   jobAnalysisHashTest('changes when the parser prompt version changes', async () => {

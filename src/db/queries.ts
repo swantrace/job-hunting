@@ -141,7 +141,7 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
         .returning({ id: jobPostings.id })
         .get()
       if (input.jobAnalysis) {
-        const inputIdentity = jobAnalysisInputFromContent(contentHash)
+        const inputIdentity = jobAnalysisInputFromContent(contentHash, rawText, tx)
         persistCompletedJobAnalysis(tx, {
           jobPostingId: posting.id,
           inputHash: inputIdentity.inputHash,

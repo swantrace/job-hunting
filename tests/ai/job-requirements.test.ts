@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import { persistJobRequirements } from '../../src/db/job-analysis'
+import * as schema from '../../src/db/schema'
 import { migrationFolderUpTo } from '../db/support/migrations'
 import { migratedDatabase } from '../support/sqlite'
 
@@ -142,7 +143,7 @@ describe('structured job requirements migration', () => {
 
   test('persists structured requirements in deterministic posting order', () => {
     const sqlite = migratedDatabase()
-    const db = drizzle({ client: sqlite })
+    const db = drizzle({ client: sqlite, schema })
     try {
       const company = sqlite
         .query('INSERT INTO companies (name, created_at, updated_at) VALUES (?, ?, ?) RETURNING id')
