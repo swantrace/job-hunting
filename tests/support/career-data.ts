@@ -1,17 +1,17 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { type CanonicalCareerData, loadCareerData } from '../../src/lib/career-data'
+import { type CanonicalCareerData, readCareerDataDirectory } from '../../src/lib/career-data'
 
 /**
- * Loads the checked-in example career data deterministically, ignoring any
- * private `career-data/` directory on the developer machine. Tests must never
- * read the user's private career data.
+ * Loads the checked-in example career documents deterministically through the
+ * import-only directory reader, ignoring any private `career-data/` directory on
+ * the developer machine. The runtime reads the database; these helpers exist for
+ * suites that assert the import source shape. Tests must never read the user's
+ * private career data.
  */
 export function loadExampleCareerData() {
-  return withCareerDataDirectory(resolve(process.cwd(), 'career-data.example'), () =>
-    loadCareerData(),
-  )
+  return readCareerDataDirectory(resolve(process.cwd(), 'career-data.example'))
 }
 
 /**
@@ -32,14 +32,15 @@ export function withCareerDataDirectory<T>(directory: string, run: (directory: s
 
 /**
  * Creates a temporary career-data directory outside the repository, writes files
- * into it with `populate`, then loads the validated canonical data from that
- * directory. The directory is always removed afterwards.
+ * into it with `populate`, then reads the validated canonical data from that
+ * directory with the import-only reader. The directory is always removed
+ * afterwards.
  */
 export function loadCareerDataFrom(populate: (directory: string) => void): CanonicalCareerData {
   const root = mkdtempSync(resolve(tmpdir(), 'job-tracker-career-data-'))
   try {
     populate(root)
-    return withCareerDataDirectory(root, () => loadCareerData())
+    return readCareerDataDirectory(root)
   } finally {
     rmSync(root, { force: true, recursive: true })
   }

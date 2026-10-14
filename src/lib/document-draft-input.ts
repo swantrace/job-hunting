@@ -1,5 +1,6 @@
+import { db } from '../db/client'
+import type { DbExecutor } from '../db/skill-queries'
 import {
-  baseResumesDirectory,
   type FrozenBaseResumeSource,
   frozenBaseResumeSource,
   loadApprovedBaseResume,
@@ -72,21 +73,27 @@ export function safeCareerData(data: CanonicalCareerData) {
   }
 }
 
-function knownDirectionIds() {
-  return new Set(listDirections().map((direction) => direction.id))
+function knownDirectionIds(executor: DbExecutor) {
+  return new Set(listDirections(executor).map((direction) => direction.id))
 }
 
 /** Loads the frozen approved Base Resume for a direction, or null when absent. */
-export function baseResumeSourceFor(direction: string): FrozenBaseResumeSource | null {
-  const resume = loadApprovedBaseResume(baseResumesDirectory(), direction, knownDirectionIds())
+export function baseResumeSourceFor(
+  direction: string,
+  executor: DbExecutor = db,
+): FrozenBaseResumeSource | null {
+  const resume = loadApprovedBaseResume(direction, knownDirectionIds(executor), executor)
   return resume ? frozenBaseResumeSource(resume) : null
 }
 
-export function baseResumeIdentity(direction: string): {
+export function baseResumeIdentity(
+  direction: string,
+  executor: DbExecutor = db,
+): {
   baseResumeHash: string | null
   baseResumeVersion: string | null
 } {
-  const source = baseResumeSourceFor(direction)
+  const source = baseResumeSourceFor(direction, executor)
   return {
     baseResumeHash: source?.sha256 ?? null,
     baseResumeVersion: source?.version ?? null,
@@ -122,9 +129,12 @@ type GenerationSourceLike = {
   }>
 }
 
-export function buildDocumentDraftSnapshot(source: GenerationSourceLike): DocumentDraftSnapshot {
-  const data = loadCareerData()
-  const baseResume = baseResumeSourceFor(source.application.direction)
+export function buildDocumentDraftSnapshot(
+  source: GenerationSourceLike,
+  executor: DbExecutor = db,
+): DocumentDraftSnapshot {
+  const data = loadCareerData(executor)
+  const baseResume = baseResumeSourceFor(source.application.direction, executor)
   if (!baseResume)
     throw new Error(
       `No approved Base Resume for direction "${source.application.direction}". Import one before generating documents.`,
@@ -138,7 +148,7 @@ export function buildDocumentDraftSnapshot(source: GenerationSourceLike): Docume
     generatedAt: todayISO(),
     kind: 'application',
     direction: source.application.direction,
-    targetTitles: directionTargetTitles(source.application.direction),
+    targetTitles: directionTargetTitles(source.application.direction, executor),
     baseResume,
     application: {
       id: source.application.id,
@@ -178,11 +188,14 @@ type BaselineRunLike = {
   targetTitle: string
 }
 
-export function buildBaselineDocumentDraftSnapshot(run: BaselineRunLike): DocumentDraftSnapshot {
-  const data = loadCareerData()
-  const baseResume = baseResumeSourceFor(run.direction)
+export function buildBaselineDocumentDraftSnapshot(
+  run: BaselineRunLike,
+  executor: DbExecutor = db,
+): DocumentDraftSnapshot {
+  const data = loadCareerData(executor)
+  const baseResume = baseResumeSourceFor(run.direction, executor)
   if (!baseResume) throw new Error(`No approved Base Resume for direction "${run.direction}".`)
-  const configured = directionTargetTitles(run.direction)
+  const configured = directionTargetTitles(run.direction, executor)
   return {
     version: 2,
     generatedAt: todayISO(),

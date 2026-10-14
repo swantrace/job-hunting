@@ -1,45 +1,29 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { resolve } from 'node:path'
 import { Hono } from 'hono'
 import { BaseResumeStatus } from '../../app/components/BaseResumeStatus'
-import { baseResumeTextHash } from '../../src/lib/base-resumes'
+import { approvedBaseResumeMarkdown } from '../career/fixtures'
+import { type CareerTestDatabase, careerTestDatabase } from '../support/career-db'
 
-let fixtureRoot = ''
-const previous = {
-  base: process.env.CAREER_BASE_RESUMES_DIR,
-}
+const markupText = '# Fred\n\n## Summary\n\nScript-free <markup> summary.\n'
+
+let database: CareerTestDatabase
 
 beforeAll(() => {
-  fixtureRoot = mkdtempSync(resolve(tmpdir(), 'job-tracker-base-status-'))
-  const baseDir = resolve(fixtureRoot, 'base-resumes')
-  mkdirSync(baseDir, { recursive: true })
-  process.env.CAREER_BASE_RESUMES_DIR = baseDir
-  const text = '# Fred\n\n## Summary\n\nScript-free <markup> summary.\n'
-  writeFileSync(
-    resolve(baseDir, 'manifest.json'),
-    `${JSON.stringify({
-      schemaVersion: 1,
-      lastUpdated: '2026-08-31',
-      resumes: [
-        {
-          direction: 'fullstack',
-          fileName: 'fullstack.md',
-          version: 'v1',
-          approvedAt: '2026-08-31',
-          sha256: baseResumeTextHash(text),
-        },
-      ],
-    })}\n`,
-  )
-  writeFileSync(resolve(baseDir, 'fullstack.md'), text)
+  database = careerTestDatabase()
+  // Store a version whose content exercises HTML escaping. The version's digest
+  // intentionally no longer matches, which also proves the stale marker.
+  database.sqlite
+    .query("UPDATE career_base_resumes SET markdown = ? WHERE direction_key = 'fullstack'")
+    .run(markupText)
 })
 
 afterAll(() => {
-  rmSync(fixtureRoot, { force: true, recursive: true })
-  if (previous.base === undefined) delete process.env.CAREER_BASE_RESUMES_DIR
-  else process.env.CAREER_BASE_RESUMES_DIR = previous.base
+  // Base Resume versions are immutable through the API, so restore the fixture
+  // content directly to keep the shared test database clean.
+  database.sqlite
+    .query("UPDATE career_base_resumes SET markdown = ? WHERE direction_key = 'fullstack'")
+    .run(approvedBaseResumeMarkdown)
+  database.cleanup()
 })
 
 describe('Base Resume readiness display', () => {

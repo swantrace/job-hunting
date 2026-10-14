@@ -35,8 +35,7 @@ export type BaselineGenerationRunWithArtifacts = BaselineGenerationRun & {
   artifacts: (typeof baselineGeneratedArtifacts.$inferSelect)[]
 }
 
-export type GenerationSource = {
-  run: GenerationRun
+export type GenerationSourceLineage = {
   application: typeof jobApplications.$inferSelect
   company: typeof companies.$inferSelect
   skills: string[]
@@ -46,6 +45,10 @@ export type GenerationSource = {
   jobRequirements: ReturnType<typeof listJobRequirements>
   analysisRun: ApplicationAnalysisRun | null
   companyInterestNote: string | null
+}
+
+export type GenerationSource = GenerationSourceLineage & {
+  run: GenerationRun
 }
 
 export type CreateGenerationRunInput = {
@@ -454,19 +457,20 @@ export function getGenerationRunResults(runId: number) {
   )
 }
 
-export function getGenerationSource(runId: number): GenerationSource | null {
-  const run = getGenerationRun(runId)
-  if (!run) return null
-  // Resolve lineage explicitly: Candidate Analysis -> Job Analysis -> Job Post
-  // -> Application -> Company. No redundant application FK or legacy
-  // application-skill table is consulted.
-  const candidateRun = run.applicationAnalysisRunId
-    ? db
-        .select()
-        .from(applicationAnalysisRuns)
-        .where(eq(applicationAnalysisRuns.id, run.applicationAnalysisRunId))
-        .get()
-    : undefined
+/**
+ * Resolves the freeze-able generation lineage from a completed Candidate
+ * Analysis run: Candidate Analysis -> Job Analysis -> Job Post -> Application ->
+ * Company. No redundant application FK or legacy application-skill table is
+ * consulted, so an enqueue can freeze the exact facts a worker will consume.
+ */
+export function getGenerationSourceLineage(
+  candidateAnalysisRunId: number,
+): GenerationSourceLineage | null {
+  const candidateRun = db
+    .select()
+    .from(applicationAnalysisRuns)
+    .where(eq(applicationAnalysisRuns.id, candidateAnalysisRunId))
+    .get()
   const analysis = candidateRun?.jobPostingAnalysisId
     ? db
         .select()
@@ -489,7 +493,6 @@ export function getGenerationSource(runId: number): GenerationSource | null {
   const requirements = candidateRun ? listRunSkillReviews(candidateRun.id) : []
   const jobRequirements = analysis ? listJobRequirements(analysis.id) : []
   return {
-    run,
     application: row.application,
     company: row.company,
     skills: requirements.map((item) => item.skillName),
@@ -500,6 +503,13 @@ export function getGenerationSource(runId: number): GenerationSource | null {
     analysisRun: candidateRun ?? null,
     companyInterestNote: null,
   }
+}
+
+export function getGenerationSource(runId: number): GenerationSource | null {
+  const run = getGenerationRun(runId)
+  if (!run || !run.applicationAnalysisRunId) return null
+  const lineage = getGenerationSourceLineage(run.applicationAnalysisRunId)
+  return lineage ? { run, ...lineage } : null
 }
 
 export function markGenerationRunProcessing(runId: number) {

@@ -251,7 +251,7 @@ export function listRunSkillReviews(runId: number, executor: DbExecutor = db): R
     const decision = decisionBySkill.get(mapping.skillId)
     return {
       ...mapping,
-      analysisResult: careerSkillMatchResult(mapping.skillKey),
+      analysisResult: careerSkillMatchResult(mapping.skillKey, executor),
       decision: decision?.decision ?? 'pending',
       decisionReason: decision?.reason ?? null,
       aliases: aliasesBySkill.get(mapping.skillId) ?? [],

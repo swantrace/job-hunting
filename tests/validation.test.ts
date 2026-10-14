@@ -1,5 +1,18 @@
-import { describe, expect, test } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { filterSchema, managedSkillSchema, quickCollectSchema } from '../src/lib/validation'
+import { type CareerTestDatabase, careerTestDatabase } from './support/career-db'
+
+// Directions and skill categories are database-owned, so payload validation is
+// exercised against a seeded career database.
+let database: CareerTestDatabase
+
+beforeAll(() => {
+  database = careerTestDatabase()
+})
+
+afterAll(() => {
+  database.cleanup()
+})
 
 describe('request validation', () => {
   test('accepts a valid quick collect payload', () => {

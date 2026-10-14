@@ -1,7 +1,12 @@
-import { describe, expect, test } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import {
+  type CareerTestDatabase,
+  careerTestDatabase,
+  createCareerTestDatabase,
+} from '../support/career-db'
 
 const taxonomyModule = resolve(process.cwd(), 'src/lib/skills/taxonomy.ts')
 const normalizationModule = resolve(process.cwd(), 'src/lib/skills/normalize.ts')
@@ -20,7 +25,11 @@ type TaxonomyModule = {
     schemaVersion: 1
     categories: Array<{ key: string; label: string; sortOrder: number }>
   }
-  skillCategoryDefinitions: () => Array<{ key: string; label: string; sortOrder: number }>
+  skillCategoryDefinitions: (executor?: unknown) => Array<{
+    key: string
+    label: string
+    sortOrder: number
+  }>
 }
 
 type NormalizationModule = {
@@ -37,51 +46,54 @@ async function loadContracts() {
   }
 }
 
+let database: CareerTestDatabase | undefined
+
+beforeAll(() => {
+  database = careerTestDatabase()
+})
+
+afterAll(() => {
+  database?.cleanup()
+})
+
 describe('planned canonical skill taxonomy contract', () => {
-  taxonomyTest('uses one predictable category vocabulary', async () => {
+  taxonomyTest('uses one predictable category vocabulary from the database', async () => {
     const { taxonomy } = await loadContracts()
-    const previous = process.env.CAREER_DATA_DIR
-    process.env.CAREER_DATA_DIR = resolve(process.cwd(), 'career-data.example')
-    try {
-      const categories = taxonomy.skillCategoryDefinitions()
-      expect(categories.length).toBeGreaterThan(0)
-      expect(new Set(categories.map((category) => category.key)).size).toBe(categories.length)
-      expect(new Set(categories.map((category) => category.label)).size).toBe(categories.length)
-      expect(new Set(categories.map((category) => category.sortOrder)).size).toBe(categories.length)
-      expect(categories.map((category) => category.sortOrder)).toEqual(
-        [...categories].map((category) => category.sortOrder).sort((left, right) => left - right),
-      )
-    } finally {
-      if (previous === undefined) delete process.env.CAREER_DATA_DIR
-      else process.env.CAREER_DATA_DIR = previous
-    }
+    const categories = taxonomy.skillCategoryDefinitions()
+    expect(categories.length).toBeGreaterThan(0)
+    expect(new Set(categories.map((category) => category.key)).size).toBe(categories.length)
+    expect(new Set(categories.map((category) => category.label)).size).toBe(categories.length)
+    expect(new Set(categories.map((category) => category.sortOrder)).size).toBe(categories.length)
+    expect(categories.map((category) => category.sortOrder)).toEqual(
+      [...categories].map((category) => category.sortOrder).sort((left, right) => left - right),
+    )
   })
 
-  taxonomyTest('loads candidate-owned categories from CAREER_DATA_DIR', async () => {
+  taxonomyTest('reads candidate-owned categories from the database, not a file', async () => {
     const { taxonomy } = await loadContracts()
-    const directory = mkdtempSync(join(tmpdir(), 'job-tracker-taxonomy-'))
-    const previous = process.env.CAREER_DATA_DIR
-    writeFileSync(
-      join(directory, 'skill-taxonomy.json'),
-      JSON.stringify({
-        schemaVersion: 1,
-        categories: [{ key: 'candidate-specific', label: 'Candidate Specific', sortOrder: 7 }],
-      }),
-    )
-    process.env.CAREER_DATA_DIR = directory
+    const custom = createCareerTestDatabase({ seed: false })
     try {
-      expect(taxonomy.skillCategoryDefinitions()).toEqual([
-        { key: 'candidate-specific', label: 'Candidate Specific', sortOrder: 7 },
-      ])
+      const before = taxonomy.skillCategoryDefinitions(custom.executor).length
+      custom.sqlite
+        .query(
+          `INSERT INTO skill_categories (key, label, sort_order, created_at, updated_at)
+           VALUES ('candidate-specific', 'Candidate Specific', 7, '2026-10-14', '2026-10-14')`,
+        )
+        .run()
+      const categories = taxonomy.skillCategoryDefinitions(custom.executor)
+      expect(categories.length).toBe(before + 1)
+      expect(categories).toContainEqual({
+        key: 'candidate-specific',
+        label: 'Candidate Specific',
+        sortOrder: 7,
+      })
     } finally {
-      if (previous === undefined) delete process.env.CAREER_DATA_DIR
-      else process.env.CAREER_DATA_DIR = previous
-      rmSync(directory, { recursive: true, force: true })
+      custom.cleanup()
     }
   })
 
   taxonomyTest(
-    'uses the example taxonomy when the configured private directory is absent',
+    'keeps database categories when the private career-data directory is absent',
     async () => {
       const { taxonomy } = await loadContracts()
       const previous = process.env.CAREER_DATA_DIR

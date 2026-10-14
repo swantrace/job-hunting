@@ -1,10 +1,11 @@
-import { describe, expect, test } from 'bun:test'
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { jobAnalysisSchemaVersion } from '../../src/ai/schemas/job-analysis'
 import { persistCompletedJobAnalysis } from '../../src/db/job-analysis-runs'
 import * as schema from '../../src/db/schema'
 import { jobAnalysisInputFromContent } from '../../src/lib/job-analysis-input'
+import { migrateCareerTestDatabase } from '../support/career-db'
 import { migratedDatabase } from '../support/sqlite'
 
 /**
@@ -42,6 +43,16 @@ function seedPosting(sqlite: ReturnType<typeof migratedDatabase>) {
   }
   return posting.id
 }
+
+// The Job Analysis identity reads the database-owned category fingerprint, so
+// the suite's isolated DB_FILE_NAME database must be migrated before use.
+let fingerprintDatabase: ReturnType<typeof migrateCareerTestDatabase> | undefined
+beforeAll(() => {
+  fingerprintDatabase = migrateCareerTestDatabase()
+})
+afterAll(() => {
+  fingerprintDatabase?.sqlite.close()
+})
 
 describe('pre-save Quick Collect job analysis identity', () => {
   test('saves a completed run with input identity without an AI call', () => {

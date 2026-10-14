@@ -74,9 +74,10 @@ function requireCareerState(executor: DbExecutor) {
 export function readCareerState(executor: DbExecutor = db): {
   revision: number
   contentHash: string
+  updatedAt: string
 } {
   const row = requireCareerState(executor)
-  return { revision: row.revision, contentHash: row.contentHash }
+  return { revision: row.revision, contentHash: row.contentHash, updatedAt: row.updatedAt }
 }
 
 /**

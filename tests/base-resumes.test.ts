@@ -12,6 +12,8 @@ import {
   normalizeBaseResumeText,
   parseBaseResumeManifest,
 } from '../src/lib/base-resumes'
+import { approvedBaseResumeMarkdown } from './career/fixtures'
+import { createCareerTestDatabase } from './support/career-db'
 
 const knownProfiles = new Set(['fullstack', 'fhir', 'frontend'])
 
@@ -86,31 +88,47 @@ describe('Base Resume source authority', () => {
     expect(() => parseBaseResumeManifest(duplicate, knownProfiles)).toThrow('duplicate direction')
   })
 
-  test('loads an approved resume and detects a stale hash', () => {
-    const loaded = loadApprovedBaseResume(fixtureRoot, 'fhir', knownProfiles)
-    expect(loaded?.version).toBe('v1')
-    expect(loaded?.empty).toBe(false)
-    expect(loaded?.stale).toBe(false)
-    expect(loaded?.sha256).toBe(manifest.resumes[0].sha256)
+  test('reads the selected approved resume from the database and detects a drifted hash', () => {
+    const database = createCareerTestDatabase()
+    try {
+      const loaded = loadApprovedBaseResume('fullstack', knownProfiles, database.executor)
+      expect(loaded?.version).toBe('v1')
+      expect(loaded?.empty).toBe(false)
+      expect(loaded?.stale).toBe(false)
+      expect(loaded?.approvedSha256).toBe(baseResumeTextHash(approvedBaseResumeMarkdown))
+      expect(loaded?.sha256).toBe(loaded?.approvedSha256)
 
-    writeFileSync(resolve(fixtureRoot, 'fhir.md'), `${sampleResume}## Certifications\n\n- CHL7\n`)
-    const changed = loadApprovedBaseResume(fixtureRoot, 'fhir', knownProfiles)
-    expect(changed?.stale).toBe(true)
-    writeFileSync(resolve(fixtureRoot, 'fhir.md'), sampleResume)
+      // A stored version is immutable through the API; simulate on-disk drift to
+      // prove the reader compares the stored Markdown with its approved digest.
+      database.sqlite
+        .query("UPDATE career_base_resumes SET markdown = ? WHERE direction_key = 'fullstack'")
+        .run(`${approvedBaseResumeMarkdown}\n## Certifications\n`)
+      const changed = loadApprovedBaseResume('fullstack', knownProfiles, database.executor)
+      expect(changed?.stale).toBe(true)
+    } finally {
+      database.cleanup()
+    }
   })
 
-  test('returns null for a missing direction and rejects an empty file', () => {
-    expect(loadApprovedBaseResume(fixtureRoot, 'fullstack', knownProfiles)).toBeNull()
-    const emptyManifest = {
-      ...manifest,
-      resumes: [{ ...manifest.resumes[0], direction: 'fullstack', fileName: 'fullstack.md' }],
+  test('returns null for a direction without an approved version', () => {
+    const database = createCareerTestDatabase()
+    try {
+      expect(loadApprovedBaseResume('fhir', knownProfiles, database.executor)).toBeNull()
+      // A direction outside the known set disables generation for that direction.
+      expect(loadApprovedBaseResume('fullstack', new Set(['fhir']), database.executor)).toBeNull()
+      // An empty approved version cannot exist at all: the schema rejects it.
+      expect(() =>
+        database.sqlite
+          .query(
+            `INSERT INTO career_base_resumes
+              (direction_key, version, status, markdown, content_hash, approved_at, revision, created_at, updated_at)
+             VALUES ('fullstack', 'v-empty', 'draft', '   ', 'hash', NULL, 1, '2026-10-14', '2026-10-14')`,
+          )
+          .run(),
+      ).toThrow()
+    } finally {
+      database.cleanup()
     }
-    writeFileSync(resolve(fixtureRoot, baseResumeManifestFileName), JSON.stringify(emptyManifest))
-    writeFileSync(resolve(fixtureRoot, 'fullstack.md'), '   \n')
-    expect(() => loadApprovedBaseResume(fixtureRoot, 'fullstack', knownProfiles)).toThrow(
-      'is empty',
-    )
-    writeFileSync(resolve(fixtureRoot, baseResumeManifestFileName), JSON.stringify(manifest))
   })
 
   test('returns null when no manifest exists', () => {

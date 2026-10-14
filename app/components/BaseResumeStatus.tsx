@@ -1,8 +1,4 @@
-import {
-  type ApprovedBaseResume,
-  baseResumesDirectory,
-  listApprovedBaseResumes,
-} from '../../src/lib/base-resumes'
+import { type ApprovedBaseResume, listApprovedBaseResumes } from '../../src/lib/base-resumes'
 import { listDirections } from '../../src/lib/directions'
 
 export function BaseResumeStatus() {
@@ -10,10 +6,7 @@ export function BaseResumeStatus() {
   let approved: ApprovedBaseResume[] = []
   let error: string | null = null
   try {
-    approved = listApprovedBaseResumes(
-      baseResumesDirectory(),
-      new Set(directions.map((direction) => direction.id)),
-    )
+    approved = listApprovedBaseResumes(new Set(directions.map((direction) => direction.id)))
   } catch (cause) {
     error = cause instanceof Error ? cause.message : 'Unable to read Base Resumes.'
   }

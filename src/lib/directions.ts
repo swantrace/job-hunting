@@ -1,31 +1,36 @@
-import { loadCareerData } from './career-data'
+import { listCareerDirections } from '../db/career-directions'
+import { db } from '../db/client'
+import type { DbExecutor } from '../db/skill-queries'
 
 export type Direction = { id: string; label: string; targetTitles: string[] }
 
 /**
- * Directions are defined solely by `preferences.directionDefinitions`. Profiles
- * no longer exist; a direction is just an identity (id + label + target titles)
- * whose content comes from an optional approved Base Resume.
+ * Directions are defined solely by the `career_directions` table. Profiles no
+ * longer exist; a direction is just an identity (id + label + target titles)
+ * whose content comes from the selected approved Base Resume version. Retired
+ * directions are omitted, and ordering is the stored display order (then label).
  */
-export function listDirections(): Direction[] {
-  const data = loadCareerData()
-  return Object.entries(data.preferences.directionDefinitions)
-    .map(([id, definition]) => ({
-      id,
-      label: definition.label,
-      targetTitles: definition.targetTitles,
+export function listDirections(executor: DbExecutor = db): Direction[] {
+  return listCareerDirections(executor)
+    .slice()
+    .sort(
+      (left, right) => left.sortOrder - right.sortOrder || left.label.localeCompare(right.label),
+    )
+    .map((row) => ({
+      id: row.key,
+      label: row.label,
+      targetTitles: row.targetTitles,
     }))
-    .sort((left, right) => left.label.localeCompare(right.label))
 }
 
-export function hasDirection(id: string): boolean {
-  return listDirections().some((direction) => direction.id === id)
+export function hasDirection(id: string, executor: DbExecutor = db): boolean {
+  return listDirections(executor).some((direction) => direction.id === id)
 }
 
-export function directionLabel(id: string): string | undefined {
-  return listDirections().find((direction) => direction.id === id)?.label
+export function directionLabel(id: string, executor: DbExecutor = db): string | undefined {
+  return listDirections(executor).find((direction) => direction.id === id)?.label
 }
 
-export function directionTargetTitles(id: string): string[] {
-  return listDirections().find((direction) => direction.id === id)?.targetTitles ?? []
+export function directionTargetTitles(id: string, executor: DbExecutor = db): string[] {
+  return listDirections(executor).find((direction) => direction.id === id)?.targetTitles ?? []
 }

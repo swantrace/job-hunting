@@ -12,6 +12,7 @@ import {
 } from '../ai/schemas/document-draft'
 import {
   getBaselineGenerationRun,
+  getGenerationRun,
   getGenerationSource,
   saveBaselineGenerationEvidenceSnapshot,
   saveBaselineGenerationResults,
@@ -33,7 +34,7 @@ import { type DocumentIdentity } from './docx/render-common'
 import { renderResumeDocx } from './docx/resume-renderer'
 import { docxRendererVersion } from './docx/styles'
 import type { GeneratedArtifactType } from './generation/constants'
-import { coverLetterModelId, resumeModelId } from './generation-input'
+import { coverLetterModelId, frozenDraftSnapshotFromRun, resumeModelId } from './generation-input'
 import { stripMarkdownFence } from './resume-experiment'
 
 type ArtifactOutput = {
@@ -208,9 +209,17 @@ async function writeDraftArtifacts(
 const docxMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 export async function generateApplicationDrafts(runId: number): Promise<ArtifactOutput[]> {
-  const source = getGenerationSource(runId)
-  if (!source) throw new Error('Generation source no longer exists.')
-  const snapshot = buildDocumentDraftSnapshot(source)
+  const run = getGenerationRun(runId)
+  if (!run) throw new Error('Generation run no longer exists.')
+  // A queued run drafts from the input frozen at enqueue, so career edits made
+  // while it waited cannot change the document. Legacy snapshots rebuild.
+  const snapshot =
+    frozenDraftSnapshotFromRun(run.frozenInputJson) ??
+    (() => {
+      const source = getGenerationSource(runId)
+      if (!source) throw new Error('Generation source no longer exists.')
+      return buildDocumentDraftSnapshot(source)
+    })()
   saveGenerationEvidenceSnapshot(runId, JSON.stringify(snapshot, null, 2))
 
   const apiKey = process.env.OPENAI_API_KEY
@@ -245,17 +254,19 @@ export async function generateApplicationDrafts(runId: number): Promise<Artifact
   })
 
   const identity = renderIdentity(snapshot)
+  const frozenApplication = snapshot.application
+  if (!frozenApplication) throw new Error('Generation snapshot has no application context.')
   const [resumeDocx, coverLetterDocx] = await Promise.all([
-    renderResumeDocx(resumeDraft, { identity, targetTitle: source.application.jobTitle }),
+    renderResumeDocx(resumeDraft, { identity, targetTitle: frozenApplication.jobTitle }),
     renderCoverLetterDocx(coverLetterDraft, {
       identity,
-      company: source.company.name,
+      company: frozenApplication.company,
       date: todayISO(),
-      targetTitle: source.application.jobTitle,
+      targetTitle: frozenApplication.jobTitle,
     }),
   ])
 
-  const baseName = `${filenamePart(source.company.name)}-${filenamePart(source.application.jobTitle)}`
+  const baseName = `${filenamePart(frozenApplication.company)}-${filenamePart(frozenApplication.jobTitle)}`
   const directory = `run-${runId}`
   return writeDraftArtifacts(directory, [
     {

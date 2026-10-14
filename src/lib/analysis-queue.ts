@@ -11,6 +11,7 @@ import {
   markAnalysisRunProcessing,
   resetStaleProcessingAnalysisRuns,
 } from '../db/analysis'
+import { db } from '../db/client'
 
 type AnalysisQueueJob = { runId: number }
 
@@ -98,22 +99,28 @@ export async function enqueueCandidateAnalysis(
   jobApplicationId: number,
 ): Promise<EnqueueAnalysisResult> {
   const { buildCandidateAnalysisInput } = await import('./candidate-analysis')
-  const built = buildCandidateAnalysisInput(jobApplicationId)
-  if (!built) return { run: null, reused: false, reason: 'missing-analysis' }
-
-  const reusable = findReusableAnalysisRun(jobApplicationId, built.inputHash)
-  if (reusable) return { run: reusable, reused: true }
-
-  const model =
-    process.env.OPENAI_MODEL_CANDIDATE_FIT ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
-  const run = createAnalysisRun({
-    jobPostingAnalysisId: built.snapshot.jobAnalysis.runId,
-    inputHash: built.inputHash,
-    inputSnapshotJson: JSON.stringify(built.snapshot),
-    model,
-    promptVersion: candidateFitPromptVersion,
-    schemaVersion: candidateFitSchemaVersion,
+  // Build and persist the frozen snapshot in one read transaction: the worker
+  // consumes this snapshot, never the career facts as they are when it runs.
+  const outcome = db.transaction(() => {
+    const built = buildCandidateAnalysisInput(jobApplicationId)
+    if (!built) return null
+    const reusable = findReusableAnalysisRun(jobApplicationId, built.inputHash)
+    if (reusable) return { reusable: true as const, run: reusable }
+    const model =
+      process.env.OPENAI_MODEL_CANDIDATE_FIT ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
+    const run = createAnalysisRun({
+      jobPostingAnalysisId: built.snapshot.jobAnalysis.runId,
+      inputHash: built.inputHash,
+      inputSnapshotJson: JSON.stringify(built.snapshot),
+      model,
+      promptVersion: candidateFitPromptVersion,
+      schemaVersion: candidateFitSchemaVersion,
+    })
+    return { reusable: false as const, run }
   })
+  if (!outcome) return { run: null, reused: false, reason: 'missing-analysis' }
+  if (outcome.reusable) return { run: outcome.run, reused: true }
+  const run = outcome.run
 
   const persistentQueue = await getQueue()
   if (!persistentQueue) {

@@ -2,14 +2,25 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { z } from 'zod'
+import { listBaseResumeVersions, selectedApprovedBaseResume } from '../db/career-base-resumes'
+import { listCareerDirections } from '../db/career-directions'
+import { db } from '../db/client'
+import type { CareerBaseResume } from '../db/schema'
+import type { DbExecutor } from '../db/skill-queries'
 import { isISODate, todayISO } from './date'
 
 /**
- * Sole authority for approved Base Resume Markdown. A Base Resume is a private
- * editorial prior; canonical Career Data remains the factual authority. Approved
- * files live at `<career-data>/base-resumes/<direction>.md` with a private
- * `manifest.json` that records the direction, version label, approval date, and
- * normalized-text SHA-256 hash so old documents stay reproducible after edits.
+ * Byte-level authority for Base Resume Markdown hashing, plus the import/export
+ * filesystem helpers. The *runtime* reading path (`loadApprovedBaseResume`,
+ * `listApprovedBaseResumes`) comes from `career_base_resumes`; the filesystem
+ * functions below are import-only and stay exported for the Step 3 importer and
+ * the Step 12 migration tooling.
+ *
+ * A Base Resume is a private editorial prior; canonical Career Data remains the
+ * factual authority. Approved files live at
+ * `<career-data>/base-resumes/<direction>.md` with a private `manifest.json`
+ * that records the direction, version label, approval date, and normalized-text
+ * SHA-256 hash so old documents stay reproducible after edits.
  */
 
 export const baseResumeManifestFileName = 'manifest.json'
@@ -45,8 +56,9 @@ export type BaseResumeManifestEntry = z.infer<typeof baseResumeManifestEntrySche
 export type BaseResumeManifest = z.infer<typeof baseResumeManifestSchema>
 
 /**
- * Resolves the Base Resume directory: an explicit `CAREER_BASE_RESUMES_DIR`, or
- * `<CAREER_DATA_DIR>/base-resumes`, or `./career-data/base-resumes`.
+ * Resolves the import-only Base Resume directory: an explicit
+ * `CAREER_BASE_RESUMES_DIR`, or `<CAREER_DATA_DIR>/base-resumes`, or
+ * `./career-data/base-resumes`. Runtime code never calls this.
  */
 export function baseResumesDirectory(
   env: Record<string, string | undefined> = process.env,
@@ -108,6 +120,7 @@ export function parseBaseResumeManifest(
   return validateBaseResumeManifest(baseResumeManifestSchema.parse(json), knownDirectionIds)
 }
 
+/** Import-only manifest reader. */
 export function loadBaseResumeManifest(
   directory: string,
   knownDirectionIds: ReadonlySet<string> = new Set(),
@@ -122,60 +135,57 @@ export type ApprovedBaseResume = {
   fileName: string
   version: string
   approvedAt: string
-  /** Hash recorded in the manifest at approval time. */
+  /** Hash recorded when the version was approved. */
   approvedSha256: string
   /** Current normalized Markdown text. */
   text: string
   /** Hash of the current normalized text. */
   sha256: string
   empty: boolean
-  /** True when the file no longer matches the approved hash. */
+  /** True when the stored Markdown no longer matches the approved hash. */
   stale: boolean
 }
 
-/**
- * Loads one approved Base Resume. Missing a resume for a direction disables
- * generation for that direction only; it never silently falls back to a blank
- * resume. A present-but-empty file is a hard error rather than an empty source.
- */
-export function loadApprovedBaseResume(
-  directory: string,
-  direction: string,
-  knownDirectionIds: ReadonlySet<string> = new Set(),
-): ApprovedBaseResume | null {
-  const manifest = loadBaseResumeManifest(directory, knownDirectionIds)
-  if (!manifest) return null
-  const entry = manifest.resumes.find((item) => item.direction === direction)
-  if (!entry) return null
-  const path = resolve(directory, entry.fileName)
-  if (!existsSync(path))
-    throw new Error(`Base Resume file "${entry.fileName}" is missing for direction "${direction}".`)
-  const raw = readFileSync(path, 'utf8')
-  const sha256 = baseResumeTextHash(raw)
-  if (isEmptyBaseResume(raw))
-    throw new Error(`Base Resume file "${entry.fileName}" for direction "${direction}" is empty.`)
+function toApprovedBaseResume(row: CareerBaseResume): ApprovedBaseResume {
+  const sha256 = baseResumeTextHash(row.markdown)
   return {
-    direction: entry.direction,
-    fileName: entry.fileName,
-    version: entry.version,
-    approvedAt: entry.approvedAt,
-    approvedSha256: entry.sha256,
-    text: normalizeBaseResumeText(raw),
+    direction: row.directionKey,
+    fileName: `${row.directionKey}.md`,
+    version: row.version,
+    approvedAt: row.approvedAt ?? '',
+    approvedSha256: row.contentHash,
+    text: normalizeBaseResumeText(row.markdown),
     sha256,
-    empty: false,
-    stale: sha256 !== entry.sha256,
+    empty: isEmptyBaseResume(row.markdown),
+    stale: sha256 !== row.contentHash,
   }
 }
 
-export function listApprovedBaseResumes(
-  directory: string,
+/**
+ * Loads the selected approved Base Resume version for a direction from the
+ * database. Missing a resume for a direction disables generation for that
+ * direction only; it never silently falls back to a blank resume.
+ */
+export function loadApprovedBaseResume(
+  direction: string,
   knownDirectionIds: ReadonlySet<string> = new Set(),
+  executor: DbExecutor = db,
+): ApprovedBaseResume | null {
+  if (knownDirectionIds.size > 0 && !knownDirectionIds.has(direction)) return null
+  const row = selectedApprovedBaseResume(executor, direction)
+  return row ? toApprovedBaseResume(row) : null
+}
+
+export function listApprovedBaseResumes(
+  knownDirectionIds: ReadonlySet<string> = new Set(),
+  executor: DbExecutor = db,
 ): ApprovedBaseResume[] {
-  const manifest = loadBaseResumeManifest(directory, knownDirectionIds)
-  if (!manifest) return []
-  return manifest.resumes
-    .map((entry) => loadApprovedBaseResume(directory, entry.direction, knownDirectionIds))
-    .filter((resume): resume is ApprovedBaseResume => resume !== null)
+  return listCareerDirections(executor)
+    .filter((direction) => knownDirectionIds.size === 0 || knownDirectionIds.has(direction.key))
+    .flatMap((direction) => {
+      const versions = listBaseResumeVersions(executor, direction.key, { status: 'approved' })
+      return versions.map(toApprovedBaseResume)
+    })
 }
 
 export type FrozenBaseResumeSource = {
@@ -217,8 +227,8 @@ export function upsertBaseResumeManifestEntry(
 
 /**
  * Approves (imports) one Base Resume as the private Markdown source for a
- * direction. This is the only write path into the Base Resume store; the
- * production app never extracts PDFs. The normalized text is written to
+ * direction. This is the only filesystem write path into the Base Resume store;
+ * the production app never extracts PDFs. The normalized text is written to
  * `<direction>.md` and the manifest entry records its hash and approval date.
  */
 export function approveBaseResume(

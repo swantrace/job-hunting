@@ -106,26 +106,33 @@ export type EnqueueJobAnalysisResult =
 
 /**
  * Persists the frozen input before queueing and returns immediately for
- * polling. A queued or processing run with the same input hash is reused;
- * an explicit rerun after completion creates a new append-only record.
+ * polling. The identity is built and the run row written in one read
+ * transaction, so a concurrent career or catalog write cannot produce a run
+ * whose stored snapshot disagrees with its hash. A queued or processing run
+ * with the same input hash is reused; an explicit rerun after completion
+ * creates a new append-only record.
  */
 export async function enqueueJobAnalysis(jobPostingId: number): Promise<EnqueueJobAnalysisResult> {
-  const built = buildJobAnalysisInput(db, jobPostingId)
-  if (!built) return { run: null, reused: false, reason: 'missing-posting' }
-
-  const reusable = findReusableJobAnalysisRun(db, jobPostingId, built.inputHash)
-  if (reusable) return { run: reusable, reused: true }
-
-  const model =
-    process.env.OPENAI_MODEL_JOB_PARSER ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
-  const run = createJobAnalysisRun(db, {
-    jobPostingId,
-    inputHash: built.inputHash,
-    frozenInputJson: JSON.stringify(built.snapshot),
-    model,
-    promptVersion: jobParserPromptVersion,
-    schemaVersion: jobAnalysisSchemaVersion,
+  const outcome = db.transaction(() => {
+    const built = buildJobAnalysisInput(db, jobPostingId)
+    if (!built) return { kind: 'missing' as const }
+    const reusable = findReusableJobAnalysisRun(db, jobPostingId, built.inputHash)
+    if (reusable) return { kind: 'reused' as const, run: reusable }
+    const model =
+      process.env.OPENAI_MODEL_JOB_PARSER ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
+    const run = createJobAnalysisRun(db, {
+      jobPostingId,
+      inputHash: built.inputHash,
+      frozenInputJson: JSON.stringify(built.snapshot),
+      model,
+      promptVersion: jobParserPromptVersion,
+      schemaVersion: jobAnalysisSchemaVersion,
+    })
+    return { kind: 'created' as const, run }
   })
+  if (outcome.kind === 'missing') return { run: null, reused: false, reason: 'missing-posting' }
+  if (outcome.kind === 'reused') return { run: outcome.run, reused: true }
+  const run = outcome.run
 
   const persistentQueue = await getQueue()
   if (!persistentQueue) {

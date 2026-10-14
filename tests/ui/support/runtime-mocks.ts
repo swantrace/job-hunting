@@ -189,6 +189,7 @@ mock.module('../../../src/lib/application-readiness', () => ({
 }))
 
 export const mockComputeWorkspaceAvailability = mock((): any => ({
+  careerDataReady: true,
   jobAnalysisCurrent: true,
   reviewReady: true,
   hasHistoricalReview: false,

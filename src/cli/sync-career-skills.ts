@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { db } from '../db/client'
-import { loadCareerData } from '../lib/career-data'
+import { readCareerDataDirectory } from '../lib/career-data'
 import { syncCareerSkills } from '../lib/skills/sync-career-skills'
 
 /**
@@ -41,7 +41,7 @@ function main() {
 
   let data
   try {
-    data = loadCareerData()
+    data = readCareerDataDirectory(canonicalCareerDataDir()!)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (ifPresent) {

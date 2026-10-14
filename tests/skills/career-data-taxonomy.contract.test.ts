@@ -1,8 +1,17 @@
 import { describe, expect, test } from 'bun:test'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { type CanonicalCareerData, validateCareerData } from '../../src/lib/career-data'
+import { parseSkillTaxonomy } from '../../src/lib/skills/taxonomy'
 import { loadExampleCareerData } from '../support/career-data'
+
+const exampleTaxonomyKeys = new Set(
+  parseSkillTaxonomy(
+    JSON.parse(
+      readFileSync(resolve(process.cwd(), 'career-data.example/skill-taxonomy.json'), 'utf8'),
+    ),
+  ).categories.map((category) => category.key),
+)
 
 const constantsModule = resolve(process.cwd(), 'src/lib/skills/constants.ts')
 const careerTaxonomyTest = existsSync(constantsModule) ? test : test.todo
@@ -30,7 +39,7 @@ describe('planned career-data skill taxonomy validation', () => {
     expect(skills.length).toBeGreaterThan(0)
     skills[0].category = 'miscellaneous'
 
-    expect(() => validateCareerData(data)).toThrow(/category|miscellaneous/i)
+    expect(() => validateCareerData(data, exampleTaxonomyKeys)).toThrow(/category|miscellaneous/i)
   })
 
   careerTaxonomyTest('rejects normalized aliases shared by two career skills', () => {
@@ -39,7 +48,7 @@ describe('planned career-data skill taxonomy validation', () => {
     skills[0].aliases = ['Node.JS']
     skills[1].aliases = [' node.js ']
 
-    expect(() => validateCareerData(data)).toThrow(
+    expect(() => validateCareerData(data, exampleTaxonomyKeys)).toThrow(
       new RegExp(`${skills[0].id}.*${skills[1].id}|${skills[1].id}.*${skills[0].id}`, 'i'),
     )
   })
@@ -49,6 +58,8 @@ describe('planned career-data skill taxonomy validation', () => {
     expect(skills.length).toBeGreaterThanOrEqual(2)
     skills[0].aliases = [skills[1].id.toUpperCase()]
 
-    expect(() => validateCareerData(data)).toThrow(/alias|collision|duplicate/i)
+    expect(() => validateCareerData(data, exampleTaxonomyKeys)).toThrow(
+      /alias|collision|duplicate/i,
+    )
   })
 })

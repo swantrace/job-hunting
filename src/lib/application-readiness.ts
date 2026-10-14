@@ -1,7 +1,10 @@
 import { hasPendingRunDecisions } from '../db/analysis-decisions'
+import { listCareerDirections } from '../db/career-directions'
+import { readCareerCandidate } from '../db/career-facts'
 import { db } from '../db/client'
 import { getJobAnalysisState } from '../db/job-analysis-runs'
 import { getApplication } from '../db/queries'
+import type { DbExecutor } from '../db/skill-queries'
 import { getCandidateAnalysisState } from './candidate-analysis'
 import { currentJobAnalysisHash } from './job-analysis-input'
 
@@ -22,6 +25,21 @@ export type ApplicationReadinessInput = {
   hasReviewedAnalysis: boolean
   analysisStatus: AnalysisReadinessStatus
   hasPendingSkillDecisions: boolean
+  /** No candidate and no direction exist yet: the user must onboard first. */
+  onboardingRequired?: boolean
+}
+
+/** Actionable guidance for an empty career database. */
+export const careerOnboardingGuidance =
+  'Add your career details or import a career dataset before generating documents.'
+
+/**
+ * True when the database holds no career facts at all (no candidate row and no
+ * direction). Callers render onboarding guidance instead of failing or calling a
+ * model. An empty database is a valid state, never an error.
+ */
+export function careerOnboardingRequired(executor: DbExecutor = db): boolean {
+  return readCareerCandidate(executor) === null && listCareerDirections(executor).length === 0
 }
 
 /**
@@ -32,6 +50,7 @@ export type ApplicationReadinessInput = {
  */
 export function assessApplicationReadiness(input: ApplicationReadinessInput): ApplicationReadiness {
   const reasons: string[] = []
+  if (input.onboardingRequired) reasons.push(careerOnboardingGuidance)
   if (!input.hasReviewedAnalysis) reasons.push('Analyze this application first.')
   else if (
     input.analysisStatus === 'none' ||
@@ -69,5 +88,6 @@ export function getApplicationReadiness(jobId: number): ApplicationReadiness {
     hasReviewedAnalysis,
     analysisStatus,
     hasPendingSkillDecisions: current ? hasPendingRunDecisions(db, current.id) : true,
+    onboardingRequired: careerOnboardingRequired(),
   })
 }

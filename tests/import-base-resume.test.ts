@@ -6,7 +6,6 @@ import { parseOptions } from '../src/cli/import-base-resume'
 import {
   approveBaseResume,
   baseResumeManifestFileName,
-  loadApprovedBaseResume,
   loadBaseResumeManifest,
 } from '../src/lib/base-resumes'
 
@@ -70,10 +69,12 @@ describe('approveBaseResume', () => {
     expect(existsSync(resolve(dir, 'fhir.md'))).toBe(true)
     expect(existsSync(resolve(dir, baseResumeManifestFileName))).toBe(true)
 
-    const reloaded = loadApprovedBaseResume(dir, 'fhir', knownProfiles)
-    expect(reloaded?.version).toBe('v1')
-    expect(reloaded?.stale).toBe(false)
-    expect(reloaded?.sha256).toBe(resume.sha256)
+    // The filesystem store is import-only; read it back through the manifest
+    // instead of the retired file-based runtime reader.
+    const manifestEntry = loadBaseResumeManifest(dir, knownProfiles)?.resumes[0]
+    expect(manifestEntry?.version).toBe('v1')
+    expect(manifestEntry?.sha256).toBe(resume.sha256)
+    expect(readFileSync(resolve(dir, 'fhir.md'), 'utf8')).toContain('Engineer.')
   })
 
   test('upserts an existing manifest entry and sorts by direction', () => {

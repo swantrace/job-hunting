@@ -9,6 +9,7 @@ import {
   loadApprovedBaseResume,
   normalizeBaseResumeText,
 } from '../../src/lib/base-resumes'
+import { createCareerTestDatabase } from '../support/career-db'
 import { migratedDatabase } from '../support/sqlite'
 import { approvedBaseResumeMarkdown, draftBaseResumeMarkdown } from './fixtures'
 
@@ -31,21 +32,18 @@ describe('approved base resume history', () => {
   test('freezes content by value so a later approval cannot rewrite history', () => {
     withTempDirectory((directory) => {
       const knownDirectionIds = new Set(['fullstack'])
-      approveBaseResume(directory, 'fullstack', approvedBaseResumeMarkdown, {
+      const approvedV1 = approveBaseResume(directory, 'fullstack', approvedBaseResumeMarkdown, {
         version: 'v1',
         approvedAt: '2026-10-01',
         knownDirectionIds,
       })
-      const approvedV1 = loadApprovedBaseResume(directory, 'fullstack', knownDirectionIds)
-      expect(approvedV1).not.toBeNull()
-      const frozen = frozenBaseResumeSource(approvedV1!)
+      const frozen = frozenBaseResumeSource(approvedV1)
 
-      approveBaseResume(directory, 'fullstack', draftBaseResumeMarkdown, {
+      const approvedV2 = approveBaseResume(directory, 'fullstack', draftBaseResumeMarkdown, {
         version: 'v2',
         approvedAt: '2026-10-14',
         knownDirectionIds,
       })
-      const approvedV2 = loadApprovedBaseResume(directory, 'fullstack', knownDirectionIds)
 
       expect(frozen.version).toBe('v1')
       expect(frozen.text).toBe(normalizeBaseResumeText(approvedBaseResumeMarkdown))
@@ -53,27 +51,33 @@ describe('approved base resume history', () => {
       expect(frozen).not.toHaveProperty('stale')
       expect(JSON.stringify(frozen)).not.toContain(directory)
 
-      expect(approvedV2!.version).toBe('v2')
-      expect(approvedV2!.text).toBe(normalizeBaseResumeText(draftBaseResumeMarkdown))
-      expect(approvedV2!.sha256).not.toBe(frozen.sha256)
+      expect(approvedV2.version).toBe('v2')
+      expect(approvedV2.text).toBe(normalizeBaseResumeText(draftBaseResumeMarkdown))
+      expect(approvedV2.sha256).not.toBe(frozen.sha256)
     })
   })
 
-  test('reports an approved file whose content no longer matches its digest as stale', () => {
-    withTempDirectory((directory) => {
+  test('reads the approved version from the database and reports a drifted digest as stale', () => {
+    const database = createCareerTestDatabase()
+    try {
       const knownDirectionIds = new Set(['fullstack'])
-      approveBaseResume(directory, 'fullstack', approvedBaseResumeMarkdown, {
-        version: 'v1',
-        approvedAt: '2026-10-01',
-        knownDirectionIds,
-      })
-      writeFileSync(resolve(directory, 'fullstack.md'), `${draftBaseResumeMarkdown}\n`)
+      const approved = loadApprovedBaseResume('fullstack', knownDirectionIds, database.executor)
+      expect(approved?.stale).toBe(false)
+      expect(approved?.approvedSha256).toBe(baseResumeTextHash(approvedBaseResumeMarkdown))
 
-      const reloaded = loadApprovedBaseResume(directory, 'fullstack', knownDirectionIds)
-      expect(reloaded!.stale).toBe(true)
-      expect(reloaded!.sha256).toBe(baseResumeTextHash(draftBaseResumeMarkdown))
-      expect(reloaded!.approvedSha256).toBe(baseResumeTextHash(approvedBaseResumeMarkdown))
-    })
+      // The draft document is only an import source; the stored version is the
+      // authority and its digest mismatch is what marks a document stale.
+      database.sqlite
+        .query("UPDATE career_base_resumes SET markdown = ? WHERE direction_key = 'fullstack'")
+        .run(`${draftBaseResumeMarkdown}\n`)
+
+      const reloaded = loadApprovedBaseResume('fullstack', knownDirectionIds, database.executor)
+      expect(reloaded?.stale).toBe(true)
+      expect(reloaded?.sha256).toBe(baseResumeTextHash(draftBaseResumeMarkdown))
+      expect(reloaded?.approvedSha256).toBe(baseResumeTextHash(approvedBaseResumeMarkdown))
+    } finally {
+      database.cleanup()
+    }
   })
 })
 

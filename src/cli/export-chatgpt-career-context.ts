@@ -1,12 +1,9 @@
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import {
-  baseResumesDirectory,
-  frozenBaseResumeSource,
-  loadApprovedBaseResume,
-} from '../lib/base-resumes'
+import { frozenBaseResumeSource, loadApprovedBaseResume } from '../lib/base-resumes'
 import { careerDataDirectory, loadCareerData } from '../lib/career-data'
 import { buildChatGptCareerContext } from '../lib/chatgpt-career-context'
+import { listDirections } from '../lib/directions'
 
 type Options = {
   directionIds: string[]
@@ -61,9 +58,7 @@ export function parseChatGptContextOptions(
 
 export function exportChatGptCareerContexts(options: Options): string[] {
   const careerData = loadCareerData()
-  const directions = Object.entries(careerData.preferences.directionDefinitions)
-    .map(([id, definition]) => ({ id, ...definition }))
-    .sort((left, right) => left.id.localeCompare(right.id))
+  const directions = listDirections()
   const knownIds = new Set(directions.map((direction) => direction.id))
   const requested = options.directionIds.length
     ? options.directionIds.map((id) => {
@@ -75,7 +70,7 @@ export function exportChatGptCareerContexts(options: Options): string[] {
     : directions
 
   const documents = requested.map((direction) => {
-    const approved = loadApprovedBaseResume(baseResumesDirectory(), direction.id, knownIds)
+    const approved = loadApprovedBaseResume(direction.id, knownIds)
     if (!approved)
       throw new Error(`No approved Base Resume exists for direction "${direction.id}".`)
     if (approved.stale)
