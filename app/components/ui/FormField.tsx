@@ -1,3 +1,4 @@
+export { CheckboxField } from './form-fields/CheckboxField'
 export { FieldError } from './form-fields/FieldError'
 export { FieldHelp } from './form-fields/FieldHelp'
 export { Fieldset } from './form-fields/Fieldset'
@@ -7,6 +8,7 @@ export { InputField } from './form-fields/InputField'
 export { SelectField } from './form-fields/SelectField'
 export { TextareaField } from './form-fields/TextareaField'
 export type {
+  CheckboxFieldProps,
   FieldBaseProps,
   FileFieldProps,
   InputFieldProps,

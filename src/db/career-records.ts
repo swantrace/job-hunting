@@ -69,6 +69,7 @@ import type { DbExecutor } from './skill-queries'
 
 export type ListOptions = { includeRetired?: boolean }
 export type UpdateOptions = { expectedRevision?: number }
+export type CareerMoveDirection = 'up' | 'down'
 export type CareerDatePrecision = 'day' | 'month' | 'year'
 export type CareerProjectEligibility = 'resume-eligible' | 'not-eligible'
 export type CareerPublicationStatus = 'published' | 'in-review' | 'preprint' | 'needs-verification'
@@ -203,6 +204,34 @@ function commitRecordWrite(args: {
 
 function insertLinks<T>(rows: T[], insert: (row: T) => void): void {
   for (const row of rows) insert(row)
+}
+
+type OrderedRecord = { id: number; sortOrder: number; revision: number; retiredAt: string | null }
+
+/**
+ * Resolves the new `sort_order` for one move. The neighbour is chosen from the
+ * same visibility set the editor lists (retired rows only step among retired
+ * rows), and the moved row lands strictly before or after it, so ties — every
+ * new record defaults to 0 — resolve without rewriting the whole table.
+ */
+function nextSortOrder(
+  rows: OrderedRecord[],
+  id: number,
+  direction: CareerMoveDirection,
+): { sortOrder: number; current: OrderedRecord } | null {
+  const ordered = [...rows].sort(
+    (left, right) => left.sortOrder - right.sortOrder || left.id - right.id,
+  )
+  const current = ordered.find((row) => row.id === id)
+  if (!current) return null
+  const visible = ordered.filter((row) => (row.retiredAt === null) === (current.retiredAt === null))
+  const index = visible.findIndex((row) => row.id === id)
+  const neighbour = visible[direction === 'up' ? index - 1 : index + 1]
+  if (!neighbour) return { sortOrder: current.sortOrder, current }
+  return {
+    sortOrder: direction === 'up' ? neighbour.sortOrder - 1 : neighbour.sortOrder + 1,
+    current,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -382,6 +411,34 @@ export function retireCareerEducation(executor: CareerDb, id: number): CareerWri
 
 export function restoreCareerEducation(executor: CareerDb, id: number): CareerWriteResult {
   return setEducationRetired(executor, id, false)
+}
+
+/** Moves one education record one position up or down the editorial order. */
+export function moveCareerEducation(
+  executor: CareerDb,
+  id: number,
+  direction: CareerMoveDirection,
+): CareerWriteResult {
+  return executor.transaction((tx) => {
+    const existing = requireEducation(tx, id)
+    const move = nextSortOrder(tx.select().from(careerEducation).all(), id, direction)
+    if (!move || move.sortOrder === existing.sortOrder) {
+      return { id, changed: false, revision: existing.revision }
+    }
+    const current = educationContent(educationToRecord(existing))
+    const result = commitRecordWrite({
+      tx,
+      current: existing,
+      currentContent: current,
+      nextContent: { ...current, sortOrder: move.sortOrder },
+    })
+    if (!result.changed) return { id, ...result }
+    tx.update(careerEducation)
+      .set({ sortOrder: move.sortOrder, revision: result.revision, updatedAt: nowISO() })
+      .where(eq(careerEducation.id, id))
+      .run()
+    return { id, ...result }
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -570,6 +627,34 @@ export function retireCareerExperience(executor: CareerDb, id: number): CareerWr
 
 export function restoreCareerExperience(executor: CareerDb, id: number): CareerWriteResult {
   return setExperienceRetired(executor, id, false)
+}
+
+/** Moves one experience one position up or down the editorial order. */
+export function moveCareerExperience(
+  executor: CareerDb,
+  id: number,
+  direction: CareerMoveDirection,
+): CareerWriteResult {
+  return executor.transaction((tx) => {
+    const existing = requireExperienceRecord(tx, id)
+    const move = nextSortOrder(tx.select().from(careerExperiences).all(), id, direction)
+    if (!move || move.sortOrder === existing.sortOrder) {
+      return { id, changed: false, revision: existing.revision }
+    }
+    const current = experienceContent(experienceToRecord(existing))
+    const result = commitRecordWrite({
+      tx,
+      current: existing,
+      currentContent: current,
+      nextContent: { ...current, sortOrder: move.sortOrder },
+    })
+    if (!result.changed) return { id, ...result }
+    tx.update(careerExperiences)
+      .set({ sortOrder: move.sortOrder, revision: result.revision, updatedAt: nowISO() })
+      .where(eq(careerExperiences.id, id))
+      .run()
+    return { id, ...result }
+  })
 }
 
 // ---------------------------------------------------------------------------

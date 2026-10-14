@@ -4,6 +4,7 @@ import type { JobCardData } from '../../../src/db/queries'
 import * as realSkillQueries from '../../../src/db/skill-queries'
 import * as realApplicationReadiness from '../../../src/lib/application-readiness'
 import * as realCareerData from '../../../src/lib/career-data'
+import * as realRequest from '../../../src/lib/request'
 import * as realValidation from '../../../src/lib/validation'
 
 export const mockStatusSafeParse = mock(() => ({
@@ -279,6 +280,9 @@ mock.module('../../../src/lib/directions', () => ({
 }))
 
 mock.module('../../../src/lib/request', () => ({
+  // Spread the real module so the mock can never hide a real export from a
+  // route that is imported after this file; only the parsers are overridden.
+  ...realRequest,
   parseFilters: () => ({
     attributes: '',
     priority: '',

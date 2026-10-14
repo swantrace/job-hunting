@@ -138,3 +138,13 @@ export function parseJsonColumn<T>(
 export function serializeJsonColumn(value: unknown): string {
   return JSON.stringify(value) ?? 'null'
 }
+
+/**
+ * Narrows a stored value to an object of preserved extension fields. Anything
+ * else (null, a scalar, an array) has no editable key/value rows.
+ */
+export function extensionObjectOrNull(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
+}

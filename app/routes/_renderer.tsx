@@ -15,6 +15,7 @@ export default jsxRenderer(({ children }) => (
           __html: `htmx.config.allowNestedOobSwaps = false;
 htmx.config.responseHandling = [
   { code: '204', swap: false },
+  { code: '409', swap: true },
   { code: '422', swap: true },
   { code: '[23]..', swap: true },
   { code: '[45]..', swap: false, error: true },
