@@ -2,6 +2,7 @@ import { mock } from 'bun:test'
 import { z } from 'zod'
 import type { JobCardData } from '../../../src/db/queries'
 import * as realSkillQueries from '../../../src/db/skill-queries'
+import * as realApplicationReadiness from '../../../src/lib/application-readiness'
 import * as realCareerData from '../../../src/lib/career-data'
 import * as realValidation from '../../../src/lib/validation'
 
@@ -162,17 +163,54 @@ const defaultReviewState = {
   reasons: [],
 }
 
+/** Empty requirement-term mapping data; tests override it per case. */
+export function mappingFixture(overrides: Record<string, any> = {}) {
+  return {
+    jobPostingAnalysisId: 1,
+    mentions: [],
+    groups: [],
+    pendingCount: 0,
+    ...overrides,
+  }
+}
+
 export function reviewDataFixture(overrides: Record<string, any> = {}) {
   const { state, ...rest } = overrides
   return {
     job: mockJob,
     jobAnalysis: null,
     jobAnalysisCurrent: false,
+    mapping: mappingFixture(),
     run: null,
     state: { ...defaultReviewState, ...(state ?? {}) },
     requirements: [],
     requirementSkills: [],
     ...rest,
+  }
+}
+
+/**
+ * One pending requirement-owned mention, shaped exactly like the Step 2
+ * projection (`mention.id` is the mention id).
+ */
+export function mentionRowFixture(overrides: Record<string, any> = {}) {
+  return {
+    id: 41,
+    jobRequirementId: 3,
+    rawTerm: 'Kubernetes',
+    normalizedTerm: 'kubernetes',
+    mappingState: 'pending',
+    resolvedSkillId: null,
+    occurrences: [
+      { source: 'job-analysis', provenance: 'job-parser', context: null, confidence: null },
+    ],
+    revision: 1,
+    createdAt: '2026-10-14',
+    updatedAt: '2026-10-14',
+    requirementSequence: 1,
+    requirementStatement: 'Operate Kubernetes clusters.',
+    importance: 'required',
+    ...overrides,
   }
 }
 
@@ -185,6 +223,7 @@ mock.module('../../../src/db/review-data', () => ({
 export const mockGetApplicationReadiness = mock((): any => ({ ready: true, reasons: [] }))
 
 mock.module('../../../src/lib/application-readiness', () => ({
+  ...realApplicationReadiness,
   getApplicationReadiness: mockGetApplicationReadiness,
 }))
 

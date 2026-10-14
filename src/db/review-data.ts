@@ -4,13 +4,14 @@ import { db } from './client'
 import { listJobRequirements } from './job-analysis'
 import { getJobAnalysisState } from './job-analysis-runs'
 import { getApplication } from './queries'
+import { type AnalysisMappingData, loadAnalysisMapping } from './skill-mapping-service'
 import { listRunSkillReviews } from './skill-queries'
 
 /**
  * Single loader for the review workspace. Returns the full candidate-analysis
- * state, normalized job requirements from the current Job Analysis run, and
- * run-scoped skill reviews so the ReviewPanel and the analysis-runs fragment
- * route render the same data.
+ * state, normalized job requirements from the current Job Analysis run,
+ * run-scoped skill reviews, and the requirement-term mapping data so the
+ * ReviewPanel and the mapping route render the same rows.
  */
 export function loadReviewData(jobId: number) {
   const job = getApplication(jobId)
@@ -22,6 +23,7 @@ export function loadReviewData(jobId: number) {
   const requirements = jobAnalysis ? listJobRequirements(jobAnalysis.id) : []
   const reviewRunId = state.currentCompleted?.id ?? state.latestCompleted?.id ?? null
   const requirementSkills = reviewRunId ? listRunSkillReviews(reviewRunId) : []
+  const mapping: AnalysisMappingData = loadAnalysisMapping(db, jobAnalysis?.id ?? null)
   return {
     job,
     jobAnalysis,
@@ -30,5 +32,6 @@ export function loadReviewData(jobId: number) {
     state,
     requirements,
     requirementSkills,
+    mapping,
   }
 }

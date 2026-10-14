@@ -73,7 +73,8 @@ const importanceRank: Record<SkillImportance, number> = {
   mentioned: 1,
 }
 
-function mentionToRecord(row: JobRequirementSkillMention): MentionRecord {
+/** Decodes one stored mention row's JSON occurrences for service callers. */
+export function mentionToRecord(row: JobRequirementSkillMention): MentionRecord {
   return {
     ...row,
     occurrences: parseJsonColumn(

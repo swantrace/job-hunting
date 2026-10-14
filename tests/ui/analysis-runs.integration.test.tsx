@@ -104,6 +104,10 @@ describe('candidate analysis run HTMX boundaries', () => {
     expect(recordsFor(html, 'skill-review-panel')).toEqual([
       expect.objectContaining({ id: 'skill-review-panel', oob: 'outerHTML' }),
     ])
+    // The composed review fragment keeps the mapping root and the canonical
+    // gap panel together, so a poll can never leave the two halves disagreeing.
+    expect(recordsFor(html, 'skill-mapping-panel')).toHaveLength(1)
+    expect(recordsFor(html, 'create-skill-form')).toHaveLength(1)
     expect(recordsFor(html, 'requirement-readiness')).toEqual([
       expect.objectContaining({ id: 'requirement-readiness', oob: 'outerHTML' }),
     ])
