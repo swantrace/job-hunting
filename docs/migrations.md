@@ -271,12 +271,16 @@ with local data, and do not import a local dataset into production.
    bun -e '
      import { Database } from "bun:sqlite";
      const db = new Database("/data/jobs.db", { readonly: true });
+     console.log("integrity", db.query("PRAGMA integrity_check").get());
      console.log("fk violations", db.query("PRAGMA foreign_key_check").all());
-     for (const t of ["career_candidate", "career_experiences", "career_skills", "career_base_resumes"])
+     for (const t of ["career_profile", "career_experiences", "career_skills", "career_base_resumes", "career_record_directions"])
        console.log(t, db.query(`SELECT COUNT(*) AS n FROM ${t}`).get().n);
      db.close();
    '
    ```
+
+   The operational tables recorded in step 2 are expected to be empty by now; see
+   "Cutting over to the database-owned career schema" above.
 
    Then open the app and confirm: Career Data loads, an approved Base Resume is
    selected per direction, Review resolves requirements, and an existing
@@ -299,6 +303,39 @@ with local data, and do not import a local dataset into production.
    not deploy again until the checks above pass. If something is wrong, fix
    forward with a new migration or restore the snapshot during a maintenance
    window (see Recovery).
+
+## Cutting over to the database-owned career schema (0026-0029)
+
+This migration set is more than an additive schema change: `0027` deliberately
+discards the job-search operational history, so it has to be backed up and
+accepted on purpose.
+
+| Migration | Effect |
+| --- | --- |
+| `0026_career_facts` | Adds the relational career, catalog and mention tables (initially empty). |
+| `0027_simplify_schema` | Clears the operational tables (applications, postings, analyses, requirements, mappings, mentions, runs, artifacts, reviews, intake, follow-ups, interviews), folds the baseline pipeline and the 1:1 result/snapshot tables into `generation_runs` (`kind`), merges the two career singletons into `career_profile`, merges five direction junctions into `career_record_directions`, replaces `job_requirements_to_skills` with a view, and drops 12 unusable indexes and two dead columns. |
+| `0028_drop_portfolio` | Drops `career_portfolio_topics` and `career_portfolio_topic_projects`. |
+| `0029_collapse_career_state` | Drops `career_state`: authored fields without a column move to each row's `extension_json`, document-level values to `career_profile.documents_json`, and the stored version counter becomes a value computed from the data. |
+
+Result: **36 application tables plus the `job_requirements_to_skills` view**.
+
+Plan for these consequences:
+
+- **The operational history is gone after `0027`.** Record the pre-migration counts
+  first (step 2 below) so the backup is meaningful, then expect those tables to be
+  empty. Empty is the designed outcome, not a failed import.
+- **`start` migrates on boot**, so deploying the image applies the whole set. Code
+  and schema ship together: the previous image cannot run against the new schema,
+  and the new image cannot start against the old one. **A rollback therefore means
+  restoring the database snapshot *and* redeploying the previous image together**;
+  an image rollback on its own will not work.
+- **Career facts are not part of the migration.** Production career tables are
+  empty after `0026`; the owner's facts arrive through the import in the runbook
+  below.
+- **Never shorten this by uploading a local `jobs.db`.** Beyond being forbidden,
+  `google_drive_connections.refresh_token_encrypted` is sealed with a key derived
+  from `GOOGLE_OAUTH_STATE_SECRET`; a token encrypted with a different secret
+  cannot be decrypted, which silently breaks Drive uploads.
 
 ## Production deployment checklist
 
@@ -323,15 +360,20 @@ Verify more than whether the home page loads:
 1. Check Fly logs for migration, constraint, or missing-table errors.
 2. Open Applications, Skills, Companies, Contacts, Career Data and Career
    Documents.
-3. Open an existing application and confirm its Job Post, Review, Documents,
-   Contacts, and Activities data still resolve.
-4. Confirm expected counts for applications, companies, contacts, postings,
-   analysis runs, generation runs, artifacts, and the career tables.
-5. Run `PRAGMA foreign_key_check` against the production database or a new
-   post-deployment snapshot.
-6. Confirm Google Drive connection verification and user-confirmed pending
+3. After `0027` there is no existing application to open: the operational history
+   is discarded on purpose. Confirm instead that Applications, Skills, Companies,
+   Contacts, Career Data and Career Documents all load, that career facts render,
+   and that an empty workspace shows onboarding guidance rather than an error.
+4. Confirm the career tables carry the imported facts, and confirm that the
+   operational tables recorded before the cutover are empty by design (the
+   `0027` migration discards them).
+5. Confirm the schema shape: 36 application tables plus the
+   `job_requirements_to_skills` view, and no `career_state` table.
+6. Run `PRAGMA integrity_check` and `PRAGMA foreign_key_check` against the
+   production database or a new post-deployment snapshot.
+7. Confirm Google Drive connection verification and user-confirmed pending
    uploads still behave correctly.
-7. Restart once and confirm the migration step is idempotent and the boot health
+8. Restart once and confirm the migration step is idempotent and the boot health
    check passes without any career-data directory.
 
 ## Recovery
@@ -380,3 +422,5 @@ unless the backup predates the import. Never overwrite production with a local
 - Do not edit an already-applied migration; add a new corrective migration.
 - Do not deploy a destructive migration without testing it against a recent
   production snapshot, and keep deployment manual.
+- Do not roll back the image without restoring the matching database snapshot:
+  from `0027` onward the two are inseparable.
