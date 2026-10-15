@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
-import { baseResumeTextHash } from '../../src/lib/base-resumes'
 import { canonicalHash } from '../../src/lib/canonical-hash'
-import { careerImportDocumentFiles } from '../../src/lib/career-import'
+import { baseResumeTextHash } from '../../src/lib/career/base-resumes'
+import { careerImportDocumentFiles } from '../../src/lib/career/import'
 import { loadCareerDataFrom } from '../support/career-data'
 import {
   approvedBaseResumeManifest,

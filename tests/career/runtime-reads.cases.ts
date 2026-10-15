@@ -23,9 +23,9 @@ import {
   careerEvidenceIds,
   loadCareerData,
   loadCareerDataFromDatabase,
-} from '../../src/lib/career-data'
+} from '../../src/lib/career/canonical-data'
+import { listDirections } from '../../src/lib/career/directions'
 import { nowISO, todayISO } from '../../src/lib/date'
-import { listDirections } from '../../src/lib/directions'
 import { generateApplicationDrafts } from '../../src/lib/document-draft-generation'
 import {
   buildGenerationInput,

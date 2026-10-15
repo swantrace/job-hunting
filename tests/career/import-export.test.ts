@@ -8,14 +8,14 @@ import { selectedApprovedBaseResume } from '../../src/db/career-base-resumes'
 import { createCareerDirection } from '../../src/db/career-directions'
 import { careerContentProbe, stableFingerprint } from '../../src/db/career-shared'
 import * as schema from '../../src/db/schema'
-import { baseResumeTextHash } from '../../src/lib/base-resumes'
-import { buildCareerDataset, serializeCareerDataset } from '../../src/lib/career-export'
+import { baseResumeTextHash } from '../../src/lib/career/base-resumes'
+import { buildCareerDataset, serializeCareerDataset } from '../../src/lib/career/export'
 import {
   applyCareerImport,
   CareerImportConflictError,
   CareerImportStaleError,
   prepareCareerImport,
-} from '../../src/lib/career-import'
+} from '../../src/lib/career/import'
 import { migratedDatabase } from '../support/sqlite'
 import {
   approvedBaseResumeManifest,

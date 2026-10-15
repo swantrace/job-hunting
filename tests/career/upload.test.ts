@@ -4,7 +4,7 @@ import {
   baseResumeDirectoryName,
   baseResumeManifestFileName,
   baseResumeTextHash,
-} from '../../src/lib/base-resumes'
+} from '../../src/lib/career/base-resumes'
 import { careerDatasetFormat } from '../../src/lib/career/dataset'
 import { decodeCareerUpload } from '../../src/lib/career/upload'
 import {

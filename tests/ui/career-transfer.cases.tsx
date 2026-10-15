@@ -7,7 +7,7 @@ import PizZip from 'pizzip'
 import { db, sqlite } from '../../src/db/client'
 import { careerExperiences, skillAliases, skillCategories, skills } from '../../src/db/schema'
 import { careerDatasetFormat } from '../../src/lib/career/dataset'
-import { applyCareerImport, prepareCareerImport } from '../../src/lib/career-import'
+import { applyCareerImport, prepareCareerImport } from '../../src/lib/career/import'
 import {
   approvedBaseResumeManifest,
   approvedBaseResumeMarkdown,

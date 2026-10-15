@@ -11,8 +11,8 @@ import {
   readCareerDirection,
   updateCareerDirection,
 } from '../../src/db/career-directions'
-import { baseResumeTextHash } from '../../src/lib/base-resumes'
 import { canonicalHash } from '../../src/lib/canonical-hash'
+import { baseResumeTextHash } from '../../src/lib/career/base-resumes'
 import {
   directionFormSchema,
   directionFormValues,

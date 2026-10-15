@@ -6,7 +6,7 @@ import {
 } from '../../src/db/career-base-resumes'
 import { createCareerDirection, listCareerDirections } from '../../src/db/career-directions'
 import { db, sqlite } from '../../src/db/client'
-import { baseResumeTextHash } from '../../src/lib/base-resumes'
+import { baseResumeTextHash } from '../../src/lib/career/base-resumes'
 import { recordsFor } from './support/html-contract'
 
 /**

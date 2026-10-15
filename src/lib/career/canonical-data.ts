@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { listCareerDirections } from '../db/career-directions'
-import { readCareerCandidate, readCareerPreferences } from '../db/career-facts'
+import { listCareerDirections } from '../../db/career-directions'
+import { readCareerCandidate, readCareerPreferences } from '../../db/career-facts'
 import {
   listCareerAchievements,
   listCareerEducation,
@@ -11,16 +11,16 @@ import {
   listCareerProjects,
   listCareerPublications,
   listCareerStories,
-} from '../db/career-records'
-import { careerContentProbe, readCareerContentProbe } from '../db/career-shared'
-import { listCareerSkills } from '../db/career-skills'
-import { db } from '../db/client'
-import { careerProfile, skillAliases, skills } from '../db/schema'
-import type { DbExecutor } from '../db/skill-queries'
-import { extensionSchema, parseJsonColumn } from './career/json-schemas'
-import { isISODate } from './date'
-import { normalizeSkillAlias } from './skills/normalize'
-import { parseSkillTaxonomy, skillCategoryKeys } from './skills/taxonomy'
+} from '../../db/career-records'
+import { careerContentProbe, readCareerContentProbe } from '../../db/career-shared'
+import { listCareerSkills } from '../../db/career-skills'
+import { db } from '../../db/client'
+import { careerProfile, skillAliases, skills } from '../../db/schema'
+import type { DbExecutor } from '../../db/skill-queries'
+import { isISODate } from '../date'
+import { normalizeSkillAlias } from '../skills/normalize'
+import { parseSkillTaxonomy, skillCategoryKeys } from '../skills/taxonomy'
+import { extensionSchema, parseJsonColumn } from './json-schemas'
 
 const idSchema = z
   .string()

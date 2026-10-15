@@ -1,15 +1,19 @@
 import { listCareerDirections, readCareerDirection } from '../db/career-directions'
 import { db } from '../db/client'
 import type { DbExecutor } from '../db/skill-queries'
+import { canonicalHash } from './canonical-hash'
 import {
   type FrozenBaseResumeSource,
   frozenBaseResumeSource,
   loadApprovedBaseResume,
-} from './base-resumes'
-import { canonicalHash } from './canonical-hash'
-import { type CanonicalCareerData, documentSafeCareerData, loadCareerData } from './career-data'
+} from './career/base-resumes'
+import {
+  type CanonicalCareerData,
+  documentSafeCareerData,
+  loadCareerData,
+} from './career/canonical-data'
+import { directionTargetTitles } from './career/directions'
 import { todayISO } from './date'
-import { directionTargetTitles } from './directions'
 import { type DocumentDraftPolicy, effectiveDocumentDraftPolicy } from './document-draft-policy'
 import {
   generationEligibleRequirements,

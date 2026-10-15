@@ -11,7 +11,7 @@ import {
   loadBaseResumeManifest,
   normalizeBaseResumeText,
   parseBaseResumeManifest,
-} from '../src/lib/base-resumes'
+} from '../src/lib/career/base-resumes'
 import { approvedBaseResumeMarkdown } from './career/fixtures'
 import { createCareerTestDatabase } from './support/career-db'
 

@@ -1,7 +1,7 @@
 import { createRoute } from 'honox/factory'
 import { listCareerGrowthRows } from '../../../src/db/career-growth'
-import { rankCareerGrowthOpportunities } from '../../../src/lib/career-growth'
-import { listDirections } from '../../../src/lib/directions'
+import { listDirections } from '../../../src/lib/career/directions'
+import { rankCareerGrowthOpportunities } from '../../../src/lib/career/growth'
 import { skillCategoryDefinitions } from '../../../src/lib/skills/taxonomy'
 import { CareerGrowthList } from '../../components/CareerGrowth'
 

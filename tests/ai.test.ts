@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
+import { parsedJobSchema } from '../src/ai/client'
 import { jobParserPromptVersion, jobParserSystemPrompt } from '../src/ai/prompts/job-parser'
 import { requirementTermSchema } from '../src/ai/schemas/job-analysis'
 import { jobParserResponseSchema } from '../src/ai/schemas/job-parser'
-import { parsedJobSchema } from '../src/lib/ai'
 
 describe('AI job parser output', () => {
   test('accepts a complete structured result with requirement-owned skills', () => {

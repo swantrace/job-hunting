@@ -1,6 +1,6 @@
 import { type Filters, type JobCardData, listManagementData } from '../../../src/db/queries'
 import { priorities } from '../../../src/lib/applications/constants'
-import { listDirections } from '../../../src/lib/directions'
+import { listDirections } from '../../../src/lib/career/directions'
 import type { FieldErrors } from '../../../src/lib/validation'
 import { InputField, SelectField, TextareaField } from '../ui/FormField'
 import { err, query } from './helpers'

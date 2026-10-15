@@ -2,12 +2,12 @@ import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { z } from 'zod'
-import { listBaseResumeVersions, selectedApprovedBaseResume } from '../db/career-base-resumes'
-import { listCareerDirections } from '../db/career-directions'
-import { db } from '../db/client'
-import type { CareerBaseResume } from '../db/schema'
-import type { DbExecutor } from '../db/skill-queries'
-import { isISODate, todayISO } from './date'
+import { listBaseResumeVersions, selectedApprovedBaseResume } from '../../db/career-base-resumes'
+import { listCareerDirections } from '../../db/career-directions'
+import { db } from '../../db/client'
+import type { CareerBaseResume } from '../../db/schema'
+import type { DbExecutor } from '../../db/skill-queries'
+import { isISODate, todayISO } from '../date'
 
 /**
  * Byte-level authority for Base Resume Markdown hashing, plus the import/export

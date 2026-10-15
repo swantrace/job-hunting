@@ -7,7 +7,7 @@ import { loadCareerDataView } from '../../src/db/career-data-view'
 import { assertDatabaseReady } from '../../src/db/health'
 import * as schema from '../../src/db/schema'
 import { careerOnboardingRequired } from '../../src/lib/application-readiness'
-import { loadCareerData } from '../../src/lib/career-data'
+import { loadCareerData } from '../../src/lib/career/canonical-data'
 import { migratedDatabase } from '../support/sqlite'
 
 /**

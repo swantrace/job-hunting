@@ -2,16 +2,16 @@ import { listBaseResumeVersions } from '../../db/career-base-resumes'
 import { listCareerDirections } from '../../db/career-directions'
 import { readCareerContentProbe } from '../../db/career-shared'
 import type { DbExecutor } from '../../db/skill-queries'
+import { canonicalHash } from '../canonical-hash'
+import { safeCareerData } from '../document-draft-input'
+import { effectiveDocumentDraftPolicy } from '../document-draft-policy'
 import {
   type ApprovedBaseResume,
   type FrozenBaseResumeSource,
   frozenBaseResumeSource,
   toApprovedBaseResume,
-} from '../base-resumes'
-import { canonicalHash } from '../canonical-hash'
-import { documentEligibleProjects, loadCareerData } from '../career-data'
-import { safeCareerData } from '../document-draft-input'
-import { effectiveDocumentDraftPolicy } from '../document-draft-policy'
+} from './base-resumes'
+import { documentEligibleProjects, loadCareerData } from './canonical-data'
 import { careerDatasetExcluded, careerDatasetFormat, careerDatasetSchemaVersion } from './dataset'
 
 /**

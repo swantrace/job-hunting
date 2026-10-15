@@ -1,4 +1,4 @@
-import type { CareerGrowthLabel, CareerGrowthOpportunity } from '../../src/lib/career-growth'
+import type { CareerGrowthLabel, CareerGrowthOpportunity } from '../../src/lib/career/growth'
 
 const labelClass: Record<CareerGrowthLabel, string> = {
   'Verify existing evidence': 'badge-warning',

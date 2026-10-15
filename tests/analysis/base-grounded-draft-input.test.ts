@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { baseResumeTextHash } from '../../src/lib/base-resumes'
+import { baseResumeTextHash } from '../../src/lib/career/base-resumes'
 import {
   baseResumeIdentity,
   baseResumeSourceFor,

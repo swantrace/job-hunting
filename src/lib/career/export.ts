@@ -1,8 +1,8 @@
 import { asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
-import { listBaseResumeVersions } from '../db/career-base-resumes'
-import { listCareerDirections } from '../db/career-directions'
-import { readCareerCandidate, readCareerPreferences } from '../db/career-facts'
+import { listBaseResumeVersions } from '../../db/career-base-resumes'
+import { listCareerDirections } from '../../db/career-directions'
+import { readCareerCandidate, readCareerPreferences } from '../../db/career-facts'
 import {
   listCareerAchievements,
   listCareerEducation,
@@ -10,10 +10,11 @@ import {
   listCareerProjects,
   listCareerPublications,
   listCareerStories,
-} from '../db/career-records'
-import { listCareerSkills } from '../db/career-skills'
-import { careerProfile, skillAliases, skillCategories, skills } from '../db/schema'
-import type { DbExecutor } from '../db/skill-queries'
+} from '../../db/career-records'
+import { listCareerSkills } from '../../db/career-skills'
+import { careerProfile, skillAliases, skillCategories, skills } from '../../db/schema'
+import type { DbExecutor } from '../../db/skill-queries'
+import { nowISO } from '../date'
 import {
   type CareerDataset,
   type CareerDatasetBaseResume,
@@ -21,9 +22,8 @@ import {
   careerDatasetExcluded,
   careerDatasetFormat,
   careerDatasetSchemaVersion,
-} from './career/dataset'
-import { extensionSchema, parseJsonColumn } from './career/json-schemas'
-import { nowISO } from './date'
+} from './dataset'
+import { extensionSchema, parseJsonColumn } from './json-schemas'
 
 /**
  * Builds the portable, versioned `career-dataset` from SQLite.

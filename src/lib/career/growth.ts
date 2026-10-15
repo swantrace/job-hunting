@@ -5,7 +5,7 @@
  * gate that excludes Archived and Rejected work.
  */
 
-import { activeStatuses, type JobStatus } from './applications/constants'
+import { activeStatuses, type JobStatus } from '../applications/constants'
 
 export const careerGrowthLabels = [
   'Verify existing evidence',

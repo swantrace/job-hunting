@@ -5,7 +5,7 @@ import { isAbsolute, relative, resolve } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import * as schema from '../../src/db/schema'
-import { applyCareerImport, prepareCareerImport } from '../../src/lib/career-import'
+import { applyCareerImport, prepareCareerImport } from '../../src/lib/career/import'
 import {
   approvedBaseResumeManifest,
   approvedBaseResumeMarkdown,

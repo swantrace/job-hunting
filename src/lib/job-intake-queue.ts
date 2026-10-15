@@ -9,7 +9,7 @@ import {
   markJobIntakeItemReady,
 } from '../db/job-intake'
 import { validateIntakeUrl } from './batch-intake'
-import { listDirections } from './directions'
+import { listDirections } from './career/directions'
 import { fetchJobPostingText } from './job-intake-fetch'
 
 function companyNameFor(item: { kind: string; normalizedUrl: string | null }): string {

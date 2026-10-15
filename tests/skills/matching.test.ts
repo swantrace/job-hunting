@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { CanonicalCareerData } from '../../src/lib/career-data'
+import type { CanonicalCareerData } from '../../src/lib/career/canonical-data'
 import { determineMatchResult, hasUsableEvidence } from '../../src/lib/skills/match-career-skills'
 
 const data = {

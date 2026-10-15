@@ -1,19 +1,19 @@
+import { listDirections } from '../lib/career/directions'
 import {
   type CatalogPromptEntry,
   jobAnalysisCatalogBlock,
   jobAnalysisPromptVersion,
   jobAnalysisSystemPrompt,
-} from '../ai/prompts/job-analysis'
-import { jobParserPromptVersion, jobParserSystemPrompt } from '../ai/prompts/job-parser'
-import type { JobAnalysis } from '../ai/schemas/job-analysis'
+} from './prompts/job-analysis'
+import { jobParserPromptVersion, jobParserSystemPrompt } from './prompts/job-parser'
+import type { JobAnalysis } from './schemas/job-analysis'
 import {
   jobAnalysisCombinedResponseSchema,
   type ParsedJob,
   type ParsedJobWithAnalysis,
   parsedJobSchema,
   parsedJobWithAnalysisSchema,
-} from '../ai/schemas/job-parser'
-import { listDirections } from './directions'
+} from './schemas/job-parser'
 
 export { type JobAnalysis, type ParsedJob, type ParsedJobWithAnalysis, parsedJobSchema }
 export type ParsedJobResult = ParsedJobWithAnalysis & {

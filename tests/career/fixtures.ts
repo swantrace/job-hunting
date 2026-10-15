@@ -2,7 +2,7 @@ import type { Database } from 'bun:sqlite'
 import { createHash } from 'node:crypto'
 import { mkdirSync, utimesSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { baseResumeTextHash } from '../../src/lib/base-resumes'
+import { baseResumeTextHash } from '../../src/lib/career/base-resumes'
 
 /**
  * Synthetic career fixtures for the database-owned career and curated skill

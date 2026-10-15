@@ -15,6 +15,7 @@ import {
 } from '../../src/db/career-records'
 import { careerContentProbe } from '../../src/db/career-shared'
 import * as schema from '../../src/db/schema'
+import { loadCareerDataFromDatabase } from '../../src/lib/career/canonical-data'
 import { storedRecordExtensions, writeRecordExtensions } from '../../src/lib/career/extensions'
 import {
   candidateFormSchema,
@@ -27,7 +28,6 @@ import {
   resolveFieldValue,
 } from '../../src/lib/career/form-input'
 import { truthfulnessView } from '../../src/lib/career/json-schemas'
-import { loadCareerDataFromDatabase } from '../../src/lib/career-data'
 import { migratedDatabase } from '../support/sqlite'
 
 /**

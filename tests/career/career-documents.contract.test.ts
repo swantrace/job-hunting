@@ -8,7 +8,7 @@ import {
   frozenBaseResumeSource,
   loadApprovedBaseResume,
   normalizeBaseResumeText,
-} from '../../src/lib/base-resumes'
+} from '../../src/lib/career/base-resumes'
 import { createCareerTestDatabase } from '../support/career-db'
 import { migratedDatabase } from '../support/sqlite'
 import { approvedBaseResumeMarkdown, draftBaseResumeMarkdown } from './fixtures'

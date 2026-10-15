@@ -1,10 +1,10 @@
 import { createRoute } from 'honox/factory'
-import { db } from '../../../src/db/client'
 import {
   OpenAIRequestError,
   OpenAIRequestTimeoutError,
   parseJobDescription,
-} from '../../../src/lib/ai'
+} from '../../../src/ai/client'
+import { db } from '../../../src/db/client'
 import { parseFilters } from '../../../src/lib/request'
 import { buildCatalogContext } from '../../../src/lib/skills/catalog-context'
 import { AiParser } from '../../components/AiParser'

@@ -10,8 +10,8 @@ import {
   priorities,
   statuses,
 } from '../../src/lib/applications/constants'
+import { listDirections } from '../../src/lib/career/directions'
 import { formatDisplayDate, todayISO } from '../../src/lib/date'
-import { listDirections } from '../../src/lib/directions'
 import {
   type ApplicationAttribute,
   applicationAttributeLabels,

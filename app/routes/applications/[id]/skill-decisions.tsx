@@ -14,7 +14,7 @@ import {
 import { listRunSkillReviews } from '../../../../src/db/skill-queries'
 import { getApplicationReadiness } from '../../../../src/lib/application-readiness'
 import { getCandidateAnalysisState } from '../../../../src/lib/candidate-analysis'
-import { careerSkillEvidenceMap } from '../../../../src/lib/career-data'
+import { careerSkillEvidenceMap } from '../../../../src/lib/career/canonical-data'
 import { parseFilters, parseForm, parseId } from '../../../../src/lib/request'
 import { skillCategoryDefinitions } from '../../../../src/lib/skills/taxonomy'
 import { skillDecisionSchema } from '../../../../src/lib/validation'

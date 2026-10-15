@@ -52,7 +52,7 @@ import {
   skipMention,
   upsertPendingMention,
 } from '../../src/db/skill-mentions'
-import { baseResumeTextHash } from '../../src/lib/base-resumes'
+import { baseResumeTextHash } from '../../src/lib/career/base-resumes'
 import { migratedDatabase } from '../support/sqlite'
 import {
   approvedBaseResumeMarkdown,

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { and, desc, eq, sql } from 'drizzle-orm'
+import type { ParsedJobResult } from '../ai/client'
 import { type JobAnalysis, jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
-import type { ParsedJobResult } from '../lib/ai'
 import { type AnalysisRunState, classifyAnalysisRunState } from '../lib/analysis-run-state'
 import { nowISO, todayISO } from '../lib/date'
 import { frozenSuppliedCatalog } from '../lib/job-analysis-input'

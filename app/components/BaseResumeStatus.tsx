@@ -1,5 +1,5 @@
-import { type ApprovedBaseResume, listApprovedBaseResumes } from '../../src/lib/base-resumes'
-import { listDirections } from '../../src/lib/directions'
+import { type ApprovedBaseResume, listApprovedBaseResumes } from '../../src/lib/career/base-resumes'
+import { listDirections } from '../../src/lib/career/directions'
 
 export function BaseResumeStatus() {
   const directions = listDirections()

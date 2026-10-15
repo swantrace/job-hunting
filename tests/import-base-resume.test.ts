@@ -6,7 +6,7 @@ import {
   approveBaseResume,
   baseResumeManifestFileName,
   loadBaseResumeManifest,
-} from '../src/lib/base-resumes'
+} from '../src/lib/career/base-resumes'
 
 const knownProfiles = new Set(['fullstack', 'fhir', 'frontend'])
 

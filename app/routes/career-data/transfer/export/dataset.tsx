@@ -1,6 +1,6 @@
 import { createRoute } from 'honox/factory'
 import { db } from '../../../../../src/db/client'
-import { buildCareerDataset, serializeCareerDataset } from '../../../../../src/lib/career-export'
+import { buildCareerDataset, serializeCareerDataset } from '../../../../../src/lib/career/export'
 
 /**
  * Portable `career-dataset` download, full or direction-scoped. This is the

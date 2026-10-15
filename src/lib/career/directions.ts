@@ -1,6 +1,6 @@
-import { listCareerDirections } from '../db/career-directions'
-import { db } from '../db/client'
-import type { DbExecutor } from '../db/skill-queries'
+import { listCareerDirections } from '../../db/career-directions'
+import { db } from '../../db/client'
+import type { DbExecutor } from '../../db/skill-queries'
 
 export type Direction = { id: string; label: string; targetTitles: string[] }
 

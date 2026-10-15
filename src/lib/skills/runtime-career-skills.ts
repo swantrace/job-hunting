@@ -1,6 +1,6 @@
 import { db } from '../../db/client'
 import type { DbExecutor } from '../../db/skill-queries'
-import { loadCareerData } from '../career-data'
+import { loadCareerData } from '../career/canonical-data'
 import type { SkillMatchResult } from './constants'
 import { determineMatchResult } from './match-career-skills'
 

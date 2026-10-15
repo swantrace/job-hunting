@@ -10,7 +10,7 @@ import {
 } from '../../src/db/career-records'
 import { listCareerSkills } from '../../src/db/career-skills'
 import { db, sqlite } from '../../src/db/client'
-import { loadCareerDataFromDatabase } from '../../src/lib/career-data'
+import { loadCareerDataFromDatabase } from '../../src/lib/career/canonical-data'
 import { recordsFor } from './support/html-contract'
 
 /**

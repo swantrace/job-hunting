@@ -4,7 +4,7 @@ import {
   careerGrowthScore,
   isActiveApplicationStatus,
   rankCareerGrowthOpportunities,
-} from '../src/lib/career-growth'
+} from '../src/lib/career/growth'
 
 const row = (overrides: Partial<CareerGrowthInputRow> = {}): CareerGrowthInputRow => ({
   skillKey: 'fhir',

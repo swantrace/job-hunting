@@ -1,5 +1,5 @@
+import type { ParsedJobResult } from '../../src/ai/client'
 import type { Filters } from '../../src/db/queries'
-import type { ParsedJobResult } from '../../src/lib/ai'
 import { todayISO } from '../../src/lib/date'
 import { QuickCollect } from './Dashboard'
 

@@ -6,13 +6,13 @@ import {
   createBaseResumeDraft,
   listBaseResumeVersions,
   supersedeBaseResumeVersion,
-} from '../db/career-base-resumes'
+} from '../../db/career-base-resumes'
 import {
   createCareerDirection,
   listCareerDirections,
   retireCareerDirection,
   updateCareerDirection,
-} from '../db/career-directions'
+} from '../../db/career-directions'
 import {
   type CareerCandidateInput,
   type CareerPreferencesInput,
@@ -20,7 +20,7 @@ import {
   readCareerPreferences,
   saveCareerCandidate,
   saveCareerPreferences,
-} from '../db/career-facts'
+} from '../../db/career-facts'
 import {
   createCareerAchievement,
   createCareerEducation,
@@ -52,19 +52,19 @@ import {
   updateCareerProject,
   updateCareerPublication,
   updateCareerStory,
-} from '../db/career-records'
+} from '../../db/career-records'
 import {
   type CareerDb,
   CareerReferenceError,
   careerContentProbe,
   stableFingerprint,
-} from '../db/career-shared'
+} from '../../db/career-shared'
 import {
   createCareerSkill,
   listCareerSkills,
   retireCareerSkill,
   updateCareerSkill,
-} from '../db/career-skills'
+} from '../../db/career-skills'
 import {
   careerBaseResumes,
   careerDirections,
@@ -75,8 +75,11 @@ import {
   skillAliases,
   skillCategories,
   skills,
-} from '../db/schema'
-import type { DbExecutor } from '../db/skill-queries'
+} from '../../db/schema'
+import type { DbExecutor } from '../../db/skill-queries'
+import { nowISO, todayISO } from '../date'
+import { normalizeSkillAlias } from '../skills/normalize'
+import { parseSkillTaxonomy } from '../skills/taxonomy'
 import {
   baseResumeDirectoryName,
   baseResumeManifestFileName,
@@ -85,6 +88,7 @@ import {
   isEmptyBaseResume,
   parseBaseResumeManifest,
 } from './base-resumes'
+import { readCareerDocuments } from './canonical-data'
 import {
   type CareerDataset,
   careerDatasetExcluded,
@@ -93,14 +97,10 @@ import {
   careerDatasetSchemaVersion,
   documentsSchema,
   parseCareerDataset,
-} from './career/dataset'
-import { writeRecordExtensions } from './career/extensions'
-import type { GenerationRules } from './career/json-schemas'
-import { parseJsonColumn, serializeJsonColumn } from './career/json-schemas'
-import { readCareerDocuments } from './career-data'
-import { nowISO, todayISO } from './date'
-import { normalizeSkillAlias } from './skills/normalize'
-import { parseSkillTaxonomy } from './skills/taxonomy'
+} from './dataset'
+import { writeRecordExtensions } from './extensions'
+import type { GenerationRules } from './json-schemas'
+import { parseJsonColumn, serializeJsonColumn } from './json-schemas'
 
 /**
  * Transactional directory/dataset import.

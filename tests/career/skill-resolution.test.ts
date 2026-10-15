@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { parseJobDescription } from '../../src/ai/client'
 import { jobAnalysisSchema, jobAnalysisSchemaVersion } from '../../src/ai/schemas/job-analysis'
 import { persistJobRequirements } from '../../src/db/job-analysis'
 import {
@@ -7,7 +8,6 @@ import {
   listRequirementMentions,
 } from '../../src/db/skill-mentions'
 import { listRequirementSkillMappings } from '../../src/db/skill-queries'
-import { parseJobDescription } from '../../src/lib/ai'
 import {
   buildJobAnalysisInput,
   frozenSuppliedCatalog,

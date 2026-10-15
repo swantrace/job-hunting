@@ -6,7 +6,7 @@ import { getGenerationSourceLineage } from '../db/generation'
 import { getApplication } from '../db/queries'
 import { getCandidateAnalysisState } from './candidate-analysis'
 import { canonicalHash } from './canonical-hash'
-import { loadCareerData } from './career-data'
+import { loadCareerData } from './career/canonical-data'
 import {
   baseResumeIdentity,
   buildDocumentDraftSnapshot,

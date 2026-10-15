@@ -1,5 +1,5 @@
 import { careerDatasetExcluded } from '../../../src/lib/career/dataset'
-import { careerImportDocumentFiles, careerImportTaxonomyFile } from '../../../src/lib/career-import'
+import { careerImportDocumentFiles, careerImportTaxonomyFile } from '../../../src/lib/career/import'
 
 /**
  * The logical limits of an export, stated where the operator exports. A career

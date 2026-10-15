@@ -1,7 +1,10 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { type CanonicalCareerData, readCareerDataDirectory } from '../../src/lib/career-data'
+import {
+  type CanonicalCareerData,
+  readCareerDataDirectory,
+} from '../../src/lib/career/canonical-data'
 
 /**
  * Loads the checked-in example career documents deterministically through the

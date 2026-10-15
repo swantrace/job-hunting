@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { JobCardData } from '../../../src/db/queries'
 import * as realSkillQueries from '../../../src/db/skill-queries'
 import * as realApplicationReadiness from '../../../src/lib/application-readiness'
-import * as realCareerData from '../../../src/lib/career-data'
+import * as realCareerData from '../../../src/lib/career/canonical-data'
 import * as realRequest from '../../../src/lib/request'
 import * as realValidation from '../../../src/lib/validation'
 
@@ -275,7 +275,7 @@ mock.module('../../../src/db/analysis-decision-service', () => ({
   decideRunSkill: mockDecideRunSkill,
 }))
 
-mock.module('../../../src/lib/directions', () => ({
+mock.module('../../../src/lib/career/directions', () => ({
   listDirections: () => [{ id: 'fullstack', label: 'Full Stack', targetTitles: [] }],
 }))
 
@@ -318,7 +318,7 @@ mock.module('../../../src/db/skill-queries', () => ({
   listRunSkillReviews: mockListRunSkillReviews,
 }))
 
-mock.module('../../../src/lib/career-data', () => ({
+mock.module('../../../src/lib/career/canonical-data', () => ({
   ...realCareerData,
   careerSkillEvidenceMap: () => ({}),
 }))

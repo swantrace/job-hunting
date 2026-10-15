@@ -1,7 +1,7 @@
+import { canonicalHash } from '../canonical-hash'
+import { safeCareerData } from '../document-draft-input'
 import type { FrozenBaseResumeSource } from './base-resumes'
-import { canonicalHash } from './canonical-hash'
-import { type CanonicalCareerData, documentEligibleProjects } from './career-data'
-import { safeCareerData } from './document-draft-input'
+import { type CanonicalCareerData, documentEligibleProjects } from './canonical-data'
 
 export type CareerContextDirection = {
   id: string

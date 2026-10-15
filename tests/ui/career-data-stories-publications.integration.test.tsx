@@ -11,7 +11,10 @@ import {
   retireCareerProject,
 } from '../../src/db/career-records'
 import { db, sqlite } from '../../src/db/client'
-import { documentSafeCareerData, loadCareerDataFromDatabase } from '../../src/lib/career-data'
+import {
+  documentSafeCareerData,
+  loadCareerDataFromDatabase,
+} from '../../src/lib/career/canonical-data'
 import { recordsFor } from './support/html-contract'
 
 /**
