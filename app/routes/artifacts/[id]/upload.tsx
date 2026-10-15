@@ -2,7 +2,7 @@ import { createRoute } from 'honox/factory'
 import { getArtifact, markArtifactUploadFailed } from '../../../../src/db/generation'
 import { uploadArtifactToGoogleDrive } from '../../../../src/lib/google-drive'
 import { parseId } from '../../../../src/lib/request'
-import { ArtifactActions } from '../../../components/Workspace'
+import { ArtifactActions } from '../../../components/workspace/ArtifactActions'
 
 export const POST = createRoute(async (c) => {
   const id = parseId(c.req.param('id'))

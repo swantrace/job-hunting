@@ -1,5 +1,5 @@
-import type { JobAnalysis } from '../../src/ai/schemas/job-analysis'
-import { type Filters, type JobCardData, listManagementData } from '../../src/db/queries'
+import type { JobAnalysis } from '../../../src/ai/schemas/job-analysis'
+import { type Filters, type JobCardData, listManagementData } from '../../../src/db/queries'
 import {
   activeStatuses,
   applicationSortLabels,
@@ -9,9 +9,9 @@ import {
   type JobStatus,
   priorities,
   statuses,
-} from '../../src/lib/applications/constants'
-import { listDirections } from '../../src/lib/career/directions'
-import { formatDisplayDate, todayISO } from '../../src/lib/date'
+} from '../../../src/lib/applications/constants'
+import { listDirections } from '../../../src/lib/career/directions'
+import { formatDisplayDate, todayISO } from '../../../src/lib/date'
 import {
   type ApplicationAttribute,
   applicationAttributeLabels,
@@ -20,12 +20,12 @@ import {
   type FieldErrors,
   parseCsvList,
   statusesFromFilters,
-} from '../../src/lib/validation'
-import { JobAnalysisDraft } from './JobAnalysisDraft'
-import { EmptyState } from './ui/EmptyState'
-import { InputField, SelectField } from './ui/FormField'
-import { Icon } from './ui/Icon'
-import { StatusBadge } from './ui/StatusBadge'
+} from '../../../src/lib/validation'
+import { JobAnalysisDraft } from '../intake/JobAnalysisDraft'
+import { EmptyState } from '../ui/EmptyState'
+import { InputField, SelectField } from '../ui/FormField'
+import { Icon } from '../ui/Icon'
+import { StatusBadge } from '../ui/StatusBadge'
 
 const enc = (filters: Filters) => new URLSearchParams(filters).toString()
 const error = (errors: FieldErrors | undefined, name: string) => errors?.[name]?.[0]
@@ -689,5 +689,5 @@ function JobCard({
   )
 }
 
-export { Metrics } from './dashboard/Metrics'
-export { WorkspaceDrawer } from './dashboard/WorkspaceDrawer'
+export { Metrics } from './Metrics'
+export { WorkspaceDrawer } from './WorkspaceDrawer'

@@ -1,6 +1,6 @@
-import type { BaselineGenerationRunWithArtifacts } from '../../src/db/generation'
-import { listDirections } from '../../src/lib/career/directions'
-import { InputField, SelectField } from './ui/FormField'
+import type { BaselineGenerationRunWithArtifacts } from '../../../src/db/generation'
+import { listDirections } from '../../../src/lib/career/directions'
+import { InputField, SelectField } from '../ui/FormField'
 
 export function BaselineGenerationPanel({
   runs,

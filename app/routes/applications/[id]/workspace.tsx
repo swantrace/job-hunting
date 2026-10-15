@@ -6,7 +6,7 @@ import { parseFilters, parseId, parseWorkspaceTab } from '../../../../src/lib/re
 import { computeWorkspaceAvailability } from '../../../../src/lib/workspace/availability'
 import { resolveWorkspaceTab, tabAvailability } from '../../../../src/lib/workspace/state'
 import { AppShell } from '../../../components/layout/AppShell'
-import { Workspace } from '../../../components/Workspace'
+import { WorkspaceShell as Workspace } from '../../../components/workspace/WorkspaceShell'
 
 export default createRoute(async (c) => {
   const id = parseId(c.req.param('id'))

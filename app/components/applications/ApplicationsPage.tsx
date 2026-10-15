@@ -1,9 +1,9 @@
-import { type Filters, listApplications } from '../../src/db/queries'
-import { Board, Filters as FiltersForm, WorkspaceDrawer } from './Dashboard'
-import { AppShell } from './layout/AppShell'
-import { AiParserModal } from './opportunities/AiParserModal'
-import { QuickCollectDrawer } from './opportunities/QuickCollectDrawer'
-import { Icon } from './ui/Icon'
+import { type Filters, listApplications } from '../../../src/db/queries'
+import { Board, Filters as FiltersForm, WorkspaceDrawer } from '../dashboard/Dashboard'
+import { AppShell } from '../layout/AppShell'
+import { Icon } from '../ui/Icon'
+import { AiParserModal } from './AiParserModal'
+import { QuickCollectDrawer } from './QuickCollectDrawer'
 
 export function ApplicationsPage({ filters }: { filters: Filters }) {
   const jobs = listApplications(filters)

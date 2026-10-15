@@ -11,7 +11,7 @@ import {
   uploadArtifactToGoogleDrive,
 } from '../../../../../src/lib/google-drive'
 import { parseFilters, parseId } from '../../../../../src/lib/request'
-import { GenerationPanel } from '../../../../components/Workspace'
+import { GenerationPanel } from '../../../../components/workspace/GenerationPanel'
 
 function panelFor(
   id: number,

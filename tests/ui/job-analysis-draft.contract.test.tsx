@@ -57,10 +57,9 @@ const analysis: JobAnalysis = {
 }
 
 async function renderDraft() {
-  const { JobAnalysisDraft } = (await import('../../app/components/JobAnalysisDraft')) as Record<
-    string,
-    unknown
-  >
+  const { JobAnalysisDraft } = (await import(
+    '../../app/components/intake/JobAnalysisDraft'
+  )) as Record<string, unknown>
   return renderJsx(
     (JobAnalysisDraft as (props: { analysis: JobAnalysis }) => unknown)({ analysis }),
   )

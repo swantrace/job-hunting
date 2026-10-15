@@ -3,7 +3,7 @@ import { listCareerGrowthRows } from '../../../src/db/career-growth'
 import { listDirections } from '../../../src/lib/career/directions'
 import { rankCareerGrowthOpportunities } from '../../../src/lib/career/growth'
 import { skillCategoryDefinitions } from '../../../src/lib/skills/taxonomy'
-import { CareerGrowthList } from '../../components/CareerGrowth'
+import { CareerGrowthList } from '../../components/career/CareerGrowth'
 
 const MAX_ROWS = 200
 

@@ -1,5 +1,5 @@
-import type { Filters } from '../../src/db/queries'
-import { TextareaField } from './ui/FormField'
+import type { Filters } from '../../../src/db/queries'
+import { TextareaField } from '../ui/FormField'
 
 export function AiParser({ filters, oob = false }: { filters: Filters; oob?: boolean }) {
   return (

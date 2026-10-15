@@ -4,7 +4,7 @@ import { getApplicationReadiness } from '../../../../src/lib/application-readine
 import { enqueueGeneration } from '../../../../src/lib/generation-queue'
 import { getGoogleDriveConnectionStatus } from '../../../../src/lib/google-drive'
 import { parseFilters, parseId } from '../../../../src/lib/request'
-import { GenerationPanel } from '../../../components/Workspace'
+import { GenerationPanel } from '../../../components/workspace/GenerationPanel'
 
 export const POST = createRoute(async (c) => {
   const id = parseId(c.req.param('id'))

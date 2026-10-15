@@ -1,6 +1,6 @@
 import { createRoute } from 'honox/factory'
 import { listBaselineGenerationRuns } from '../../../src/db/generation'
-import { CareerDocumentsPage } from '../../components/CareerDocuments'
+import { CareerDocumentsPage } from '../../components/career/CareerDocuments'
 
 export default createRoute((c) =>
   c.render(<CareerDocumentsPage runs={listBaselineGenerationRuns()} />),

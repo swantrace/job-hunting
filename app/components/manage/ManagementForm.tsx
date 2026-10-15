@@ -1,6 +1,6 @@
-import type { listManagementData } from '../../src/db/queries'
+import type { listManagementData } from '../../../src/db/queries'
+import { InputField, SelectField } from '../ui/FormField'
 import type { ManagementKind } from './Management'
-import { InputField, SelectField } from './ui/FormField'
 
 type ManagementData = ReturnType<typeof listManagementData>
 

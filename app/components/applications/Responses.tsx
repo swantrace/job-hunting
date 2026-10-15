@@ -1,7 +1,7 @@
-import type { Filters, JobCardData } from '../../src/db/queries'
-import type { JobStatus } from '../../src/lib/applications/constants'
-import { AiParser } from './AiParser'
-import { Board, Metrics, QuickCollect } from './Dashboard'
+import type { Filters, JobCardData } from '../../../src/db/queries'
+import type { JobStatus } from '../../../src/lib/applications/constants'
+import { Board, Metrics, QuickCollect } from '../dashboard/Dashboard'
+import { AiParser } from '../intake/AiParser'
 
 export function MutationResponse({
   jobs,

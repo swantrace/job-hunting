@@ -1,7 +1,7 @@
-import type { ParsedJobResult } from '../../src/ai/client'
-import type { Filters } from '../../src/db/queries'
-import { todayISO } from '../../src/lib/date'
-import { QuickCollect } from './Dashboard'
+import type { ParsedJobResult } from '../../../src/ai/client'
+import type { Filters } from '../../../src/db/queries'
+import { todayISO } from '../../../src/lib/date'
+import { QuickCollect } from '../dashboard/Dashboard'
 
 export function ParsedJobDraft({
   parsed,

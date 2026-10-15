@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { Hono } from 'hono'
-import { BaseResumeStatus } from '../../app/components/BaseResumeStatus'
+import { BaseResumeStatus } from '../../app/components/career/BaseResumeStatus'
 import { approvedBaseResumeMarkdown } from '../career/fixtures'
 import { type CareerTestDatabase, careerTestDatabase } from '../support/career-db'
 

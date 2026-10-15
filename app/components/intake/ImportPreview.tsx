@@ -1,4 +1,4 @@
-import type { ImportPreview as Preview } from '../../src/db/queries'
+import type { ImportPreview as Preview } from '../../../src/db/queries'
 
 export function ImportPreview({ preview, payload }: { preview: Preview; payload: string }) {
   return (

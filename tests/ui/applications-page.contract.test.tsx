@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { ApplicationsPage } from '../../app/components/ApplicationsPage'
-import { Board, Filters } from '../../app/components/Dashboard'
+import { ApplicationsPage } from '../../app/components/applications/ApplicationsPage'
+import { Board, Filters } from '../../app/components/dashboard/Dashboard'
 import { AppNavigation } from '../../app/components/layout/AppNavigation'
 import type { Filters as ApplicationFilters } from '../../src/db/queries'
 import { renderJsx } from './support/html-contract'

@@ -6,7 +6,7 @@ import {
 } from '../../../../src/db/queries'
 import { parseForm } from '../../../../src/lib/request'
 import { companySchema, managedContactSchema, skillSchema } from '../../../../src/lib/validation'
-import { ManagementContent, type ManagementKind } from '../../../components/Management'
+import { ManagementContent, type ManagementKind } from '../../../components/manage/Management'
 
 const kinds = ['skills', 'companies', 'contacts'] as const
 

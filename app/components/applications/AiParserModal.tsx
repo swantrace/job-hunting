@@ -1,5 +1,5 @@
 import type { Filters } from '../../../src/db/queries'
-import { AiParser } from '../AiParser'
+import { AiParser } from '../intake/AiParser'
 import { Icon } from '../ui/Icon'
 
 export function AiParserModal({ filters }: { filters: Filters }) {

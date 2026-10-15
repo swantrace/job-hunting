@@ -1,7 +1,7 @@
-import type { BaselineGenerationRunWithArtifacts } from '../../src/db/generation'
+import type { BaselineGenerationRunWithArtifacts } from '../../../src/db/generation'
+import { AppShell } from '../layout/AppShell'
 import { BaselineGenerationPanel } from './BaselineGenerationPanel'
 import { BaseResumeStatus } from './BaseResumeStatus'
-import { AppShell } from './layout/AppShell'
 
 export function CareerDocumentsPage({ runs }: { runs: BaselineGenerationRunWithArtifacts[] }) {
   return (

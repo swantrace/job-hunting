@@ -1,4 +1,4 @@
-import type { JobIntakeItem } from '../../src/db/schema'
+import type { JobIntakeItem } from '../../../src/db/schema'
 
 export type JobIntakeBatchView = {
   id: number

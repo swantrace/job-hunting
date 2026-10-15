@@ -5,7 +5,7 @@ import { directionLabel, listDirections } from '../../../src/lib/career/directio
 import { enqueueBaselineGeneration } from '../../../src/lib/generation-queue'
 import { parseForm } from '../../../src/lib/request'
 import { baselineGenerationSchema } from '../../../src/lib/validation'
-import { BaselineGenerationPanel } from '../../components/BaselineGenerationPanel'
+import { BaselineGenerationPanel } from '../../components/career/BaselineGenerationPanel'
 
 export default createRoute((c) =>
   c.html(<BaselineGenerationPanel runs={listBaselineGenerationRuns()} />),

@@ -2,7 +2,7 @@ import { createRoute } from 'honox/factory'
 import { createContact, listManagementData, updateManagedItem } from '../../../src/db/queries'
 import { parseForm } from '../../../src/lib/request'
 import { managedContactSchema } from '../../../src/lib/validation'
-import { ManagementContent } from '../../components/Management'
+import { ManagementContent } from '../../components/manage/Management'
 
 export const POST = createRoute(async (c) => {
   const form = await parseForm(c)

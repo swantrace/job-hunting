@@ -1,6 +1,6 @@
 import type { Child } from 'hono/jsx'
 import type { Filters } from '../../../src/db/queries'
-import { QuickCollect } from '../Dashboard'
+import { QuickCollect } from '../dashboard/Dashboard'
 import { Icon } from '../ui/Icon'
 
 export function QuickCollectDrawer({ filters, children }: { filters: Filters; children: Child }) {

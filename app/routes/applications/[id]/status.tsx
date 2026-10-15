@@ -2,7 +2,7 @@ import { createRoute } from 'honox/factory'
 import { changeStatus, getApplication, listApplications, metrics } from '../../../../src/db/queries'
 import { parseFilters, parseForm, parseId } from '../../../../src/lib/request'
 import { statusSchema } from '../../../../src/lib/validation'
-import { Board, Metrics } from '../../../components/Dashboard'
+import { Board, Metrics } from '../../../components/dashboard/Dashboard'
 import { FlashMessage } from '../../../components/responses/FlashMessage'
 import { WorkspaceHeader } from '../../../components/workspace/WorkspaceHeader'
 

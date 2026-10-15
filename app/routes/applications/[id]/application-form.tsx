@@ -1,7 +1,7 @@
 import { createRoute } from 'honox/factory'
 import { getApplication } from '../../../../src/db/queries'
 import { parseFilters, parseId } from '../../../../src/lib/request'
-import { ApplicationForm } from '../../../components/Workspace'
+import { ApplicationForm } from '../../../components/workspace/ApplicationForm'
 
 export default createRoute((c) => {
   const id = parseId(c.req.param('id'))

@@ -1,6 +1,6 @@
-import { metrics } from '../../src/db/queries'
+import { metrics } from '../../../src/db/queries'
+import { AppShell } from '../layout/AppShell'
 import { Metrics } from './Dashboard'
-import { AppShell } from './layout/AppShell'
 
 export function StatsDashboard() {
   return (

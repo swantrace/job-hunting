@@ -1,5 +1,8 @@
-import { type JobAnalysis, roleTypes, seniorities } from '../../src/ai/schemas/job-analysis'
-import { requirementImportances, requirementTypes } from '../../src/lib/job-requirements/constants'
+import { type JobAnalysis, roleTypes, seniorities } from '../../../src/ai/schemas/job-analysis'
+import {
+  requirementImportances,
+  requirementTypes,
+} from '../../../src/lib/job-requirements/constants'
 
 const emphasisFields = [
   ['frontend', 'Frontend'],
