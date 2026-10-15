@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { skillCategories } from '../../db/schema'
 import type { DbExecutor } from '../../db/skill-queries'
 import type { SkillDb } from '../../db/skill-service'
-import { todayISO } from '../date'
+import { nowISO } from '../date'
 import type { SkillCategoryDefinition } from './taxonomy'
 
 export type TaxonomySyncReport = {
@@ -23,7 +23,7 @@ export function syncSkillTaxonomy(
   options: { apply?: boolean } = {},
 ): TaxonomySyncReport {
   const apply = options.apply ?? false
-  const date = todayISO()
+  const date = nowISO()
   const report: TaxonomySyncReport = { inserted: 0, updated: 0, unchanged: 0, orphaned: [] }
 
   const run = (tx: DbExecutor) => {

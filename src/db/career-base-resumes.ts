@@ -1,13 +1,7 @@
 import { and, asc, eq, ne } from 'drizzle-orm'
 import { baseResumeTextHash, isEmptyBaseResume } from '../lib/base-resumes'
 import { nowISO, todayISO } from '../lib/date'
-import {
-  type CareerDb,
-  CareerReferenceError,
-  type CareerWriteResult,
-  recordCareerChange,
-  stableFingerprint,
-} from './career-state'
+import { type CareerDb, CareerReferenceError, type CareerWriteResult } from './career-shared'
 import { db } from './client'
 import { type CareerBaseResume, careerBaseResumes, careerDirections } from './schema'
 import type { DbExecutor } from './skill-queries'
@@ -182,15 +176,6 @@ export function createBaseResumeDraft(
       })
       .returning()
       .get()
-    recordCareerChange(
-      tx,
-      stableFingerprint({
-        directionKey: input.directionKey,
-        version,
-        contentHash,
-        markdown: input.markdown,
-      }),
-    )
     return inserted
   })
 }
@@ -238,17 +223,6 @@ export function approveBaseResumeVersion(
     if (!targetAlreadySelected) {
       updateVersion(tx, target, { status: 'approved', approvedAt, revision })
     }
-    recordCareerChange(
-      tx,
-      stableFingerprint({
-        directionKey: target.directionKey,
-        version: target.version,
-        contentHash: target.contentHash,
-        status: 'approved',
-        approvedAt,
-        supersededId: previous?.id ?? null,
-      }),
-    )
     return {
       id: target.id,
       approvedAt,
@@ -268,15 +242,6 @@ export function supersedeBaseResumeVersion(executor: CareerDb, id: number): Care
     }
     const revision = existing.revision + 1
     updateVersion(tx, existing, { status: 'superseded', revision })
-    recordCareerChange(
-      tx,
-      stableFingerprint({
-        directionKey: existing.directionKey,
-        version: existing.version,
-        contentHash: existing.contentHash,
-        status: 'superseded',
-      }),
-    )
     return { id, changed: true, revision }
   })
 }

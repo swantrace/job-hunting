@@ -6,7 +6,7 @@ import {
   saveCareerCandidate,
   saveCareerPreferences,
 } from '../../src/db/career-facts'
-import { CareerRevisionConflictError } from '../../src/db/career-state'
+import { CareerRevisionConflictError } from '../../src/db/career-shared'
 import * as schema from '../../src/db/schema'
 import { migratedDatabase } from '../support/sqlite'
 

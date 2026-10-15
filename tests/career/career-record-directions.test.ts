@@ -10,7 +10,7 @@ import {
   listCareerPublications,
   listCareerStories,
 } from '../../src/db/career-records'
-import { CareerReferenceError } from '../../src/db/career-state'
+import { CareerReferenceError } from '../../src/db/career-shared'
 import * as schema from '../../src/db/schema'
 import { migratedDatabase } from '../support/sqlite'
 

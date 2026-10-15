@@ -1,7 +1,7 @@
 import { createRoute } from 'honox/factory'
 import { loadCareerDataView } from '../../../../src/db/career-data-view'
 import { createCareerPublication, listCareerPublications } from '../../../../src/db/career-records'
-import { CareerReferenceError } from '../../../../src/db/career-state'
+import { CareerReferenceError } from '../../../../src/db/career-shared'
 import { db } from '../../../../src/db/client'
 import { saveRecordExtensions, storedRecordExtensions } from '../../../../src/lib/career/extensions'
 import {

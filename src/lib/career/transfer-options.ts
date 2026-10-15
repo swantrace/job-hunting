@@ -1,6 +1,6 @@
 import { listBaseResumeVersions } from '../../db/career-base-resumes'
 import { loadCareerDataView } from '../../db/career-data-view'
-import { readCareerState } from '../../db/career-state'
+import { careerContentProbe } from '../../db/career-shared'
 import { db } from '../../db/client'
 import type { DbExecutor } from '../../db/skill-queries'
 import { type ChatGptContextPreview, previewChatGptContext } from './chatgpt-context'
@@ -11,7 +11,8 @@ import { type ChatGptContextPreview, previewChatGptContext } from './chatgpt-con
  * the tests all agree on what is in scope.
  */
 export type CareerTransferOptions = {
-  revision: number
+  /** The computed career-content fingerprint, shown so a stale page is visible. */
+  contentFingerprint: string
   directions: { key: string; label: string }[]
   datasetDirectionKey: string
   contextDirectionKey: string
@@ -114,7 +115,7 @@ export function loadCareerTransferOptions(
   const datasetDirectionKey = isKnown(query.datasetDirectionKey) ? query.datasetDirectionKey : ''
   const { preview, error } = contextPreviewFor(executor, { ...query, contextDirectionKey })
   return {
-    revision: readCareerState(executor).revision,
+    contentFingerprint: careerContentProbe(executor),
     directions,
     datasetDirectionKey,
     contextDirectionKey,

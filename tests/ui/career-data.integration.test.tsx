@@ -11,10 +11,13 @@ import {
   listCareerEducation,
   listCareerExperiences,
 } from '../../src/db/career-records'
-import { readCareerStateDocuments, writeCareerStateDocuments } from '../../src/db/career-state'
 import { db, sqlite } from '../../src/db/client'
 import { careerOnboardingGuidance } from '../../src/lib/application-readiness'
-import { applyExtensionFields } from '../../src/lib/career/form-input'
+import {
+  saveRecordExtensions,
+  storedRecordExtensions,
+  writeRecordExtensions,
+} from '../../src/lib/career/extensions'
 import { createCareerTestDatabase } from '../support/career-db'
 import { recordsFor, renderJsx } from './support/html-contract'
 
@@ -45,10 +48,8 @@ function uiEducation() {
 
 function cleanup() {
   const education = uiEducation()
-  let records = readCareerStateDocuments(db).records
-  for (const row of education)
-    records = applyExtensionFields(records, 'education', row.stableKey, null)
-  writeCareerStateDocuments(db, { records })
+  // Clearing an extension needs the owning row, so clear before deleting rows.
+  for (const row of education) saveRecordExtensions(db, 'education', row.stableKey, '')
   for (const row of uiExperiences()) {
     sqlite.query('DELETE FROM career_experiences WHERE id = ?').run(row.id)
   }
@@ -448,7 +449,7 @@ describe('education form fragments', () => {
     expect(record?.coursework).toEqual(['Algorithms', 'Data structures'])
     expect(record?.details).toBe('Evening program.')
     expect(record?.year).toBe(2023)
-    expect(readCareerStateDocuments(db).records.education?.[record?.stableKey ?? '']).toEqual({
+    expect(storedRecordExtensions(db, 'education', record?.stableKey ?? '')).toEqual({
       preserved: 'yes',
     })
     expect(recordsFor(html, `career-education-${record?.id}-form`)).toEqual([
@@ -486,14 +487,9 @@ describe('education form fragments', () => {
   test('preserved details and extension fields stay editable without raw JSON', async () => {
     const app = await harness()
     const record = createEducation({ note: 'preserved' })
-    writeCareerStateDocuments(db, {
-      records: applyExtensionFields(
-        readCareerStateDocuments(db).records,
-        'education',
-        record.stableKey,
-        { preserved: 7 },
-      ),
-    })
+    // Seeded as an object so the JSON number type is preserved by the form's
+    // `key = value` round trip, exactly as the importer stores it.
+    writeRecordExtensions(db, 'education', record.stableKey, { preserved: 7 })
 
     const form = await (await app.request(`/career-data/education/${record.id}/form`)).text()
     expect(form).toContain('preserved = 7')
@@ -519,7 +515,7 @@ describe('education form fragments', () => {
       (row) => row.id === record.id,
     )
     expect(updated?.details).toEqual({ note: 'preserved' })
-    expect(readCareerStateDocuments(db).records.education?.[record.stableKey]).toEqual({
+    expect(storedRecordExtensions(db, 'education', record.stableKey)).toEqual({
       preserved: 7,
     })
 
@@ -532,7 +528,7 @@ describe('education form fragments', () => {
       expectedRevision: String(updated?.revision),
     })
     expect(removed.status).toBe(200)
-    expect(readCareerStateDocuments(db).records.education?.[record.stableKey]).toBeUndefined()
+    expect(storedRecordExtensions(db, 'education', record.stableKey)).toBeNull()
   })
 })
 

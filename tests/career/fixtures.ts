@@ -316,8 +316,9 @@ const preferencesDocument = {
 /**
  * The removed portfolio-topic feature no longer has a structured reader, but the
  * raw document is still part of the legacy directory so the directory-import
- * round-trip keeps proving that the original file is preserved verbatim in
- * `career_state.legacy_documents_json`. It holds no topics.
+ * round-trip keeps proving the file is accepted and only its unmodelled roots
+ * (`schemaVersion`, `lastUpdated`) are carried into
+ * `career_profile.documents_json`. It holds no topics.
  */
 const portfolioDocument = {
   schemaVersion: 1,

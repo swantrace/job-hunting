@@ -1,6 +1,6 @@
 import { createRoute } from 'honox/factory'
 import { createCareerExperience, listCareerExperiences } from '../../../../src/db/career-records'
-import { CareerReferenceError } from '../../../../src/db/career-state'
+import { CareerReferenceError } from '../../../../src/db/career-shared'
 import { db } from '../../../../src/db/client'
 import {
   careerStableKey,

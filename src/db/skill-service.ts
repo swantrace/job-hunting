@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm'
-import { todayISO } from '../lib/date'
+import { nowISO } from '../lib/date'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
 import { resolveSkillInput, type SkillResolver } from '../lib/skills/resolve'
 import type { SkillCategory } from '../lib/skills/taxonomy'
@@ -49,7 +49,7 @@ function requireActiveSkill(tx: DbExecutor, id: number): Skill {
 export function approveSkill(id: number, executor: SkillDb = db) {
   executor
     .update(skills)
-    .set({ reviewStatus: 'approved', updatedAt: todayISO() })
+    .set({ reviewStatus: 'approved', updatedAt: nowISO() })
     .where(eq(skills.id, id))
     .run()
 }
@@ -57,17 +57,17 @@ export function approveSkill(id: number, executor: SkillDb = db) {
 export function rejectSkill(id: number, executor: SkillDb = db) {
   executor
     .update(skills)
-    .set({ reviewStatus: 'rejected', updatedAt: todayISO() })
+    .set({ reviewStatus: 'rejected', updatedAt: nowISO() })
     .where(eq(skills.id, id))
     .run()
 }
 
 export function recategorizeSkill(id: number, category: SkillCategory, executor: SkillDb = db) {
-  executor.update(skills).set({ category, updatedAt: todayISO() }).where(eq(skills.id, id)).run()
+  executor.update(skills).set({ category, updatedAt: nowISO() }).where(eq(skills.id, id)).run()
 }
 
 export function renameSkill(id: number, name: string, executor: SkillDb = db) {
-  const date = todayISO()
+  const date = nowISO()
   executor.transaction((tx) => {
     const skill = requireActiveSkill(tx, id)
     tx.update(skills).set({ name, updatedAt: date }).where(eq(skills.id, id)).run()
@@ -97,7 +97,7 @@ export function addSkillAlias(
       alias,
       normalizedAlias: normalized,
       origin,
-      createdAt: todayISO(),
+      createdAt: nowISO(),
     })
     .run()
 }
@@ -154,7 +154,7 @@ export function mergeSkills(sourceId: number, targetId: number, executor: SkillD
   const conflicts = previewMerge(sourceId, targetId, executor).conflicts
   if (conflicts.length) throw new MergeConflictError(conflicts)
 
-  const date = todayISO()
+  const date = nowISO()
   return executor.transaction((tx) => {
     const source = requireActiveSkill(tx, sourceId)
     const target = requireActiveSkill(tx, targetId)

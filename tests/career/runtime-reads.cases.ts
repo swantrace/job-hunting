@@ -6,11 +6,7 @@ import { candidateFitSchemaVersion } from '../../src/ai/schemas/candidate-fit'
 import { jobAnalysisSchemaVersion } from '../../src/ai/schemas/job-analysis'
 import { completeAnalysisRun, createAnalysisRun } from '../../src/db/analysis'
 import { listCareerAchievements, updateCareerAchievement } from '../../src/db/career-records'
-import {
-  readCareerState,
-  readCareerStateDocuments,
-  writeCareerStateDocuments,
-} from '../../src/db/career-state'
+import { careerContentProbe } from '../../src/db/career-shared'
 import { db } from '../../src/db/client'
 import { companies, jobApplications, jobPostingAnalyses, jobPostings } from '../../src/db/schema'
 import {
@@ -275,36 +271,28 @@ describe('database-owned runtime career reads', () => {
     expect(stored).not.toBeNull()
     const storedSnapshot = stored!.snapshot
     const currentCandidateHash = currentCandidateAnalysisHash(applicationId)
-    const revisionBefore = readCareerState(db).revision
-
-    // A category display-order edit changes the catalog, never the facts. The
-    // catalog has no dedicated revision counter, so the write that must be
-    // invisible is paired with a preserved legacy-document edit (which does bump
-    // `career_state.revision`): the hashes below must still be untouched.
-    const categories = database.sqlite
-      .query('SELECT key, label, sort_order FROM skill_categories ORDER BY sort_order')
+    const before = database.sqlite
+      .query('SELECT key, label, sort_order FROM skill_categories ORDER BY key')
       .all() as Array<{ key: string; label: string; sort_order: number }>
+
+    // A category display-order edit changes the catalog, never the facts, so the
+    // document identity must stay untouched. The write really happened (proved
+    // by the stored order below), which is the surviving equivalent of the old
+    // `career_state.revision` bump: the identity is derived from the document
+    // shape, not from any change counter.
     syncSkillTaxonomy(
       db,
-      categories.map((row) => ({
+      before.map((row) => ({
         key: row.key,
         label: row.label,
         sortOrder: 1_000 - row.sort_order,
       })),
       { apply: true },
     )
-    const legacy = readCareerStateDocuments(db).legacyDocuments as Record<string, unknown>
-    writeCareerStateDocuments(db, {
-      legacyDocuments: {
-        ...legacy,
-        'portfolio-content.json': {
-          schemaVersion: 1,
-          lastUpdated: '2026-10-20',
-          topics: [{ id: 'a-preserved-topic', title: 'Preserved raw topic' }],
-        },
-      },
-    })
-    expect(readCareerState(db).revision).toBeGreaterThan(revisionBefore)
+    const after = database.sqlite
+      .query('SELECT key, sort_order FROM skill_categories ORDER BY key')
+      .all() as Array<{ key: string; sort_order: number }>
+    expect(after.map((row) => row.sort_order)).toEqual(before.map((row) => 1_000 - row.sort_order))
 
     const current = buildGenerationInput(applicationId)
     expect(current?.inputHash).toBe(stored?.inputHash)
@@ -313,12 +301,13 @@ describe('database-owned runtime career reads', () => {
     expect(candidateStalenessReasons({}, {})).toEqual([])
   })
 
-  test('6. the revision-keyed cache returns the same object and refreshes after a career write', () => {
+  test('6. the probe-keyed cache returns the same object and refreshes after a career write', async () => {
     const before = loadCareerData()
     expect(loadCareerData()).toBe(before)
-    const revisionBefore = readCareerState(db).revision
+    const probeBefore = careerContentProbe(db)
     const achievement = syntheticAchievement()
 
+    await Bun.sleep(2)
     updateCareerAchievement(
       db,
       achievement.id,
@@ -327,7 +316,7 @@ describe('database-owned runtime career reads', () => {
 
     const after = loadCareerData()
     expect(after).not.toBe(before)
-    expect(readCareerState(db).revision).toBeGreaterThan(revisionBefore)
+    expect(careerContentProbe(db)).not.toBe(probeBefore)
     expect(loadCareerData()).toBe(after)
     expect(JSON.stringify(after)).toContain('(cache refresh)')
 

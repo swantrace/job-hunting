@@ -66,11 +66,11 @@ describe('ChatGPT JSON career context', () => {
         projectIds: ['synthetic-tracker'],
       })
 
-      // Source identities bind the database revision, the dataset format and the
-      // approved Base Resume the export actually used.
+      // Source identities bind the computed career-content fingerprint, the
+      // dataset format and the approved Base Resume the export actually used.
       expect(identities.database).toMatchObject({
-        revision: expect.any(Number),
-        contentHash: expect.any(String),
+        contentFingerprint: expect.any(String),
+        updatedAt: expect.any(String),
       })
       expect(identities.careerDataset).toMatchObject({ format: 'career-dataset' })
       expect(identities.baseResumes).toEqual([

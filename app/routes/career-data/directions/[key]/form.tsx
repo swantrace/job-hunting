@@ -4,7 +4,7 @@ import { readCareerDirection, updateCareerDirection } from '../../../../../src/d
 import {
   CareerReferenceError,
   CareerRevisionConflictError,
-} from '../../../../../src/db/career-state'
+} from '../../../../../src/db/career-shared'
 import { db } from '../../../../../src/db/client'
 import {
   directionFormSchema,

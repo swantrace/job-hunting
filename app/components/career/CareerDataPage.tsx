@@ -1,5 +1,4 @@
 import type { CareerDataView } from '../../../src/db/career-data-view'
-import { extensionObjectOrNull } from '../../../src/lib/career/json-schemas'
 import type { CareerTransferOptions } from '../../../src/lib/career/transfer-options'
 import { AppShell } from '../layout/AppShell'
 import { AchievementSection } from './AchievementSection'
@@ -82,10 +81,7 @@ function renderActiveSection(
       )
     case 'preferences':
       return (
-        <PreferencesSection
-          preferences={view.preferences}
-          extensions={extensionObjectOrNull(view.extensionRecords.preferences?.['$'])}
-        />
+        <PreferencesSection preferences={view.preferences} extensions={view.candidateExtensions} />
       )
     case 'directions':
       return <DirectionsSection directions={view.directions} includeRetired={includeRetired} />

@@ -7,9 +7,9 @@ const requiredTables = [
   'job_postings',
   'generation_runs',
   // Database-owned career facts and requirement-owned skill mentions
-  // (migrations 0026 and 0027). A partially-applied migration must fail at boot.
+  // (migrations 0026, 0027 and 0029). A partially-applied migration must fail at
+  // boot.
   'career_profile',
-  'career_state',
   'career_directions',
   'career_education',
   'career_experiences',
@@ -31,6 +31,8 @@ const requiredTables = [
 // partially-applied or drift-out-of-sync migration fails fast at boot with a
 // readable message instead of surfacing mid-request (e.g. during generation).
 const requiredColumns: Record<string, string[]> = {
+  // 0029 moved the career_state archive onto the career tables themselves.
+  career_profile: ['extension_json', 'documents_json'],
   generation_runs: [
     'kind',
     'baseline_json',

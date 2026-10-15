@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, like, or } from 'drizzle-orm'
 import { nowISO } from '../lib/date'
 import { canonicalSkillKey, normalizeSkillAlias } from '../lib/skills/normalize'
 import { hasSkillCategory } from '../lib/skills/taxonomy'
-import { type CareerDb, CareerReferenceError } from './career-state'
+import { type CareerDb, CareerReferenceError } from './career-shared'
 import { db } from './client'
 import {
   jobPostingAnalyses,

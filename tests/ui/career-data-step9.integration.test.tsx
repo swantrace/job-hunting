@@ -10,9 +10,7 @@ import {
   retireCareerExperience,
   retireCareerProject,
 } from '../../src/db/career-records'
-import { readCareerStateDocuments, writeCareerStateDocuments } from '../../src/db/career-state'
 import { db, sqlite } from '../../src/db/client'
-import { applyExtensionFields } from '../../src/lib/career/form-input'
 import { documentSafeCareerData, loadCareerDataFromDatabase } from '../../src/lib/career-data'
 import { recordsFor } from './support/html-contract'
 
@@ -63,13 +61,15 @@ function markerPublications() {
 }
 
 function clearExtensions() {
-  let records = readCareerStateDocuments(db).records
-  for (const kind of ['stories', 'publications']) {
-    for (const key of Object.keys(records[kind] ?? {})) {
-      if (key.startsWith(keyPrefix)) records = applyExtensionFields(records, kind, key, null)
-    }
-  }
-  writeCareerStateDocuments(db, { records })
+  // Preserved fields now live on each record's own `extension_json` column.
+  sqlite
+    .query(`UPDATE career_stories SET extension_json = NULL WHERE stable_key LIKE '${keyPrefix}%'`)
+    .run()
+  sqlite
+    .query(
+      `UPDATE career_publications SET extension_json = NULL WHERE stable_key LIKE '${keyPrefix}%'`,
+    )
+    .run()
 }
 
 function cleanup() {

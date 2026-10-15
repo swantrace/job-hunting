@@ -10,9 +10,9 @@ function countRows(preview: CareerImportPreview) {
 
 /**
  * Preview of an uploaded career source. It reports counts, conflicts, the source
- * fingerprint and the database revision — never personal content, a file path or
+ * fingerprint and the database fingerprint — never personal content, a file path or
  * any text from the upload. Confirming re-reads the same bytes server-side and
- * re-checks the database revision, so a preview that has gone stale is refused
+ * re-checks the database fingerprint, so a preview that has gone stale is refused
  * instead of applied.
  */
 export function CareerImportPreviewPanel({
@@ -41,7 +41,7 @@ export function CareerImportPreviewPanel({
           </div>
           <div>
             <dt class="text-xs font-semibold uppercase tracking-wider text-base-content/50">
-              Database revision
+              Database fingerprint
             </dt>
             <dd class="text-sm">{preview.databaseRevision}</dd>
           </div>

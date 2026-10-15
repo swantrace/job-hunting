@@ -1,19 +1,14 @@
 import { createRoute } from 'honox/factory'
-import { type CareerDataView, loadCareerDataView } from '../../../../src/db/career-data-view'
+import { loadCareerDataView } from '../../../../src/db/career-data-view'
 import { saveCareerCandidate } from '../../../../src/db/career-facts'
-import {
-  CareerReferenceError,
-  CareerRevisionConflictError,
-  writeCareerStateDocuments,
-} from '../../../../src/db/career-state'
+import { CareerReferenceError, CareerRevisionConflictError } from '../../../../src/db/career-shared'
 import { db } from '../../../../src/db/client'
+import { saveRecordExtensions } from '../../../../src/lib/career/extensions'
 import {
-  applyExtensionFields,
   type CandidateFormValues,
   candidateFormSchema,
   candidateFormValues,
   candidateInput,
-  parseExtensionLines,
   submittedValues,
 } from '../../../../src/lib/career/form-input'
 import { parseForm, retargetFragment } from '../../../../src/lib/request'
@@ -29,14 +24,13 @@ import { FlashMessage } from '../../../components/responses/FlashMessage'
  * anything really changed. No-op writes stay invisible: the repositories do not
  * bump a revision, and the flash says so.
  */
-function saveIdentity(values: CandidateFormValues, view: CareerDataView): boolean {
+function saveIdentity(values: CandidateFormValues): boolean {
   const saved = saveCareerCandidate(db, candidateInput(values), {
     expectedRevision: values.expectedRevision,
   })
-  const extension = parseExtensionLines(view.candidateExtensions, values.extensionFields)
-  const extensionsChanged = writeCareerStateDocuments(db, {
-    records: applyExtensionFields(view.extensionRecords, 'candidate', '$', extension),
-  })
+  // The preserved fields live on the profile singleton row the save above
+  // guarantees, so this write always addresses a real row.
+  const extensionsChanged = saveRecordExtensions(db, 'candidate', '$', values.extensionFields)
   return saved.changed || extensionsChanged
 }
 
@@ -76,7 +70,7 @@ export const POST = createRoute(async (c) => {
 
   let changed = false
   try {
-    changed = saveIdentity(parsed.data, view)
+    changed = saveIdentity(parsed.data)
   } catch (error) {
     if (error instanceof CareerRevisionConflictError) {
       retargetFragment(c, identityFormRootId)

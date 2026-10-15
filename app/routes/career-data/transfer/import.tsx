@@ -10,7 +10,7 @@ import { CareerImportPreviewPanel } from '../../../components/career/CareerImpor
  * Preview of an uploaded career source. The upload is decoded in memory and read
  * strictly as data: a failure returns the upload form with a 422 and an
  * actionable message, and a valid source returns a preview that binds the source
- * fingerprint and the database revision. Nothing is written here.
+ * fingerprint and the database fingerprint. Nothing is written here.
  *
  * The exact bytes are echoed back inside the confirm form so the confirm step can
  * re-read the same source and re-derive its fingerprint instead of trusting a

@@ -54,23 +54,22 @@ import {
   updateCareerStory,
 } from '../db/career-records'
 import {
+  type CareerDb,
+  CareerReferenceError,
+  careerContentProbe,
+  stableFingerprint,
+} from '../db/career-shared'
+import {
   createCareerSkill,
   listCareerSkills,
   retireCareerSkill,
   updateCareerSkill,
 } from '../db/career-skills'
 import {
-  type CareerDb,
-  CareerReferenceError,
-  type CareerStateExtensionRecords,
-  readCareerState,
-  stableFingerprint,
-  writeCareerStateDocuments,
-} from '../db/career-state'
-import {
   careerBaseResumes,
   careerDirections,
   careerExperiences,
+  careerProfile,
   careerProjects,
   careerPublications,
   skillAliases,
@@ -92,9 +91,12 @@ import {
   careerDatasetFormat,
   careerDatasetSchema,
   careerDatasetSchemaVersion,
+  documentsSchema,
   parseCareerDataset,
 } from './career/dataset'
+import { writeRecordExtensions } from './career/extensions'
 import type { GenerationRules } from './career/json-schemas'
+import { parseJsonColumn, serializeJsonColumn } from './career/json-schemas'
 import { readCareerDocuments } from './career-data'
 import { nowISO, todayISO } from './date'
 import { normalizeSkillAlias } from './skills/normalize'
@@ -106,8 +108,9 @@ import { parseSkillTaxonomy } from './skills/taxonomy'
  * `prepareCareerImport` reads, parses and validates the entire source and then
  * runs the same write pipeline inside a transaction that is rolled back, so the
  * preview reports exactly what an apply would do without writing anything. The
- * preview binds the source bytes and the database revision; `applyCareerImport`
- * refuses a stale preview and then applies everything in one transaction.
+ * preview binds the source bytes and the computed career-content fingerprint;
+ * `applyCareerImport` refuses a stale preview and then applies everything in one
+ * transaction.
  *
  * Merge is by stable key only. A record missing from the source is untouched —
  * an import never deletes — and every cross-record reference is resolved from a
@@ -138,7 +141,12 @@ export type CareerImportReport = {
 
 export type CareerImportPreview = {
   sourceHash: string
-  databaseRevision: number
+  /**
+   * The computed `careerContentProbe` fingerprint of the database the preview
+   * was prepared against. It replaces the deleted `career_state.revision`
+   * token: the apply re-checks it, both before and inside the transaction.
+   */
+  databaseRevision: string
   report: CareerImportReport
   conflicts: string[]
   dataset: CareerDataset
@@ -396,6 +404,37 @@ function extensionsOrUndefined(record: Record<string, unknown>, known: ReadonlyS
   return Object.keys(extensions).length > 0 ? extensions : undefined
 }
 
+/**
+ * Document-root keys that already have a relational home; every other root key
+ * of a source document is carried in `career_profile.documents_json`. This
+ * mirrors the frozen 0029 migration's `NOT IN (...)` list exactly, so a
+ * directory import stores the same document roots the migration carries over.
+ */
+const modelledDocumentRoots = new Set([
+  'identity',
+  'education',
+  'authorization',
+  'careerBreak',
+  'truthfulnessRules',
+  'directionDefinitions',
+  'skills',
+  'achievements',
+  'experiences',
+  'publications',
+  'projects',
+  'stories',
+  'topics',
+])
+
+function documentRoots(documents: Record<string, unknown>): Record<string, unknown> {
+  const roots: Record<string, unknown> = {}
+  for (const [file, document] of Object.entries(documents)) {
+    const unmodelled = splitUnknown(asRecord(document), modelledDocumentRoots)
+    if (Object.keys(unmodelled).length > 0) roots[file] = unmodelled
+  }
+  return roots
+}
+
 function datasetFromDirectory(snapshot: DirectorySnapshot): CareerDataset {
   const documents = snapshot.documents
   const candidateDocument = asRecord(documents['candidate.json'])
@@ -624,7 +663,7 @@ function datasetFromDirectory(snapshot: DirectorySnapshot): CareerDataset {
     personalSkills,
     directions,
     baseResumes,
-    state: { legacyDocuments: documents, extensions: {} },
+    documents: documentRoots(documents),
     excluded: careerDatasetExcluded,
   })
 }
@@ -1181,7 +1220,14 @@ const singletonKey = '$'
 export function applyCareerDataset(executor: CareerDb, dataset: CareerDataset): CareerImportReport {
   const report = emptyReport()
   const now = nowISO()
-  const extensions: CareerStateExtensionRecords = {}
+  /**
+   * Per-record authored extras, collected while the records are written and
+   * persisted into each owning row's `extension_json` column at the end, once
+   * every row exists. Kinds with no extension column (categories, catalog,
+   * directions) are collected but have nowhere to land — the frozen migration
+   * gave them no column, so they are dropped.
+   */
+  const extensions: Record<string, Record<string, unknown>> = {}
   const setExtensions = (kind: string, key: string, value: Record<string, unknown> | undefined) => {
     if (!value || Object.keys(value).length === 0) return
     extensions[kind] = { ...(extensions[kind] ?? {}), [key]: value }
@@ -1367,11 +1413,14 @@ export function applyCareerDataset(executor: CareerDb, dataset: CareerDataset): 
   }
 
   // Singletons. Both halves now share the one `career_profile` row, so their
-  // pre-import existence is captured before either save for the report.
+  // pre-import existence is captured before either save for the report. Their
+  // preserved fields share the row's single `extension_json` column, so the two
+  // halves merge into one value (the preferences half wins a key collision).
   const candidateExisted = readCareerCandidate(executor) !== null
   const preferencesExisted = readCareerPreferences(executor) !== null
+  const profileExtension: Record<string, unknown> = {}
   if (dataset.candidate) {
-    setExtensions('candidate', singletonKey, mergeExtensions(dataset.candidate, candidateFields))
+    Object.assign(profileExtension, mergeExtensions(dataset.candidate, candidateFields))
     const result = saveCareerCandidate(executor, dataset.candidate as CareerCandidateInput)
     addCount(
       report,
@@ -1380,11 +1429,7 @@ export function applyCareerDataset(executor: CareerDb, dataset: CareerDataset): 
     )
   }
   if (dataset.preferences) {
-    setExtensions(
-      'preferences',
-      singletonKey,
-      mergeExtensions(dataset.preferences, preferencesFields),
-    )
+    Object.assign(profileExtension, mergeExtensions(dataset.preferences, preferencesFields))
     const result = saveCareerPreferences(executor, dataset.preferences as CareerPreferencesInput)
     addCount(
       report,
@@ -1392,6 +1437,7 @@ export function applyCareerDataset(executor: CareerDb, dataset: CareerDataset): 
       preferencesExisted ? (result.changed ? 'updated' : 'unchanged') : 'inserted',
     )
   }
+  setExtensions('candidate', singletonKey, profileExtension)
 
   // Education.
   const existingEducation = new Map(
@@ -1733,14 +1779,59 @@ export function applyCareerDataset(executor: CareerDb, dataset: CareerDataset): 
     }
   }
 
-  const stateChanged = writeCareerStateDocuments(executor, {
-    legacyDocuments: dataset.state.legacyDocuments,
-    extensions: asRecord(dataset.state.extensions),
-    records: extensions,
-  })
-  addCount(report, 'state', stateChanged ? 'updated' : 'unchanged')
+  // Preserved authored fields land in the row that owns them. Every row now
+  // exists, so each write addresses a real row; kinds without an extension
+  // column report no change. A never-written extension stays NULL.
+  let extensionsChanged = false
+  for (const [kind, entries] of Object.entries(extensions)) {
+    for (const key of Object.keys(entries)) {
+      const value = entries[key] as Record<string, unknown> | undefined
+      if (writeRecordExtensions(executor, kind, key, value ?? null)) {
+        extensionsChanged = true
+      }
+    }
+  }
+  addCount(report, 'extensions', extensionsChanged ? 'updated' : 'unchanged')
+
+  // Document roots ride on the profile singleton. There is no row to write to
+  // when a dataset carries neither a candidate nor preferences.
+  const documentsChanged = writeCareerDocuments(executor, dataset.documents ?? {})
+  addCount(report, 'documents', documentsChanged ? 'updated' : 'unchanged')
 
   return report
+}
+
+/**
+ * Persists the per-source-document roots on the `career_profile` singleton,
+ * returning `true` only for a real change. A legacy dataset's `state` archive is
+ * deliberately ignored: every fact it carried now lives in the tables.
+ */
+function writeCareerDocuments(executor: CareerDb, documents: Record<string, unknown>): boolean {
+  const profile = executor
+    .select({ documentsJson: careerProfile.documentsJson })
+    .from(careerProfile)
+    .where(eq(careerProfile.id, 1))
+    .get()
+  if (!profile) return false
+  const next = Object.keys(documents).length > 0 ? documents : null
+  const current = parseDocuments(profile.documentsJson)
+  if (stableFingerprint(current) === stableFingerprint(next)) return false
+  return (
+    executor
+      .update(careerProfile)
+      .set({
+        documentsJson: next === null ? null : serializeJsonColumn(next),
+        updatedAt: nowISO(),
+      })
+      .where(eq(careerProfile.id, 1))
+      .returning({ id: careerProfile.id })
+      .all().length > 0
+  )
+}
+
+function parseDocuments(value: string | null): Record<string, unknown> | null {
+  if (value === null || value.trim() === '') return null
+  return asRecord(parseJsonColumn(value, documentsSchema, {}, 'career_profile.documents_json'))
 }
 
 // ---------------------------------------------------------------------------
@@ -1771,7 +1862,7 @@ export function prepareCareerImport(
   source: CareerImportSource,
 ): CareerImportPreview {
   const { dataset, sourceHash } = readSource(source)
-  const databaseRevision = readCareerState(executor).revision
+  const databaseRevision = careerContentProbe(executor)
   const conflicts = validateCareerImport(executor, dataset)
   let report = emptyReport()
   if (conflicts.length === 0) {
@@ -1804,13 +1895,13 @@ export function applyCareerImport(
       'The import source changed since the preview was prepared; run a new dry run.',
     )
   }
-  if (readCareerState(executor).revision !== preview.databaseRevision) {
+  if (careerContentProbe(executor) !== preview.databaseRevision) {
     throw new CareerImportStaleError(
       'The career database changed since the preview was prepared; run a new dry run.',
     )
   }
   return executor.transaction((tx) => {
-    if (readCareerState(tx).revision !== preview.databaseRevision) {
+    if (careerContentProbe(tx) !== preview.databaseRevision) {
       throw new CareerImportStaleError(
         'The career database changed while applying the import; run a new dry run.',
       )

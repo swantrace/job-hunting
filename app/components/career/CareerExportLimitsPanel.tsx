@@ -8,14 +8,14 @@ import { careerImportDocumentFiles, careerImportTaxonomyFile } from '../../../sr
  * generation runs, document reviews or artifact binaries. Full recovery needs a
  * consistent SQLite backup *and* an artifact backup, which Step 12 documents.
  */
-export function CareerExportLimitsPanel({ revision }: { revision: number }) {
+export function CareerExportLimitsPanel({ contentFingerprint }: { contentFingerprint: string }) {
   return (
     <section class="card border border-base-300 bg-base-100">
       <div class="card-body gap-3">
         <h3 class="card-title text-base">What a logical export cannot carry</h3>
         <p class="text-sm text-base-content/70">
-          Database revision {revision}. Everything below is deliberately outside the dataset and the
-          ChatGPT context:
+          Database fingerprint <code class="font-mono break-all">{contentFingerprint}</code>.
+          Everything below is deliberately outside the dataset and the ChatGPT context:
         </p>
         <ul class="list-disc ps-5 text-sm">
           {careerDatasetExcluded.kinds.map((kind) => (

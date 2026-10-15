@@ -10,7 +10,7 @@ export const careerImportResultId = 'career-import-result'
  *
  * The upload is only ever *read*. The response is a preview fragment; nothing is
  * written until the operator confirms the preview, and the preview is bound to
- * the source bytes and the database revision so a stale confirmation is refused.
+ * the source bytes and the database fingerprint so a stale confirmation is refused.
  */
 export function CareerImportForm({ message }: { message?: string }) {
   return (
@@ -28,8 +28,8 @@ export function CareerImportForm({ message }: { message?: string }) {
         <p class="text-sm text-base-content/70">
           Upload a <code>career-dataset</code> JSON export, or a zip archive of the legacy
           <code> career-data</code> directory. The preview reports counts and conflicts and binds
-          the source fingerprint and database revision; confirming re-validates both and refuses a
-          stale preview. Nothing is written during the preview.
+          the source fingerprint and database fingerprint; confirming re-validates both and refuses
+          a stale preview. Nothing is written during the preview.
         </p>
         <FileField
           id="career-import-file"

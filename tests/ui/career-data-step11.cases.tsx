@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { Hono } from 'hono'
@@ -57,26 +57,32 @@ const careerTables = [
   'skill_categories',
 ] as const
 
-/** Clears every career row and restores the `career_state` singleton. */
+/** Clears every career row; the computed change probe sees the counts drop. */
 function resetDatabase() {
   for (const table of careerTables) sqlite.exec(`DELETE FROM ${table}`)
-  sqlite.exec("UPDATE career_state SET revision = 0, content_hash = '' WHERE id = 1")
 }
 
 /** Imports the synthetic fixtures through the Step 3 importer into `db`. */
 function seedSyntheticCareerData() {
   const directory = mkdtempSync(resolve(databaseRoot, 'seed-'))
   try {
+    // Written synchronously: `Bun.write` returns before a newly created
+    // subdirectory's file is visible, which would make the preview and the apply
+    // hash different directory snapshots.
     for (const [name, document] of Object.entries(syntheticCareerDocuments)) {
-      Bun.write(resolve(directory, name), `${JSON.stringify(document, null, 2)}\n`)
+      writeFileSync(resolve(directory, name), `${JSON.stringify(document, null, 2)}\n`)
     }
-    Bun.write(resolve(directory, 'skill-taxonomy.json'), JSON.stringify(syntheticTaxonomy, null, 2))
+    writeFileSync(
+      resolve(directory, 'skill-taxonomy.json'),
+      JSON.stringify(syntheticTaxonomy, null, 2),
+    )
     const baseResumes = resolve(directory, 'base-resumes')
-    Bun.write(
+    mkdirSync(baseResumes, { recursive: true })
+    writeFileSync(
       resolve(baseResumes, 'manifest.json'),
       JSON.stringify(approvedBaseResumeManifest(), null, 2),
     )
-    Bun.write(resolve(baseResumes, 'fullstack.md'), approvedBaseResumeMarkdown)
+    writeFileSync(resolve(baseResumes, 'fullstack.md'), approvedBaseResumeMarkdown)
     const preview = prepareCareerImport(db, { kind: 'directory', directory })
     if (preview.conflicts.length > 0)
       throw new Error(`Synthetic fixtures reported conflicts: ${preview.conflicts.join(' ')}`)
@@ -217,7 +223,7 @@ describe('career dataset import flow', () => {
     expect(response.status).toBe(200)
     expect(recordsFor(html, 'career-import-preview')).toHaveLength(1)
     expect(html).toContain('Source fingerprint')
-    expect(html).toContain('Database revision')
+    expect(html).toContain('Database fingerprint')
     expect(html).toContain('Planned changes')
     expect(html).toContain('Confirm import')
     expect(html).toContain('<th scope="row">experiences</th><td>2</td>')
@@ -239,7 +245,7 @@ describe('career dataset import flow', () => {
     expect(db.select().from(careerExperiences).all()).toHaveLength(2)
 
     // The stale-preview contract has two halves: the source fingerprint (proved
-    // by the swapped-payload case below) and the database revision (proved by the
+    // by the swapped-payload case below) and the database fingerprint (proved by the
     // Step 3 `applyCareerImport` contract tests). Repeating an identical no-op
     // import is legitimately accepted because nothing changed.
   })

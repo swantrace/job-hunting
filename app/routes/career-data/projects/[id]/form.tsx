@@ -4,7 +4,7 @@ import { listCareerProjects, updateCareerProject } from '../../../../../src/db/c
 import {
   CareerReferenceError,
   CareerRevisionConflictError,
-} from '../../../../../src/db/career-state'
+} from '../../../../../src/db/career-shared'
 import { db } from '../../../../../src/db/client'
 import {
   projectFormSchema,

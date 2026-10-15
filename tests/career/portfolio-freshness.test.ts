@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { readCareerStateDocuments, writeCareerStateDocuments } from '../../src/db/career-state'
+import { saveCareerPreferences } from '../../src/db/career-facts'
+import { careerContentProbe } from '../../src/db/career-shared'
 import { candidateStalenessReasons } from '../../src/lib/candidate-analysis'
 import { canonicalHash } from '../../src/lib/canonical-hash'
 import { type CanonicalCareerData, loadCareerDataFromDatabase } from '../../src/lib/career-data'
@@ -11,73 +12,39 @@ import { type CareerTestDatabase, careerTestDatabase } from '../support/career-d
  * Career evidence freshness identity. `generation-input.ts` hashes
  * `safeCareerData(loadCareerData())` as the document evidence hash and
  * `candidate-analysis.ts` hashes the same safe career shape inside its snapshot.
- * Data outside that identity — preserved legacy documents such as
- * `portfolio-content.json`, and category display ordering — is deliberately
- * excluded, so editing only that data must not mark an unrelated analysis or
- * generated document stale, even though it bumps `career_state.revision`.
+ * Data outside that identity — the preferences half of the `career_profile`
+ * singleton, and preserved document roots such as `portfolio-content.json` — is
+ * deliberately excluded, so editing only that data must not mark an unrelated
+ * analysis or generated document stale, even though it advances the computed
+ * change probe that replaced `career_state.revision`.
  */
 
 function candidateSnapshot(careerData: CanonicalCareerData) {
   return { version: 2, jobAnalysis: { runId: 1 }, careerData: safeCareerData(careerData) }
 }
 
-/**
- * The surviving equivalent of a portfolio-only edit: the raw
- * `portfolio-content.json` document is preserved in
- * `career_state.legacy_documents_json` and rewritten, which bumps
- * `career_state.revision`, but nothing it holds reaches the document shape. The
- * other preserved documents are carried over untouched, so the assertion proves
- * the identity is derived from the document shape rather than the revision
- * counter.
- */
-function preservedDocumentEdited(executor: Parameters<typeof writeCareerStateDocuments>[0]): void {
-  const current = readCareerStateDocuments(executor).legacyDocuments as Record<string, unknown>
-  writeCareerStateDocuments(executor, {
-    legacyDocuments: {
-      ...current,
-      'portfolio-content.json': {
-        schemaVersion: 1,
-        lastUpdated: '2026-10-20',
-        topics: [
-          {
-            id: 'a-preserved-portfolio-topic',
-            title: 'A preserved raw portfolio topic',
-            projects: ['synthetic-tracker'],
-            directions: ['fullstack'],
-          },
-        ],
-      },
-    },
-  })
-}
-
 describe('edits outside the document shape do not stale unrelated documents', () => {
-  test('a preserved legacy-document edit bumps the revision but not the identity', () => {
+  test('a preferences edit advances the change probe but not the identity', async () => {
     const database: CareerTestDatabase = careerTestDatabase()
-    const { sqlite, executor } = database
+    const { executor } = database
     try {
       const before = loadCareerDataFromDatabase(executor)
-      const revisionBefore = (
-        sqlite.query('SELECT revision FROM career_state WHERE id = 1').get() as { revision: number }
-      ).revision
+      const probeBefore = careerContentProbe(executor)
 
-      preservedDocumentEdited(executor)
+      // A real career write the safe document shape excludes: the preferences
+      // half of the profile singleton. `saveCareerPreferences` advances the
+      // probe through the row's `updated_at`, but nothing it stores reaches the
+      // generated document shape.
+      await Bun.sleep(2)
+      saveCareerPreferences(executor, {
+        locations: ['Nowhere'],
+        notes: 'Preference edit outside the document shape.',
+      })
 
-      const revisionAfter = (
-        sqlite.query('SELECT revision FROM career_state WHERE id = 1').get() as { revision: number }
-      ).revision
-      expect(revisionAfter).toBeGreaterThan(revisionBefore)
-      // The preserved document really was stored, proving the trigger ran.
-      expect(
-        (
-          sqlite.query('SELECT legacy_documents_json FROM career_state WHERE id = 1').get() as {
-            legacy_documents_json: string
-          }
-        ).legacy_documents_json,
-      ).toContain('a-preserved-portfolio-topic')
+      expect(careerContentProbe(executor)).not.toBe(probeBefore)
 
       // The document shape did not change: the evidence hash and the candidate
-      // career-data sub-hash are untouched even though the revision advanced.
+      // career-data sub-hash are untouched even though the probe advanced.
       const after = loadCareerDataFromDatabase(executor)
       expect(canonicalHash(safeCareerData(after))).toBe(canonicalHash(safeCareerData(before)))
       expect(

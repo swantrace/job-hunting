@@ -1,7 +1,6 @@
 import { createRoute } from 'honox/factory'
 import { loadCareerDataView } from '../../../../src/db/career-data-view'
 import { db } from '../../../../src/db/client'
-import { extensionObjectOrNull } from '../../../../src/lib/career/json-schemas'
 import { CareerDataPage } from '../../../components/career/CareerDataPage'
 import { CareerDataSection } from '../../../components/career/CareerDataSection'
 import { CareerDataTabs } from '../../../components/career/CareerDataTabs'
@@ -15,10 +14,7 @@ export default createRoute((c) => {
   return c.html(
     <>
       <CareerDataSection activeTab="preferences" onboardingRequired={view.onboardingRequired}>
-        <PreferencesSection
-          preferences={view.preferences}
-          extensions={extensionObjectOrNull(view.extensionRecords.preferences?.['$'])}
-        />
+        <PreferencesSection preferences={view.preferences} extensions={view.candidateExtensions} />
       </CareerDataSection>
       <CareerDataTabs activeTab="preferences" oob />
     </>,

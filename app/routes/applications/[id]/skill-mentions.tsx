@@ -1,5 +1,5 @@
 import { createRoute } from 'honox/factory'
-import { CareerReferenceError } from '../../../../src/db/career-state'
+import { CareerReferenceError } from '../../../../src/db/career-shared'
 import { db } from '../../../../src/db/client'
 import type { Filters } from '../../../../src/db/queries'
 import { getApplication, type JobCardData } from '../../../../src/db/queries'

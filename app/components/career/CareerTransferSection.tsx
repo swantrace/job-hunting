@@ -28,7 +28,7 @@ export function CareerTransferSection(options: CareerTransferOptions) {
         directions={options.directions}
         directionKey={options.datasetDirectionKey}
       />
-      <CareerExportLimitsPanel revision={options.revision} />
+      <CareerExportLimitsPanel contentFingerprint={options.contentFingerprint} />
     </div>
   )
 }

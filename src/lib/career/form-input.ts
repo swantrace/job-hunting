@@ -12,7 +12,6 @@ import type {
   CareerStoryInput,
 } from '../../db/career-records'
 import type { CareerSkillInput, CareerSkillUpdateInput } from '../../db/career-skills'
-import type { CareerStateExtensionRecords } from '../../db/career-state'
 import { documentDraftPolicy } from '../document-draft-policy'
 import type { FieldErrors } from '../validation'
 import {
@@ -244,16 +243,16 @@ export function parseExtensionLines(
 }
 
 /**
- * Replaces one record's extension fields inside the database-owned extension
- * store, removing empty kinds so an empty edit leaves no residue.
+ * Replaces one record's extension fields inside a `kind -> key -> fields` map,
+ * removing empty kinds so an empty edit leaves no residue.
  */
 export function applyExtensionFields(
-  records: CareerStateExtensionRecords,
+  records: Record<string, Record<string, unknown>>,
   kind: string,
   key: string,
   value: Record<string, unknown> | null,
-): CareerStateExtensionRecords {
-  const next: CareerStateExtensionRecords = Object.fromEntries(
+): Record<string, Record<string, unknown>> {
+  const next: Record<string, Record<string, unknown>> = Object.fromEntries(
     Object.entries(records).map(([name, entries]) => [name, { ...entries }]),
   )
   const kindEntries = next[kind] ?? {}

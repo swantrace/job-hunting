@@ -18,9 +18,8 @@ import {
   assertExpectedRevision,
   type CareerDb,
   type CareerSaveResult,
-  recordCareerChange,
   stableFingerprint,
-} from './career-state'
+} from './career-shared'
 import { db } from './client'
 import { type CareerProfile, careerProfile } from './schema'
 import type { DbExecutor } from './skill-queries'
@@ -222,7 +221,6 @@ export function saveCareerCandidate(
         .values({ id: 1, ...columns, revision, createdAt: now, updatedAt: now })
         .run()
     }
-    recordCareerChange(tx, stableFingerprint(content))
     return { changed: true, revision }
   })
 }
@@ -328,7 +326,6 @@ export function saveCareerPreferences(
         .values({ id: 1, ...columns, revision, createdAt: now, updatedAt: now })
         .run()
     }
-    recordCareerChange(tx, stableFingerprint(content))
     return { changed: true, revision }
   })
 }

@@ -1,10 +1,10 @@
 import { createRoute } from 'honox/factory'
 import { loadCareerDataView } from '../../../../../src/db/career-data-view'
-import { listCareerSkills, updateCareerSkill } from '../../../../../src/db/career-skills'
 import {
   CareerReferenceError,
   CareerRevisionConflictError,
-} from '../../../../../src/db/career-state'
+} from '../../../../../src/db/career-shared'
+import { listCareerSkills, updateCareerSkill } from '../../../../../src/db/career-skills'
 import { db } from '../../../../../src/db/client'
 import {
   personalSkillFormSchema,

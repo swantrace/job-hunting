@@ -16,13 +16,13 @@ import {
   updateCareerAchievement,
   updateCareerProject,
 } from '../../src/db/career-records'
+import { CareerReferenceError, CareerRevisionConflictError } from '../../src/db/career-shared'
 import {
   createCareerSkill,
   listCareerSkills,
   restoreCareerSkill,
   retireCareerSkill,
 } from '../../src/db/career-skills'
-import { CareerReferenceError, CareerRevisionConflictError } from '../../src/db/career-state'
 import * as schema from '../../src/db/schema'
 import {
   careerEvidenceIds,

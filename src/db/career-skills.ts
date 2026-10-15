@@ -1,14 +1,18 @@
 import { asc, eq } from 'drizzle-orm'
-import { parseJsonColumn, serializeJsonColumn, stringListSchema } from '../lib/career/json-schemas'
+import {
+  extensionSchema,
+  parseJsonColumn,
+  serializeJsonColumn,
+  stringListSchema,
+} from '../lib/career/json-schemas'
 import { nowISO } from '../lib/date'
 import {
   assertExpectedRevision,
   type CareerDb,
   CareerReferenceError,
   type CareerWriteResult,
-  recordCareerChange,
   stableFingerprint,
-} from './career-state'
+} from './career-shared'
 import { db } from './client'
 import { careerSkills, skills } from './schema'
 import type { DbExecutor } from './skill-queries'
@@ -34,6 +38,8 @@ export type CareerSkillRecord = {
   explanation: string | null
   notes: string | null
   evidence: string[]
+  /** Preserved authored fields with no relational column (0029 `extension_json`). */
+  extension: unknown
   retiredAt: string | null
   revision: number
   createdAt: string
@@ -106,6 +112,12 @@ export function listCareerSkills(
         [],
         'career_skills.evidence_json',
       ),
+      extension: parseJsonColumn(
+        row.row.extensionJson,
+        extensionSchema,
+        null,
+        'career_skills.extension_json',
+      ),
       retiredAt: row.row.retiredAt,
       revision: row.row.revision,
       createdAt: row.row.createdAt,
@@ -159,7 +171,6 @@ export function createCareerSkill(executor: CareerDb, input: CareerSkillInput): 
       .values({ skillId: skill.id, ...careerSkillColumns(content), createdAt: now, updatedAt: now })
       .returning({ id: careerSkills.id })
       .get()
-    recordCareerChange(tx, stableFingerprint({ skillId: skill.id, ...content }))
     return { id: inserted.id, changed: true, revision: 1 }
   })
 }
@@ -194,7 +205,6 @@ export function updateCareerSkill(
       .set({ ...careerSkillColumns(content), revision, updatedAt: nowISO() })
       .where(eq(careerSkills.id, id))
       .run()
-    recordCareerChange(tx, stableFingerprint({ skillId: existing.skillId, ...content }))
     return { id, changed: true, revision }
   })
 }
@@ -208,7 +218,6 @@ export function retireCareerSkill(executor: CareerDb, id: number): CareerWriteRe
       .set({ retiredAt: nowISO(), revision, updatedAt: nowISO() })
       .where(eq(careerSkills.id, id))
       .run()
-    recordCareerChange(tx, stableFingerprint({ careerSkillId: id, retired: true }))
     return { id, changed: true, revision }
   })
 }
@@ -223,7 +232,6 @@ export function restoreCareerSkill(executor: CareerDb, id: number): CareerWriteR
       .set({ retiredAt: null, revision, updatedAt: nowISO() })
       .where(eq(careerSkills.id, id))
       .run()
-    recordCareerChange(tx, stableFingerprint({ careerSkillId: id, retired: false }))
     return { id, changed: true, revision }
   })
 }

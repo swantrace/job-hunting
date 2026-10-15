@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm'
-import { todayISO } from '../lib/date'
+import { nowISO } from '../lib/date'
 import type {
   SkillDecision,
   SkillImportance,
@@ -61,7 +61,7 @@ export function insertSkill(
     origin?: SkillOrigin
   },
 ): Skill {
-  const date = todayISO()
+  const date = nowISO()
   const origin = input.origin ?? 'manual'
   const skill = tx
     .insert(skills)
@@ -131,7 +131,7 @@ export function addAliasIfAbsent(
     .get()
   if (existing) return
   tx.insert(skillAliases)
-    .values({ skillId, alias, normalizedAlias: normalized, origin, createdAt: todayISO() })
+    .values({ skillId, alias, normalizedAlias: normalized, origin, createdAt: nowISO() })
     .run()
 }
 

@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm'
 import { skillAliases, skills } from '../../db/schema'
 import type { DbExecutor } from '../../db/skill-queries'
 import type { SkillDb } from '../../db/skill-service'
-import { todayISO } from '../date'
+import { nowISO } from '../date'
 import { normalizeSkillAlias } from './normalize'
 import type { SkillCategory } from './taxonomy'
 
@@ -72,7 +72,7 @@ export function syncCareerSkills(
   options: { apply?: boolean } = {},
 ): SyncReport {
   const apply = options.apply ?? false
-  const date = todayISO()
+  const date = nowISO()
   const report = emptyReport()
 
   const run = (tx: DbExecutor) => {

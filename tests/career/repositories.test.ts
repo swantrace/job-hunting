@@ -34,12 +34,12 @@ import {
   retireCareerProject,
   updateCareerEducation,
 } from '../../src/db/career-records'
-import { createCareerSkill, listCareerSkills, retireCareerSkill } from '../../src/db/career-skills'
 import {
   CareerReferenceError,
   CareerRevisionConflictError,
-  readCareerState,
-} from '../../src/db/career-state'
+  careerContentProbe,
+} from '../../src/db/career-shared'
+import { createCareerSkill, listCareerSkills, retireCareerSkill } from '../../src/db/career-skills'
 import { assertDatabaseReady } from '../../src/db/health'
 import * as schema from '../../src/db/schema'
 import {
@@ -114,21 +114,29 @@ const baseInput = {
 }
 
 describe('revision semantics', () => {
-  test('a real change bumps the row revision and career_state, a no-op write is invisible', () => {
+  test('a real change bumps the row revision and the change probe, a no-op write is invisible', async () => {
     const { sqlite, db } = database()
     try {
+      const emptyProbe = careerContentProbe(db)
       const created = createCareerEducation(db, baseInput)
       expect(created.changed).toBe(true)
       expect(created.revision).toBe(1)
-      expect(readCareerState(db).revision).toBe(1)
-      const afterCreate = educationRow(sqlite, created.id)
+      const afterCreate = careerContentProbe(db)
+      expect(afterCreate).not.toBe(emptyProbe)
+      const createdRow = educationRow(sqlite, created.id)
 
       const noop = updateCareerEducation(db, created.id, baseInput)
       expect(noop).toEqual({ id: created.id, changed: false, revision: 1 })
-      expect(educationRow(sqlite, created.id)).toEqual(afterCreate)
-      expect(readCareerState(db).revision).toBe(1)
+      expect(educationRow(sqlite, created.id)).toEqual(createdRow)
+      expect(careerContentProbe(db)).toBe(afterCreate)
 
+      // The probe's timestamp component has millisecond resolution, so a real
+      // update is separated from the write before it to make the assertion
+      // deterministic rather than clock-dependent.
+      await Bun.sleep(2)
       const first = updateCareerEducation(db, created.id, { ...baseInput, degree: 'MSc Computing' })
+      const afterFirst = careerContentProbe(db)
+      await Bun.sleep(2)
       const second = updateCareerEducation(db, created.id, {
         ...baseInput,
         degree: 'PhD Computing',
@@ -137,25 +145,27 @@ describe('revision semantics', () => {
       expect(second.changed).toBe(true)
       expect([first.revision, second.revision]).toEqual([2, 3])
       expect(educationRow(sqlite, created.id).degree).toBe('PhD Computing')
-      expect(readCareerState(db).revision).toBe(3)
-      expect(readCareerState(db).contentHash).not.toBe('')
+      expect(careerContentProbe(db)).not.toBe(afterFirst)
+      expect(careerContentProbe(db)).not.toBe('')
     } finally {
       sqlite.close()
     }
   })
 
-  test('two same-day changes produce two revisions and two distinct hashes', () => {
+  test('two same-day changes produce two revisions and two distinct probe fingerprints', async () => {
     const { sqlite, db } = database()
     try {
       const created = createCareerEducation(db, baseInput)
-      const before = readCareerState(db).contentHash
+      const before = careerContentProbe(db)
+      await Bun.sleep(2)
       updateCareerEducation(db, created.id, {
         ...baseInput,
         degree: 'BSc Computer Science (Honours)',
       })
-      const middle = readCareerState(db).contentHash
+      const middle = careerContentProbe(db)
+      await Bun.sleep(2)
       updateCareerEducation(db, created.id, { ...baseInput, degree: 'MSc Computing' })
-      const after = readCareerState(db).contentHash
+      const after = careerContentProbe(db)
       expect(new Set([before, middle, after]).size).toBe(3)
       expect(educationRow(sqlite, created.id).revision).toBe(3)
     } finally {

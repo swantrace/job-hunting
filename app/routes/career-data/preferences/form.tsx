@@ -1,7 +1,7 @@
 import { createRoute } from 'honox/factory'
 import { loadCareerDataView } from '../../../../src/db/career-data-view'
 import { saveCareerPreferences } from '../../../../src/db/career-facts'
-import { CareerRevisionConflictError } from '../../../../src/db/career-state'
+import { CareerRevisionConflictError } from '../../../../src/db/career-shared'
 import { db } from '../../../../src/db/client'
 import { saveRecordExtensions } from '../../../../src/lib/career/extensions'
 import {
@@ -10,7 +10,6 @@ import {
   preferencesInput,
   submittedValues,
 } from '../../../../src/lib/career/form-input'
-import { extensionObjectOrNull } from '../../../../src/lib/career/json-schemas'
 import { parseForm, retargetFragment } from '../../../../src/lib/request'
 import { CareerDataTabs } from '../../../components/career/CareerDataTabs'
 import { CareerOnboardingRegion } from '../../../components/career/CareerOnboardingRegion'
@@ -23,7 +22,7 @@ export const GET = createRoute((c) => {
   const view = loadCareerDataView(db)
   return c.html(
     <PreferencesForm
-      values={preferencesFormValues(view.preferences, view.extensionRecords.preferences?.['$'])}
+      values={preferencesFormValues(view.preferences, view.candidateExtensions)}
       exists={view.preferences !== null}
     />,
   )
@@ -37,7 +36,7 @@ export const GET = createRoute((c) => {
 export const POST = createRoute(async (c) => {
   const view = loadCareerDataView(db)
   const exists = view.preferences !== null
-  const fallback = preferencesFormValues(view.preferences, view.extensionRecords.preferences?.['$'])
+  const fallback = preferencesFormValues(view.preferences, view.candidateExtensions)
   const raw = await parseForm(c)
   const submitted = submittedValues(raw, fallback)
   const render = (feedback?: CareerFormFeedback, status: 200 | 409 | 422 = 200) =>
@@ -81,15 +80,12 @@ export const POST = createRoute(async (c) => {
   return c.html(
     <>
       <PreferencesForm
-        values={preferencesFormValues(
-          updated.preferences,
-          updated.extensionRecords.preferences?.['$'],
-        )}
+        values={preferencesFormValues(updated.preferences, updated.candidateExtensions)}
         exists={updated.preferences !== null}
       />
       <PreferencesPanel
         preferences={updated.preferences}
-        extensions={extensionObjectOrNull(updated.extensionRecords.preferences?.['$'])}
+        extensions={updated.candidateExtensions}
         oob
       />
       <CareerOnboardingRegion onboardingRequired={updated.onboardingRequired} oob />

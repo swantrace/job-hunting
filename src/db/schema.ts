@@ -643,27 +643,15 @@ export const careerProfile = sqliteTable(
     revision: integer('revision').notNull().default(1),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
+    // Added by 0029: the profile singleton now owns the career-level authored
+    // fields the schema does not model (the old `career_state` archive) and the
+    // per-source-document root values, keyed by file name.
+    extensionJson: text('extension_json'),
+    documentsJson: text('documents_json'),
   },
   (table) => [
     check('career_profile_singleton_check', sql`${table.id} = 1`),
     check('career_profile_revision_check', sql`${table.revision} > 0`),
-  ],
-)
-
-export const careerState = sqliteTable(
-  'career_state',
-  {
-    id: integer('id').primaryKey(),
-    revision: integer('revision').notNull().default(0),
-    contentHash: text('content_hash').notNull().default(''),
-    legacyDocumentsJson: text('legacy_documents_json'),
-    extensionJson: text('extension_json'),
-    createdAt: text('created_at').notNull(),
-    updatedAt: text('updated_at').notNull(),
-  },
-  (table) => [
-    check('career_state_singleton_check', sql`${table.id} = 1`),
-    check('career_state_revision_check', sql`${table.revision} >= 0`),
   ],
 )
 
@@ -706,6 +694,7 @@ export const careerEducation = sqliteTable(
     revision: integer('revision').notNull().default(1),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
   },
   (table) => [
     uniqueIndex('career_education_stable_key_unique_idx').on(table.stableKey),
@@ -771,6 +760,7 @@ export const careerAchievements = sqliteTable(
     revision: integer('revision').notNull().default(1),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
   },
   (table) => [
     uniqueIndex('career_achievements_stable_key_unique_idx').on(table.stableKey),
@@ -799,6 +789,7 @@ export const careerProjects = sqliteTable(
     revision: integer('revision').notNull().default(1),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
   },
   (table) => [
     uniqueIndex('career_projects_stable_key_unique_idx').on(table.stableKey),
@@ -830,6 +821,7 @@ export const careerStories = sqliteTable(
     revision: integer('revision').notNull().default(1),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
   },
   (table) => [
     uniqueIndex('career_stories_stable_key_unique_idx').on(table.stableKey),
@@ -861,6 +853,7 @@ export const careerPublications = sqliteTable(
     revision: integer('revision').notNull().default(1),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
   },
   (table) => [
     uniqueIndex('career_publications_stable_key_unique_idx').on(table.stableKey),
@@ -892,6 +885,7 @@ export const careerSkills = sqliteTable(
     revision: integer('revision').notNull().default(1),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
   },
   (table) => [
     uniqueIndex('career_skills_skill_unique_idx').on(table.skillId),
@@ -915,6 +909,7 @@ export const careerBaseResumes = sqliteTable(
     revision: integer('revision').notNull().default(1),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
   },
   (table) => [
     uniqueIndex('career_base_resumes_direction_version_unique_idx').on(
@@ -1080,8 +1075,6 @@ export const jobRequirementSkillMentions = sqliteTable(
 
 export type CareerProfile = typeof careerProfile.$inferSelect
 export type NewCareerProfile = typeof careerProfile.$inferInsert
-export type CareerStateRow = typeof careerState.$inferSelect
-export type NewCareerStateRow = typeof careerState.$inferInsert
 export type CareerDirection = typeof careerDirections.$inferSelect
 export type NewCareerDirection = typeof careerDirections.$inferInsert
 export type CareerEducation = typeof careerEducation.$inferSelect

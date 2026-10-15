@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { asc } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { listCareerDirections } from '../db/career-directions'
 import { readCareerCandidate, readCareerPreferences } from '../db/career-facts'
@@ -12,11 +12,12 @@ import {
   listCareerPublications,
   listCareerStories,
 } from '../db/career-records'
+import { careerContentProbe, readCareerContentProbe } from '../db/career-shared'
 import { listCareerSkills } from '../db/career-skills'
-import { readCareerState, readCareerStateDocuments } from '../db/career-state'
 import { db } from '../db/client'
-import { skillAliases, skills } from '../db/schema'
+import { careerProfile, skillAliases, skills } from '../db/schema'
 import type { DbExecutor } from '../db/skill-queries'
+import { extensionSchema, parseJsonColumn } from './career/json-schemas'
 import { isISODate } from './date'
 import { normalizeSkillAlias } from './skills/normalize'
 import { parseSkillTaxonomy, skillCategoryKeys } from './skills/taxonomy'
@@ -305,9 +306,10 @@ const careerDataFiles = [
  * is the database assembler the runtime uses.
  *
  * `portfolio-content.json` is read here even though the portfolio-topic feature
- * was removed in migration 0028: the raw document is still preserved verbatim in
- * `career_state.legacy_documents_json`, so the original source is never lost.
- * Only the structured/canonical portfolio path is gone.
+ * was removed in migration 0028: the directory importer still accepts the file,
+ * and only its document-root values without a relational home are carried into
+ * `career_profile.documents_json`. The structured/canonical portfolio path is
+ * gone and the verbatim blob is no longer stored.
  *
  * `publications.json` is optional (matching the loader) and falls back to the
  * empty versioned document.
@@ -371,37 +373,58 @@ function nonEmptyRecord(value: unknown): Record<string, unknown> {
 
 /**
  * Document-level metadata (`schemaVersion`, `lastUpdated`) that the relational
- * schema does not model. Legacy source documents are stored in the database by
- * the importer, so reading them here is still a database read — never a
- * filesystem fallback.
+ * schema does not model. The document roots are stored on the `career_profile`
+ * singleton by the importer, so reading them here is still a database read —
+ * never a filesystem fallback.
  */
 function documentMeta(
-  legacyDocuments: Record<string, unknown>,
+  documents: Record<string, unknown>,
   file: string,
   fallbackDate: string,
 ): { schemaVersion: 1; lastUpdated: string } {
-  const legacy = asRecord(legacyDocuments[file])
+  const document = asRecord(documents[file])
   const lastUpdated =
-    typeof legacy.lastUpdated === 'string' && isISODate(legacy.lastUpdated)
-      ? legacy.lastUpdated
+    typeof document.lastUpdated === 'string' && isISODate(document.lastUpdated)
+      ? document.lastUpdated
       : fallbackDate
   return { schemaVersion: 1, lastUpdated }
+}
+
+/** Parses one row's `extension_json` column into preserved authored fields. */
+function rowExtension(value: string | null): Record<string, unknown> {
+  if (value === null || value.trim() === '') return {}
+  return nonEmptyRecord(parseJsonColumn(value, extensionSchema, {}, 'extension_json'))
 }
 
 /**
  * Assembles the canonical career shape from the relational career tables so no
  * prompt, renderer or schema has to change. Every junction is rendered back
  * into the array field it came from, in stored `position` order, using stable
- * keys; unknown authored fields stored in `career_state` are merged back so a
- * database round trip never drops an extension field.
+ * keys; unknown authored fields are read back from each row's `extension_json`
+ * column (and the `career_profile` singleton's) so a database round trip never
+ * drops an extension field.
  */
 export function loadCareerDataFromDatabase(executor: DbExecutor = db): CanonicalCareerData {
-  const state = readCareerState(executor)
-  const documents = readCareerStateDocuments(executor)
-  const legacyDocuments = asRecord(documents.legacyDocuments)
-  const extension = (kind: string, key: string) => nonEmptyRecord(documents.records[kind]?.[key])
-  const fallbackDate = isISODate(state.updatedAt.slice(0, 10))
-    ? state.updatedAt.slice(0, 10)
+  const probe = readCareerContentProbe(executor)
+  const profile = executor
+    .select({
+      extensionJson: careerProfile.extensionJson,
+      documentsJson: careerProfile.documentsJson,
+    })
+    .from(careerProfile)
+    .where(eq(careerProfile.id, 1))
+    .get()
+  const profileExtension = rowExtension(profile?.extensionJson ?? null)
+  const documents = asRecord(
+    parseJsonColumn(
+      profile?.documentsJson ?? null,
+      z.record(z.string(), z.unknown()),
+      {},
+      'career_profile.documents_json',
+    ),
+  )
+  const fallbackDate = isISODate(probe.updatedAt.slice(0, 10))
+    ? probe.updatedAt.slice(0, 10)
     : '1970-01-01'
 
   const candidateRow = readCareerCandidate(executor)
@@ -443,7 +466,7 @@ export function loadCareerDataFromDatabase(executor: DbExecutor = db): Canonical
     id === null ? null : (experienceKeyById.get(id) ?? null)
 
   const candidate = {
-    ...documentMeta(legacyDocuments, 'candidate.json', fallbackDate),
+    ...documentMeta(documents, 'candidate.json', fallbackDate),
     identity: {
       fullName: candidateRow?.fullName ?? '',
       email: candidateRow?.email ?? '',
@@ -452,7 +475,7 @@ export function loadCareerDataFromDatabase(executor: DbExecutor = db): Canonical
       website: candidateRow?.website ?? null,
       linkedinUrl: candidateRow?.linkedinUrl ?? null,
       githubUrl: candidateRow?.githubUrl ?? null,
-      ...extension('candidate', '$'),
+      ...profileExtension,
     },
     authorization: candidateRow?.authorization ?? null,
     careerBreak: candidateRow?.careerBreak ?? null,
@@ -469,14 +492,14 @@ export function loadCareerDataFromDatabase(executor: DbExecutor = db): Canonical
       sortOrder: row.sortOrder,
       coursework: row.coursework,
       ...(row.details === null ? {} : { details: row.details }),
-      ...extension('education', row.stableKey),
+      ...rowExtension(row.extensionJson),
     })),
   }
 
   return {
     candidate,
     experiences: {
-      ...documentMeta(legacyDocuments, 'experiences.json', fallbackDate),
+      ...documentMeta(documents, 'experiences.json', fallbackDate),
       experiences: experiences.map((row) => ({
         id: row.stableKey,
         company: row.company,
@@ -490,11 +513,11 @@ export function loadCareerDataFromDatabase(executor: DbExecutor = db): Canonical
         context: row.context,
         responsibilities: row.responsibilities,
         ...nonEmptyRecord(row.extension),
-        ...extension('experiences', row.stableKey),
+        ...nonEmptyRecord(row.extension),
       })),
     },
     achievements: {
-      ...documentMeta(legacyDocuments, 'achievements.json', fallbackDate),
+      ...documentMeta(documents, 'achievements.json', fallbackDate),
       achievements: achievements.map((row) => ({
         id: row.stableKey,
         experienceId: experienceKey(row.experienceId),
@@ -506,33 +529,34 @@ export function loadCareerDataFromDatabase(executor: DbExecutor = db): Canonical
         skills: row.skills.map(skillKey).filter(isDefined),
         directions: row.directions,
         publicationIds: row.publicationIds.map(publicationKey).filter(isDefined),
-        ...extension('achievements', row.stableKey),
+        ...rowExtension(row.extensionJson),
       })),
     },
     publications: {
-      ...documentMeta(legacyDocuments, 'publications.json', fallbackDate),
-      publications: publications.map((row) => ({
-        id: row.stableKey,
-        title: row.title,
-        citation: row.citation,
-        year: row.year,
-        publicationType: String(
-          extension('publications', row.stableKey).publicationType ?? 'other',
-        ),
-        status: row.status,
-        safeToUse: row.safeToUse,
-        experienceId: experienceKey(row.experienceId),
-        authors: row.authors,
-        authorListIsTruncated: row.authorListTruncated,
-        contributions: row.contributions,
-        sourceUrls: row.sourceUrls,
-        projectIds: row.projectIds.map(projectKey).filter(isDefined),
-        directions: row.directions,
-        ...extension('publications', row.stableKey),
-      })),
+      ...documentMeta(documents, 'publications.json', fallbackDate),
+      publications: publications.map((row) => {
+        const extension = rowExtension(row.extensionJson)
+        return {
+          id: row.stableKey,
+          title: row.title,
+          citation: row.citation,
+          year: row.year,
+          publicationType: String(extension.publicationType ?? 'other'),
+          status: row.status,
+          safeToUse: row.safeToUse,
+          experienceId: experienceKey(row.experienceId),
+          authors: row.authors,
+          authorListIsTruncated: row.authorListTruncated,
+          contributions: row.contributions,
+          sourceUrls: row.sourceUrls,
+          projectIds: row.projectIds.map(projectKey).filter(isDefined),
+          directions: row.directions,
+          ...extension,
+        }
+      }),
     },
     projects: {
-      ...documentMeta(legacyDocuments, 'projects.json', fallbackDate),
+      ...documentMeta(documents, 'projects.json', fallbackDate),
       projects: projects.map((row) => ({
         id: row.stableKey,
         name: row.name,
@@ -545,11 +569,11 @@ export function loadCareerDataFromDatabase(executor: DbExecutor = db): Canonical
         urls: row.urls,
         safeWording: row.safeWording,
         limitations: row.limitations,
-        ...extension('projects', row.stableKey),
+        ...rowExtension(row.extensionJson),
       })),
     },
     skills: {
-      ...documentMeta(legacyDocuments, 'skills.json', fallbackDate),
+      ...documentMeta(documents, 'skills.json', fallbackDate),
       skills: jobSkills.map((row) => ({
         id: row.skillKey,
         label: row.skillName,
@@ -561,11 +585,11 @@ export function loadCareerDataFromDatabase(executor: DbExecutor = db): Canonical
         personalExplanation: row.explanation,
         notes: row.notes,
         evidence: row.evidence,
-        ...extension('personalSkills', row.skillKey),
+        ...nonEmptyRecord(row.extension),
       })),
     },
     stories: {
-      ...documentMeta(legacyDocuments, 'stories.json', fallbackDate),
+      ...documentMeta(documents, 'stories.json', fallbackDate),
       stories: stories.map((row) => ({
         id: row.stableKey,
         experienceId: experienceKey(row.experienceId),
@@ -577,11 +601,11 @@ export function loadCareerDataFromDatabase(executor: DbExecutor = db): Canonical
         result: row.result,
         narrative: row.narrative,
         directions: row.directions,
-        ...extension('stories', row.stableKey),
+        ...rowExtension(row.extensionJson),
       })),
     },
     preferences: {
-      ...documentMeta(legacyDocuments, 'preferences.json', fallbackDate),
+      ...documentMeta(documents, 'preferences.json', fallbackDate),
       directionDefinitions: Object.fromEntries(
         [...directions]
           .sort(
@@ -601,7 +625,7 @@ export function loadCareerDataFromDatabase(executor: DbExecutor = db): Canonical
             },
           }
         : {}),
-      ...extension('preferences', '$'),
+      ...profileExtension,
     },
   } as CanonicalCareerData
 }
@@ -611,29 +635,25 @@ function isDefined<T>(value: T | undefined): value is T {
 }
 
 let careerDataCache: {
-  revision: number
-  contentHash: string
+  probe: string
   data: CanonicalCareerData
 } | null = null
 
 /**
  * Database-owned canonical career data. The relational tables are the sole
- * runtime authority; the result is memoized on `career_state.revision` +
- * `content_hash` so a workspace render does not re-query the whole dataset, and
- * any career write (which bumps the revision) refreshes it on the next call.
- * An empty database yields a well-formed empty shape rather than an error.
+ * runtime authority; the result is memoized on the computed change probe
+ * (`careerContentProbe`) so a workspace render does not re-query the whole
+ * dataset, and any career, catalog, category or junction write refreshes it on
+ * the next call. An empty database yields a well-formed empty shape rather than
+ * an error.
  */
 export function loadCareerData(executor: DbExecutor = db): CanonicalCareerData {
-  const state = readCareerState(executor)
-  if (
-    careerDataCache &&
-    careerDataCache.revision === state.revision &&
-    careerDataCache.contentHash === state.contentHash
-  ) {
+  const probe = careerContentProbe(executor)
+  if (careerDataCache && careerDataCache.probe === probe) {
     return careerDataCache.data
   }
   const data = loadCareerDataFromDatabase(executor)
-  careerDataCache = { revision: state.revision, contentHash: state.contentHash, data }
+  careerDataCache = { probe, data }
   return data
 }
 

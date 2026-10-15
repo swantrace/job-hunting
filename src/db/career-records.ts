@@ -15,9 +15,8 @@ import {
   type CareerDb,
   CareerReferenceError,
   type CareerWriteResult,
-  recordCareerChange,
   stableFingerprint,
-} from './career-state'
+} from './career-shared'
 import { db } from './client'
 import {
   type CareerAchievement,
@@ -47,9 +46,9 @@ import type { DbExecutor } from './skill-queries'
  * stories and publications. Every write inside this module:
  *
  * - compares the complete logical content (including ordered junctions) and is
- *   completely invisible when nothing changed: no revision bump, no
- *   `updated_at` change and no `career_state` write;
- * - increments the row revision and records one career change otherwise;
+ *   completely invisible when nothing changed: no revision bump and no
+ *   `updated_at` change;
+ * - increments the row revision otherwise;
  * - replaces the record's junctions wholesale inside the same transaction,
  *   preserving array order in `position`, and rejects unknown, duplicated or
  *   retired references;
@@ -260,7 +259,7 @@ function requirePublicationYear(value: number): number {
   return value
 }
 
-/** No-op detection plus the revision/career-state bookkeeping for one write. */
+/** No-op detection plus the per-row revision bookkeeping for one write. */
 function commitRecordWrite(args: {
   tx: CareerDb
   current: { revision: number } | null
@@ -274,7 +273,6 @@ function commitRecordWrite(args: {
     return { changed: false, revision: args.current.revision }
   }
   const revision = args.current ? args.current.revision + 1 : 1
-  recordCareerChange(args.tx, stableFingerprint(args.nextContent))
   return { changed: true, revision }
 }
 
@@ -425,7 +423,6 @@ export function createCareerEducation(
       .values({ ...educationColumns(content), createdAt: now, updatedAt: now })
       .returning({ id: careerEducation.id })
       .get()
-    recordCareerChange(tx, stableFingerprint(content))
     return { id: inserted.id, changed: true, revision: 1 }
   })
 }
@@ -641,7 +638,6 @@ export function createCareerExperience(
       .values({ ...experienceColumns(content), createdAt: now, updatedAt: now })
       .returning({ id: careerExperiences.id })
       .get()
-    recordCareerChange(tx, stableFingerprint(content))
     return { id: inserted.id, changed: true, revision: 1 }
   })
 }
@@ -936,7 +932,6 @@ export function createCareerAchievement(
       .returning({ id: careerAchievements.id })
       .get()
     replaceAchievementLinks(tx, inserted.id, links)
-    recordCareerChange(tx, stableFingerprint(content))
     return { id: inserted.id, changed: true, revision: 1 }
   })
 }
@@ -1158,7 +1153,6 @@ export function createCareerProject(
       .returning({ id: careerProjects.id })
       .get()
     replaceProjectLinks(tx, inserted.id, links)
-    recordCareerChange(tx, stableFingerprint(content))
     return { id: inserted.id, changed: true, revision: 1 }
   })
 }
@@ -1331,7 +1325,6 @@ export function createCareerStory(executor: CareerDb, input: CareerStoryInput): 
       .returning({ id: careerStories.id })
       .get()
     replaceStoryDirections(tx, inserted.id, directions)
-    recordCareerChange(tx, stableFingerprint(content))
     return { id: inserted.id, changed: true, revision: 1 }
   })
 }
@@ -1585,7 +1578,6 @@ export function createCareerPublication(
       .returning({ id: careerPublications.id })
       .get()
     replacePublicationLinks(tx, inserted.id, links)
-    recordCareerChange(tx, stableFingerprint(content))
     return { id: inserted.id, changed: true, revision: 1 }
   })
 }

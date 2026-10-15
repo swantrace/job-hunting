@@ -14,7 +14,6 @@ import { seedPopulatedLegacyCatalog } from './fixtures'
 
 const careerTables = [
   'career_profile',
-  'career_state',
   'career_directions',
   'career_education',
   'career_experiences',
@@ -35,6 +34,13 @@ const careerTables = [
 function tableNames(sqlite: ReturnType<typeof migratedDatabase>) {
   return sqlite
     .query("SELECT name FROM sqlite_master WHERE type = 'table'")
+    .all()
+    .map((row) => String((row as { name: string }).name))
+}
+
+function columnNames(sqlite: ReturnType<typeof migratedDatabase>, table: string): string[] {
+  return sqlite
+    .query(`PRAGMA table_info('${table}')`)
     .all()
     .map((row) => String((row as { name: string }).name))
 }
@@ -66,14 +72,28 @@ describe('career schema migration on a fresh database', () => {
     }
   })
 
-  test('creates only the career state bookkeeping row, never a fabricated candidate', () => {
+  test('creates no fabricated candidate and every career-level extension column', () => {
     const sqlite = migratedDatabase()
     try {
-      const states = sqlite.query('SELECT id, revision, content_hash FROM career_state').all()
-      expect(states).toEqual([{ id: 1, revision: 0, content_hash: '' }])
+      // 0029 dissolved the bookkeeping singleton into the career tables.
+      expect(tableNames(sqlite)).not.toContain('career_state')
       expect(sqlite.query('SELECT count(*) AS count FROM career_profile').get()).toEqual({
         count: 0,
       })
+      for (const table of [
+        'career_profile',
+        'career_education',
+        'career_experiences',
+        'career_achievements',
+        'career_projects',
+        'career_stories',
+        'career_publications',
+        'career_skills',
+        'career_base_resumes',
+      ]) {
+        expect(columnNames(sqlite, table)).toContain('extension_json')
+      }
+      expect(columnNames(sqlite, 'career_profile')).toContain('documents_json')
     } finally {
       sqlite.close()
     }

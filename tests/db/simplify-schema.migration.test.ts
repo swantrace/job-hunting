@@ -450,9 +450,10 @@ describe('schema simplification migration (0027)', () => {
       const tables = tableNames(sqlite)
       for (const table of droppedTables) expect(tables).not.toContain(table)
 
-      // 37 application tables plus the junction as a view: 0027 left 39, and
-      // 0028 then drops the two portfolio tables.
-      expect(tables).toHaveLength(37)
+      // 36 application tables plus the junction as a view: 0027 left 39, 0028
+      // dropped the two portfolio tables, and 0029 dissolved career_state.
+      expect(tables).toHaveLength(36)
+      expect(tables).not.toContain('career_state')
       expect(
         sqlite
           .query("SELECT type FROM sqlite_master WHERE name = 'job_requirements_to_skills'")

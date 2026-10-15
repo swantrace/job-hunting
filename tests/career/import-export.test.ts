@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { selectedApprovedBaseResume } from '../../src/db/career-base-resumes'
 import { createCareerDirection } from '../../src/db/career-directions'
-import { readCareerState, stableFingerprint } from '../../src/db/career-state'
+import { careerContentProbe, stableFingerprint } from '../../src/db/career-shared'
 import * as schema from '../../src/db/schema'
 import { baseResumeTextHash } from '../../src/lib/base-resumes'
 import { buildCareerDataset, serializeCareerDataset } from '../../src/lib/career-export'
@@ -125,7 +125,7 @@ describe('career dataset import and export', () => {
 
     const preview = prepareCareerImport(db, { kind: 'directory', directory })
     expect(preview.conflicts).toEqual([])
-    expect(preview.databaseRevision).toBe(0)
+    expect(preview.databaseRevision).toBe(careerContentProbe(db))
 
     const report = applyCareerImport(db, preview)
     expect(report.byKind.catalog).toEqual({ inserted: 5, updated: 0, unchanged: 0 })
@@ -151,12 +151,12 @@ describe('career dataset import and export', () => {
     expect(rowCount(sqlite, 'career_profile')).toBe(1)
   })
 
-  test('2. a repeat import is a no-op and does not change career_state.revision', () => {
+  test('2. a repeat import is a no-op and does not change the change probe', () => {
     const { db } = database()
     const directory = temporaryDirectory((dir) => writeSyntheticCareerData(dir))
     applyCareerImport(db, prepareCareerImport(db, { kind: 'directory', directory }))
-    const revision = readCareerState(db).revision
-    expect(revision).toBeGreaterThan(0)
+    const probe = careerContentProbe(db)
+    expect(probe).not.toBe('')
 
     const preview = prepareCareerImport(db, { kind: 'directory', directory })
     expect(preview.conflicts).toEqual([])
@@ -165,7 +165,7 @@ describe('career dataset import and export', () => {
     expect(report.updated).toBe(0)
     expect(report.unchanged).toBe(preview.report.unchanged)
     expect(report.unchanged).toBeGreaterThan(0)
-    expect(readCareerState(db).revision).toBe(revision)
+    expect(careerContentProbe(db)).toBe(probe)
   })
 
   test('3. an ambiguous catalog alias blocks with a conflict and writes nothing', () => {
@@ -368,12 +368,39 @@ describe('career dataset import and export', () => {
       'skill_aliases',
     ]
     const before = tables.map((table) => rowCount(sqlite, table))
-    const revisionBefore = readCareerState(db).revision
+    const probeBefore = careerContentProbe(db)
     expect(before.every((count) => count === 0)).toBe(true)
 
     expect(() => applyCareerImport(failingExecutor(db), preview)).toThrow('injected import failure')
 
-    expect(readCareerState(db).revision).toBe(revisionBefore)
+    expect(careerContentProbe(db)).toBe(probeBefore)
     expect(tables.map((table) => rowCount(sqlite, table))).toEqual(before)
+  })
+
+  test('11. a legacy dataset carrying the removed state archive still imports', () => {
+    const source = database()
+    const directory = temporaryDirectory((dir) => writeSyntheticCareerData(dir))
+    applyCareerImport(source.db, prepareCareerImport(source.db, { kind: 'directory', directory }))
+    const dataset = buildCareerDataset(source.db) as Record<string, unknown>
+
+    // A pre-0029 export: it has `state.legacyDocuments`/`state.extensions` and
+    // no `documents`. The importer must ignore the removed archive and still
+    // apply the rest without error.
+    const legacy: Record<string, unknown> = {
+      ...dataset,
+      state: {
+        legacyDocuments: { 'candidate.json': { identity: { fullName: 'Legacy' } } },
+        extensions: { someDocument: { kept: true } },
+      },
+    }
+    delete legacy.documents
+
+    const target = database()
+    const preview = prepareCareerImport(target.db, { kind: 'dataset', json: legacy })
+    expect(preview.conflicts).toEqual([])
+    const report = applyCareerImport(target.db, preview)
+    expect(report.inserted).toBeGreaterThan(0)
+    expect(rowCount(target.sqlite, 'career_education')).toBe(2)
+    expect(rowCount(target.sqlite, 'career_experiences')).toBe(2)
   })
 })

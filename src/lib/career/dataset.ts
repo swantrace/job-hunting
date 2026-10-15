@@ -218,6 +218,13 @@ const careerStateSchema = z.looseObject({
   extensions: extensionsSchema.optional(),
 })
 
+/**
+ * Document-root values with no relational home, keyed by source file name. The
+ * archive that used to live in `career_state` is now owned by the tables
+ * themselves; only these per-document roots ride on the profile singleton.
+ */
+export const documentsSchema = z.record(z.string(), z.unknown())
+
 export const careerDatasetSchema = z.looseObject({
   format: z.literal(careerDatasetFormat),
   schemaVersion: z.literal(careerDatasetSchemaVersion),
@@ -236,7 +243,14 @@ export const careerDatasetSchema = z.looseObject({
   personalSkills: z.array(personalSkillSchema),
   directions: z.array(directionSchema),
   baseResumes: z.array(baseResumeSchema),
-  state: careerStateSchema,
+  /** Per-source-document roots (schemaVersion, lastUpdated and other extras). */
+  documents: documentsSchema.optional(),
+  /**
+   * Legacy compatibility only: a dataset exported before migration 0029 carried
+   * the raw document archive and its extension map here. The importer ignores
+   * it, so an older operator backup still imports without error.
+   */
+  state: careerStateSchema.optional(),
   excluded: z.looseObject({ kinds: z.array(z.string()), reason: z.string() }),
 })
 

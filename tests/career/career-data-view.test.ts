@@ -13,12 +13,9 @@ import {
   retireCareerEducation,
   retireCareerExperience,
 } from '../../src/db/career-records'
-import {
-  readCareerState,
-  readCareerStateDocuments,
-  writeCareerStateDocuments,
-} from '../../src/db/career-state'
+import { careerContentProbe } from '../../src/db/career-shared'
 import * as schema from '../../src/db/schema'
+import { storedRecordExtensions, writeRecordExtensions } from '../../src/lib/career/extensions'
 import {
   applyExtensionFields,
   candidateFormSchema,
@@ -278,27 +275,34 @@ describe('career form input', () => {
     expect(resolveFieldValue('kept', 'kept')).toBe('kept')
   })
 
-  test('preserved extension fields round trip through the database store', () => {
+  test('preserved extension fields round trip through the owning education row', () => {
     const { sqlite, db } = database()
     try {
-      const records = applyExtensionFields(
-        readCareerStateDocuments(db).records,
-        'education',
-        'fixture-education',
-        { preserved: 7 },
-      )
-      writeCareerStateDocuments(db, { records })
-      expect(readCareerStateDocuments(db).records.education?.['fixture-education']).toEqual({
-        preserved: 7,
+      createCareerEducation(db, {
+        stableKey: 'fixture-education',
+        degree: 'BSc',
+        school: 'Example Institute',
       })
-      const cleared = applyExtensionFields(
-        readCareerStateDocuments(db).records,
-        'education',
-        'fixture-education',
-        null,
+      expect(storedRecordExtensions(db, 'education', 'fixture-education')).toBeNull()
+
+      // An object value round-trips through the row's column with its JSON
+      // types intact, matching what the importer writes.
+      expect(writeRecordExtensions(db, 'education', 'fixture-education', { preserved: 7 })).toBe(
+        true,
       )
-      writeCareerStateDocuments(db, { records: cleared })
-      expect(readCareerStateDocuments(db).records.education).toBeUndefined()
+      expect(storedRecordExtensions(db, 'education', 'fixture-education')).toEqual({ preserved: 7 })
+
+      // An emptied extension removes the field from the row instead of leaving
+      // an empty object behind.
+      expect(writeRecordExtensions(db, 'education', 'fixture-education', null)).toBe(true)
+      expect(storedRecordExtensions(db, 'education', 'fixture-education')).toBeNull()
+      expect(
+        sqlite
+          .query(
+            "SELECT extension_json FROM career_education WHERE stable_key = 'fixture-education'",
+          )
+          .get(),
+      ).toEqual({ extension_json: null })
     } finally {
       sqlite.close()
     }
@@ -306,13 +310,13 @@ describe('career form input', () => {
 })
 
 describe('no-op writes stay invisible', () => {
-  test('re-saving identical identity content keeps the revision and hash', () => {
+  test('re-saving identical identity content keeps the change probe', () => {
     const { sqlite, db } = database()
     try {
       saveCareerCandidate(db, candidate)
-      const before = readCareerState(db)
+      const before = careerContentProbe(db)
       expect(saveCareerCandidate(db, candidate)).toMatchObject({ changed: false })
-      expect(readCareerState(db)).toEqual(before)
+      expect(careerContentProbe(db)).toBe(before)
     } finally {
       sqlite.close()
     }

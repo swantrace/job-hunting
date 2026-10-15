@@ -3,20 +3,19 @@ import { listCareerEducation, updateCareerEducation } from '../../../../../src/d
 import {
   CareerReferenceError,
   CareerRevisionConflictError,
-  readCareerStateDocuments,
-  writeCareerStateDocuments,
-} from '../../../../../src/db/career-state'
+} from '../../../../../src/db/career-shared'
 import { db } from '../../../../../src/db/client'
 import {
-  applyExtensionFields,
+  saveRecordExtensions,
+  storedRecordExtensions,
+} from '../../../../../src/lib/career/extensions'
+import {
   educationFormSchema,
   educationFormValues,
   educationInput,
-  parseExtensionLines,
   resolveFieldValue,
   submittedValues,
 } from '../../../../../src/lib/career/form-input'
-import { extensionObjectOrNull } from '../../../../../src/lib/career/json-schemas'
 import { parseForm, parseId, queryFlag, retargetFragment } from '../../../../../src/lib/request'
 import { CareerDataTabs } from '../../../../components/career/CareerDataTabs'
 import { EducationForm, educationFormRootId } from '../../../../components/career/EducationForm'
@@ -31,20 +30,12 @@ function findEducation(id: number | null) {
 }
 
 function storedExtensions(stableKey: string): Record<string, unknown> | null {
-  return extensionObjectOrNull(readCareerStateDocuments(db).records.education?.[stableKey])
+  return storedRecordExtensions(db, 'education', stableKey)
 }
 
-/** Preserved extension fields live in the career state store, by stable key. */
+/** Preserved extension fields live on the education row, by stable key. */
 function saveExtensions(stableKey: string, text: string | undefined): boolean {
-  const extension = parseExtensionLines(storedExtensions(stableKey), text)
-  return writeCareerStateDocuments(db, {
-    records: applyExtensionFields(
-      readCareerStateDocuments(db).records,
-      'education',
-      stableKey,
-      extension,
-    ),
-  })
+  return saveRecordExtensions(db, 'education', stableKey, text)
 }
 
 export const GET = createRoute((c) => {

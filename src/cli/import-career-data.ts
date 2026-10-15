@@ -38,7 +38,7 @@ Options:
   --apply            Write the import in one transaction (default is a dry run).
   --help             Show this help.
 
-A stale preview (source bytes or database revision changed) is rejected; run a
+A stale preview (source bytes or database fingerprint changed) is rejected; run a
 new dry run before applying. Conflicts always block the import. An import merges
 by stable key and never deletes records missing from the source.`)
 }
@@ -80,7 +80,7 @@ function main() {
     console.log(`Source: ${sourcePath} (${source.kind})`)
     const preview = prepareCareerImport(db, source)
     console.log(`Source hash: ${preview.sourceHash}`)
-    console.log(`Database revision: ${preview.databaseRevision}`)
+    console.log(`Database fingerprint: ${preview.databaseRevision}`)
     const kinds = Object.entries(preview.report.byKind).sort(([left], [right]) =>
       left.localeCompare(right),
     )

@@ -12,9 +12,8 @@ import {
   type CareerDb,
   CareerReferenceError,
   type CareerSaveResult,
-  recordCareerChange,
   stableFingerprint,
-} from './career-state'
+} from './career-shared'
 import { db } from './client'
 import { type CareerDirection, careerDirections } from './schema'
 import type { DbExecutor } from './skill-queries'
@@ -130,7 +129,6 @@ export function createCareerDirection(
         updatedAt: now,
       })
       .run()
-    recordCareerChange(tx, stableFingerprint({ key, ...validated, sortOrder }))
     return { changed: true, revision: 1 }
   })
 }
@@ -177,7 +175,6 @@ export function updateCareerDirection(
       })
       .where(eq(careerDirections.key, key))
       .run()
-    recordCareerChange(tx, stableFingerprint(content))
     return { changed: true, revision }
   })
 }
@@ -191,7 +188,6 @@ export function retireCareerDirection(executor: CareerDb, key: string): CareerSa
       .set({ retiredAt: nowISO(), revision, updatedAt: nowISO() })
       .where(eq(careerDirections.key, key))
       .run()
-    recordCareerChange(tx, stableFingerprint({ key, retired: true }))
     return { changed: true, revision }
   })
 }
@@ -206,7 +202,6 @@ export function restoreCareerDirection(executor: CareerDb, key: string): CareerS
       .set({ retiredAt: null, revision, updatedAt: nowISO() })
       .where(eq(careerDirections.key, key))
       .run()
-    recordCareerChange(tx, stableFingerprint({ key, retired: false }))
     return { changed: true, revision }
   })
 }

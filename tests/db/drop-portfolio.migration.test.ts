@@ -10,7 +10,7 @@ import { migratedDatabase, migrationFolderUpTo, removeTempDir } from './support/
  * facts and direction links — including a portfolio-topic record type that 0028
  * no longer supports — then applies `./drizzle` and checks that:
  *
- * - the two portfolio tables are gone and the schema has 37 application tables;
+ * - the two portfolio tables are gone and 0029 leaves 36 application tables;
  * - `career_record_directions` was rebuilt without `topic_id` and without its
  *   topic partial unique index, keeping the four remaining partial indexes;
  * - every career row count is unchanged;
@@ -108,8 +108,8 @@ function seedCareerFacts(sqlite: ReturnType<typeof migratedDatabase>) {
       .run(key, `Direction ${index + 1}`, index, T, T)
   }
 
-  // `career_state` already carries its singleton row from 0026; `career_profile`
-  // is empty until a candidate is saved.
+  // At 0027 `career_state` still carries its singleton row from 0026;
+  // `career_profile` is empty until a candidate is saved.
   sqlite
     .query(
       `UPDATE career_state SET revision = 3, content_hash = 'hash', updated_at = ? WHERE id = 1`,
@@ -277,11 +277,12 @@ describe('portfolio removal migration (0028)', () => {
       // Apply only the frozen 0028 migration on top of the 0027 database.
       migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
 
-      // 1. The portfolio tables are gone and the schema has 37 application tables.
+      // 1. The portfolio tables are gone and 0029 dissolved career_state: 36 tables.
       const tables = tableNames(sqlite)
       expect(tables).not.toContain('career_portfolio_topics')
       expect(tables).not.toContain('career_portfolio_topic_projects')
-      expect(tables).toHaveLength(37)
+      expect(tables).toHaveLength(36)
+      expect(tables).not.toContain('career_state')
 
       // 2. The rebuilt junction has no topic column and no topic unique index;
       //    the four remaining partial unique indexes are recreated.

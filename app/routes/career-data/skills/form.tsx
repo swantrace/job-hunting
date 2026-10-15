@@ -1,7 +1,7 @@
 import { createRoute } from 'honox/factory'
 import { loadCareerDataView } from '../../../../src/db/career-data-view'
+import { CareerReferenceError } from '../../../../src/db/career-shared'
 import { createCareerSkill } from '../../../../src/db/career-skills'
-import { CareerReferenceError } from '../../../../src/db/career-state'
 import { db } from '../../../../src/db/client'
 import {
   personalSkillFormSchema,

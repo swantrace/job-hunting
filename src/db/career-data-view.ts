@@ -1,6 +1,6 @@
 import { asc, eq } from 'drizzle-orm'
 import { careerOnboardingRequired } from '../lib/application-readiness'
-import { extensionObjectOrNull } from '../lib/career/json-schemas'
+import { extensionObjectOrNull, extensionSchema, parseJsonColumn } from '../lib/career/json-schemas'
 import { listAllBaseResumeVersions } from './career-base-resumes'
 import { type CareerDirectionRecord, listCareerDirections } from './career-directions'
 import {
@@ -24,9 +24,8 @@ import {
   listCareerStories,
 } from './career-records'
 import { type CareerSkillRecord, listCareerSkills } from './career-skills'
-import { type CareerStateExtensionRecords, readCareerStateDocuments } from './career-state'
 import { db } from './client'
-import { type CareerBaseResume, skills } from './schema'
+import { type CareerBaseResume, careerProfile, skills } from './schema'
 import type { DbExecutor } from './skill-queries'
 
 /**
@@ -57,14 +56,25 @@ export function listApprovedCatalogSkills(executor: DbExecutor = db): CareerCata
     .all()
 }
 
+/** Parses a stored extension column, returning null for absent or empty values. */
+function storedExtensions(value: string | null | undefined): Record<string, unknown> | null {
+  if (value === null || value === undefined || value.trim() === '') return null
+  const parsed = extensionObjectOrNull(
+    parseJsonColumn(value, extensionSchema, {}, 'career_profile.extension_json'),
+  )
+  return parsed && Object.keys(parsed).length > 0 ? parsed : null
+}
+
 export type CareerDataView = {
   /** No candidate and no direction exist yet: show the onboarding empty state. */
   onboardingRequired: boolean
   candidate: CareerCandidateRecord | null
-  /** Preserved identity fields that have no relational column. */
+  /**
+   * Preserved authored fields of the `career_profile` singleton. Migration 0029
+   * merged the identity's and the preferences' extras into this one column, so
+   * both halves of the shared row render and edit the same field set.
+   */
   candidateExtensions: Record<string, unknown> | null
-  /** Preserved record extensions, by kind and stable key. */
-  extensionRecords: CareerStateExtensionRecords
   education: CareerEducationRecord[]
   experiences: CareerExperienceRecord[]
   achievements: CareerAchievementRecord[]
@@ -103,7 +113,12 @@ export function loadCareerDataView(
   executor: DbExecutor = db,
   options: { includeRetired?: boolean } = {},
 ): CareerDataView {
-  const state = readCareerStateDocuments(executor)
+  const profile = executor
+    .select({ extensionJson: careerProfile.extensionJson })
+    .from(careerProfile)
+    .where(eq(careerProfile.id, 1))
+    .get()
+  const profileExtensions = storedExtensions(profile?.extensionJson)
   const allExperiences = listCareerExperiences(executor, { includeRetired: true })
   const allDirections = listCareerDirections(executor, { includeRetired: true })
   const allPublications = listCareerPublications(executor, { includeRetired: true })
@@ -115,8 +130,7 @@ export function loadCareerDataView(
   return {
     onboardingRequired: careerOnboardingRequired(executor),
     candidate: readCareerCandidate(executor),
-    candidateExtensions: extensionObjectOrNull(state.records.candidate?.['$']),
-    extensionRecords: state.records,
+    candidateExtensions: profileExtensions,
     education: listCareerEducation(executor, { includeRetired: options.includeRetired }),
     experiences: visible(allExperiences),
     achievements: listCareerAchievements(executor, { includeRetired: options.includeRetired }),

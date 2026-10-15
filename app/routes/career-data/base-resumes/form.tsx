@@ -6,7 +6,7 @@ import {
   readBaseResumeVersion,
 } from '../../../../src/db/career-base-resumes'
 import { loadCareerDataView } from '../../../../src/db/career-data-view'
-import { CareerReferenceError } from '../../../../src/db/career-state'
+import { CareerReferenceError } from '../../../../src/db/career-shared'
 import { db } from '../../../../src/db/client'
 import {
   baseResumeDraftFormSchema,

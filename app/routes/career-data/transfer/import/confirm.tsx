@@ -14,7 +14,7 @@ import { FlashMessage } from '../../../../components/responses/FlashMessage'
  * Confirm step for an uploaded career import.
  *
  * The uploaded bytes are re-read and re-decoded, then the source fingerprint and
- * the database revision are re-derived from scratch and compared with the values
+ * the database fingerprint are re-derived from scratch and compared with the values
  * the preview bound. A source whose bytes changed, a database that was written
  * between preview and confirm, and any conflict all abort with an actionable 422
  * and write nothing. Only an unchanged, conflict-free preview is applied, in one

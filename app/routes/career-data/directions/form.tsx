@@ -5,7 +5,7 @@ import {
   listCareerDirections,
   readCareerDirection,
 } from '../../../../src/db/career-directions'
-import { CareerReferenceError } from '../../../../src/db/career-state'
+import { CareerReferenceError } from '../../../../src/db/career-shared'
 import { db } from '../../../../src/db/client'
 import {
   careerStableKey,

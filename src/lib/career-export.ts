@@ -1,4 +1,5 @@
-import { asc } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
+import { z } from 'zod'
 import { listBaseResumeVersions } from '../db/career-base-resumes'
 import { listCareerDirections } from '../db/career-directions'
 import { readCareerCandidate, readCareerPreferences } from '../db/career-facts'
@@ -11,8 +12,7 @@ import {
   listCareerStories,
 } from '../db/career-records'
 import { listCareerSkills } from '../db/career-skills'
-import { readCareerStateDocuments } from '../db/career-state'
-import { skillAliases, skillCategories, skills } from '../db/schema'
+import { careerProfile, skillAliases, skillCategories, skills } from '../db/schema'
 import type { DbExecutor } from '../db/skill-queries'
 import {
   type CareerDataset,
@@ -22,6 +22,7 @@ import {
   careerDatasetFormat,
   careerDatasetSchemaVersion,
 } from './career/dataset'
+import { extensionSchema, parseJsonColumn } from './career/json-schemas'
 import { nowISO } from './date'
 
 /**
@@ -52,6 +53,12 @@ function asRecord(value: unknown): Record<string, unknown> {
 function nonEmpty(value: unknown): Record<string, unknown> | undefined {
   const record = asRecord(value)
   return Object.keys(record).length > 0 ? record : undefined
+}
+
+/** One row's preserved authored fields, read from its `extension_json` column. */
+function rowExtensions(value: string | null | undefined): Record<string, unknown> | undefined {
+  if (value === null || value === undefined || value.trim() === '') return undefined
+  return nonEmpty(parseJsonColumn(value, extensionSchema, {}, 'extension_json'))
 }
 
 type DirectionalRecord = {
@@ -134,9 +141,6 @@ export function buildCareerDataset(
   const scope = resolveScope(options)
   const directionKey = scope.kind === 'direction' ? scope.directionKey : null
 
-  const state = readCareerStateDocuments(executor)
-  const recordExtensions = (kind: string, key: string) => nonEmpty(state.records[kind]?.[key])
-
   const categories = executor
     .select()
     .from(skillCategories)
@@ -146,7 +150,6 @@ export function buildCareerDataset(
       key: row.key,
       label: row.label,
       sortOrder: row.sortOrder,
-      ...(recordExtensions('categories', row.key) ?? {}),
     }))
 
   const skillRows = executor.select().from(skills).orderBy(asc(skills.key)).all()
@@ -165,11 +168,29 @@ export function buildCareerDataset(
     origin: row.origin,
     aliases: aliasesBySkill.get(row.id) ?? [],
     mergedIntoKey: row.mergedIntoSkillId ? (skillKeyById.get(row.mergedIntoSkillId) ?? null) : null,
-    ...(recordExtensions('catalog', row.key) ?? {}),
   }))
 
   const candidate = readCareerCandidate(executor)
   const preferences = readCareerPreferences(executor)
+  // The profile singleton owns both halves' preserved fields (0029 merged them
+  // into one column) and the per-source-document root values.
+  const profileRow = executor
+    .select({
+      extensionJson: careerProfile.extensionJson,
+      documentsJson: careerProfile.documentsJson,
+    })
+    .from(careerProfile)
+    .where(eq(careerProfile.id, 1))
+    .get()
+  const profileExtensions = rowExtensions(profileRow?.extensionJson ?? null) ?? {}
+  const documents = asRecord(
+    parseJsonColumn(
+      profileRow?.documentsJson ?? null,
+      z.record(z.string(), z.unknown()),
+      {},
+      'career_profile.documents_json',
+    ),
+  )
 
   const allEducation = listCareerEducation(executor, { includeRetired: true })
   const allExperiences = listCareerExperiences(executor, { includeRetired: true })
@@ -204,7 +225,7 @@ export function buildCareerDataset(
     coursework: row.coursework,
     details: row.details,
     retiredAt: row.retiredAt,
-    extensions: recordExtensions('education', row.stableKey),
+    extensions: rowExtensions(row.extensionJson),
   }))
 
   const experiences = allExperiences
@@ -248,7 +269,7 @@ export function buildCareerDataset(
       skillKeys: row.skills.map(skillKey).filter((key): key is string => Boolean(key)),
       directionKeys: row.directions,
       retiredAt: row.retiredAt,
-      extensions: recordExtensions('projects', row.stableKey),
+      extensions: rowExtensions(row.extensionJson),
     }))
 
   const publications = allPublications
@@ -270,7 +291,7 @@ export function buildCareerDataset(
       projectKeys: row.projectIds.map(projectKey).filter((key): key is string => Boolean(key)),
       directionKeys: row.directions,
       retiredAt: row.retiredAt,
-      extensions: recordExtensions('publications', row.stableKey),
+      extensions: rowExtensions(row.extensionJson),
     }))
 
   const achievements = allAchievements
@@ -291,7 +312,7 @@ export function buildCareerDataset(
         .map(publicationKey)
         .filter((key): key is string => Boolean(key)),
       retiredAt: row.retiredAt,
-      extensions: recordExtensions('achievements', row.stableKey),
+      extensions: rowExtensions(row.extensionJson),
     }))
 
   const stories = allStories
@@ -310,7 +331,7 @@ export function buildCareerDataset(
       narrative: row.narrative,
       directionKeys: row.directions,
       retiredAt: row.retiredAt,
-      extensions: recordExtensions('stories', row.stableKey),
+      extensions: rowExtensions(row.extensionJson),
     }))
 
   const personalSkills = listCareerSkills(executor, { includeRetired: true }).map((row) => ({
@@ -321,7 +342,7 @@ export function buildCareerDataset(
     notes: row.notes,
     evidence: row.evidence,
     retiredAt: row.retiredAt,
-    extensions: recordExtensions('personalSkills', row.skillKey),
+    extensions: nonEmpty(row.extension),
   }))
 
   const directions = listCareerDirections(executor, { includeRetired: true })
@@ -333,7 +354,6 @@ export function buildCareerDataset(
       rules: row.rules,
       sortOrder: row.sortOrder,
       retiredAt: row.retiredAt,
-      ...(recordExtensions('directions', row.key) ?? {}),
     }))
 
   const baseResumes: CareerDatasetBaseResume[] = directions.flatMap((direction) =>
@@ -344,7 +364,7 @@ export function buildCareerDataset(
       markdown: row.markdown,
       contentHash: row.contentHash,
       approvedAt: row.approvedAt,
-      ...(recordExtensions('baseResumes', `${row.directionKey}#${row.version}`) ?? {}),
+      ...rowExtensions(row.extensionJson),
     })),
   )
 
@@ -367,7 +387,7 @@ export function buildCareerDataset(
           authorization: candidate.authorization,
           careerBreak: candidate.careerBreak,
           truthfulness: candidate.truthfulness,
-          ...(recordExtensions('candidate', '$') ?? {}),
+          ...profileExtensions,
         }
       : null,
     preferences: preferences
@@ -377,7 +397,7 @@ export function buildCareerDataset(
           availability: preferences.availability,
           compensation: preferences.compensation,
           notes: preferences.notes,
-          ...(recordExtensions('preferences', '$') ?? {}),
+          ...profileExtensions,
         }
       : null,
     education,
@@ -389,10 +409,7 @@ export function buildCareerDataset(
     personalSkills,
     directions,
     baseResumes,
-    state: {
-      legacyDocuments: state.legacyDocuments,
-      extensions: state.extensions,
-    },
+    documents,
     excluded: {
       kinds: [...careerDatasetExcluded.kinds],
       reason: careerDatasetExcluded.reason,

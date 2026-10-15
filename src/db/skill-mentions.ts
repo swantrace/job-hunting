@@ -8,7 +8,7 @@ import {
 import { nowISO } from '../lib/date'
 import type { SkillImportance } from '../lib/skills/constants'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
-import { type CareerDb, CareerReferenceError, stableFingerprint } from './career-state'
+import { type CareerDb, CareerReferenceError, stableFingerprint } from './career-shared'
 import { db } from './client'
 import {
   type JobRequirementSkillMention,
