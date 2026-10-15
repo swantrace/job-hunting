@@ -34,7 +34,7 @@ import { generationStalenessReasons } from '../../src/lib/generation-input'
 import { type CareerTestDatabase, createCareerTestDatabase } from '../support/career-db'
 
 /**
- * Step 10 data-level contracts: a direction's stored bounded rules are the
+ * data-level contracts: a direction's stored bounded rules are the
  * effective source for both drafting and deterministic validation, they are
  * part of the document freshness identity, and the Base Resume draft/approval
  * lifecycle snapshots immutable content.
@@ -133,7 +133,7 @@ describe('effective direction generation rules', () => {
   test('stored rules reach the prompt, the snapshot and deterministic validation', () => {
     createCareerDirection(executor(), {
       key: 'career-step10-rules',
-      label: 'Step 10 rules',
+      label: ' rules',
       targetTitles: ['Staff Engineer'],
       rules: {
         maxWords: 600,
@@ -232,7 +232,7 @@ describe('base resume version lifecycle', () => {
     const key = 'career-step10-unapproved'
     createCareerDirection(executor(), { key, label: 'Unapproved', targetTitles: ['Engineer'] })
     expect(() =>
-      createBaseResumeDraft(executor(), { directionKey: key, version: 'empty', markdown: '   ' }),
+      createBaseResumeDraft(executor(), { directionKey: key, version: 'empty', markdown: '  ' }),
     ).toThrow(/empty/i)
 
     const draft = createBaseResumeDraft(executor(), {

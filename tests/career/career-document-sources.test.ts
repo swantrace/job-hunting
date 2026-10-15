@@ -33,7 +33,7 @@ import { safeCareerData } from '../../src/lib/document-draft-input'
 import { migratedDatabase } from '../support/sqlite'
 
 /**
- * Step 8 data contracts. Achievements, projects and personal skills must keep
+ * data contracts. Achievements, projects and personal skills must keep
  * their ordered junctions, reject retired or unapproved references, exclude
  * unsafe and resume-ineligible records from every document input, and never let
  * a personal skill create a catalog entry (or the reverse). Every database here
@@ -49,7 +49,7 @@ function seedDirection(sqlite: Database, key = 'fullstack', label = 'Full-Stack 
   sqlite
     .query(
       `INSERT INTO career_directions (key, label, target_titles_json, created_at, updated_at)
-       VALUES (?, ?, '["Full-Stack Developer"]', 'T', 'T')`,
+    VALUES (?, ?, '["Full-Stack Developer"]', 'T', 'T')`,
     )
     .run(key, label)
 }
@@ -63,7 +63,7 @@ function seedSkill(
   return sqlite
     .query(
       `INSERT INTO skills (key, name, category, review_status, origin, merged_into_skill_id, created_at, updated_at)
-       VALUES (?, ?, NULL, ?, 'manual', NULL, 'T', 'T') RETURNING id`,
+    VALUES (?, ?, NULL, ?, 'manual', NULL, 'T', 'T') RETURNING id`,
     )
     .get(key, name, reviewStatus) as { id: number }
 }
@@ -72,7 +72,7 @@ function seedExperience(sqlite: Database, stableKey: string): { id: number } {
   return sqlite
     .query(
       `INSERT INTO career_experiences (stable_key, company, role, created_at, updated_at)
-       VALUES (?, 'Northwind Analytics', 'Senior Developer', 'T', 'T') RETURNING id`,
+    VALUES (?, 'Northwind Analytics', 'Senior Developer', 'T', 'T') RETURNING id`,
     )
     .get(stableKey) as { id: number }
 }

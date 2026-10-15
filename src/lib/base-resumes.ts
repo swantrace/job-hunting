@@ -13,8 +13,8 @@ import { isISODate, todayISO } from './date'
  * Byte-level authority for Base Resume Markdown hashing, plus the import/export
  * filesystem helpers. The *runtime* reading path (`loadApprovedBaseResume`,
  * `listApprovedBaseResumes`) comes from `career_base_resumes`; the filesystem
- * functions below are import-only and stay exported for the Step 3 importer and
- * the Step 12 migration tooling.
+ * functions below are import-only: the importer and the Base Resume forms keep
+ * them exported.
  *
  * A Base Resume is a private editorial prior; canonical Career Data remains the
  * factual authority. Approved files live at

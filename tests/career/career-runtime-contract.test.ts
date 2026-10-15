@@ -11,10 +11,11 @@ import { loadCareerData } from '../../src/lib/career-data'
 import { migratedDatabase } from '../support/sqlite'
 
 /**
- * Step 12 acceptance: setup/start migrate the schema only, the import-only env
- * vars are documented and not runtime requirements, and a fresh empty database
- * boots and renders onboarding without any career-data directory. Every database
- * here is a temporary migrated database; the owner's `jobs.db` is never touched.
+ * Runtime contract: `start` migrates the schema only, the retired file-sync and
+ * one-off CLIs stay out of `package.json`, the import-only env vars are
+ * documented and are not runtime requirements, and a fresh empty database boots
+ * and renders onboarding without any career-data directory. Every database here
+ * is a temporary migrated database; the owner's `jobs.db` is never touched.
  */
 
 function repoFile(path: string): string {
@@ -33,23 +34,39 @@ function withMissingCareerDataDirectory<T>(body: () => T): T {
   }
 }
 
-describe('setup and start migrate the schema only', () => {
+describe('start migrates the schema only', () => {
   const scripts = (JSON.parse(repoFile('package.json')) as { scripts: Record<string, string> })
     .scripts
 
-  test('start and setup run db:migrate and never the file synchronizers', () => {
+  test('start runs db:migrate and no script runs a file synchronizer', () => {
     expect(scripts.start).toContain('db:migrate')
-    expect(scripts.setup).toBe('bun run db:migrate')
-    for (const script of [scripts.start, scripts.setup]) {
+    for (const script of Object.values(scripts)) {
       expect(script).not.toContain('taxonomy:sync')
       expect(script).not.toContain('skills:sync')
     }
   })
 
-  test('keeps the import CLIs available for explicit use', () => {
-    expect(scripts['career:import']).toContain('import-career-data')
-    expect(scripts['taxonomy:sync']).toContain('sync-skill-taxonomy')
-    expect(scripts['skills:sync']).toContain('sync-career-skills')
+  test('the retired file-sync and one-off CLIs are gone', () => {
+    // career export/import, Base Resume import and the ChatGPT context export are
+    // browser flows under /career-data/transfer; nothing may reintroduce a CLI.
+    for (const name of [
+      'setup',
+      'db:generate',
+      'career:import',
+      'career:export',
+      'career:export-chatgpt-context',
+      'resume:import',
+      'resume:experiment',
+      'fly:sync-career-data',
+      'taxonomy:sync',
+      'skills:sync',
+      'skills:audit',
+      'artifacts:audit',
+      'test:unit',
+      'test:skills',
+      'test:ui-contracts',
+    ])
+      expect(scripts).not.toHaveProperty(name)
   })
 })
 

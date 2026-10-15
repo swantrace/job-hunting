@@ -64,7 +64,7 @@ describe('requirement-owned raw skill terms draft', () => {
     expect(html).toContain('data-ja-requirement')
     expect(html).toContain('data-ja-terms')
     expect(html).toContain('data-ja-term')
-    // Step 5 removes the model-owned canonical/category editor; Step 6 adds the
+    // removes the model-owned canonical/category editor; adds the
     // reviewed mapping UI, so no parser-side mapping control may reappear here.
     expect(html).not.toContain('data-ja-skill-canonical')
     expect(html).not.toContain('data-ja-skill-category')

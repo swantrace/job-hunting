@@ -5,7 +5,7 @@ import { migratedDatabase, migrationFolderUpTo, removeTempDir } from '../db/supp
 import { seedPopulatedLegacyCatalog } from './fixtures'
 
 /**
- * Step 2 migration contracts. Migration 0026 is additive: it must install the
+ * migration contracts. Migration 0026 is additive: it must install the
  * relational career tables on a fresh database, and migrate a populated
  * database up from 0025 without losing analyses, artifacts, OAuth metadata or
  * the historical requirement/skill mappings, which are backfilled as
@@ -109,7 +109,7 @@ describe('career schema migration over a populated database', () => {
       sqlite
         .query(
           `INSERT INTO generation_runs (application_analysis_run_id, status, queue_job_id, created_at, updated_at, completed_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?)`,
         )
         .run(
           seeded.applicationAnalysisRunId,
@@ -122,7 +122,7 @@ describe('career schema migration over a populated database', () => {
       sqlite
         .query(
           `INSERT INTO generated_artifacts (generation_run_id, type, file_name, file_path, mime_type, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?)`,
         )
         .run(
           1,
@@ -135,7 +135,7 @@ describe('career schema migration over a populated database', () => {
       sqlite
         .query(
           `INSERT INTO google_drive_connections (id, refresh_token_encrypted, folder_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?)`,
         )
         .run(
           1,
@@ -184,7 +184,7 @@ describe('career schema migration over a populated database', () => {
       const mentions = sqlite
         .query(
           `SELECT job_requirement_id, raw_term, normalized_term, mapping_state, resolved_skill_id, occurrences_json
-           FROM job_requirement_skill_mentions`,
+      FROM job_requirement_skill_mentions`,
         )
         .all() as Array<{
         job_requirement_id: number
@@ -220,7 +220,7 @@ describe('career schema migration over a populated database', () => {
       sqlite
         .query(
           `INSERT INTO job_requirements_to_skills (job_requirement_id, skill_id, raw_label, confidence)
-           VALUES (?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?)`,
         )
         .run(seeded.requirementId, seeded.mergedSkillId, 'TypeScript', 0.4)
 
@@ -229,7 +229,7 @@ describe('career schema migration over a populated database', () => {
       const mentions = sqlite
         .query(
           `SELECT mapping_state, resolved_skill_id, occurrences_json
-           FROM job_requirement_skill_mentions`,
+      FROM job_requirement_skill_mentions`,
         )
         .all() as Array<{
         mapping_state: string
@@ -254,19 +254,19 @@ describe('career schema constraints', () => {
       sqlite
         .query(
           `INSERT INTO career_directions (key, label, target_titles_json, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?)`,
         )
         .run('fullstack', 'Full-Stack Developer', '["Full-Stack Developer"]', 'T', 'T')
       const insertEducation = sqlite.query(
         `INSERT INTO career_education (stable_key, degree, school, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)`,
       )
       insertEducation.run('edu-one', 'BSc', 'Example School', 'T', 'T')
       expect(() => insertEducation.run('edu-one', 'MSc', 'Example School', 'T', 'T')).toThrow()
 
       const insertResume = sqlite.query(
         `INSERT INTO career_base_resumes (direction_key, version, status, markdown, content_hash, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       insertResume.run('fullstack', 'v1', 'draft', '# Draft', 'hash-1', 'T', 'T')
       expect(() =>
@@ -283,12 +283,12 @@ describe('career schema constraints', () => {
       sqlite
         .query(
           `INSERT INTO career_directions (key, label, target_titles_json, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?)`,
         )
         .run('fullstack', 'Full-Stack Developer', '[]', 'T', 'T')
       const insertResume = sqlite.query(
         `INSERT INTO career_base_resumes (direction_key, version, status, markdown, content_hash, approved_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       insertResume.run(
         'fullstack',
@@ -328,18 +328,18 @@ describe('career schema constraints', () => {
       sqlite
         .query(
           `INSERT INTO career_directions (key, label, target_titles_json, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?)`,
         )
         .run('fullstack', 'Full-Stack Developer', '[]', 'T', 'T')
       const insertResume = sqlite.query(
         `INSERT INTO career_base_resumes (direction_key, version, status, markdown, content_hash, approved_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       expect(() =>
         insertResume.run('fullstack', 'v1', 'approved', '# Approved', 'h', null, 'T', 'T'),
       ).toThrow()
       expect(() =>
-        insertResume.run('fullstack', 'v2', 'draft', '   ', 'h', null, 'T', 'T'),
+        insertResume.run('fullstack', 'v2', 'draft', '  ', 'h', null, 'T', 'T'),
       ).toThrow()
     } finally {
       sqlite.close()
@@ -354,7 +354,7 @@ describe('career schema constraints', () => {
       applyCareerFactsMigration(sqlite)
       const insertMention = sqlite.query(
         `INSERT INTO job_requirement_skill_mentions (job_requirement_id, raw_term, normalized_term, mapping_state, resolved_skill_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       expect(() =>
         insertMention.run(seeded.requirementId, 'OAuth', 'oauth', 'mapped', null, 'T', 'T'),
@@ -386,26 +386,26 @@ describe('career schema constraints', () => {
     try {
       const insertAchievement = sqlite.query(
         `INSERT INTO career_achievements (stable_key, claim, safe_to_use, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)`,
       )
       expect(() => insertAchievement.run('a1', 'Claim', 2, 'T', 'T')).toThrow()
 
       const insertProject = sqlite.query(
         `INSERT INTO career_projects (stable_key, name, eligibility, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?)`,
       )
       expect(() => insertProject.run('p1', 'Project', 'maybe', 'T', 'T')).toThrow()
 
       const insertEducation = sqlite.query(
         `INSERT INTO career_education (stable_key, degree, school, date_precision, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?)`,
       )
       expect(() => insertEducation.run('e1', 'BSc', 'School', 'quarter', 'T', 'T')).toThrow()
       expect(() =>
         sqlite
           .query(
             `INSERT INTO career_education (stable_key, degree, school, year, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?)`,
           )
           .run('e2', 'BSc', 'School', 1800, 'T', 'T'),
       ).toThrow()
@@ -421,7 +421,7 @@ describe('career schema constraints', () => {
         sqlite
           .query(
             `INSERT INTO career_experiences (stable_key, company, role, revision, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?)`,
           )
           .run('x', 'Company', 'Role', 0, 'T', 'T'),
       ).toThrow()

@@ -18,7 +18,7 @@ import {
  * The runtime authority for career facts is SQLite, so tests must seed a
  * database rather than point `CAREER_DATA_DIR` at a directory. This module
  * builds temporary migrated databases outside the repository and seeds them from
- * the Step 1 synthetic fixtures through the Step 3 importer. It never opens the
+ * the synthetic fixtures through the importer. It never opens the
  * developer's `jobs.db` or private `career-data/`.
  */
 

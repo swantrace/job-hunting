@@ -11,7 +11,7 @@ import {
 /**
  * Run-status fragment integration contract. The existing candidate
  * `analysis-runs` route establishes the polling fragment pattern that the new
- * `workspace-job-analysis-status` boundary (Step 4.2) mirrors: a single
+ * `workspace-job-analysis-status` boundary () mirrors: a single
  * self-contained status fragment, no AppShell, and preserved active tab.
  */
 async function createHarness() {

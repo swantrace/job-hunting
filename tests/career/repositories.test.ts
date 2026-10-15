@@ -61,7 +61,7 @@ import {
 } from './fixtures'
 
 /**
- * Step 2 repository contracts. Every database here is an in-memory database
+ * repository contracts. Every database here is an in-memory database
  * migrated from `drizzle/`, never the developer's `jobs.db`.
  */
 
@@ -74,7 +74,7 @@ function seedDirection(sqlite: Database, key = 'fullstack', label = 'Full-Stack 
   sqlite
     .query(
       `INSERT INTO career_directions (key, label, target_titles_json, created_at, updated_at)
-       VALUES (?, ?, '["Full-Stack Developer"]', 'T', 'T')`,
+    VALUES (?, ?, '["Full-Stack Developer"]', 'T', 'T')`,
     )
     .run(key, label)
 }
@@ -89,7 +89,7 @@ function seedSkill(
   return sqlite
     .query(
       `INSERT INTO skills (key, name, category, review_status, origin, merged_into_skill_id, created_at, updated_at)
-       VALUES (?, ?, NULL, ?, 'manual', ?, 'T', 'T') RETURNING id`,
+    VALUES (?, ?, NULL, ?, 'manual', ?, 'T', 'T') RETURNING id`,
     )
     .get(key, name, reviewStatus, mergedIntoSkillId) as { id: number }
 }
@@ -282,7 +282,7 @@ describe('retirement', () => {
       const experience = sqlite
         .query(
           `INSERT INTO career_experiences (stable_key, company, role, created_at, updated_at)
-           VALUES ('northwind', 'Northwind Analytics', 'Senior Developer', 'T', 'T') RETURNING id`,
+      VALUES ('northwind', 'Northwind Analytics', 'Senior Developer', 'T', 'T') RETURNING id`,
         )
         .get() as { id: number }
       const skill = seedSkill(sqlite, 'rest-api', 'REST APIs')
@@ -398,7 +398,7 @@ describe('base resume versions', () => {
         }),
       ).toThrow(/already exists/i)
       expect(() =>
-        createBaseResumeDraft(db, { directionKey: 'fullstack', version: 'v2', markdown: '   ' }),
+        createBaseResumeDraft(db, { directionKey: 'fullstack', version: 'v2', markdown: '  ' }),
       ).toThrow(/empty/i)
       expect(() =>
         createBaseResumeDraft(db, {
@@ -498,10 +498,10 @@ describe('requirement-owned mentions', () => {
     const second = sqlite
       .query(
         `INSERT INTO job_requirements (
-          job_posting_analysis_id, sequence, requirement_type, importance, basis, statement,
-          source_text, created_at, updated_at
-        ) VALUES (?, 2, 'skill', 'preferred', 'explicit', 'OAuth 2.0 preferred.', 'OAuth 2.0.', 'T', 'T')
-        RETURNING id`,
+     job_posting_analysis_id, sequence, requirement_type, importance, basis, statement,
+     source_text, created_at, updated_at
+    ) VALUES (?, 2, 'skill', 'preferred', 'explicit', 'OAuth 2.0 preferred.', 'OAuth 2.0.', 'T', 'T')
+    RETURNING id`,
       )
       .get(analysis.id) as { id: number }
     return {
@@ -546,7 +546,7 @@ describe('requirement-owned mentions', () => {
       expect(() =>
         upsertPendingMention(db, {
           jobRequirementId: requirementId,
-          rawTerm: '   ',
+          rawTerm: '  ',
           normalizedTerm: 'blank',
           occurrences: [],
         }),

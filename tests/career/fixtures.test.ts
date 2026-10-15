@@ -17,7 +17,7 @@ import {
 } from './fixtures'
 
 /**
- * Step 1 fixture contracts. These prove the synthetic career data is realistic
+ * fixture contracts. These prove the synthetic career data is realistic
  * enough to drive every later step: it loads through the production loader, it
  * carries an editable field for each fact the management UI must expose, and it
  * reproduces the catalog, mapping and freshness edge cases the plan names.

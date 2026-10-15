@@ -4,7 +4,7 @@ import { buildCareerDataset, serializeCareerDataset } from '../../../../../src/l
 
 /**
  * Portable `career-dataset` download, full or direction-scoped. This is the
- * versioned Step 3 format identified by its own `format` marker; it is separate
+ * versioned format identified by its own `format` marker; it is separate
  * from the v4 application backup at `/export`, whose payload is unchanged.
  */
 export const GET = createRoute((c) => {

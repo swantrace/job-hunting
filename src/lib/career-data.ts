@@ -138,7 +138,7 @@ export type CanonicalCareerData = {
 /**
  * Resolves the import-only career-data directory from an explicit
  * `CAREER_DATA_DIR` or the conventional locations. Runtime code never calls
- * this: it exists for the Step 3 importer CLI and the retired Step 12 sync
+ * this: it exists for the importer CLI and the retired sync
  * tools, which read files on purpose. The database, not this directory, is the
  * runtime authority.
  */

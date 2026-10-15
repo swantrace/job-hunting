@@ -15,7 +15,7 @@ import {
 } from './fixtures'
 
 /**
- * Step 11 acceptance for the uploaded career source decoder. Everything is built
+ * acceptance for the uploaded career source decoder. Everything is built
  * in memory from the synthetic fixtures: an upload never touches the filesystem,
  * and only the known career-document paths are ever read out of an archive.
  */

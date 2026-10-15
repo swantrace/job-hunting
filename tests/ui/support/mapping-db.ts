@@ -5,7 +5,7 @@ import { Database } from 'bun:sqlite'
  * database (`DB_FILE_NAME`, created outside the repository by the test preload)
  * so the mapping route can be exercised end to end:
  *
- *   route -> skill-mapping service -> Step 2 mention repository -> SQLite
+ *  route -> skill-mapping service -> mention repository -> SQLite
  *
  * Rows are addressed by explicit high ids and a sentinel company name, and
  * {@link removeMappingFixture} deletes them after each test. Nothing here ever
@@ -59,9 +59,9 @@ function insertApplication(sqlite: Database, id: number, company: string, title:
   sqlite
     .query(
       `INSERT OR REPLACE INTO job_applications (
-        id, company_id, job_title, direction, location, url, posted_date, priority,
-        application_source, status, created_at, updated_at
-      ) VALUES (?, ?, ?, 'fullstack', NULL, NULL, '2026-10-14', 'B', 'Fixture', 'Saved', '2026-10-14', '2026-10-14')`,
+    id, company_id, job_title, direction, location, url, posted_date, priority,
+    application_source, status, created_at, updated_at
+   ) VALUES (?, ?, ?, 'fullstack', NULL, NULL, '2026-10-14', 'B', 'Fixture', 'Saved', '2026-10-14', '2026-10-14')`,
     )
     .run(id, companyId, title)
 }
@@ -71,7 +71,7 @@ function insertPosting(sqlite: Database, applicationId: number, rawText: string)
     sqlite
       .query(
         `INSERT INTO job_postings (job_application_id, version, raw_text, captured_at, content_hash)
-         VALUES (?, 1, ?, '2026-10-14', ?) RETURNING id`,
+     VALUES (?, 1, ?, '2026-10-14', ?) RETURNING id`,
       )
       .get(applicationId, rawText, `mapping-fixture-hash-${applicationId}`) as { id: number }
   ).id
@@ -82,8 +82,8 @@ function insertCompletedAnalysis(sqlite: Database, postingId: number): number {
     sqlite
       .query(
         `INSERT INTO job_posting_analyses (
-          job_posting_id, status, attempts, created_at, updated_at, completed_at
-        ) VALUES (?, 'Completed', 1, '2026-10-14', '2026-10-14', '2026-10-14') RETURNING id`,
+     job_posting_id, status, attempts, created_at, updated_at, completed_at
+    ) VALUES (?, 'Completed', 1, '2026-10-14', '2026-10-14', '2026-10-14') RETURNING id`,
       )
       .get(postingId) as { id: number }
   ).id
@@ -94,9 +94,9 @@ function insertRequirement(sqlite: Database, analysisId: number, statement: stri
     sqlite
       .query(
         `INSERT INTO job_requirements (
-          job_posting_analysis_id, sequence, requirement_type, importance, basis,
-          statement, source_text, inference_rationale, created_at, updated_at
-        ) VALUES (?, 1, 'skill', 'required', 'explicit', ?, ?, NULL, '2026-10-14', '2026-10-14') RETURNING id`,
+     job_posting_analysis_id, sequence, requirement_type, importance, basis,
+     statement, source_text, inference_rationale, created_at, updated_at
+    ) VALUES (?, 1, 'skill', 'required', 'explicit', ?, ?, NULL, '2026-10-14', '2026-10-14') RETURNING id`,
       )
       .get(analysisId, statement, statement) as { id: number }
   ).id
@@ -113,9 +113,9 @@ function insertMention(
     sqlite
       .query(
         `INSERT INTO job_requirement_skill_mentions (
-          job_requirement_id, raw_term, normalized_term, mapping_state, resolved_skill_id,
-          occurrences_json, revision, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 1, '2026-10-14', '2026-10-14') RETURNING id`,
+     job_requirement_id, raw_term, normalized_term, mapping_state, resolved_skill_id,
+     occurrences_json, revision, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 1, '2026-10-14', '2026-10-14') RETURNING id`,
       )
       .get(
         requirementId,
@@ -140,7 +140,7 @@ function insertSkill(sqlite: Database, key: string, name: string, category: stri
     sqlite
       .query(
         `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
-         VALUES (?, ?, ?, 'approved', 'manual', '2026-10-14', '2026-10-14') RETURNING id`,
+     VALUES (?, ?, ?, 'approved', 'manual', '2026-10-14', '2026-10-14') RETURNING id`,
       )
       .get(key, name, category) as { id: number }
   ).id
@@ -158,7 +158,7 @@ export function seedMappingFixture(): MappingFixture {
     sqlite
       .query(
         `INSERT OR REPLACE INTO skill_categories (key, label, sort_order, created_at, updated_at)
-         VALUES (?, 'Fixture Category', 900, '2026-10-14', '2026-10-14')`,
+     VALUES (?, 'Fixture Category', 900, '2026-10-14', '2026-10-14')`,
       )
       .run(categoryKey)
 
@@ -232,7 +232,7 @@ export function removeMappingFixture(fixture: MappingFixture) {
     sqlite
       .query(
         `DELETE FROM skill_aliases
-         WHERE skill_id IN (SELECT id FROM skills WHERE key LIKE 'fixture-%')`,
+     WHERE skill_id IN (SELECT id FROM skills WHERE key LIKE 'fixture-%')`,
       )
       .run()
     sqlite.query("DELETE FROM skills WHERE key LIKE 'fixture-%'").run()

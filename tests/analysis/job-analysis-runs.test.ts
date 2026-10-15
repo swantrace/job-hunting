@@ -15,7 +15,7 @@ import { migratedDatabase } from '../support/sqlite'
  * database-free freshness classifier shared by every rerunnable stage.
  *
  * The `run reuse and append-only history` suite is a conditional contract:
- * it stays pending until `src/db/job-analysis-runs.ts` exists (Step 1.2)
+ * it stays pending until `src/db/job-analysis-runs.ts` exists ()
  * and then exercises the temporary-database service boundary.
  */
 const jobAnalysisRunsPath = resolve(process.cwd(), 'src/db/job-analysis-runs.ts')
@@ -293,9 +293,9 @@ describe('job analysis completion transaction', () => {
         const application = sqlite
           .query(
             `INSERT INTO job_applications (
-             company_id, job_title, direction, location, posted_date, salary,
-             priority, status, created_at, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+       company_id, job_title, direction, location, posted_date, salary,
+       priority, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
           )
           .get(
             company.id,
@@ -312,7 +312,7 @@ describe('job analysis completion transaction', () => {
         const posting = sqlite
           .query(
             `INSERT INTO job_postings (job_application_id, raw_text, captured_at, content_hash)
-           VALUES (?, ?, ?, ?) RETURNING id`,
+      VALUES (?, ?, ?, ?) RETURNING id`,
           )
           .get(application.id, 'Senior Platform Engineer role', '2026-08-28', 'posting-hash') as {
           id: number
@@ -356,7 +356,7 @@ function seedPosting(sqlite: ReturnType<typeof migratedDatabase>) {
   const posting = sqlite
     .query(
       `INSERT INTO job_postings (job_application_id, raw_text, captured_at, content_hash)
-       VALUES (?, ?, ?, ?) RETURNING id`,
+    VALUES (?, ?, ?, ?) RETURNING id`,
     )
     .get(applicationId, 'Senior Engineer role', '2026-08-28', 'posting-hash') as { id: number }
   return { applicationId: posting.id }
@@ -415,8 +415,8 @@ function seedApplicationHelper(sqlite: ReturnType<typeof migratedDatabase>) {
   const application = sqlite
     .query(
       `INSERT INTO job_applications (
-        company_id, job_title, direction, posted_date, priority, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+    company_id, job_title, direction, posted_date, priority, status, created_at, updated_at
+   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     )
     .get(
       company.id,

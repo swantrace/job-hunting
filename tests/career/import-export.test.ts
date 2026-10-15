@@ -27,7 +27,7 @@ import {
 } from './fixtures'
 
 /**
- * Step 3 acceptance: transactional directory/dataset import and dataset export.
+ * acceptance: transactional directory/dataset import and dataset export.
  *
  * Every database is an isolated in-memory SQLite migrated from `drizzle/`; no
  * test touches the developer's `jobs.db`. Imports always receive the explicit
@@ -238,13 +238,13 @@ describe('career dataset import and export', () => {
     sqlite
       .query(
         `INSERT INTO google_drive_connections (id, refresh_token_encrypted, folder_id, created_at, updated_at)
-         VALUES (1, 'refresh-token-secret-marker', 'folder-secret-marker', 'T', 'T')`,
+     VALUES (1, 'refresh-token-secret-marker', 'folder-secret-marker', 'T', 'T')`,
       )
       .run()
     sqlite
       .query(
         `INSERT INTO companies (name, created_at, updated_at)
-         VALUES ('Application History Secret Co', 'T', 'T')`,
+     VALUES ('Application History Secret Co', 'T', 'T')`,
       )
       .run()
 

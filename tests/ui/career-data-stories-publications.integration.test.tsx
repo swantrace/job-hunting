@@ -15,10 +15,10 @@ import { documentSafeCareerData, loadCareerDataFromDatabase } from '../../src/li
 import { recordsFor } from './support/html-contract'
 
 /**
- * Step 9 route acceptance for the stories, publications and preferences tabs.
+ * stories, publications and preferences route acceptance for the stories, publications and preferences tabs.
  *
  * Every route resolves the real `db` singleton, so the acceptance criteria are
- * proved end to end through the Step 2 repositories. Fixture rows use the
+ * proved end to end through the repositories. Fixture rows use the
  * `career-ui9` marker and are removed before and after every test; the
  * developer's `jobs.db` is never opened, and the preferences singleton is the
  * only shared row this suite writes.
@@ -147,7 +147,7 @@ describe('career data step 9 page and fragment boundaries', () => {
     const { parseCareerDataTab, careerDataTabs } = await import(
       '../../app/components/career/CareerDataTabs'
     )
-    // Step 10 appends directions/base-resumes to the same registry.
+    // Directions and Base Resumes join the same registry.
     expect(careerDataTabs.map((tab) => tab.key)).toEqual([
       'identity',
       'experience',

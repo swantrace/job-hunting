@@ -15,16 +15,18 @@ operator runs it.
 - `drizzle/*.sql` contains ordered, immutable database migrations.
 - `drizzle/meta/_journal.json` records their execution order.
 - `src/db/migrate.ts` (`bun run db:migrate`) applies pending migrations.
-- `jobs.db` (or `DB_FILE_NAME`) owns career facts, directions, categories,
-  personal skills, Base Resume versions, and the operational skill catalog.
+- `jobs.db` (or `DB_FILE_NAME`) owns applications, postings, analyses,
+  requirements, mentions, career facts, directions, categories, personal skills,
+  Base Resume versions, and the operational skill catalog.
 - A legacy `career-data/` directory (`*.json`, `skill-taxonomy.json`,
   `base-resumes/`) is an **import-only** source. It is never read at runtime and
-  is never synchronized automatically.
-  `bun run career:import --source <dir> --database <path>` loads it.
+  is never synchronized automatically. Load it through the browser flow at
+  `/career-data/transfer`, which previews the change set (source fingerprint,
+  database fingerprint, per-kind counts, conflicts) and then applies it in one
+  transaction after confirmation.
 
-`bun run setup` and `bun run start` apply schema migrations only. They do not
-run `taxonomy:sync`, `skills:sync`, or any other file synchronizer, even if a
-career-data directory is mounted.
+`bun run start` applies schema migrations only. No boot path runs a file
+synchronizer, even when a career-data directory is mounted.
 
 ## Runtime behavior
 
@@ -34,33 +36,17 @@ The production start command performs these operations in order:
 db:migrate -> start server
 ```
 
-The legacy per-file sync commands (`taxonomy:sync`, `skills:sync`) and the Fly
-file upload (`fly:sync-career-data`) still exist as explicit, import-only tools,
-but no boot path invokes them. A migration failure prevents the server from
-starting and must never be handled by deleting the production database.
-
-### CLI database selection (required)
-
-Every CLI that opens or writes the database — `career:import`, `career:export`,
-`career:export-chatgpt-context`, `resume:import`, `resume:experiment`,
-`skills:audit`, `artifacts:audit`, `taxonomy:sync`, `skills:sync` and
-`fly:sync-career-data` — resolves its target from `--database <path>` or
-`DB_FILE_NAME` and fails loudly when neither is set:
-
-```text
-No database selected: pass --database <path> or set DB_FILE_NAME.
-Refusing to fall back to ./jobs.db because a CLI could then read or write production data.
-```
-
-The app server is unchanged and still defaults to `DB_FILE_NAME ?? 'jobs.db'`.
-The `db:migrate` script is part of that server path and keeps the same default.
+A migration failure prevents the server from starting and must never be handled
+by deleting the production database. Import and export are browser flows under
+`/career-data/transfer`, so there is no command-line path that could open
+production data by accident.
 
 `src/db/health.ts` runs at boot before the server accepts requests. If any
 canonical table or migration-added column is missing it fails fast with a
 readable message naming the missing object, for example:
 
 ```text
-Database schema is missing required table(s): career_candidate, career_state, ...
+Database schema is missing required table(s): career_profile, career_record_directions, ...
 Run the database migrations (bun run db:migrate) before starting the server.
 ```
 
@@ -88,19 +74,19 @@ use a shell — it execs the words directly, so `cd /app && ...`, pipes, `;` and
 globs fail with `exec: "cd": executable file not found in $PATH`. Wrap those:
 
 ```sh
-fly ssh console -a job-hunting -C 'sh -c "cd /app && ls -lh /data/jobs.db*"'
+fly ssh console -a job-hunting -C 'sh -c "cd /data && ls -lh jobs.db*"'
 ```
 
-For multi-line probes, prefer an interactive console and paste the script, and use
-an absolute path (`bun --no-install /app/src/cli/<tool>.ts`) when a single command
-is enough.
+For multi-line probes, prefer an interactive console and paste the script.
 
 ## Creating a migration
 
 1. Change `src/db/schema.ts`.
-2. Add the next ordered SQL file under `drizzle/` and its journal entry. Use
-   `bun run db:generate` when Drizzle can express the change safely; review all
-   generated SQL before accepting it.
+2. Add the next ordered SQL file under `drizzle/` and its journal entry by hand.
+   Migrations in this repository are written deliberately: there is no generator
+   script (`bun run db:generate` no longer exists), and DDL that SQLite cannot
+   express as a plain `ALTER` is rebuilt explicitly with a copy-and-verify step
+   (see step 5).
 3. Never edit or reorder a migration that may already have been applied.
 4. Keep migrations deterministic and local. They must not call an LLM, make a
    network request, or depend on private career data.
@@ -248,42 +234,28 @@ with local data, and do not import a local dataset into production.
    ```
 
    Confirm the health check passes and startup logs report the schema ready.
-4. **Dry-run the import (default).** Point `--source` at the existing volume
-   directory and `--database` at the production database. A dry run writes
-   nothing and prints the source hash, database revision, per-kind counts and
-   every conflict:
+4. **Bring the volume files to the browser.** Import is a browser flow: open
+   `/career-data/transfer`, choose Import, and upload **either** a career dataset
+   JSON **or** a zip of the legacy `career-data/` directory. The upload is decoded
+   in memory and read strictly as data. To package the volume copy, download it
+   first:
 
    ```sh
-   cd /app
-   bun --no-install src/cli/import-career-data.ts --source /data/career-data --database /data/jobs.db
+   fly sftp get -R /data/career-data ./career-data-volume --app job-hunting
+   cd career-data-volume && zip -r ../career-data.zip . && cd ..
    ```
 
-   Run the CLI file directly rather than through `bun run`: the production image
-   installs without devDependencies, and `bun run`'s auto-install can block on the
-   network when a module is missing. Add `timeout 120` while diagnosing so a stall
-   fails instead of waiting.
-
-   Importing from a dataset JSON file works the same way:
-
-   ```sh
-   bun --no-install src/cli/import-career-data.ts --source /data/career-data/career-dataset.json --database /data/jobs.db
-   ```
-
-5. **Review conflicts and counts.** Any reported conflict blocks the whole
-   import. Resolve the source or the conflicting database record, then run a new
-   dry run — a stale preview is rejected, so always re-run before applying.
-   Verify the planned inserts/updates match the legacy files and that unrelated
-   operational tables are untouched.
-6. **Apply in one transaction.**
-
-   ```sh
-   cd /app
-   bun --no-install src/cli/import-career-data.ts --source /data/career-data --database /data/jobs.db --apply
-   ```
-
-   The apply is transactional; on any validation error nothing is written.
+5. **Review the preview.** The preview writes nothing and shows the source
+   fingerprint, the database fingerprint, per-kind counts and every conflict. Any
+   conflict blocks the whole import; resolve the source or the conflicting record
+   and upload again — a stale preview is rejected, so always re-run before
+   confirming. Verify the planned inserts/updates match the legacy files and that
+   unrelated operational tables are untouched.
+6. **Confirm to apply in one transaction.** The confirm step re-reads the same
+   bytes and re-derives the fingerprints before writing, and the apply is
+   transactional: on any validation error nothing is written.
 7. **Verify readiness and counts.** Re-run the count query from step 2 and
-   confirm the career tables are populated; an empty `career_candidate` means
+   confirm the career tables are populated; an empty `career_profile` means
    onboarding still applies. Check foreign-key integrity:
 
    ```sh
@@ -306,19 +278,18 @@ with local data, and do not import a local dataset into production.
    selected per direction, Review resolves requirements, and an existing
    application still shows its Job Post, Documents, Contacts and Activities.
    Drive connection status and confirmed pending uploads must still work.
-8. **Retire the file-based environment variables.** Once the database is
-   authoritative and verified, remove `CAREER_DATA_DIR` (and
-   `CAREER_BASE_RESUMES_DIR` if set) from the Fly app configuration and from any
-   local `.env`, so nothing suggests runtime file reads:
+8. **Retire the file-based environment variables.** No runtime request reads
+   `CAREER_DATA_DIR` or `CAREER_BASE_RESUMES_DIR`, so they must not remain in the
+   Fly app configuration. `fly.toml` no longer sets `CAREER_DATA_DIR`; if the
+   variable is still present as a secret, unset it:
 
    ```sh
    fly secrets unset CAREER_DATA_DIR --app job-hunting   # only if set as a secret
    ```
 
-   If the variable is set in `fly.toml` `[env]` instead, remove it there and
-   deploy the change through the normal manual flow. Keep the legacy
-   `/data/career-data/` files in place until you have confirmed the import and
-   kept the backup; they are harmless once unused.
+   Deploy the change through the normal manual flow. Keep the legacy
+   `/data/career-data/` files in place: they are harmless once unused, and they
+   are the source you would upload again at `/career-data/transfer`.
 9. **Keep the manual deploy policy.** Do not enable automatic deployment, and do
    not deploy again until the checks above pass. If something is wrong, fix
    forward with a new migration or restore the snapshot during a maintenance

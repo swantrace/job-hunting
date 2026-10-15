@@ -10,10 +10,10 @@ import { baseResumeTextHash } from '../../src/lib/base-resumes'
 import { recordsFor } from './support/html-contract'
 
 /**
- * Step 10 route acceptance for the directions and Base Resume tabs.
+ * directions route acceptance for the directions and Base Resume tabs.
  *
  * Every route resolves the real `db` singleton, so the acceptance criteria are
- * proved end to end through the Step 2 repositories. Fixture rows use the
+ * proved end to end through the repositories. Fixture rows use the
  * `career-ui10` marker and are removed before and after every test; the
  * developer's `jobs.db` is never opened.
  */

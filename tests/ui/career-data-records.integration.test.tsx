@@ -14,10 +14,10 @@ import { loadCareerDataFromDatabase } from '../../src/lib/career-data'
 import { recordsFor } from './support/html-contract'
 
 /**
- * Step 8 route acceptance for the achievements, projects and skills tabs.
+ * achievements, projects and skills route acceptance for the achievements, projects and skills tabs.
  *
  * Every route resolves the real `db` singleton, so the acceptance criteria are
- * proved end to end through the Step 2 repositories. Fixture rows use the
+ * proved end to end through the repositories. Fixture rows use the
  * `career-ui8` marker and are removed before and after every test; the
  * developer's `jobs.db` is never opened, and no identity row is written.
  */
@@ -187,9 +187,9 @@ describe('career data step 8 page and fragment boundaries', () => {
     const { parseCareerDataTab, careerDataTabs } = await import(
       '../../app/components/career/CareerDataTabs'
     )
-    // Step 9 appends stories/publications/preferences and Step 10 adds
+    // Later tabs append stories, publications, preferences
     // directions/base-resumes; the exact registry is updated here the same way
-    // Step 8 updated the Step 7 tabs.
+    // This suite covers the tabs added after them.
     expect(careerDataTabs.map((tab) => tab.key)).toEqual([
       'identity',
       'experience',

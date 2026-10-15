@@ -17,10 +17,10 @@ import {
 import { recordsFor } from './support/html-contract'
 
 /**
- * Step 11 route acceptance for the Career data "Import & export" tab.
+ * career transfer route acceptance for the Career data "Import & export" tab.
  *
  * This file runs in its own child process with a private `DB_FILE_NAME` (see
- * `career-data-step11.integration.test.tsx`), exactly like the Step 4
+ * `career-transfer.integration.test.tsx`), exactly like the
  * runtime-read acceptance. It therefore exercises the real `db` singleton and the
  * real route modules against a temporary migrated database outside the
  * repository; the developer's `jobs.db` and private `career-data/` are never
@@ -62,7 +62,7 @@ function resetDatabase() {
   for (const table of careerTables) sqlite.exec(`DELETE FROM ${table}`)
 }
 
-/** Imports the synthetic fixtures through the Step 3 importer into `db`. */
+/** Imports the synthetic fixtures through the importer into `db`. */
 function seedSyntheticCareerData() {
   const directory = mkdtempSync(resolve(databaseRoot, 'seed-'))
   try {
@@ -246,7 +246,7 @@ describe('career dataset import flow', () => {
 
     // The stale-preview contract has two halves: the source fingerprint (proved
     // by the swapped-payload case below) and the database fingerprint (proved by the
-    // Step 3 `applyCareerImport` contract tests). Repeating an identical no-op
+    // `applyCareerImport` contract tests). Repeating an identical no-op
     // import is legitimately accepted because nothing changed.
   })
 

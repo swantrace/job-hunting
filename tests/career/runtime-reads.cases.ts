@@ -43,7 +43,7 @@ import {
 } from '../support/career-db'
 
 /**
- * Step 4 acceptance: SQLite is the sole runtime authority for career facts,
+ * acceptance: SQLite is the sole runtime authority for career facts,
  * directions, categories, personal skills and Base Resume versions.
  *
  * Every database is the isolated `DB_FILE_NAME` database (or a temporary one

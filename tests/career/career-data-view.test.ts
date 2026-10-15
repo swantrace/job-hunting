@@ -31,7 +31,7 @@ import { loadCareerDataFromDatabase } from '../../src/lib/career-data'
 import { migratedDatabase } from '../support/sqlite'
 
 /**
- * Step 7 data contracts for career identity, experience and education: the
+ * data contracts for career identity, experience and education: the
  * section read model (including the empty-database onboarding state), precision
  * validation, generated stable keys, order moves, retirement visibility and
  * extension-field editing without raw JSON. Every database here is an in-memory

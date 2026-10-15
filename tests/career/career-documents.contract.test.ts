@@ -14,7 +14,7 @@ import { migratedDatabase } from '../support/sqlite'
 import { approvedBaseResumeMarkdown, draftBaseResumeMarkdown } from './fixtures'
 
 /**
- * Step 1 document-history contracts. Approved Base Resume content and queued run
+ * document-history contracts. Approved Base Resume content and queued run
  * inputs must be frozen by value so that later edits cannot rewrite history and
  * a queued worker never reads facts that changed after enqueue.
  */

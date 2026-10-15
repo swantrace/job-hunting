@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { parseOptions } from '../src/cli/import-base-resume'
 import {
   approveBaseResume,
   baseResumeManifestFileName,
@@ -27,34 +26,6 @@ function tempInputFile(content = '# Resume\n') {
 
 afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { force: true, recursive: true })
-})
-
-describe('Base Resume import CLI', () => {
-  test('parses direction, input, version, and output options', () => {
-    const input = tempInputFile()
-    const options = parseOptions(
-      ['--direction', 'fhir', '--input', input, '--version', 'v2', '--output', '/tmp/base'],
-      {},
-    )
-    expect(options.direction).toBe('fhir')
-    expect(options.inputPath).toBe(input)
-    expect(options.version).toBe('v2')
-    expect(options.outputDirectory).toBe('/tmp/base')
-  })
-
-  test('requires a direction and input and validates the direction shape', () => {
-    expect(() => parseOptions(['--input', tempInputFile()], {})).toThrow('--direction is required')
-    expect(() =>
-      parseOptions(['--direction', 'Not Valid!', '--input', tempInputFile()], {}),
-    ).toThrow('Invalid direction')
-  })
-
-  test('defaults the output directory to the resolved base-resumes path', () => {
-    const options = parseOptions(['--direction', 'fhir', '--input', tempInputFile()], {
-      CAREER_BASE_RESUMES_DIR: '/tmp/custom-base',
-    })
-    expect(options.outputDirectory).toBe('/tmp/custom-base')
-  })
 })
 
 describe('approveBaseResume', () => {

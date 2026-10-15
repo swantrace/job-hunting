@@ -191,7 +191,7 @@ export function reviewDataFixture(overrides: Record<string, any> = {}) {
 }
 
 /**
- * One pending requirement-owned mention, shaped exactly like the Step 2
+ * One pending requirement-owned mention, shaped exactly like the
  * projection (`mention.id` is the mention id).
  */
 export function mentionRowFixture(overrides: Record<string, any> = {}) {

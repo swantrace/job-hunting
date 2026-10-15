@@ -4,7 +4,7 @@ export const careerDatasetExportFormId = 'career-dataset-export-form'
 
 /**
  * Portable `career-dataset` export: a full dataset, or one direction and the
- * records linked to it. The download is the versioned Step 3 format, identified
+ * records linked to it. The download is the versioned format, identified
  * by its own `format: "career-dataset"` marker, so it can never be confused with
  * the v4 application backup exported at `/export`.
  */
