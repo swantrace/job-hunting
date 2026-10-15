@@ -8,6 +8,9 @@ export const careerDataTabs = [
   { key: 'identity', label: 'Identity' },
   { key: 'experience', label: 'Experience' },
   { key: 'education', label: 'Education' },
+  { key: 'achievements', label: 'Achievements' },
+  { key: 'projects', label: 'Projects' },
+  { key: 'skills', label: 'Skills' },
 ] as const
 
 export type CareerDataTab = (typeof careerDataTabs)[number]['key']

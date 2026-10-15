@@ -1,6 +1,6 @@
 import type { FrozenBaseResumeSource } from './base-resumes'
 import { canonicalHash } from './canonical-hash'
-import type { CanonicalCareerData } from './career-data'
+import { type CanonicalCareerData, documentEligibleProjects } from './career-data'
 import { safeCareerData } from './document-draft-input'
 
 export type CareerContextDirection = {
@@ -30,7 +30,9 @@ function directionEvidenceIndex(data: CanonicalCareerData, directionId: string) 
     publicationIds: data.publications.publications
       .filter((item) => item.safeToUse && appliesToDirection(item))
       .map((item) => item.id),
-    projectIds: data.projects.projects.filter(appliesToDirection).map((item) => item.id),
+    projectIds: documentEligibleProjects(data.projects.projects)
+      .filter(appliesToDirection)
+      .map((item) => item.id),
     skillIds: data.skills.skills.filter(appliesToDirection).map((item) => item.id),
     storyIds: data.stories.stories.filter(appliesToDirection).map((item) => item.id),
   }

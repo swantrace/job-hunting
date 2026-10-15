@@ -98,6 +98,11 @@ function assertUniqueReferences(label: string, values: Array<number | string>): 
   }
 }
 
+/**
+ * Career evidence may cite only an approved catalog skill. A pending, rejected
+ * or merged catalog entry is not a ratified skill, so linking it to an
+ * achievement or project would let an unreviewed term prove a match.
+ */
 function requireSkillIds(tx: CareerDb, ids: number[]): void {
   assertUniqueReferences('skills', ids)
   for (const id of ids) {
@@ -106,6 +111,11 @@ function requireSkillIds(tx: CareerDb, ids: number[]): void {
     if (skill.reviewStatus === 'merged') {
       throw new CareerReferenceError(
         `Catalog skill ${id} is merged; reference its target skill instead.`,
+      )
+    }
+    if (skill.reviewStatus !== 'approved') {
+      throw new CareerReferenceError(
+        `Catalog skill ${id} is ${skill.reviewStatus}, not approved; career evidence requires an approved catalog entry.`,
       )
     }
   }
@@ -144,10 +154,17 @@ function requirePublicationIds(tx: CareerDb, ids: number[]): void {
   }
 }
 
+/**
+ * The linked experience must exist and be active. A retired experience is
+ * history: new achievements, projects, stories or publications must not cite it
+ * as a current source.
+ */
 function requireExperience(tx: CareerDb, id: number | null | undefined): void {
   if (id === null || id === undefined) return
   const experience = tx.select().from(careerExperiences).where(eq(careerExperiences.id, id)).get()
   if (!experience) throw new CareerReferenceError(`Unknown experience id ${id}.`)
+  if (experience.retiredAt !== null)
+    throw new CareerReferenceError(`Experience ${id} is retired and cannot be referenced.`)
 }
 
 function requireDatePrecision(value: string): CareerDatePrecision {

@@ -6,7 +6,7 @@ import {
   loadApprovedBaseResume,
 } from './base-resumes'
 import { canonicalHash } from './canonical-hash'
-import { type CanonicalCareerData, loadCareerData } from './career-data'
+import { type CanonicalCareerData, documentSafeCareerData, loadCareerData } from './career-data'
 import { todayISO } from './date'
 import { directionTargetTitles, listDirections } from './directions'
 import { documentDraftPolicy } from './document-draft-policy'
@@ -62,15 +62,7 @@ export type DocumentDraftSnapshot = {
 }
 
 export function safeCareerData(data: CanonicalCareerData) {
-  return {
-    candidate: data.candidate,
-    experiences: data.experiences.experiences,
-    achievements: data.achievements.achievements.filter((item) => item.safeToUse),
-    publications: data.publications.publications.filter((item) => item.safeToUse),
-    projects: data.projects.projects,
-    skills: data.skills.skills,
-    stories: data.stories.stories,
-  }
+  return documentSafeCareerData(data)
 }
 
 function knownDirectionIds(executor: DbExecutor) {

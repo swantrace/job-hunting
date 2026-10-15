@@ -1,10 +1,13 @@
 import { z } from 'zod'
 import type { CareerCandidateInput } from '../../db/career-facts'
 import type {
+  CareerAchievementInput,
   CareerDatePrecision,
   CareerEducationInput,
   CareerExperienceInput,
+  CareerProjectInput,
 } from '../../db/career-records'
+import type { CareerSkillInput, CareerSkillUpdateInput } from '../../db/career-skills'
 import type { CareerStateExtensionRecords } from '../../db/career-state'
 import { extensionObjectOrNull } from './json-schemas'
 
@@ -322,9 +325,114 @@ export const educationFormSchema = z
   })
   .superRefine(refineCareerDates)
 
+/**
+ * A `RelationPicker` submits one checkbox value per selected reference, so a
+ * name can arrive as an array (multiple selections), a single string (one
+ * selection) or a line-joined string (the re-rendered form after a 422/409).
+ * All three normalise to the same ordered list.
+ */
+function pickerStrings(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((entry) => String(entry).trim()).filter(Boolean)
+  return typeof value === 'string' ? parseLineList(value) : []
+}
+
+/** External stable keys chosen in a picker (direction keys). */
+const pickerKeyList = z.preprocess(pickerStrings, z.array(z.string().min(1).max(120)))
+
+/** Internal ids chosen in a picker (catalog skills, publications). */
+const pickerIdList = z.preprocess(
+  (value) => pickerStrings(value).map(Number),
+  z.array(z.number().int().positive('Choose a reference from the list.')),
+)
+
+/** An optional single picker (the experience a record belongs to). */
+const optionalPickerId = z.preprocess((value) => {
+  const id = Number(value)
+  return Number.isInteger(id) && id > 0 ? id : undefined
+}, z.number().int().positive().optional())
+
+/** A required single picker (the approved catalog skill a personal skill uses). */
+const requiredPickerId = z.preprocess((value) => {
+  const id = Number(value)
+  return Number.isInteger(id) && id > 0 ? id : undefined
+}, z.number({ error: 'Choose an approved catalog skill.' }).int().positive())
+
+/**
+ * Achievement form: a claim with validated source links (experience, catalog
+ * skills, directions, publications) kept separate from narrative attestation
+ * (evidence notes and the candidate's own narrative).
+ */
+export const achievementFormSchema = z.object({
+  claim: requiredLine('Claim', 500),
+  experienceId: optionalPickerId,
+  skills: pickerIdList,
+  directions: pickerKeyList,
+  publicationIds: pickerIdList,
+  safeToUse: checkbox,
+  evidence: optionalText(6000),
+  evidenceNarratives: optionalText(6000),
+  limitations: optionalText(6000),
+  expectedRevision: revisionField,
+})
+
+/**
+ * Project form. URLs are validated as http(s) here so an invalid address is an
+ * inline 422 rather than a repository serialization error.
+ */
+export const projectFormSchema = z
+  .object({
+    name: requiredLine('Project name', 200),
+    experienceId: optionalPickerId,
+    ownership: optionalText(200),
+    eligibility: z.preprocess(
+      (value) => (value === 'not-eligible' ? 'not-eligible' : 'resume-eligible'),
+      z.enum(['resume-eligible', 'not-eligible']),
+    ),
+    completion: optionalText(200),
+    urls: optionalText(6000),
+    safeWording: optionalText(2000),
+    limitations: optionalText(6000),
+    skills: pickerIdList,
+    directions: pickerKeyList,
+    expectedRevision: revisionField,
+  })
+  .superRefine((value, ctx) => {
+    for (const [index, line] of parseLineList(value.urls).entries()) {
+      let usable = /^https?:\/\//i.test(line)
+      if (usable) {
+        try {
+          new URL(line)
+        } catch {
+          usable = false
+        }
+      }
+      if (!usable) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['urls'],
+          message: `URL ${index + 1} must be a valid http:// or https:// address.`,
+        })
+      }
+    }
+  })
+
+/** Personal skill form: an approved catalog entry plus the candidate's own detail. */
+export const personalSkillFormSchema = z.object({
+  skillId: requiredPickerId,
+  level: optionalText(80),
+  resumeEligible: checkbox,
+  explanation: optionalText(4000),
+  notes: optionalText(4000),
+  evidence: optionalText(6000),
+  expectedRevision: revisionField,
+})
+
 export type CandidateFormValues = z.infer<typeof candidateFormSchema>
 export type ExperienceFormValues = z.infer<typeof experienceFormSchema>
 export type EducationFormValues = z.infer<typeof educationFormSchema>
+export type AchievementFormValues = z.infer<typeof achievementFormSchema>
+export type ProjectFormValues = z.infer<typeof projectFormSchema>
+export type PersonalSkillFormValues = z.infer<typeof personalSkillFormSchema>
 
 export function candidateInput(values: CandidateFormValues): CareerCandidateInput {
   const authorization = {
@@ -397,6 +505,68 @@ export function educationInput(
     sortOrder: values.sortOrder ?? 0,
     coursework: parseLineList(values.coursework),
     details: options.details,
+  }
+}
+
+export function achievementInput(
+  values: AchievementFormValues,
+  options: { stableKey: string },
+): CareerAchievementInput {
+  return {
+    stableKey: options.stableKey,
+    experienceId: values.experienceId ?? null,
+    claim: values.claim,
+    safeToUse: values.safeToUse,
+    evidence: parseLineList(values.evidence),
+    evidenceNarratives: parseLineList(values.evidenceNarratives),
+    limitations: parseLineList(values.limitations),
+    skills: values.skills,
+    directions: values.directions,
+    publicationIds: values.publicationIds,
+  }
+}
+
+export function projectInput(
+  values: ProjectFormValues,
+  options: { stableKey: string },
+): CareerProjectInput {
+  return {
+    stableKey: options.stableKey,
+    name: values.name,
+    experienceId: values.experienceId ?? null,
+    ownership: values.ownership ?? null,
+    eligibility: values.eligibility,
+    completion: values.completion ?? null,
+    urls: parseLineList(values.urls),
+    safeWording: values.safeWording ?? null,
+    limitations: parseLineList(values.limitations),
+    skills: values.skills,
+    directions: values.directions,
+  }
+}
+
+export function personalSkillInput(values: PersonalSkillFormValues): CareerSkillInput {
+  return {
+    skillId: values.skillId,
+    level: values.level ?? null,
+    resumeEligible: values.resumeEligible,
+    explanation: values.explanation ?? null,
+    notes: values.notes ?? null,
+    evidence: parseLineList(values.evidence),
+  }
+}
+
+/**
+ * A personal skill's catalog entry is its identity and cannot be changed, so an
+ * update never carries `skillId`; the submitted one is ignored.
+ */
+export function personalSkillUpdateInput(values: PersonalSkillFormValues): CareerSkillUpdateInput {
+  return {
+    level: values.level ?? null,
+    resumeEligible: values.resumeEligible,
+    explanation: values.explanation ?? null,
+    notes: values.notes ?? null,
+    evidence: parseLineList(values.evidence),
   }
 }
 
@@ -518,6 +688,101 @@ export function educationFormValues(
   }
 }
 
+/** One line per selected reference, the editable shape a `RelationPicker` reads. */
+export function pickerSelection(values: Array<number | string> | null | undefined): string {
+  return (values ?? []).map(String).join('\n')
+}
+
+export type AchievementFormSource = {
+  claim?: string
+  experienceId?: number | null
+  skills?: number[]
+  directions?: string[]
+  publicationIds?: number[]
+  safeToUse?: boolean
+  evidence?: string[]
+  evidenceNarratives?: string[]
+  limitations?: string[]
+  revision?: number
+}
+
+export type ProjectFormSource = {
+  name?: string
+  experienceId?: number | null
+  ownership?: string | null
+  eligibility?: string | null
+  completion?: string | null
+  urls?: string[]
+  safeWording?: string | null
+  limitations?: string[]
+  skills?: number[]
+  directions?: string[]
+  revision?: number
+}
+
+export type PersonalSkillFormSource = {
+  skillId?: number
+  level?: string | null
+  resumeEligible?: boolean
+  explanation?: string | null
+  notes?: string | null
+  evidence?: string[]
+  revision?: number
+}
+
+export function achievementFormValues(
+  record: AchievementFormSource | null,
+): Record<string, string> {
+  return {
+    claim: record?.claim ?? '',
+    experienceId:
+      record?.experienceId === null || record?.experienceId === undefined
+        ? ''
+        : String(record.experienceId),
+    skills: pickerSelection(record?.skills),
+    directions: pickerSelection(record?.directions),
+    publicationIds: pickerSelection(record?.publicationIds),
+    safeToUse: record === null || record.safeToUse !== false ? 'on' : '',
+    evidence: formatLineList(record?.evidence),
+    evidenceNarratives: formatLineList(record?.evidenceNarratives),
+    limitations: formatLineList(record?.limitations),
+    expectedRevision: String(record?.revision ?? 0),
+  }
+}
+
+export function projectFormValues(record: ProjectFormSource | null): Record<string, string> {
+  return {
+    name: record?.name ?? '',
+    experienceId:
+      record?.experienceId === null || record?.experienceId === undefined
+        ? ''
+        : String(record.experienceId),
+    ownership: record?.ownership ?? '',
+    eligibility: record?.eligibility === 'not-eligible' ? 'not-eligible' : 'resume-eligible',
+    completion: record?.completion ?? '',
+    urls: formatLineList(record?.urls),
+    safeWording: record?.safeWording ?? '',
+    limitations: formatLineList(record?.limitations),
+    skills: pickerSelection(record?.skills),
+    directions: pickerSelection(record?.directions),
+    expectedRevision: String(record?.revision ?? 0),
+  }
+}
+
+export function personalSkillFormValues(
+  record: PersonalSkillFormSource | null,
+): Record<string, string> {
+  return {
+    skillId: record?.skillId === undefined ? '' : String(record.skillId),
+    level: record?.level ?? '',
+    resumeEligible: record === null || record.resumeEligible !== false ? 'on' : '',
+    explanation: record?.explanation ?? '',
+    notes: record?.notes ?? '',
+    evidence: formatLineList(record?.evidence),
+    expectedRevision: String(record?.revision ?? 0),
+  }
+}
+
 /** Merges a submitted form back over its previous values, so a 422 keeps edits. */
 export function submittedValues(
   raw: Record<string, unknown>,
@@ -525,7 +790,11 @@ export function submittedValues(
 ): Record<string, string> {
   const submitted: Record<string, string> = {}
   for (const [key, value] of Object.entries(raw)) {
-    submitted[key] = typeof value === 'string' ? value : ''
+    submitted[key] = Array.isArray(value)
+      ? value.map(String).join('\n')
+      : typeof value === 'string'
+        ? value
+        : ''
   }
   return { ...fallback, ...submitted }
 }

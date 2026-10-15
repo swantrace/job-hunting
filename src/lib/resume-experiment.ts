@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import type { CanonicalCareerData } from './career-data'
+import { type CanonicalCareerData, documentEligibleProjects } from './career-data'
 
 export const resumeExperimentMethods = [
   'base-minimal',
@@ -175,7 +175,10 @@ export function canonicalCareerContext(data: CanonicalCareerData, direction: str
         ...data.publications,
         publications: data.publications.publications.filter((item) => item.safeToUse),
       },
-      projects: data.projects,
+      projects: {
+        ...data.projects,
+        projects: documentEligibleProjects(data.projects.projects),
+      },
       skills: data.skills,
       stories: data.stories,
       preferences: data.preferences,

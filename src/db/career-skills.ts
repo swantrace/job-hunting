@@ -212,3 +212,18 @@ export function retireCareerSkill(executor: CareerDb, id: number): CareerWriteRe
     return { id, changed: true, revision }
   })
 }
+
+/** Reverses retirement; the skill keeps its evidence and resume eligibility. */
+export function restoreCareerSkill(executor: CareerDb, id: number): CareerWriteResult {
+  return executor.transaction((tx) => {
+    const existing = requireCareerSkill(tx, id)
+    if (existing.retiredAt === null) return { id, changed: false, revision: existing.revision }
+    const revision = existing.revision + 1
+    tx.update(careerSkills)
+      .set({ retiredAt: null, revision, updatedAt: nowISO() })
+      .where(eq(careerSkills.id, id))
+      .run()
+    recordCareerChange(tx, stableFingerprint({ careerSkillId: id, retired: false }))
+    return { id, changed: true, revision }
+  })
+}

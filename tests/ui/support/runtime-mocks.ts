@@ -294,7 +294,9 @@ mock.module('../../../src/lib/request', () => ({
   }),
   parseForm: async (c: { req: { formData: () => Promise<FormData> } }) => {
     try {
-      return Object.fromEntries((await c.req.formData()).entries())
+      // Delegate to the real parser so a leaked mock keeps production semantics,
+      // including repeated field names (a RelationPicker's checkbox list).
+      return realValidation.formObject(await c.req.formData())
     } catch {
       return {}
     }

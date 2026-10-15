@@ -14,7 +14,7 @@ import { getApplication } from '../db/queries'
 import { listRequirementSkillMappings } from '../db/skill-queries'
 import { type AnalysisRunState, classifyAnalysisRunState } from './analysis-run-state'
 import { canonicalHash } from './canonical-hash'
-import { careerEvidenceIds, loadCareerData } from './career-data'
+import { careerEvidenceIds, documentSafeCareerData, loadCareerData } from './career-data'
 import { todayISO } from './date'
 import { assertEveryRequirementAssessed, validateCandidateFitEvidence } from './fit-analysis'
 import { currentJobAnalysisHash } from './job-analysis-input'
@@ -129,15 +129,7 @@ export function buildCandidateAnalysisInput(
     skills: data.skills.schemaVersion,
     stories: data.stories.schemaVersion,
   }
-  const careerData = {
-    candidate: data.candidate,
-    experiences: data.experiences.experiences,
-    achievements: data.achievements.achievements.filter((item) => item.safeToUse),
-    publications: data.publications.publications.filter((item) => item.safeToUse),
-    projects: data.projects.projects,
-    skills: data.skills.skills,
-    stories: data.stories.stories,
-  }
+  const careerData = documentSafeCareerData(data)
 
   const snapshot = {
     version: 2 as const,

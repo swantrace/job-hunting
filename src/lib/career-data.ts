@@ -681,9 +681,39 @@ export function careerSkillEvidenceMap(executor: DbExecutor = db): Record<string
 }
 
 /**
+ * Resume-ineligible projects are editorial drafts: they exist in the career data
+ * but must never reach a generated document or an evidence allowlist.
+ */
+export function documentEligibleProjects<T>(projects: T[]): T[] {
+  return projects.filter(
+    (project) => (project as { eligibility?: unknown }).eligibility === 'resume-eligible',
+  )
+}
+
+/**
+ * The career sources a new document, analysis or ChatGPT context may cite.
+ * Retired records never reach `loadCareerDataFromDatabase`, and unsafe
+ * achievements/publications plus resume-ineligible projects are removed here, so
+ * no prompt, snapshot or evidence allowlist can see them. Narrative text stays
+ * attached to its record; only whole ineligible records are dropped.
+ */
+export function documentSafeCareerData(data: CanonicalCareerData) {
+  return {
+    candidate: data.candidate,
+    experiences: data.experiences.experiences,
+    achievements: data.achievements.achievements.filter((item) => item.safeToUse),
+    publications: data.publications.publications.filter((item) => item.safeToUse),
+    projects: documentEligibleProjects(data.projects.projects),
+    skills: data.skills.skills,
+    stories: data.stories.stories,
+  }
+}
+
+/**
  * Reusable catalog of canonical source IDs. Achievements and publications are
- * included only when safeToUse; every other catalog is included in full so the
- * candidate-fit service can reject references to unsafe or ineligible sources.
+ * included only when safeToUse, projects only when resume-eligible; every other
+ * catalog is included in full so the candidate-fit service can reject references
+ * to unsafe or ineligible sources.
  */
 export function careerEvidenceIds(data: CanonicalCareerData) {
   return {
@@ -691,7 +721,7 @@ export function careerEvidenceIds(data: CanonicalCareerData) {
     achievement: new Set(
       data.achievements.achievements.filter((item) => item.safeToUse).map((item) => item.id),
     ),
-    project: new Set(data.projects.projects.map((item) => item.id)),
+    project: new Set(documentEligibleProjects(data.projects.projects).map((item) => item.id)),
     publication: new Set(
       data.publications.publications.filter((item) => item.safeToUse).map((item) => item.id),
     ),
