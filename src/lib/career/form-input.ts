@@ -242,27 +242,6 @@ export function parseExtensionLines(
   return Object.keys(entries).length > 0 ? entries : null
 }
 
-/**
- * Replaces one record's extension fields inside a `kind -> key -> fields` map,
- * removing empty kinds so an empty edit leaves no residue.
- */
-export function applyExtensionFields(
-  records: Record<string, Record<string, unknown>>,
-  kind: string,
-  key: string,
-  value: Record<string, unknown> | null,
-): Record<string, Record<string, unknown>> {
-  const next: Record<string, Record<string, unknown>> = Object.fromEntries(
-    Object.entries(records).map(([name, entries]) => [name, { ...entries }]),
-  )
-  const kindEntries = next[kind] ?? {}
-  if (value && Object.keys(value).length > 0) kindEntries[key] = value
-  else delete kindEntries[key]
-  if (Object.keys(kindEntries).length > 0) next[kind] = kindEntries
-  else delete next[kind]
-  return next
-}
-
 function refineCareerDates(
   value: { startDate?: string; endDate?: string; datePrecision: CareerDatePrecision },
   ctx: z.RefinementCtx,

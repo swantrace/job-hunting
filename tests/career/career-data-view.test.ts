@@ -17,7 +17,6 @@ import { careerContentProbe } from '../../src/db/career-shared'
 import * as schema from '../../src/db/schema'
 import { storedRecordExtensions, writeRecordExtensions } from '../../src/lib/career/extensions'
 import {
-  applyExtensionFields,
   candidateFormSchema,
   careerDateError,
   careerStableKey,
@@ -262,9 +261,6 @@ describe('career form input', () => {
     // An edited value becomes text; a removed line removes the field.
     expect(parseExtensionLines(preserved, 'count = 4')).toEqual({ count: '4' })
     expect(parseExtensionLines(preserved, '')).toBeNull()
-    expect(
-      applyExtensionFields({ education: { one: { a: 1 } } }, 'education', 'one', null),
-    ).toEqual({})
   })
 
   test('an untouched detail keeps its stored shape while an edit stores text', () => {
