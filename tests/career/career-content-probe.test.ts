@@ -10,7 +10,7 @@ import {
 import { careerContentProbe } from '../../src/db/career-shared'
 import { skillCategories, skills } from '../../src/db/schema'
 import { renameSkill } from '../../src/db/skill-service'
-import { syncSkillTaxonomy } from '../../src/lib/skills/sync-taxonomy'
+import { nowISO } from '../../src/lib/date'
 import { createCareerTestDatabase } from '../support/career-db'
 
 /**
@@ -87,11 +87,11 @@ describe('careerContentProbe', () => {
       const category = executor.select().from(skillCategories).limit(1).get()
       if (!category) throw new Error('Synthetic skill category is missing.')
       await Bun.sleep(2)
-      syncSkillTaxonomy(
-        executor,
-        [{ key: category.key, label: category.label, sortOrder: category.sortOrder + 5 }],
-        { apply: true },
-      )
+      executor
+        .update(skillCategories)
+        .set({ sortOrder: category.sortOrder + 5, updatedAt: nowISO() })
+        .where(eq(skillCategories.key, category.key))
+        .run()
       const afterCategory = careerContentProbe(executor)
       expect(afterCategory).not.toBe(afterCatalog)
 

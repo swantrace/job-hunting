@@ -34,7 +34,6 @@ import {
 } from '../../src/lib/generation-input'
 import { enqueueGeneration } from '../../src/lib/generation-queue'
 import { currentJobAnalysisHash } from '../../src/lib/job-analysis-input'
-import { syncSkillTaxonomy } from '../../src/lib/skills/sync-taxonomy'
 import { writeSyntheticCareerData } from '../career/fixtures'
 import {
   type CareerTestDatabase,
@@ -280,15 +279,9 @@ describe('database-owned runtime career reads', () => {
     // by the stored order below), which is the surviving equivalent of the old
     // `career_state.revision` bump: the identity is derived from the document
     // shape, not from any change counter.
-    syncSkillTaxonomy(
-      db,
-      before.map((row) => ({
-        key: row.key,
-        label: row.label,
-        sortOrder: 1_000 - row.sort_order,
-      })),
-      { apply: true },
-    )
+    database.sqlite
+      .query('UPDATE skill_categories SET sort_order = 1000 - sort_order, updated_at = ?')
+      .run(nowISO())
     const after = database.sqlite
       .query('SELECT key, sort_order FROM skill_categories ORDER BY key')
       .all() as Array<{ key: string; sort_order: number }>
