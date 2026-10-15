@@ -3,11 +3,15 @@
  * controlled section vocabulary enforced by `parseDocumentDraft`; code owns the
  * Word layout. The renderer owns the displayed title, so the model never
  * fabricates an employer, a job posting, or application metadata.
+ *
+ * The prompt is built from the effective direction policy, so a direction's
+ * stored word/bullet budgets reach the model too; the exported constants are the
+ * documented default policy used by any direction without stored rules.
  */
 
-import { documentDraftPolicy } from '../../lib/document-draft-policy'
+import { type DocumentDraftPolicy, documentDraftPolicy } from '../../lib/document-draft-policy'
 
-export const documentDraftPromptVersion = '2.0.1'
+export const documentDraftPromptVersion = '2.1.0'
 
 const sourceRules = `# Source authority
 1. Canonical Career Data is the factual authority.
@@ -30,7 +34,8 @@ const markdownRules = `
 - Do not write a document title, subject line, address block, signature, or placeholders; the renderer owns application metadata and document chrome.
 `
 
-export const resumeDraftSystemPrompt = `# Role
+export function resumeDraftSystemPromptFor(policy: DocumentDraftPolicy): string {
+  return `# Role
 You are an expert technical resume editor. You write a complete resume body as Markdown from a frozen drafting input.
 
 # Goal
@@ -50,10 +55,12 @@ ${markdownRules}
 - Required sections, in order: "## Summary", "## Skills", "## Experience", "## Education".
 - Optional sections: "## Projects" after Experience and "## Publications" before Education. Include either only when it adds relevant, supported evidence; omit it rather than render an empty or distracting section.
 - The renderer already displays the exact target title. Do not add a title line or mechanically open Summary by repeating it.
-- Keep Summary within ${documentDraftPolicy.resume.summaryMaxWords} words and include every canonical education entry supplied.
-- Keep the complete resume within ${documentDraftPolicy.resume.maxWords} words and ${documentDraftPolicy.resume.maxBullets} bullets so it can fit the current two-page layout. Prefer stronger selection and tighter wording over shrinking important evidence.`
+- Keep Summary within ${policy.resume.summaryMaxWords} words and include every canonical education entry supplied.
+- Keep the complete resume within ${policy.resume.maxWords} words and ${policy.resume.maxBullets} bullets so it can fit the current two-page layout. Prefer stronger selection and tighter wording over shrinking important evidence.`
+}
 
-export const coverLetterDraftSystemPrompt = `# Role
+export function coverLetterDraftSystemPromptFor(policy: DocumentDraftPolicy): string {
+  return `# Role
 You are an expert technical cover-letter editor. You write a concise cover-letter body as Markdown from a frozen drafting input.
 
 # Goal
@@ -61,7 +68,7 @@ Produce a persuasive, truthful letter that complements the resume instead of par
 
 # Success criteria
 - Opening names the exact role and company, establishes the candidate's positioning immediately, and avoids generic enthusiasm or formulaic openings.
-- Evidence develops ${documentDraftPolicy.coverLetter.minEvidenceParagraphs}-${documentDraftPolicy.coverLetter.maxEvidenceParagraphs} coherent proof themes using specific contributions or outcomes; it does not walk through the resume role by role.
+- Evidence develops ${policy.coverLetter.minEvidenceParagraphs}-${policy.coverLetter.maxEvidenceParagraphs} coherent proof themes using specific contributions or outcomes; it does not walk through the resume role by role.
 - Company Interest refers to a concrete product, responsibility, problem, or working context found in the reviewed Job Description.
 - Closing is confident and concise, adds no new claim, and invites a conversation without sounding presumptuous.
 - The writing sounds natural and individually composed, with varied sentence openings and no keyword list disguised as prose.
@@ -73,11 +80,13 @@ ${markdownRules}
 - Required sections, in order: "## Salutation", "## Opening", "## Evidence", "## Company Interest", "## Closing".
 - Optional section: "## Authorization" immediately before Closing, only when supplied facts support a useful authorization statement.
 - Salutation contains only the recipient name or role, such as "Hiring Team"; never include "Dear" or punctuation.
-- Evidence contains ${documentDraftPolicy.coverLetter.minEvidenceParagraphs}-${documentDraftPolicy.coverLetter.maxEvidenceParagraphs} paragraphs.
+- Evidence contains ${policy.coverLetter.minEvidenceParagraphs}-${policy.coverLetter.maxEvidenceParagraphs} paragraphs.
 - Company Interest uses only the reviewed posting and supplied company facts; never invent external company research.
-- Keep the complete letter within ${documentDraftPolicy.coverLetter.maxWords} words.`
+- Keep the complete letter within ${policy.coverLetter.maxWords} words.`
+}
 
-export const baselineDraftSystemPrompt = `You write a reusable direction baseline resume body as Markdown.
+export function baselineDraftSystemPromptFor(policy: DocumentDraftPolicy): string {
+  return `You write a reusable direction baseline resume body as Markdown.
 # Goal
 Create the strongest truthful reusable baseline by editing the approved Base Resume rather than rebuilding it. Preserve its strongest editorial structure, voice, wording, and information density while correcting conflicts from Canonical Career Data.
 
@@ -89,4 +98,10 @@ ${markdownRules}
 - Required sections, in order: "## Summary", "## Skills", "## Experience", "## Education".
 - Optional sections: "## Projects" after Experience and "## Publications" before Education. Include either only when it strengthens the supplied direction.
 - Summary positions the candidate for the supplied direction target titles without adding a separate title line.
-- Keep Summary within ${documentDraftPolicy.resume.summaryMaxWords} words, include every canonical education entry, and keep the complete resume within ${documentDraftPolicy.resume.maxWords} words and ${documentDraftPolicy.resume.maxBullets} bullets.`
+- Keep Summary within ${policy.resume.summaryMaxWords} words, include every canonical education entry, and keep the complete resume within ${policy.resume.maxWords} words and ${policy.resume.maxBullets} bullets.`
+}
+
+/** Default-policy prompts, exported for the documented seed and contract tests. */
+export const resumeDraftSystemPrompt = resumeDraftSystemPromptFor(documentDraftPolicy)
+export const coverLetterDraftSystemPrompt = coverLetterDraftSystemPromptFor(documentDraftPolicy)
+export const baselineDraftSystemPrompt = baselineDraftSystemPromptFor(documentDraftPolicy)

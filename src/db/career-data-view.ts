@@ -1,6 +1,7 @@
 import { asc, eq } from 'drizzle-orm'
 import { careerOnboardingRequired } from '../lib/application-readiness'
 import { extensionObjectOrNull } from '../lib/career/json-schemas'
+import { listAllBaseResumeVersions } from './career-base-resumes'
 import { type CareerDirectionRecord, listCareerDirections } from './career-directions'
 import {
   type CareerCandidateRecord,
@@ -27,7 +28,7 @@ import {
 import { type CareerSkillRecord, listCareerSkills } from './career-skills'
 import { type CareerStateExtensionRecords, readCareerStateDocuments } from './career-state'
 import { db } from './client'
-import { skills } from './schema'
+import { type CareerBaseResume, skills } from './schema'
 import type { DbExecutor } from './skill-queries'
 
 /**
@@ -73,6 +74,10 @@ export type CareerDataView = {
   stories: CareerStoryRecord[]
   publications: CareerPublicationRecord[]
   portfolioTopics: CareerPortfolioTopicRecord[]
+  /** Directions in stored order; retired ones only when requested. */
+  directions: CareerDirectionRecord[]
+  /** Every Base Resume version, including superseded history. */
+  baseResumes: CareerBaseResume[]
   /** The preferences singleton, or null before it is first saved. */
   preferences: CareerPreferencesRecord | null
   /** Personal ("My skills") records; retired ones only when requested. */
@@ -124,6 +129,8 @@ export function loadCareerDataView(
     portfolioTopics: listCareerPortfolioTopics(executor, {
       includeRetired: options.includeRetired,
     }),
+    directions: visible(allDirections),
+    baseResumes: listAllBaseResumeVersions(executor),
     preferences: readCareerPreferences(executor),
     personalSkills: listCareerSkills(executor, { includeRetired: options.includeRetired }),
     catalogSkills: listApprovedCatalogSkills(executor),

@@ -166,6 +166,7 @@ describe('career data step 9 page and fragment boundaries', () => {
     const { parseCareerDataTab, careerDataTabs } = await import(
       '../../app/components/career/CareerDataTabs'
     )
+    // Step 10 appends directions/base-resumes to the same registry.
     expect(careerDataTabs.map((tab) => tab.key)).toEqual([
       'identity',
       'experience',
@@ -177,6 +178,8 @@ describe('career data step 9 page and fragment boundaries', () => {
       'publications',
       'portfolio',
       'preferences',
+      'directions',
+      'base-resumes',
     ])
     expect(parseCareerDataTab('portfolio')).toBe('portfolio')
     expect(parseCareerDataTab('forged')).toBe('identity')

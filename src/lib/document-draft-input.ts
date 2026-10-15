@@ -1,3 +1,4 @@
+import { listCareerDirections, readCareerDirection } from '../db/career-directions'
 import { db } from '../db/client'
 import type { DbExecutor } from '../db/skill-queries'
 import {
@@ -8,8 +9,8 @@ import {
 import { canonicalHash } from './canonical-hash'
 import { type CanonicalCareerData, documentSafeCareerData, loadCareerData } from './career-data'
 import { todayISO } from './date'
-import { directionTargetTitles, listDirections } from './directions'
-import { documentDraftPolicy } from './document-draft-policy'
+import { directionTargetTitles } from './directions'
+import { type DocumentDraftPolicy, effectiveDocumentDraftPolicy } from './document-draft-policy'
 import {
   generationEligibleRequirements,
   isGenerationEligible,
@@ -57,7 +58,7 @@ export type DocumentDraftSnapshot = {
   }>
   requirements: DocumentDraftRequirement[]
   excludedSkills: string[]
-  documentPolicy: typeof documentDraftPolicy
+  documentPolicy: DocumentDraftPolicy
   careerData: ReturnType<typeof safeCareerData>
 }
 
@@ -68,8 +69,24 @@ export function safeCareerData(
   return documentSafeCareerData(data, options)
 }
 
+/**
+ * The effective drafting policy for a direction. Stored direction rules override
+ * the documented default, and the resolved policy is what both the prompt and
+ * deterministic validation consume, so the two can never disagree.
+ */
+export function directionDocumentPolicy(
+  direction: string,
+  executor: DbExecutor = db,
+): DocumentDraftPolicy {
+  return effectiveDocumentDraftPolicy(readCareerDirection(executor, direction)?.rules ?? null)
+}
+
+/**
+ * Active direction keys, read straight from the database repository. The
+ * drafting path must not depend on a wrapper that a UI test can stub.
+ */
 function knownDirectionIds(executor: DbExecutor) {
-  return new Set(listDirections(executor).map((direction) => direction.id))
+  return new Set(listCareerDirections(executor).map((direction) => direction.key))
 }
 
 /** Loads the frozen approved Base Resume for a direction, or null when absent. */
@@ -173,7 +190,7 @@ export function buildDocumentDraftSnapshot(
       sourceText: item.requirementStatement ?? null,
     })),
     excludedSkills: [...new Set(excludedSkills)],
-    documentPolicy: documentDraftPolicy,
+    documentPolicy: directionDocumentPolicy(source.application.direction, executor),
     careerData: safeCareerData(data),
   }
 }
@@ -203,7 +220,7 @@ export function buildBaselineDocumentDraftSnapshot(
     jobRequirements: [],
     requirements: [],
     excludedSkills: [],
-    documentPolicy: documentDraftPolicy,
+    documentPolicy: directionDocumentPolicy(run.direction, executor),
     careerData: safeCareerData(data),
   }
 }

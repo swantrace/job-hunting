@@ -1,10 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import {
-  baselineDraftSystemPrompt,
-  coverLetterDraftSystemPrompt,
+  baselineDraftSystemPromptFor,
+  coverLetterDraftSystemPromptFor,
   documentDraftPromptVersion,
-  resumeDraftSystemPrompt,
+  resumeDraftSystemPromptFor,
 } from '../ai/prompts/document-draft'
 import {
   documentMarkdownResponseSchema,
@@ -27,7 +27,6 @@ import {
   buildDocumentDraftSnapshot,
   type DocumentDraftSnapshot,
 } from './document-draft-input'
-import { documentDraftPolicy } from './document-draft-policy'
 import { extractMetricClaims, validateDocumentDraft } from './document-draft-validation'
 import { renderCoverLetterDocx } from './docx/cover-letter-renderer'
 import { type DocumentIdentity } from './docx/render-common'
@@ -127,24 +126,26 @@ function educationEntries(snapshot: DocumentDraftSnapshot) {
 }
 
 function validateResumeDraft(draft: DocumentDraft, snapshot: DocumentDraftSnapshot) {
+  const policy = snapshot.documentPolicy.resume
   return validateDocumentDraft(draft, {
     education: educationEntries(snapshot),
     supportedMetrics: supportedMetrics(snapshot),
     excludedSkills: snapshot.excludedSkills,
-    maxWords: documentDraftPolicy.resume.maxWords,
-    maxBullets: documentDraftPolicy.resume.maxBullets,
+    maxWords: policy.maxWords,
+    maxBullets: policy.maxBullets,
     sectionContract: {
       required: ['summary', 'skills', 'experience', 'education'],
       order: ['summary', 'skills', 'experience', 'projects', 'publications', 'education'],
     },
-    sectionWordBudgets: { summary: documentDraftPolicy.resume.summaryMaxWords },
+    sectionWordBudgets: { ...policy.sectionWordBudgets, summary: policy.summaryMaxWords },
   })
 }
 
 function validateCoverLetterDraft(draft: DocumentDraft, snapshot: DocumentDraftSnapshot) {
+  const policy = snapshot.documentPolicy.coverLetter
   return validateDocumentDraft(draft, {
     salutation: sectionText(draft, 'salutation'),
-    maxWords: documentDraftPolicy.coverLetter.maxWords,
+    maxWords: policy.maxWords,
     maxBullets: 0,
     supportedMetrics: supportedMetrics(snapshot),
     excludedSkills: snapshot.excludedSkills,
@@ -154,8 +155,8 @@ function validateCoverLetterDraft(draft: DocumentDraft, snapshot: DocumentDraftS
     },
     sectionBlockBudgets: {
       evidence: {
-        min: documentDraftPolicy.coverLetter.minEvidenceParagraphs,
-        max: documentDraftPolicy.coverLetter.maxEvidenceParagraphs,
+        min: policy.minEvidenceParagraphs,
+        max: policy.maxEvidenceParagraphs,
       },
     },
   })
@@ -227,13 +228,13 @@ export async function generateApplicationDrafts(runId: number): Promise<Artifact
   const resumeMarkdown = await callMarkdown({
     apiKey,
     model: resumeModelId(),
-    system: resumeDraftSystemPrompt,
+    system: resumeDraftSystemPromptFor(snapshot.documentPolicy),
     input: snapshot,
   })
   const coverLetterMarkdown = await callMarkdown({
     apiKey,
     model: coverLetterModelId(),
-    system: coverLetterDraftSystemPrompt,
+    system: coverLetterDraftSystemPromptFor(snapshot.documentPolicy),
     input: snapshot,
   })
 
@@ -301,7 +302,7 @@ export async function generateBaselineDraft(runId: number) {
   const resumeMarkdown = await callMarkdown({
     apiKey,
     model: resumeModelId(),
-    system: baselineDraftSystemPrompt,
+    system: baselineDraftSystemPromptFor(snapshot.documentPolicy),
     input: snapshot,
   })
   const draft = parseDocumentDraft(resumeMarkdown, 'resume')

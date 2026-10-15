@@ -110,6 +110,15 @@ export function readBaseResumeVersion(executor: DbExecutor, id: number): CareerB
   return executor.select().from(careerBaseResumes).where(eq(careerBaseResumes.id, id)).get() ?? null
 }
 
+/** Every version, grouped deterministically by direction, for the management view. */
+export function listAllBaseResumeVersions(executor: DbExecutor = db): CareerBaseResume[] {
+  return executor
+    .select()
+    .from(careerBaseResumes)
+    .orderBy(asc(careerBaseResumes.directionKey), asc(careerBaseResumes.id))
+    .all()
+}
+
 export function selectedApprovedBaseResume(
   executor: DbExecutor,
   directionKey: string,

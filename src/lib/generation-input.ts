@@ -11,11 +11,12 @@ import {
   baseResumeIdentity,
   buildDocumentDraftSnapshot,
   type DocumentDraftSnapshot,
+  directionDocumentPolicy,
   safeCareerData,
 } from './document-draft-input'
 import { docxRendererVersion } from './docx/styles'
 
-export const generationInputVersion = 3
+export const generationInputVersion = 4
 
 export type GenerationInputParts = {
   candidateAnalysisRunId: number
@@ -26,6 +27,8 @@ export type GenerationInputParts = {
   evidenceHash: string
   baseResumeHash: string | null
   baseResumeVersion: string | null
+  /** The effective direction rules the drafting prompt and validation consumed. */
+  directionPolicyHash: string
   generationPromptVersion: string
   generationSchemaVersion: string
   rendererVersion: string
@@ -120,6 +123,7 @@ export function buildGenerationInput(jobApplicationId: number) {
       .map((decision) => ({ skillId: decision.skillId, reason: decision.reason ?? '' })),
     evidenceHash: evidenceSourceHash(),
     ...baseResumeIdentity(job.direction),
+    directionPolicyHash: canonicalHash(directionDocumentPolicy(job.direction)),
     generationPromptVersion: documentDraftPromptVersion,
     generationSchemaVersion: documentDraftSchemaVersion,
     rendererVersion: docxRendererVersion,
@@ -162,6 +166,7 @@ function generationSubHashes(snapshot: unknown) {
     direction: record.direction,
     decisions: canonicalHash(record.decisions ?? []),
     evidenceHash: record.evidenceHash,
+    directionPolicy: record.directionPolicyHash,
     baseResume: canonicalHash({
       hash: record.baseResumeHash,
       version: record.baseResumeVersion,
@@ -187,6 +192,8 @@ export function generationStalenessReasons(current: unknown, stored: unknown) {
   if (currentSub.direction !== storedSub.direction) reasons.push('direction-changed')
   if (currentSub.decisions !== storedSub.decisions) reasons.push('skill-decisions-changed')
   if (currentSub.evidenceHash !== storedSub.evidenceHash) reasons.push('career-evidence-changed')
+  if (currentSub.directionPolicy !== storedSub.directionPolicy)
+    reasons.push('direction-rules-changed')
   if (currentSub.baseResume !== storedSub.baseResume) reasons.push('base-resume-changed')
   if (currentSub.contract !== storedSub.contract) reasons.push('generation-contract-changed')
   if (currentSub.renderer !== storedSub.renderer) reasons.push('renderer-contract-changed')

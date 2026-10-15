@@ -2,8 +2,10 @@ import type { CareerDataView } from '../../../src/db/career-data-view'
 import { extensionObjectOrNull } from '../../../src/lib/career/json-schemas'
 import { AppShell } from '../layout/AppShell'
 import { AchievementSection } from './AchievementSection'
+import { BaseResumeSection } from './BaseResumeSection'
 import { CareerDataSection } from './CareerDataSection'
 import { type CareerDataTab, CareerDataTabs } from './CareerDataTabs'
+import { DirectionsSection } from './DirectionsSection'
 import { EducationSection } from './EducationSection'
 import { ExperienceSection } from './ExperienceSection'
 import { IdentitySection } from './IdentitySection'
@@ -90,6 +92,16 @@ function renderActiveSection(
         <PreferencesSection
           preferences={view.preferences}
           extensions={extensionObjectOrNull(view.extensionRecords.preferences?.['$'])}
+        />
+      )
+    case 'directions':
+      return <DirectionsSection directions={view.directions} includeRetired={includeRetired} />
+    case 'base-resumes':
+      return (
+        <BaseResumeSection
+          directions={view.directions}
+          versions={view.baseResumes}
+          includeRetired={includeRetired}
         />
       )
     default:

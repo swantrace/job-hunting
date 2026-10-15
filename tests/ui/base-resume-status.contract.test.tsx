@@ -37,6 +37,9 @@ describe('Base Resume readiness display', () => {
     expect(html).toContain('Approved Base Resumes')
     expect(html).toContain('version v1')
     expect(html).toContain('View content')
+    // Drift is a content-hash mismatch now that approvals live in the database.
+    expect(html).toContain('stale — content hash mismatch')
+    expect(html).not.toContain('file changed')
     // Content is escaped, never interpreted as markup.
     expect(html).toContain('&lt;markup&gt;')
     expect(html).not.toContain('<markup>')

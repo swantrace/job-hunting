@@ -39,7 +39,9 @@ export function BaseResumeStatus() {
                       <span class="badge badge-success badge-sm">version {resume.version}</span>
                       <span class="text-base-content/60">approved {resume.approvedAt}</span>
                       {resume.stale ? (
-                        <span class="badge badge-warning badge-sm">stale — file changed</span>
+                        <span class="badge badge-warning badge-sm">
+                          stale — content hash mismatch
+                        </span>
                       ) : null}
                       <details class="mt-2 w-full">
                         <summary class="cursor-pointer font-semibold">View content</summary>

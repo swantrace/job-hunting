@@ -195,3 +195,18 @@ export function retireCareerDirection(executor: CareerDb, key: string): CareerSa
     return { changed: true, revision }
   })
 }
+
+/** Undoes a retirement so a direction can be targeted again; history is intact. */
+export function restoreCareerDirection(executor: CareerDb, key: string): CareerSaveResult {
+  return executor.transaction((tx) => {
+    const existing = requireDirection(tx, key)
+    if (existing.retiredAt === null) return { changed: false, revision: existing.revision }
+    const revision = existing.revision + 1
+    tx.update(careerDirections)
+      .set({ retiredAt: null, revision, updatedAt: nowISO() })
+      .where(eq(careerDirections.key, key))
+      .run()
+    recordCareerChange(tx, stableFingerprint({ key, retired: false }))
+    return { changed: true, revision }
+  })
+}

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { CareerDirectionInput, CareerDirectionUpdateInput } from '../../db/career-directions'
 import type { CareerCandidateInput, CareerPreferencesInput } from '../../db/career-facts'
 import type {
   CareerAchievementInput,
@@ -13,8 +14,9 @@ import type {
 } from '../../db/career-records'
 import type { CareerSkillInput, CareerSkillUpdateInput } from '../../db/career-skills'
 import type { CareerStateExtensionRecords } from '../../db/career-state'
+import { documentDraftPolicy } from '../document-draft-policy'
 import type { FieldErrors } from '../validation'
-import { type Compensation, extensionObjectOrNull } from './json-schemas'
+import { type Compensation, extensionObjectOrNull, type GenerationRules } from './json-schemas'
 
 /**
  * Structured input for the career data tabs (identity, experience, education).
@@ -581,6 +583,88 @@ export const personalSkillFormSchema = z.object({
   expectedRevision: revisionField,
 })
 
+/** One `section = words` line for a direction's per-section word budgets. */
+const sectionBudgetLine = /^([A-Za-z][\w-]*)\s*=\s*(\d+)$/
+
+/** Returns an error message when any non-empty line is not `section = words`. */
+export function sectionBudgetLinesError(text: string | null | undefined): string | null {
+  for (const line of (text ?? '').split('\n')) {
+    const trimmed = line.trim()
+    if (trimmed === '') continue
+    const match = sectionBudgetLine.exec(trimmed)
+    if (!match) return 'Each section budget must be written as section = words, one per line.'
+    const words = Number(match[2])
+    if (words < 1 || words > 5000)
+      return 'Each section word budget must be between 1 and 5000 words.'
+  }
+  return null
+}
+
+export function formatSectionBudgets(value: Record<string, number> | null | undefined): string {
+  return Object.entries(value ?? {})
+    .map(([section, words]) => `${section} = ${words}`)
+    .join('\n')
+}
+
+export function parseSectionBudgets(text: string | null | undefined): Record<string, number> {
+  const budgets: Record<string, number> = {}
+  for (const line of (text ?? '').split('\n')) {
+    const match = sectionBudgetLine.exec(line.trim())
+    if (match) budgets[match[1] ?? ''] = Number(match[2])
+  }
+  return budgets
+}
+
+/**
+ * Direction form: stable identity plus ordinary controls for the bounded
+ * generation rules. Target titles are repeatable editorial lines, and the
+ * word/bullet budgets are numbers seeded from `documentDraftPolicy` so a saved
+ * direction keeps the current drafting behaviour.
+ */
+export const directionFormSchema = z
+  .object({
+    label: requiredLine('Direction label', 120),
+    targetTitles: optionalText(4000),
+    sortOrder: optionalInteger(-10000, 10000, 'Sort order'),
+    maxWords: optionalInteger(1, 5000, 'Maximum words'),
+    maxBullets: optionalInteger(0, 500, 'Maximum bullets'),
+    summaryMaxWords: optionalInteger(1, 1000, 'Summary maximum words'),
+    sectionWordBudgets: optionalText(4000),
+    expectedRevision: revisionField,
+  })
+  .superRefine((value, ctx) => {
+    if (parseLineList(value.targetTitles).length === 0)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['targetTitles'],
+        message: 'Add at least one target title.',
+      })
+    const budgetError = sectionBudgetLinesError(value.sectionWordBudgets)
+    if (budgetError)
+      ctx.addIssue({ code: 'custom', path: ['sectionWordBudgets'], message: budgetError })
+  })
+
+/**
+ * Base Resume draft form. A version is immutable once created: this form only
+ * ever creates a new draft, and a version label that already exists is refused
+ * by the repository instead of overwriting the stored Markdown.
+ */
+export const baseResumeDraftFormSchema = z.object({
+  directionKey: requiredLine('Direction', 80),
+  version: requiredLine('Version', 100),
+  markdown: z.preprocess(
+    (value) => (typeof value === 'string' ? value : ''),
+    z
+      .string()
+      .trim()
+      .min(1, 'Enter the Base Resume Markdown.')
+      .max(200_000, 'Base Resume Markdown must be 200000 characters or fewer.'),
+  ),
+})
+
+export type DirectionFormValues = z.infer<typeof directionFormSchema>
+export type BaseResumeDraftFormValues = z.infer<typeof baseResumeDraftFormSchema>
+
 export type CandidateFormValues = z.infer<typeof candidateFormSchema>
 export type ExperienceFormValues = z.infer<typeof experienceFormSchema>
 export type EducationFormValues = z.infer<typeof educationFormSchema>
@@ -815,6 +899,46 @@ export function preferencesInput(
 
 function checkboxValue(value: boolean | undefined): string {
   return value ? 'on' : ''
+}
+
+/**
+ * Builds a direction's stored generation rules from its form. Known budgets
+ * overwrite their stored value (a blank control falls back to the documented
+ * default) while any unknown preserved rule key stays, so an imported rule is
+ * never silently dropped.
+ */
+export function directionRulesFromForm(
+  values: DirectionFormValues,
+  current?: GenerationRules | null,
+): GenerationRules {
+  const rules: GenerationRules = { ...(current ?? {}) }
+  const setBudget = (
+    key: 'maxWords' | 'maxBullets' | 'summaryMaxWords',
+    value: number | undefined,
+  ) => {
+    if (value === undefined) delete rules[key]
+    else rules[key] = value
+  }
+  setBudget('maxWords', values.maxWords)
+  setBudget('maxBullets', values.maxBullets)
+  setBudget('summaryMaxWords', values.summaryMaxWords)
+  const sectionBudgets = parseSectionBudgets(values.sectionWordBudgets)
+  if (Object.keys(sectionBudgets).length > 0) rules.sectionWordBudgets = sectionBudgets
+  else delete rules.sectionWordBudgets
+  return rules
+}
+
+export function directionInput(
+  values: DirectionFormValues,
+  options: { key: string; currentRules?: GenerationRules | null },
+): CareerDirectionInput & CareerDirectionUpdateInput {
+  return {
+    key: options.key,
+    label: values.label,
+    targetTitles: parseLineList(values.targetTitles),
+    rules: directionRulesFromForm(values, options.currentRules),
+    sortOrder: values.sortOrder ?? 0,
+  }
 }
 
 export function candidateFormValues(
@@ -1194,6 +1318,51 @@ export function preferencesFormValues(
     notes: record?.notes ?? '',
     extensionFields: formatExtensionLines(extensions),
     expectedRevision: String(record?.revision ?? 0),
+  }
+}
+
+/** A direction as it is edited, with its stored rules rendered as ordinary controls. */
+export type DirectionFormSource = {
+  key?: string
+  label?: string
+  targetTitles?: string[]
+  rules?: GenerationRules | null
+  sortOrder?: number
+  revision?: number
+}
+
+/**
+ * Renders a direction for editing. A new direction starts from the documented
+ * default budgets, so an explicitly saved direction keeps today's behaviour
+ * while a legacy direction without stored rules still falls back to them.
+ */
+export function directionFormValues(record: DirectionFormSource | null): Record<string, string> {
+  const rules = record?.rules ?? null
+  const budget = (value: number | undefined, fallback: number) => String(value ?? fallback)
+  return {
+    label: record?.label ?? '',
+    targetTitles: formatLineList(record?.targetTitles),
+    sortOrder: String(record?.sortOrder ?? 0),
+    maxWords: budget(rules?.maxWords, documentDraftPolicy.resume.maxWords),
+    maxBullets: budget(rules?.maxBullets, documentDraftPolicy.resume.maxBullets),
+    summaryMaxWords: budget(rules?.summaryMaxWords, documentDraftPolicy.resume.summaryMaxWords),
+    sectionWordBudgets: formatSectionBudgets(rules?.sectionWordBudgets),
+    expectedRevision: String(record?.revision ?? 0),
+  }
+}
+
+/**
+ * Renders a Base Resume draft control. `source` copies an existing version into
+ * a new draft; it never edits the stored version.
+ */
+export function baseResumeDraftFormValues(
+  source: { directionKey?: string; markdown?: string } | null = null,
+  options: { directionKey?: string } = {},
+): Record<string, string> {
+  return {
+    directionKey: source?.directionKey ?? options.directionKey ?? '',
+    version: '',
+    markdown: source?.markdown ?? '',
   }
 }
 
