@@ -211,6 +211,13 @@
       "when": 1788800000000,
       "tag": "0029_collapse_career_state",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1788900000000,
+      "tag": "0030_drop_orphan_resume_strategies",
+      "breakpoints": true
     }
   ]
 }

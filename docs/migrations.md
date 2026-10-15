@@ -336,8 +336,14 @@ accepted on purpose.
 | `0027_simplify_schema` | Clears the operational tables (applications, postings, analyses, requirements, mappings, mentions, runs, artifacts, reviews, intake, follow-ups, interviews), folds the baseline pipeline and the 1:1 result/snapshot tables into `generation_runs` (`kind`), merges the two career singletons into `career_profile`, merges five direction junctions into `career_record_directions`, replaces `job_requirements_to_skills` with a view, and drops 12 unusable indexes and two dead columns. |
 | `0028_drop_portfolio` | Drops `career_portfolio_topics` and `career_portfolio_topic_projects`. |
 | `0029_collapse_career_state` | Drops `career_state`: authored fields without a column move to each row's `extension_json`, document-level values to `career_profile.documents_json`, and the stored version counter becomes a value computed from the data. |
+| `0030_drop_orphan_resume_strategies` | Drops `analysis_run_resume_strategies`, an orphan whose creating migration (`0023_run_scoped_resume_strategies`) disappeared when the chain was renumbered. Databases migrated by the older chain still carry it; databases built from the current chain never did, hence `DROP TABLE IF EXISTS`. |
 
 Result: **36 application tables plus the `job_requirements_to_skills` view**.
+
+A database count above 36 means an orphan table survived a removed migration. Before
+`0030` the known one was `analysis_run_resume_strategies` (carried by databases
+migrated before the chain renumbering); applying `0030` brings such a database to 36.
+Consult that table's migration history rather than assuming a failed migration.
 
 Plan for these consequences:
 
