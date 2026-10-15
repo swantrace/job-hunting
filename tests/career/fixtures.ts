@@ -653,12 +653,38 @@ export function seedPopulatedLegacyCatalog(sqlite: Database) {
     id: number
   }
 
-  sqlite
+  // From migration 0026 the mapping is owned by the mention row and
+  // `job_requirements_to_skills` is a derived read-only view (0027). Before
+  // 0026 the junction itself is still the storage.
+  const mentionsTable = sqlite
     .query(
-      `INSERT INTO job_requirements_to_skills (job_requirement_id, skill_id, raw_label, confidence)
-       VALUES (?, ?, ?, ?)`,
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'job_requirement_skill_mentions'",
     )
-    .run(requirement.id, typescript.id, 'TypeScript', 1)
+    .get()
+  if (mentionsTable) {
+    sqlite
+      .query(
+        `INSERT INTO job_requirement_skill_mentions (
+          job_requirement_id, raw_term, normalized_term, mapping_state, resolved_skill_id,
+          occurrences_json, created_at, updated_at
+        ) VALUES (?, ?, 'typescript', 'mapped', ?, ?, ?, ?)`,
+      )
+      .run(
+        requirement.id,
+        'TypeScript',
+        typescript.id,
+        '[{"source":"jd","provenance":"jd-text","confidence":1}]',
+        legacyTimestamp,
+        legacyTimestamp,
+      )
+  } else {
+    sqlite
+      .query(
+        `INSERT INTO job_requirements_to_skills (job_requirement_id, skill_id, raw_label, confidence)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .run(requirement.id, typescript.id, 'TypeScript', 1)
+  }
 
   return {
     typescriptSkillId: typescript.id,

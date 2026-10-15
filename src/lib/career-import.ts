@@ -1423,12 +1423,18 @@ export function applyCareerDataset(executor: CareerDb, dataset: CareerDataset): 
     }
   }
 
-  // Singletons.
+  // Singletons. Both halves now share the one `career_profile` row, so their
+  // pre-import existence is captured before either save for the report.
+  const candidateExisted = readCareerCandidate(executor) !== null
+  const preferencesExisted = readCareerPreferences(executor) !== null
   if (dataset.candidate) {
     setExtensions('candidate', singletonKey, mergeExtensions(dataset.candidate, candidateFields))
-    const existed = readCareerCandidate(executor) !== null
     const result = saveCareerCandidate(executor, dataset.candidate as CareerCandidateInput)
-    addCount(report, 'candidate', existed ? (result.changed ? 'updated' : 'unchanged') : 'inserted')
+    addCount(
+      report,
+      'candidate',
+      candidateExisted ? (result.changed ? 'updated' : 'unchanged') : 'inserted',
+    )
   }
   if (dataset.preferences) {
     setExtensions(
@@ -1436,12 +1442,11 @@ export function applyCareerDataset(executor: CareerDb, dataset: CareerDataset): 
       singletonKey,
       mergeExtensions(dataset.preferences, preferencesFields),
     )
-    const existed = readCareerPreferences(executor) !== null
     const result = saveCareerPreferences(executor, dataset.preferences as CareerPreferencesInput)
     addCount(
       report,
       'preferences',
-      existed ? (result.changed ? 'updated' : 'unchanged') : 'inserted',
+      preferencesExisted ? (result.changed ? 'updated' : 'unchanged') : 'inserted',
     )
   }
 

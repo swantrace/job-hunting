@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
-import { createBaselineMigrationFolder, migratedAt, removeTempDir } from '../db/support/migrations'
+import {
+  createBaselineMigrationFolder,
+  migratedAt,
+  migrationFolderUpTo,
+  removeTempDir,
+} from '../db/support/migrations'
 
 describe('key-only skill identity migration', () => {
   test('preserves core job data while resetting skills and derived AI history', () => {
@@ -44,7 +49,15 @@ describe('key-only skill identity migration', () => {
         )
         .run()
 
-      migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
+      // Scoped to the 0022 key-only identity contract; the later 0027
+      // simplification deliberately wipes operational job-search rows and has
+      // its own migration suite.
+      const keyIdentityFolder = migrationFolderUpTo(22)
+      try {
+        migrate(drizzle({ client: sqlite }), { migrationsFolder: keyIdentityFolder })
+      } finally {
+        removeTempDir(keyIdentityFolder)
+      }
 
       expect(sqlite.query('SELECT job_title FROM job_applications').get()).toEqual({
         job_title: 'Engineer',

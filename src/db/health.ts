@@ -7,9 +7,8 @@ const requiredTables = [
   'job_postings',
   'generation_runs',
   // Database-owned career facts and requirement-owned skill mentions
-  // (migration 0026). A partially-applied migration must fail at boot.
-  'career_candidate',
-  'career_preferences',
+  // (migrations 0026 and 0027). A partially-applied migration must fail at boot.
+  'career_profile',
   'career_state',
   'career_directions',
   'career_education',
@@ -26,19 +25,21 @@ const requiredTables = [
   'career_publication_projects',
   'career_achievement_publications',
   'career_portfolio_topic_projects',
-  'career_achievement_directions',
-  'career_project_directions',
-  'career_story_directions',
-  'career_publication_directions',
-  'career_portfolio_topic_directions',
+  'career_record_directions',
   'job_requirement_skill_mentions',
 ]
 
-// Columns added to existing tables by later migrations. Checked here so a
+// Columns added or folded in by later migrations. Checked here so a
 // partially-applied or drift-out-of-sync migration fails fast at boot with a
 // readable message instead of surfacing mid-request (e.g. during generation).
 const requiredColumns: Record<string, string[]> = {
-  generation_run_results: [
+  generation_runs: [
+    'kind',
+    'baseline_json',
+    'evidence_snapshot_json',
+    'resume_json',
+    'cover_letter_json',
+    'ats_audit_json',
     'resume_markdown',
     'cover_letter_markdown',
     'draft_validation_json',
@@ -62,7 +63,7 @@ function tableColumns(connection: Database, table: string): string[] {
  */
 export function assertDatabaseReady(connection: Database = sqlite) {
   const rows = connection
-    .query("SELECT name FROM sqlite_master WHERE type = 'table'")
+    .query("SELECT name FROM sqlite_master WHERE type in ('table', 'view')")
     .all()
     .map((row) => String((row as { name: string }).name))
   const missing = requiredTables.filter((table) => !rows.includes(table))

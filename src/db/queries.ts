@@ -48,7 +48,6 @@ import {
   contacts,
   documentReviews,
   followUps,
-  generationRunResults,
   generationRuns,
   interviews,
   type JobApplication,

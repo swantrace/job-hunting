@@ -85,8 +85,11 @@ function seedRequirement(
 
 function seedMapping(db: Db, requirementId: number, skillId: number) {
   db.query(
-    'INSERT INTO job_requirements_to_skills (job_requirement_id, skill_id, raw_label) VALUES (?, ?, ?)',
-  ).get(requirementId, skillId, 'label')
+    `INSERT INTO job_requirement_skill_mentions (
+      job_requirement_id, raw_term, normalized_term, mapping_state, resolved_skill_id,
+      occurrences_json, created_at, updated_at
+    ) VALUES (?, 'label', ?, 'mapped', ?, '[{"confidence":1}]', '2026-08-28', '2026-08-28')`,
+  ).get(requirementId, `label-${skillId}`, skillId)
 }
 
 function candidateResult(assessments: Array<{ id: number; status: string }>) {

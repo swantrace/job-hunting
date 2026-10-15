@@ -13,8 +13,7 @@ import { seedPopulatedLegacyCatalog } from './fixtures'
  */
 
 const careerTables = [
-  'career_candidate',
-  'career_preferences',
+  'career_profile',
   'career_state',
   'career_directions',
   'career_education',
@@ -31,11 +30,7 @@ const careerTables = [
   'career_publication_projects',
   'career_achievement_publications',
   'career_portfolio_topic_projects',
-  'career_achievement_directions',
-  'career_project_directions',
-  'career_story_directions',
-  'career_publication_directions',
-  'career_portfolio_topic_directions',
+  'career_record_directions',
   'job_requirement_skill_mentions',
 ] as const
 
@@ -46,9 +41,18 @@ function tableNames(sqlite: ReturnType<typeof migratedDatabase>) {
     .map((row) => String((row as { name: string }).name))
 }
 
-/** Applies the full migration directory on top of a database already at 0025. */
-function upgradeToLatest(sqlite: ReturnType<typeof migratedDatabase>) {
-  migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
+/**
+ * Applies only the additive 0026 career-facts migration on top of a database
+ * already at 0025, so these contracts stay scoped to 0026; the destructive 0027
+ * simplification has its own migration suite.
+ */
+function applyCareerFactsMigration(sqlite: ReturnType<typeof migratedDatabase>) {
+  const folder = migrationFolderUpTo(26)
+  try {
+    migrate(drizzle({ client: sqlite }), { migrationsFolder: folder })
+  } finally {
+    removeTempDir(folder)
+  }
 }
 
 describe('career schema migration on a fresh database', () => {
@@ -69,10 +73,7 @@ describe('career schema migration on a fresh database', () => {
     try {
       const states = sqlite.query('SELECT id, revision, content_hash FROM career_state').all()
       expect(states).toEqual([{ id: 1, revision: 0, content_hash: '' }])
-      expect(sqlite.query('SELECT count(*) AS count FROM career_candidate').get()).toEqual({
-        count: 0,
-      })
-      expect(sqlite.query('SELECT count(*) AS count FROM career_preferences').get()).toEqual({
+      expect(sqlite.query('SELECT count(*) AS count FROM career_profile').get()).toEqual({
         count: 0,
       })
     } finally {
@@ -126,7 +127,7 @@ describe('career schema migration over a populated database', () => {
           '2026-08-01T00:00:00.000Z',
         )
 
-      upgradeToLatest(sqlite)
+      applyCareerFactsMigration(sqlite)
 
       expect(
         sqlite.query('SELECT count(*) AS count FROM job_requirements_to_skills').get(),
@@ -160,7 +161,7 @@ describe('career schema migration over a populated database', () => {
     const sqlite = migratedDatabase(folder)
     try {
       const seeded = seedPopulatedLegacyCatalog(sqlite)
-      upgradeToLatest(sqlite)
+      applyCareerFactsMigration(sqlite)
 
       const mentions = sqlite
         .query(
@@ -205,7 +206,7 @@ describe('career schema migration over a populated database', () => {
         )
         .run(seeded.requirementId, seeded.mergedSkillId, 'TypeScript', 0.4)
 
-      upgradeToLatest(sqlite)
+      applyCareerFactsMigration(sqlite)
 
       const mentions = sqlite
         .query(
@@ -332,7 +333,7 @@ describe('career schema constraints', () => {
     const sqlite = migratedDatabase(folder)
     try {
       const seeded = seedPopulatedLegacyCatalog(sqlite)
-      upgradeToLatest(sqlite)
+      applyCareerFactsMigration(sqlite)
       const insertMention = sqlite.query(
         `INSERT INTO job_requirement_skill_mentions (job_requirement_id, raw_term, normalized_term, mapping_state, resolved_skill_id, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,

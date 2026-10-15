@@ -22,25 +22,33 @@ import {
   stableFingerprint,
 } from './career-state'
 import { db } from './client'
-import {
-  type CareerCandidate,
-  type CareerPreferences,
-  careerCandidate,
-  careerPreferences,
-} from './schema'
+import { type CareerProfile, careerProfile } from './schema'
 import type { DbExecutor } from './skill-queries'
 
 /**
- * Candidate identity and career preferences are singletons: the database owns
- * exactly one candidate and one preference row, written only through these
- * functions. JSON columns are validated with loose schemas, so unknown
- * extension keys round trip untouched.
+ * Candidate identity and career preferences share the single `career_profile`
+ * row (migration 0027 folded the two old singletons into one). Each half is
+ * written through its own function and only ever touches its own columns, so a
+ * preferences save never clobbers the identity and vice versa.
+ *
+ * Both halves share one `revision`, so a save of either half bumps the counter
+ * the other half's form carries: a stale form of either half still conflicts
+ * through `expectedRevision`. JSON columns are validated with loose schemas, so
+ * unknown extension keys round trip untouched.
  */
 
-export type CareerCandidateRecord = Omit<
-  CareerCandidate,
-  'authorizationJson' | 'careerBreakJson' | 'truthfulnessJson'
-> & {
+export type CareerCandidateRecord = {
+  id: number
+  fullName: string
+  email: string | null
+  phone: string | null
+  location: string | null
+  website: string | null
+  linkedinUrl: string | null
+  githubUrl: string | null
+  revision: number
+  createdAt: string
+  updatedAt: string
   authorization: Authorization | null
   careerBreak: CareerBreak | null
   truthfulness: TruthfulnessRules | null
@@ -59,13 +67,16 @@ export type CareerCandidateInput = {
   truthfulness?: TruthfulnessRules | null
 }
 
-export type CareerPreferencesRecord = Omit<
-  CareerPreferences,
-  'locationsJson' | 'workModesJson' | 'compensationJson'
-> & {
+export type CareerPreferencesRecord = {
+  id: number
   locations: string[]
   workModes: string[]
+  availability: string | null
   compensation: Compensation | null
+  notes: string | null
+  revision: number
+  createdAt: string
+  updatedAt: string
 }
 
 export type CareerPreferencesInput = {
@@ -74,6 +85,10 @@ export type CareerPreferencesInput = {
   availability?: string | null
   compensation?: Compensation | null
   notes?: string | null
+}
+
+function readProfileRow(executor: DbExecutor): CareerProfile | null {
+  return executor.select().from(careerProfile).where(eq(careerProfile.id, 1)).get() ?? null
 }
 
 function candidateContent(source: CareerCandidateInput | CareerCandidateRecord) {
@@ -106,54 +121,66 @@ function candidateColumns(content: ReturnType<typeof candidateContent>) {
       authorization === null
         ? null
         : serializeJsonColumn(
-            parseJsonValue(
-              authorization,
-              authorizationSchema,
-              'career_candidate.authorization_json',
-            ),
+            parseJsonValue(authorization, authorizationSchema, 'career_profile.authorization_json'),
           ),
     careerBreakJson:
       careerBreak === null
         ? null
         : serializeJsonColumn(
-            parseJsonValue(careerBreak, careerBreakSchema, 'career_candidate.career_break_json'),
+            parseJsonValue(careerBreak, careerBreakSchema, 'career_profile.career_break_json'),
           ),
     truthfulnessJson:
       truthfulness === null
         ? null
         : serializeJsonColumn(
-            parseJsonValue(truthfulness, truthfulnessSchema, 'career_candidate.truthfulness_json'),
+            parseJsonValue(truthfulness, truthfulnessSchema, 'career_profile.truthfulness_json'),
           ),
   }
 }
 
-function candidateToRecord(row: CareerCandidate): CareerCandidateRecord {
+function candidateToRecord(row: CareerProfile): CareerCandidateRecord {
   return {
-    ...row,
+    id: row.id,
+    fullName: row.fullName,
+    email: row.email,
+    phone: row.phone,
+    location: row.location,
+    website: row.website,
+    linkedinUrl: row.linkedinUrl,
+    githubUrl: row.githubUrl,
+    revision: row.revision,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
     authorization: parseJsonColumn(
       row.authorizationJson,
       authorizationSchema,
       null,
-      'career_candidate.authorization_json',
+      'career_profile.authorization_json',
     ),
     careerBreak: parseJsonColumn(
       row.careerBreakJson,
       careerBreakSchema,
       null,
-      'career_candidate.career_break_json',
+      'career_profile.career_break_json',
     ),
     truthfulness: parseJsonColumn(
       row.truthfulnessJson,
       truthfulnessSchema,
       null,
-      'career_candidate.truthfulness_json',
+      'career_profile.truthfulness_json',
     ),
   }
 }
 
+/**
+ * The candidate half is "present" only once an identity has been saved; its
+ * `full_name` is the discriminator because a candidate save always requires a
+ * non-empty name while a preferences-only row keeps the empty default. While
+ * the half is unset its effective revision is 0, matching what its form renders.
+ */
 export function readCareerCandidate(executor: DbExecutor = db): CareerCandidateRecord | null {
-  const row = executor.select().from(careerCandidate).where(eq(careerCandidate.id, 1)).get()
-  return row ? candidateToRecord(row) : null
+  const row = readProfileRow(executor)
+  return row && row.fullName !== '' ? candidateToRecord(row) : null
 }
 
 export function saveCareerCandidate(
@@ -162,17 +189,21 @@ export function saveCareerCandidate(
   options: { expectedRevision?: number } = {},
 ): CareerSaveResult {
   return executor.transaction((tx) => {
-    const existing =
-      tx.select().from(careerCandidate).where(eq(careerCandidate.id, 1)).get() ?? null
+    const existing = readProfileRow(tx)
+    // A preferences-only row already carries the shared revision, but the
+    // identity form still reports revision 0, so compare against the half's own
+    // baseline until an identity exists.
+    const candidateRevision = existing && existing.fullName !== '' ? existing.revision : 0
     assertExpectedRevision(
-      'career_candidate',
+      'career_profile',
       'candidate',
       options.expectedRevision,
-      existing?.revision ?? 0,
+      candidateRevision,
     )
     const content = candidateContent(input)
     if (
       existing &&
+      existing.fullName !== '' &&
       stableFingerprint(content) ===
         stableFingerprint(candidateContent(candidateToRecord(existing)))
     ) {
@@ -182,12 +213,12 @@ export function saveCareerCandidate(
     const now = nowISO()
     const columns = candidateColumns(content)
     if (existing) {
-      tx.update(careerCandidate)
+      tx.update(careerProfile)
         .set({ ...columns, revision, updatedAt: now })
-        .where(eq(careerCandidate.id, 1))
+        .where(eq(careerProfile.id, 1))
         .run()
     } else {
-      tx.insert(careerCandidate)
+      tx.insert(careerProfile)
         .values({ id: 1, ...columns, revision, createdAt: now, updatedAt: now })
         .run()
     }
@@ -209,10 +240,10 @@ function preferencesContent(source: CareerPreferencesInput | CareerPreferencesRe
 function preferencesColumns(content: ReturnType<typeof preferencesContent>) {
   return {
     locationsJson: serializeJsonColumn(
-      parseJsonValue(content.locations, stringListSchema, 'career_preferences.locations_json'),
+      parseJsonValue(content.locations, stringListSchema, 'career_profile.locations_json'),
     ),
     workModesJson: serializeJsonColumn(
-      parseJsonValue(content.workModes, stringListSchema, 'career_preferences.work_modes_json'),
+      parseJsonValue(content.workModes, stringListSchema, 'career_profile.work_modes_json'),
     ),
     availability: content.availability,
     compensationJson:
@@ -222,39 +253,44 @@ function preferencesColumns(content: ReturnType<typeof preferencesContent>) {
             parseJsonValue(
               content.compensation,
               compensationSchema,
-              'career_preferences.compensation_json',
+              'career_profile.compensation_json',
             ),
           ),
     notes: content.notes,
   }
 }
 
-function preferencesToRecord(row: CareerPreferences): CareerPreferencesRecord {
+function preferencesToRecord(row: CareerProfile): CareerPreferencesRecord {
   return {
-    ...row,
+    id: row.id,
     locations: parseJsonColumn(
       row.locationsJson,
       stringListSchema,
       [],
-      'career_preferences.locations_json',
+      'career_profile.locations_json',
     ),
     workModes: parseJsonColumn(
       row.workModesJson,
       stringListSchema,
       [],
-      'career_preferences.work_modes_json',
+      'career_profile.work_modes_json',
     ),
+    availability: row.availability,
     compensation: parseJsonColumn(
       row.compensationJson,
       compensationSchema,
       null,
-      'career_preferences.compensation_json',
+      'career_profile.compensation_json',
     ),
+    notes: row.notes,
+    revision: row.revision,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   }
 }
 
 export function readCareerPreferences(executor: DbExecutor = db): CareerPreferencesRecord | null {
-  const row = executor.select().from(careerPreferences).where(eq(careerPreferences.id, 1)).get()
+  const row = readProfileRow(executor)
   return row ? preferencesToRecord(row) : null
 }
 
@@ -264,10 +300,9 @@ export function saveCareerPreferences(
   options: { expectedRevision?: number } = {},
 ): CareerSaveResult {
   return executor.transaction((tx) => {
-    const existing =
-      tx.select().from(careerPreferences).where(eq(careerPreferences.id, 1)).get() ?? null
+    const existing = readProfileRow(tx)
     assertExpectedRevision(
-      'career_preferences',
+      'career_profile',
       'preferences',
       options.expectedRevision,
       existing?.revision ?? 0,
@@ -284,12 +319,12 @@ export function saveCareerPreferences(
     const now = nowISO()
     const columns = preferencesColumns(content)
     if (existing) {
-      tx.update(careerPreferences)
+      tx.update(careerProfile)
         .set({ ...columns, revision, updatedAt: now })
-        .where(eq(careerPreferences.id, 1))
+        .where(eq(careerProfile.id, 1))
         .run()
     } else {
-      tx.insert(careerPreferences)
+      tx.insert(careerProfile)
         .values({ id: 1, ...columns, revision, createdAt: now, updatedAt: now })
         .run()
     }

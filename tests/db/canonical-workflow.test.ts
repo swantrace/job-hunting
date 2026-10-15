@@ -119,8 +119,8 @@ describe('canonical application workflow', () => {
       const generationRun = sqlite
         .query(
           `INSERT INTO generation_runs (
-            application_analysis_run_id, status, queue_job_id, created_at, updated_at
-          ) VALUES (?, 'Completed', 'generation-1', '2026-08-28', '2026-08-28') RETURNING id`,
+            kind, application_analysis_run_id, status, queue_job_id, created_at, updated_at, completed_at
+          ) VALUES ('application', ?, 'Completed', 'generation-1', '2026-08-28', '2026-08-28', '2026-08-28') RETURNING id`,
         )
         .get(candidateRun.id) as { id: number }
       expect(

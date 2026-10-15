@@ -9,16 +9,9 @@ import { db } from './client'
 import { listJobRequirements } from './job-analysis'
 import {
   applicationAnalysisRuns,
-  type BaselineGenerationRun,
-  baselineGeneratedArtifacts,
-  baselineGenerationEvidenceSnapshots,
-  baselineGenerationResults,
-  baselineGenerationRuns,
   companies,
   type GenerationRun,
   generatedArtifacts,
-  generationEvidenceSnapshots,
-  generationRunResults,
   generationRuns,
   googleDriveConnections,
   jobApplications,
@@ -27,12 +20,40 @@ import {
 } from './schema'
 import { listRunSkillReviews, type RunSkillReview } from './skill-queries'
 
+/**
+ * One `generation_runs` table serves both pipelines (migration 0027). `kind`
+ * discriminates application runs (which carry the candidate-analysis FK) from
+ * baseline runs (whose `baseline_json` holds `{ direction, targetTitle,
+ * targetKeywords }`). The former 1:1 result and evidence-snapshot side tables
+ * are columns on the run row, and baseline resume artifacts are ordinary
+ * `generated_artifacts` rows.
+ */
+
 export type GenerationRunWithArtifacts = GenerationRun & {
   artifacts: (typeof generatedArtifacts.$inferSelect)[]
 }
 
-export type BaselineGenerationRunWithArtifacts = BaselineGenerationRun & {
-  artifacts: (typeof baselineGeneratedArtifacts.$inferSelect)[]
+/** A baseline run with its `baseline_json` descriptor decoded for callers. */
+export type BaselineGenerationRunRecord = GenerationRun & {
+  direction: string
+  targetTitle: string
+  targetKeywords: string
+}
+
+export type BaselineGenerationRunWithArtifacts = BaselineGenerationRunRecord & {
+  artifacts: (typeof generatedArtifacts.$inferSelect)[]
+}
+
+type BaselineDescriptor = { direction: string; targetTitle: string; targetKeywords: string[] }
+
+function decodeBaseline(row: GenerationRun): BaselineGenerationRunRecord {
+  const descriptor = parseSnapshot(row.baselineJson) as Partial<BaselineDescriptor> | null
+  return {
+    ...row,
+    direction: descriptor?.direction ?? '',
+    targetTitle: descriptor?.targetTitle ?? '',
+    targetKeywords: JSON.stringify(descriptor?.targetKeywords ?? []),
+  }
 }
 
 export type GenerationSourceLineage = {
@@ -66,6 +87,7 @@ export function createGenerationRun(input: CreateGenerationRunInput) {
   return db
     .insert(generationRuns)
     .values({
+      kind: 'application',
       applicationAnalysisRunId: input.applicationAnalysisRunId,
       queueJobId: `generation-${crypto.randomUUID()}`,
       status: 'Queued',
@@ -145,10 +167,15 @@ export function createBaselineGenerationRun(input: {
 }) {
   const date = todayISO()
   return db
-    .insert(baselineGenerationRuns)
+    .insert(generationRuns)
     .values({
-      ...input,
-      targetKeywords: JSON.stringify(input.targetKeywords),
+      kind: 'baseline',
+      applicationAnalysisRunId: null,
+      baselineJson: JSON.stringify({
+        direction: input.direction,
+        targetTitle: input.targetTitle,
+        targetKeywords: input.targetKeywords,
+      }),
       queueJobId: `baseline-generation-${crypto.randomUUID()}`,
       status: 'Queued',
       createdAt: date,
@@ -161,70 +188,75 @@ export function createBaselineGenerationRun(input: {
 export function listBaselineGenerationRuns(): BaselineGenerationRunWithArtifacts[] {
   const runs = db
     .select()
-    .from(baselineGenerationRuns)
-    .orderBy(desc(baselineGenerationRuns.id))
+    .from(generationRuns)
+    .where(eq(generationRuns.kind, 'baseline'))
+    .orderBy(desc(generationRuns.id))
     .all()
   if (!runs.length) return []
   const artifacts = db
     .select()
-    .from(baselineGeneratedArtifacts)
+    .from(generatedArtifacts)
     .where(
-      sql`${baselineGeneratedArtifacts.baselineGenerationRunId} in (${sql.join(
+      sql`${generatedArtifacts.generationRunId} in (${sql.join(
         runs.map((run) => sql`${run.id}`),
         sql`, `,
       )})`,
     )
     .all()
   return runs.map((run) => ({
-    ...run,
-    artifacts: artifacts.filter((artifact) => artifact.baselineGenerationRunId === run.id),
+    ...decodeBaseline(run),
+    artifacts: artifacts.filter((artifact) => artifact.generationRunId === run.id),
   }))
 }
 
 export function getBaselineGenerationRun(runId: number) {
-  return (
-    db.select().from(baselineGenerationRuns).where(eq(baselineGenerationRuns.id, runId)).get() ??
-    null
-  )
+  const row =
+    db
+      .select()
+      .from(generationRuns)
+      .where(and(eq(generationRuns.id, runId), eq(generationRuns.kind, 'baseline')))
+      .get() ?? null
+  return row ? decodeBaseline(row) : null
 }
 
 export function listQueuedBaselineGenerationRuns() {
   return db
     .select()
-    .from(baselineGenerationRuns)
-    .where(eq(baselineGenerationRuns.status, 'Queued'))
-    .orderBy(baselineGenerationRuns.id)
+    .from(generationRuns)
+    .where(and(eq(generationRuns.kind, 'baseline'), eq(generationRuns.status, 'Queued')))
+    .orderBy(generationRuns.id)
     .all()
+    .map(decodeBaseline)
 }
 
 /** Resets baseline runs orphaned mid-flight by a crashed worker back to Queued. */
 export function resetStaleProcessingBaselineGenerationRuns() {
-  db.update(baselineGenerationRuns)
+  db.update(generationRuns)
     .set({ status: 'Queued', errorMessage: null, updatedAt: todayISO() })
-    .where(eq(baselineGenerationRuns.status, 'Processing'))
+    .where(and(eq(generationRuns.kind, 'baseline'), eq(generationRuns.status, 'Processing')))
     .run()
 }
 
 export function saveBaselineGenerationEvidenceSnapshot(runId: number, snapshotJson: string) {
-  const date = todayISO()
   return db
-    .insert(baselineGenerationEvidenceSnapshots)
-    .values({ baselineGenerationRunId: runId, snapshotJson, createdAt: date })
-    .onConflictDoUpdate({
-      target: baselineGenerationEvidenceSnapshots.baselineGenerationRunId,
-      set: { snapshotJson, createdAt: date },
-    })
+    .update(generationRuns)
+    .set({ evidenceSnapshotJson: snapshotJson, updatedAt: todayISO() })
+    .where(eq(generationRuns.id, runId))
     .run()
 }
 
 export function getBaselineGenerationEvidenceSnapshot(runId: number) {
-  return (
+  const row =
     db
-      .select()
-      .from(baselineGenerationEvidenceSnapshots)
-      .where(eq(baselineGenerationEvidenceSnapshots.baselineGenerationRunId, runId))
+      .select({
+        baselineGenerationRunId: generationRuns.id,
+        snapshotJson: generationRuns.evidenceSnapshotJson,
+        createdAt: generationRuns.createdAt,
+      })
+      .from(generationRuns)
+      .where(eq(generationRuns.id, runId))
       .get() ?? null
-  )
+  return row && row.snapshotJson !== null ? row : null
 }
 
 export function saveBaselineGenerationResults(
@@ -235,50 +267,42 @@ export function saveBaselineGenerationResults(
     rendererVersion: string | null
   },
 ) {
-  const date = todayISO()
   return db
-    .insert(baselineGenerationResults)
-    .values({
-      baselineGenerationRunId: runId,
+    .update(generationRuns)
+    .set({
       resumeMarkdown: results.resumeMarkdown,
       draftValidationJson: results.draftValidationJson,
       rendererVersion: results.rendererVersion,
-      createdAt: date,
-      updatedAt: date,
+      updatedAt: todayISO(),
     })
-    .onConflictDoUpdate({
-      target: baselineGenerationResults.baselineGenerationRunId,
-      set: {
-        resumeMarkdown: results.resumeMarkdown,
-        draftValidationJson: results.draftValidationJson,
-        rendererVersion: results.rendererVersion,
-        updatedAt: date,
-      },
-    })
+    .where(eq(generationRuns.id, runId))
     .run()
 }
 
 export function getBaselineGenerationResults(runId: number) {
-  return (
-    db
-      .select()
-      .from(baselineGenerationResults)
-      .where(eq(baselineGenerationResults.baselineGenerationRunId, runId))
-      .get() ?? null
-  )
+  const row = db.select().from(generationRuns).where(eq(generationRuns.id, runId)).get()
+  if (!row) return null
+  return {
+    baselineGenerationRunId: row.id,
+    resumeMarkdown: row.resumeMarkdown,
+    draftValidationJson: row.draftValidationJson,
+    rendererVersion: row.rendererVersion,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }
 }
 
 export function markBaselineGenerationRunProcessing(runId: number) {
   const date = todayISO()
-  db.update(baselineGenerationRuns)
+  db.update(generationRuns)
     .set({
       status: 'Processing',
-      attempts: sql`${baselineGenerationRuns.attempts} + 1`,
+      attempts: sql`${generationRuns.attempts} + 1`,
       errorMessage: null,
       startedAt: date,
       updatedAt: date,
     })
-    .where(eq(baselineGenerationRuns.id, runId))
+    .where(eq(generationRuns.id, runId))
     .run()
 }
 
@@ -288,17 +312,14 @@ export function completeBaselineGenerationRun(
 ) {
   const date = todayISO()
   return db.transaction((tx) => {
-    tx.update(baselineGenerationRuns)
+    tx.update(generationRuns)
       .set({ status: 'Completed', errorMessage: null, completedAt: date, updatedAt: date })
-      .where(eq(baselineGenerationRuns.id, runId))
+      .where(eq(generationRuns.id, runId))
       .run()
-    tx.insert(baselineGeneratedArtifacts)
-      .values({ ...artifact, baselineGenerationRunId: runId, type: 'resume', createdAt: date })
+    tx.insert(generatedArtifacts)
+      .values({ ...artifact, generationRunId: runId, type: 'resume', createdAt: date })
       .onConflictDoUpdate({
-        target: [
-          baselineGeneratedArtifacts.baselineGenerationRunId,
-          baselineGeneratedArtifacts.type,
-        ],
+        target: [generatedArtifacts.generationRunId, generatedArtifacts.type],
         set: { ...artifact, createdAt: date },
       })
       .run()
@@ -307,22 +328,19 @@ export function completeBaselineGenerationRun(
 
 export function failBaselineGenerationRun(runId: number, error: unknown) {
   const message = error instanceof Error ? error.message : 'Baseline resume generation failed.'
-  db.update(baselineGenerationRuns)
+  db.update(generationRuns)
     .set({ status: 'Failed', errorMessage: message.slice(0, 2000), updatedAt: todayISO() })
-    .where(eq(baselineGenerationRuns.id, runId))
+    .where(eq(generationRuns.id, runId))
     .run()
 }
 
 export function getBaselineArtifact(id: number) {
   return (
     db
-      .select({ artifact: baselineGeneratedArtifacts, run: baselineGenerationRuns })
-      .from(baselineGeneratedArtifacts)
-      .innerJoin(
-        baselineGenerationRuns,
-        eq(baselineGeneratedArtifacts.baselineGenerationRunId, baselineGenerationRuns.id),
-      )
-      .where(eq(baselineGeneratedArtifacts.id, id))
+      .select({ artifact: generatedArtifacts, run: generationRuns })
+      .from(generatedArtifacts)
+      .innerJoin(generationRuns, eq(generatedArtifacts.generationRunId, generationRuns.id))
+      .where(and(eq(generatedArtifacts.id, id), eq(generationRuns.kind, 'baseline')))
       .get() ?? null
   )
 }
@@ -340,7 +358,12 @@ export function listGenerationRuns(jobApplicationId: number): GenerationRunWithA
       eq(applicationAnalysisRuns.jobPostingAnalysisId, jobPostingAnalyses.id),
     )
     .innerJoin(jobPostings, eq(jobPostingAnalyses.jobPostingId, jobPostings.id))
-    .where(eq(jobPostings.jobApplicationId, jobApplicationId))
+    .where(
+      and(
+        eq(jobPostings.jobApplicationId, jobApplicationId),
+        eq(generationRuns.kind, 'application'),
+      ),
+    )
     .orderBy(desc(generationRuns.id))
     .all()
     .map((row) => row.run)
@@ -365,7 +388,7 @@ export function listQueuedGenerationRuns() {
   return db
     .select()
     .from(generationRuns)
-    .where(eq(generationRuns.status, 'Queued'))
+    .where(and(eq(generationRuns.kind, 'application'), eq(generationRuns.status, 'Queued')))
     .orderBy(generationRuns.id)
     .all()
 }
@@ -374,7 +397,7 @@ export function listQueuedGenerationRuns() {
 export function resetStaleProcessingGenerationRuns() {
   db.update(generationRuns)
     .set({ status: 'Queued', errorMessage: null, updatedAt: todayISO() })
-    .where(eq(generationRuns.status, 'Processing'))
+    .where(and(eq(generationRuns.kind, 'application'), eq(generationRuns.status, 'Processing')))
     .run()
 }
 
@@ -383,25 +406,30 @@ export function getGenerationRun(runId: number) {
 }
 
 export function saveGenerationEvidenceSnapshot(runId: number, snapshotJson: string) {
-  const date = todayISO()
   return db
-    .insert(generationEvidenceSnapshots)
-    .values({ generationRunId: runId, snapshotJson, createdAt: date })
-    .onConflictDoUpdate({
-      target: generationEvidenceSnapshots.generationRunId,
-      set: { snapshotJson, createdAt: date },
-    })
+    .update(generationRuns)
+    .set({ evidenceSnapshotJson: snapshotJson, updatedAt: todayISO() })
+    .where(eq(generationRuns.id, runId))
     .run()
 }
 
 export function getGenerationEvidenceSnapshot(runId: number) {
-  return (
+  const row =
     db
-      .select()
-      .from(generationEvidenceSnapshots)
-      .where(eq(generationEvidenceSnapshots.generationRunId, runId))
+      .select({
+        generationRunId: generationRuns.id,
+        snapshotJson: generationRuns.evidenceSnapshotJson,
+        createdAt: generationRuns.createdAt,
+      })
+      .from(generationRuns)
+      .where(eq(generationRuns.id, runId))
       .get() ?? null
-  )
+  if (!row || row.snapshotJson === null) return null
+  return {
+    generationRunId: row.generationRunId,
+    snapshotJson: row.snapshotJson,
+    createdAt: row.createdAt,
+  }
 }
 
 export function saveGenerationRunResults(
@@ -416,11 +444,9 @@ export function saveGenerationRunResults(
     rendererVersion?: string | null
   },
 ) {
-  const date = todayISO()
   return db
-    .insert(generationRunResults)
-    .values({
-      generationRunId: runId,
+    .update(generationRuns)
+    .set({
       resumeJson: results.resumeJson,
       coverLetterJson: results.coverLetterJson,
       atsAuditJson: results.atsAuditJson,
@@ -428,33 +454,27 @@ export function saveGenerationRunResults(
       coverLetterMarkdown: results.coverLetterMarkdown ?? null,
       draftValidationJson: results.draftValidationJson ?? null,
       rendererVersion: results.rendererVersion ?? null,
-      createdAt: date,
-      updatedAt: date,
+      updatedAt: todayISO(),
     })
-    .onConflictDoUpdate({
-      target: generationRunResults.generationRunId,
-      set: {
-        resumeJson: results.resumeJson,
-        coverLetterJson: results.coverLetterJson,
-        atsAuditJson: results.atsAuditJson,
-        resumeMarkdown: results.resumeMarkdown ?? null,
-        coverLetterMarkdown: results.coverLetterMarkdown ?? null,
-        draftValidationJson: results.draftValidationJson ?? null,
-        rendererVersion: results.rendererVersion ?? null,
-        updatedAt: date,
-      },
-    })
+    .where(eq(generationRuns.id, runId))
     .run()
 }
 
 export function getGenerationRunResults(runId: number) {
-  return (
-    db
-      .select()
-      .from(generationRunResults)
-      .where(eq(generationRunResults.generationRunId, runId))
-      .get() ?? null
-  )
+  const row = db.select().from(generationRuns).where(eq(generationRuns.id, runId)).get()
+  if (!row) return null
+  return {
+    generationRunId: row.id,
+    resumeJson: row.resumeJson,
+    coverLetterJson: row.coverLetterJson,
+    atsAuditJson: row.atsAuditJson,
+    resumeMarkdown: row.resumeMarkdown,
+    coverLetterMarkdown: row.coverLetterMarkdown,
+    draftValidationJson: row.draftValidationJson,
+    rendererVersion: row.rendererVersion,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }
 }
 
 /**

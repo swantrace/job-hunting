@@ -81,7 +81,12 @@ describe('structured job requirements migration', () => {
         .all()
         .map((row) => String((row as { name: string }).name))
       expect(tables).toContain('job_requirements')
-      expect(tables).toContain('job_requirements_to_skills')
+      // 0027 replaced the duplicate junction table with a read-only view.
+      expect(
+        sqlite
+          .query("SELECT type FROM sqlite_master WHERE name = 'job_requirements_to_skills'")
+          .get(),
+      ).toEqual({ type: 'view' })
 
       const columns = sqlite.query("PRAGMA table_info('job_requirements')").all() as Array<{
         name: string
@@ -244,27 +249,31 @@ describe('structured job requirements migration', () => {
     }
   })
 
-  test('creates generation run results with a unique run id and text dates', () => {
+  test('folds generation run results into generation_runs with text dates', () => {
     const sqlite = migratedDatabase()
     try {
       const tables = sqlite
         .query("SELECT name FROM sqlite_master WHERE type = 'table'")
         .all()
         .map((row) => String((row as { name: string }).name))
-      expect(tables).toContain('generation_run_results')
+      expect(tables).not.toContain('generation_run_results')
 
-      const columns = sqlite.query("PRAGMA table_info('generation_run_results')").all() as Array<{
+      const columns = sqlite.query("PRAGMA table_info('generation_runs')").all() as Array<{
         name: string
         type: string
-        pk: number
       }>
       for (const column of columns) {
         if (column.name.endsWith('_at')) expect(column.type.toUpperCase()).toBe('TEXT')
       }
-      // The run id is the one-to-one primary key.
-      expect(columns.some((column) => column.name === 'generation_run_id' && column.pk === 1)).toBe(
-        true,
-      )
+      // The former one-to-one result columns now live on the run row.
+      for (const name of [
+        'resume_json',
+        'resume_markdown',
+        'draft_validation_json',
+        'renderer_version',
+      ]) {
+        expect(columns.some((column) => column.name === name)).toBe(true)
+      }
     } finally {
       sqlite.close()
     }

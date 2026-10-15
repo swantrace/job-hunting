@@ -78,7 +78,7 @@ export type CareerDataView = {
   directions: CareerDirectionRecord[]
   /** Every Base Resume version, including superseded history. */
   baseResumes: CareerBaseResume[]
-  /** The preferences singleton, or null before it is first saved. */
+  /** The preferences half of the shared `career_profile` row, or null before it exists. */
   preferences: CareerPreferencesRecord | null
   /** Personal ("My skills") records; retired ones only when requested. */
   personalSkills: CareerSkillRecord[]

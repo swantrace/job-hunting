@@ -524,7 +524,11 @@ describe('requirement-owned mentions', () => {
       expect(again.id).toBe(first.id)
       expect(again.occurrences).toHaveLength(2)
       expect(
-        sqlite.query('SELECT count(*) AS count FROM job_requirement_skill_mentions').get(),
+        sqlite
+          .query(
+            "SELECT count(*) AS count FROM job_requirement_skill_mentions WHERE normalized_term = 'oauth'",
+          )
+          .get(),
       ).toEqual({ count: 1 })
       expect(sqlite.query('SELECT count(*) AS count FROM career_skills').get()).toEqual({
         count: 0,
@@ -696,7 +700,9 @@ describe('candidate and preferences singletons', () => {
         availability: 'Two weeks notice',
         compensation: { currency: 'CAD', minimum: 120000, syntheticRange: true },
       })
-      expect(preferences).toEqual({ changed: true, revision: 1 })
+      // Both halves share the one career_profile revision, so this bump follows
+      // the candidate save above.
+      expect(preferences).toEqual({ changed: true, revision: 2 })
       const stored = readCareerPreferences(db)
       expect(stored?.locations).toEqual(['Edmonton, AB', 'Remote (Canada)'])
       expect(stored?.compensation).toMatchObject({
@@ -711,7 +717,7 @@ describe('candidate and preferences singletons', () => {
           availability: stored?.availability,
           compensation: stored?.compensation,
         }),
-      ).toEqual({ changed: false, revision: 1 })
+      ).toEqual({ changed: false, revision: 2 })
     } finally {
       sqlite.close()
     }
@@ -721,11 +727,9 @@ describe('candidate and preferences singletons', () => {
     const { sqlite, db } = database()
     try {
       saveCareerCandidate(db, { fullName: 'Jordan Rivera', authorization: { notes: 'ok' } })
-      sqlite
-        .query("UPDATE career_candidate SET authorization_json = '{not json' WHERE id = 1")
-        .run()
-      expect(() => readCareerCandidate(db)).toThrow(/career_candidate\.authorization_json/)
-      sqlite.query('UPDATE career_candidate SET authorization_json = NULL WHERE id = 1').run()
+      sqlite.query("UPDATE career_profile SET authorization_json = '{not json' WHERE id = 1").run()
+      expect(() => readCareerCandidate(db)).toThrow(/career_profile\.authorization_json/)
+      sqlite.query('UPDATE career_profile SET authorization_json = NULL WHERE id = 1').run()
       expect(readCareerCandidate(db)?.authorization).toBeNull()
     } finally {
       sqlite.close()

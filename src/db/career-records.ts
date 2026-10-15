@@ -27,24 +27,20 @@ import {
   type CareerProject,
   type CareerPublication,
   type CareerStory,
-  careerAchievementDirections,
   careerAchievementPublications,
   careerAchievementSkills,
   careerAchievements,
   careerDirections,
   careerEducation,
   careerExperiences,
-  careerPortfolioTopicDirections,
   careerPortfolioTopicProjects,
   careerPortfolioTopics,
-  careerProjectDirections,
   careerProjectSkills,
   careerProjects,
-  careerPublicationDirections,
   careerPublicationProjects,
   careerPublications,
+  careerRecordDirections,
   careerStories,
-  careerStoryDirections,
   skills,
 } from './schema'
 import type { DbExecutor } from './skill-queries'
@@ -121,14 +117,82 @@ function requireSkillIds(tx: CareerDb, ids: number[]): void {
   }
 }
 
+/**
+ * Removes a direction repeated within one record's list instead of rejecting
+ * the submit; `position` is assigned afterwards from the deduped order.
+ */
+function dedupeDirections(keys: string[]): string[] {
+  return [...new Set(keys)]
+}
+
 function requireDirectionKeys(tx: CareerDb, keys: string[]): void {
-  assertUniqueReferences('directions', keys)
   for (const key of keys) {
     const direction = tx.select().from(careerDirections).where(eq(careerDirections.key, key)).get()
     if (!direction) throw new CareerReferenceError(`Unknown direction "${key}".`)
     if (direction.retiredAt !== null)
       throw new CareerReferenceError(`Direction "${key}" is retired.`)
   }
+}
+
+/**
+ * The five record columns of the exclusive-arc `career_record_directions`
+ * junction. Exactly one is set per row, so every direction list is addressed by
+ * its record column plus that record's id.
+ */
+type DirectionRecordColumn = 'achievementId' | 'projectId' | 'storyId' | 'publicationId' | 'topicId'
+
+function directionRecordColumn(column: DirectionRecordColumn) {
+  return {
+    achievementId: careerRecordDirections.achievementId,
+    projectId: careerRecordDirections.projectId,
+    storyId: careerRecordDirections.storyId,
+    publicationId: careerRecordDirections.publicationId,
+    topicId: careerRecordDirections.topicId,
+  }[column]
+}
+
+function directionRecordValues(column: DirectionRecordColumn, recordId: number) {
+  return {
+    achievementId: column === 'achievementId' ? recordId : null,
+    projectId: column === 'projectId' ? recordId : null,
+    storyId: column === 'storyId' ? recordId : null,
+    publicationId: column === 'publicationId' ? recordId : null,
+    topicId: column === 'topicId' ? recordId : null,
+  }
+}
+
+function readDirectionKeys(
+  executor: DbExecutor,
+  column: DirectionRecordColumn,
+  recordId: number,
+): string[] {
+  return executor
+    .select({ directionKey: careerRecordDirections.directionKey })
+    .from(careerRecordDirections)
+    .where(eq(directionRecordColumn(column), recordId))
+    .orderBy(asc(careerRecordDirections.position))
+    .all()
+    .map((row) => row.directionKey)
+}
+
+function replaceDirectionLinks(
+  tx: CareerDb,
+  column: DirectionRecordColumn,
+  recordId: number,
+  directions: string[],
+): void {
+  tx.delete(careerRecordDirections)
+    .where(eq(directionRecordColumn(column), recordId))
+    .run()
+  if (!directions.length) return
+  insertLinks(
+    directions.map((directionKey, position) => ({
+      ...directionRecordValues(column, recordId),
+      directionKey,
+      position,
+    })),
+    (row) => tx.insert(careerRecordDirections).values(row).run(),
+  )
 }
 
 function requireProjectIds(tx: CareerDb, ids: number[]): void {
@@ -747,13 +811,7 @@ function achievementLinks(executor: DbExecutor, achievementId: number): Achievem
       .orderBy(asc(careerAchievementSkills.position))
       .all()
       .map((row) => row.skillId),
-    directions: executor
-      .select()
-      .from(careerAchievementDirections)
-      .where(eq(careerAchievementDirections.achievementId, achievementId))
-      .orderBy(asc(careerAchievementDirections.position))
-      .all()
-      .map((row) => row.directionKey),
+    directions: readDirectionKeys(executor, 'achievementId', achievementId),
     publicationIds: executor
       .select()
       .from(careerAchievementPublications)
@@ -806,9 +864,6 @@ function replaceAchievementLinks(
   tx.delete(careerAchievementSkills)
     .where(eq(careerAchievementSkills.achievementId, achievementId))
     .run()
-  tx.delete(careerAchievementDirections)
-    .where(eq(careerAchievementDirections.achievementId, achievementId))
-    .run()
   tx.delete(careerAchievementPublications)
     .where(eq(careerAchievementPublications.achievementId, achievementId))
     .run()
@@ -818,16 +873,7 @@ function replaceAchievementLinks(
       (row) => tx.insert(careerAchievementSkills).values(row).run(),
     )
   }
-  if (links.directions.length) {
-    insertLinks(
-      links.directions.map((directionKey, position) => ({
-        achievementId,
-        directionKey,
-        position,
-      })),
-      (row) => tx.insert(careerAchievementDirections).values(row).run(),
-    )
-  }
+  replaceDirectionLinks(tx, 'achievementId', achievementId, links.directions)
   if (links.publicationIds.length) {
     insertLinks(
       links.publicationIds.map((publicationId, position) => ({
@@ -849,7 +895,7 @@ function validateAchievementLinks(tx: CareerDb, links: AchievementLinks): void {
 function inputAchievementLinks(input: CareerAchievementInput): AchievementLinks {
   return {
     skills: input.skills ?? [],
-    directions: input.directions ?? [],
+    directions: dedupeDirections(input.directions ?? []),
     publicationIds: input.publicationIds ?? [],
   }
 }
@@ -1036,13 +1082,7 @@ function projectLinks(executor: DbExecutor, projectId: number): ProjectLinks {
       .orderBy(asc(careerProjectSkills.position))
       .all()
       .map((row) => row.skillId),
-    directions: executor
-      .select()
-      .from(careerProjectDirections)
-      .where(eq(careerProjectDirections.projectId, projectId))
-      .orderBy(asc(careerProjectDirections.position))
-      .all()
-      .map((row) => row.directionKey),
+    directions: readDirectionKeys(executor, 'projectId', projectId),
   }
 }
 
@@ -1068,23 +1108,17 @@ function requireProject(tx: CareerDb, id: number): CareerProject {
 
 function replaceProjectLinks(tx: CareerDb, projectId: number, links: ProjectLinks): void {
   tx.delete(careerProjectSkills).where(eq(careerProjectSkills.projectId, projectId)).run()
-  tx.delete(careerProjectDirections).where(eq(careerProjectDirections.projectId, projectId)).run()
   if (links.skills.length) {
     insertLinks(
       links.skills.map((skillId, position) => ({ projectId, skillId, position })),
       (row) => tx.insert(careerProjectSkills).values(row).run(),
     )
   }
-  if (links.directions.length) {
-    insertLinks(
-      links.directions.map((directionKey, position) => ({ projectId, directionKey, position })),
-      (row) => tx.insert(careerProjectDirections).values(row).run(),
-    )
-  }
+  replaceDirectionLinks(tx, 'projectId', projectId, links.directions)
 }
 
 function inputProjectLinks(input: CareerProjectInput): ProjectLinks {
-  return { skills: input.skills ?? [], directions: input.directions ?? [] }
+  return { skills: input.skills ?? [], directions: dedupeDirections(input.directions ?? []) }
 }
 
 export function listCareerProjects(
@@ -1247,13 +1281,7 @@ function storyColumns(content: ReturnType<typeof storyContent>) {
 }
 
 function storyDirections(executor: DbExecutor, storyId: number): string[] {
-  return executor
-    .select()
-    .from(careerStoryDirections)
-    .where(eq(careerStoryDirections.storyId, storyId))
-    .orderBy(asc(careerStoryDirections.position))
-    .all()
-    .map((row) => row.directionKey)
+  return readDirectionKeys(executor, 'storyId', storyId)
 }
 
 function storyToRecord(row: CareerStory, directions: string[]): CareerStoryRecord {
@@ -1267,13 +1295,7 @@ function requireStory(tx: CareerDb, id: number): CareerStory {
 }
 
 function replaceStoryDirections(tx: CareerDb, storyId: number, directions: string[]): void {
-  tx.delete(careerStoryDirections).where(eq(careerStoryDirections.storyId, storyId)).run()
-  if (directions.length) {
-    insertLinks(
-      directions.map((directionKey, position) => ({ storyId, directionKey, position })),
-      (row) => tx.insert(careerStoryDirections).values(row).run(),
-    )
-  }
+  replaceDirectionLinks(tx, 'storyId', storyId, directions)
 }
 
 export function listCareerStories(
@@ -1293,7 +1315,7 @@ export function createCareerStory(executor: CareerDb, input: CareerStoryInput): 
   return executor.transaction((tx) => {
     requireExperience(tx, input.experienceId)
     if (input.title.trim() === '') throw new CareerReferenceError('Story title is required.')
-    const directions = input.directions ?? []
+    const directions = dedupeDirections(input.directions ?? [])
     requireDirectionKeys(tx, directions)
     const content = storyContent(input, directions)
     content.stableKey = requireText(content.stableKey, 'Story stable_key')
@@ -1330,7 +1352,7 @@ export function updateCareerStory(
     assertStableKey('Career story', existing.stableKey, input.stableKey)
     assertExpectedRevision('Career story', id, options.expectedRevision, existing.revision)
     requireExperience(tx, input.experienceId)
-    const directions = input.directions ?? []
+    const directions = dedupeDirections(input.directions ?? [])
     requireDirectionKeys(tx, directions)
     const content = storyContent(input, directions)
     const result = commitRecordWrite({
@@ -1465,13 +1487,7 @@ function publicationLinks(executor: DbExecutor, publicationId: number): Publicat
       .orderBy(asc(careerPublicationProjects.position))
       .all()
       .map((row) => row.projectId),
-    directions: executor
-      .select()
-      .from(careerPublicationDirections)
-      .where(eq(careerPublicationDirections.publicationId, publicationId))
-      .orderBy(asc(careerPublicationDirections.position))
-      .all()
-      .map((row) => row.directionKey),
+    directions: readDirectionKeys(executor, 'publicationId', publicationId),
   }
 }
 
@@ -1517,25 +1533,20 @@ function replacePublicationLinks(
   tx.delete(careerPublicationProjects)
     .where(eq(careerPublicationProjects.publicationId, publicationId))
     .run()
-  tx.delete(careerPublicationDirections)
-    .where(eq(careerPublicationDirections.publicationId, publicationId))
-    .run()
   if (links.projectIds.length) {
     insertLinks(
       links.projectIds.map((projectId, position) => ({ publicationId, projectId, position })),
       (row) => tx.insert(careerPublicationProjects).values(row).run(),
     )
   }
-  if (links.directions.length) {
-    insertLinks(
-      links.directions.map((directionKey, position) => ({ publicationId, directionKey, position })),
-      (row) => tx.insert(careerPublicationDirections).values(row).run(),
-    )
-  }
+  replaceDirectionLinks(tx, 'publicationId', publicationId, links.directions)
 }
 
 function inputPublicationLinks(input: CareerPublicationInput): PublicationLinks {
-  return { projectIds: input.projectIds ?? [], directions: input.directions ?? [] }
+  return {
+    projectIds: input.projectIds ?? [],
+    directions: dedupeDirections(input.directions ?? []),
+  }
 }
 
 export function listCareerPublications(
@@ -1719,13 +1730,7 @@ function topicLinks(executor: DbExecutor, topicId: number): TopicLinks {
       .orderBy(asc(careerPortfolioTopicProjects.position))
       .all()
       .map((row) => row.projectId),
-    directions: executor
-      .select()
-      .from(careerPortfolioTopicDirections)
-      .where(eq(careerPortfolioTopicDirections.topicId, topicId))
-      .orderBy(asc(careerPortfolioTopicDirections.position))
-      .all()
-      .map((row) => row.directionKey),
+    directions: readDirectionKeys(executor, 'topicId', topicId),
   }
 }
 
@@ -1758,25 +1763,20 @@ function replaceTopicLinks(tx: CareerDb, topicId: number, links: TopicLinks): vo
   tx.delete(careerPortfolioTopicProjects)
     .where(eq(careerPortfolioTopicProjects.topicId, topicId))
     .run()
-  tx.delete(careerPortfolioTopicDirections)
-    .where(eq(careerPortfolioTopicDirections.topicId, topicId))
-    .run()
   if (links.projectIds.length) {
     insertLinks(
       links.projectIds.map((projectId, position) => ({ topicId, projectId, position })),
       (row) => tx.insert(careerPortfolioTopicProjects).values(row).run(),
     )
   }
-  if (links.directions.length) {
-    insertLinks(
-      links.directions.map((directionKey, position) => ({ topicId, directionKey, position })),
-      (row) => tx.insert(careerPortfolioTopicDirections).values(row).run(),
-    )
-  }
+  replaceDirectionLinks(tx, 'topicId', topicId, links.directions)
 }
 
 function inputTopicLinks(input: CareerPortfolioTopicInput): TopicLinks {
-  return { projectIds: input.projectIds ?? [], directions: input.directions ?? [] }
+  return {
+    projectIds: input.projectIds ?? [],
+    directions: dedupeDirections(input.directions ?? []),
+  }
 }
 
 export function listCareerPortfolioTopics(

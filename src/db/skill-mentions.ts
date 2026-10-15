@@ -14,7 +14,6 @@ import {
   type JobRequirementSkillMention,
   jobRequirementSkillMentions,
   jobRequirements,
-  jobRequirementsToSkills,
   skills,
 } from './schema'
 import type { DbExecutor } from './skill-queries'
@@ -106,11 +105,6 @@ function mergeOccurrences(
     if (!merged.some((candidate) => JSON.stringify(candidate) === encoded)) merged.push(occurrence)
   }
   return merged
-}
-
-function occurrenceConfidence(occurrences: SourceOccurrence[]): number | null {
-  const match = occurrences.find((occurrence) => typeof occurrence.confidence === 'number')
-  return match?.confidence ?? null
 }
 
 export function listRequirementMentions(
@@ -310,10 +304,12 @@ export function upsertPendingMention(
 }
 
 /**
- * Maps a mention to an existing approved, unmerged catalog skill and upserts
- * the `job_requirements_to_skills` junction with the raw term as `raw_label`,
- * preserving an existing confidence. It never creates a catalog skill and never
- * creates a personal `career_skills` row.
+ * Maps a mention to an existing approved, unmerged catalog skill. The mention
+ * row is the single mapping store: `job_requirements_to_skills` is a read-only
+ * view derived from this row, so no junction is written. `raw_label` and
+ * `confidence` in that view come from `raw_term` and `occurrences_json`. It
+ * never creates a catalog skill and never creates a personal `career_skills`
+ * row.
  */
 export function mapMention(
   executor: CareerDb,
@@ -334,40 +330,6 @@ export function mapMention(
       )
     }
     const record = mentionToRecord(mention)
-    const junction =
-      tx
-        .select()
-        .from(jobRequirementsToSkills)
-        .where(
-          and(
-            eq(jobRequirementsToSkills.jobRequirementId, mention.jobRequirementId),
-            eq(jobRequirementsToSkills.skillId, skillId),
-          ),
-        )
-        .get() ?? null
-    const confidence = junction?.confidence ?? occurrenceConfidence(record.occurrences)
-    if (junction) {
-      if (junction.rawLabel !== mention.rawTerm || junction.confidence !== confidence) {
-        tx.update(jobRequirementsToSkills)
-          .set({ rawLabel: mention.rawTerm, confidence })
-          .where(
-            and(
-              eq(jobRequirementsToSkills.jobRequirementId, mention.jobRequirementId),
-              eq(jobRequirementsToSkills.skillId, skillId),
-            ),
-          )
-          .run()
-      }
-    } else {
-      tx.insert(jobRequirementsToSkills)
-        .values({
-          jobRequirementId: mention.jobRequirementId,
-          skillId,
-          rawLabel: mention.rawTerm,
-          confidence,
-        })
-        .run()
-    }
     if (mention.mappingState === 'mapped' && mention.resolvedSkillId === skillId) return record
     const revision = mention.revision + 1
     const updatedAt = date ?? nowISO()
@@ -386,16 +348,6 @@ function setMentionState(
 ): MentionRecord {
   return executor.transaction((tx) => {
     const mention = requireMention(tx, mentionId)
-    if (mention.resolvedSkillId !== null) {
-      tx.delete(jobRequirementsToSkills)
-        .where(
-          and(
-            eq(jobRequirementsToSkills.jobRequirementId, mention.jobRequirementId),
-            eq(jobRequirementsToSkills.skillId, mention.resolvedSkillId),
-          ),
-        )
-        .run()
-    }
     const record = mentionToRecord(mention)
     if (mention.mappingState === state && mention.resolvedSkillId === null) return record
     const revision = mention.revision + 1
@@ -410,14 +362,14 @@ function setMentionState(
 
 /**
  * Explicitly skips a mention. Skip is always an explicit decision for a known
- * mention id; blank or whitespace input is never treated as a skip, and the
- * junction row (if any) is removed.
+ * mention id, and blank or whitespace input is never treated as a skip. Clearing
+ * `resolved_skill_id` removes the mention from the derived mapping view.
  */
 export function skipMention(executor: CareerDb, mentionId: number): MentionRecord {
   return setMentionState(executor, mentionId, 'skipped')
 }
 
-/** Returns a mention to `pending` and removes any junction row. */
+/** Returns a mention to `pending`, which also removes it from the mapping view. */
 export function resetMention(executor: CareerDb, mentionId: number): MentionRecord {
   return setMentionState(executor, mentionId, 'pending')
 }

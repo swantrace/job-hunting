@@ -216,21 +216,15 @@ export function seedMappingFixture(): MappingFixture {
 }
 
 /**
- * Removes every row this fixture created. Junction and alias rows hold
- * restricting foreign keys into `skills`, so they are cleared first; deleting
- * the fixture applications then cascades postings, analyses, requirements and
- * mentions.
+ * Removes every row this fixture created. `job_requirements_to_skills` is a
+ * read-only view over the mentions, so deleting the fixture applications
+ * cascades postings, analyses, requirements and mentions; the alias rows hold
+ * restricting foreign keys into `skills`, so they are cleared first.
  */
 export function removeMappingFixture(fixture: MappingFixture) {
   const sqlite = openDatabase()
   try {
     sqlite.exec('PRAGMA foreign_keys = ON;')
-    sqlite
-      .query(
-        `DELETE FROM job_requirements_to_skills
-         WHERE skill_id IN (SELECT id FROM skills WHERE key LIKE 'fixture-%')`,
-      )
-      .run()
     sqlite
       .query('DELETE FROM job_applications WHERE id IN (?, ?)')
       .run(fixture.applicationId, fixture.otherApplicationId)

@@ -70,9 +70,10 @@ describe('canonical lineage expand migration', () => {
       expect(columnNames(sqlite, 'contacts')).toContain('updated_at')
       expect(columnNames(sqlite, 'follow_ups')).toContain('action_type')
       expect(columnNames(sqlite, 'interviews')).toContain('round_type')
-      expect(columnNames(sqlite, 'job_applications_to_contacts')).toContain('relationship_type')
-      expect(columnNames(sqlite, 'job_applications_to_contacts')).toContain('is_primary')
-      expect(indexNames(sqlite, 'job_applications_to_contacts')).toContain(
+      // Migration 0027 dropped the two contact-link columns no query referenced.
+      expect(columnNames(sqlite, 'job_applications_to_contacts')).not.toContain('relationship_type')
+      expect(columnNames(sqlite, 'job_applications_to_contacts')).not.toContain('is_primary')
+      expect(indexNames(sqlite, 'job_applications_to_contacts')).not.toContain(
         'job_applications_to_contacts_primary_unique_idx',
       )
 

@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { todayISO } from '../lib/date'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
 import { resolveSkillInput, type SkillResolver } from '../lib/skills/resolve'
@@ -6,6 +6,7 @@ import type { SkillCategory } from '../lib/skills/taxonomy'
 import { db } from './client'
 import {
   analysisRunDecisions,
+  jobRequirementSkillMentions,
   jobRequirementsToSkills,
   type Skill,
   skillAliases,
@@ -175,41 +176,19 @@ export function mergeSkills(sourceId: number, targetId: number, executor: SkillD
       tx.update(skillAliases).set({ skillId: targetId }).where(eq(skillAliases.id, alias.id)).run()
     }
 
-    const sourceLinks = tx
+    // Requirement mappings are owned by the mentions; moving the mention's
+    // resolved skill is enough and never rewrites `normalized_term`, so the
+    // (job_requirement_id, normalized_term) unique index cannot collide even
+    // when the requirement already maps a different term to the target.
+    const sourceMentions = tx
       .select()
-      .from(jobRequirementsToSkills)
-      .where(eq(jobRequirementsToSkills.skillId, sourceId))
+      .from(jobRequirementSkillMentions)
+      .where(eq(jobRequirementSkillMentions.resolvedSkillId, sourceId))
       .all()
-    for (const link of sourceLinks) {
-      const targetLink = tx
-        .select()
-        .from(jobRequirementsToSkills)
-        .where(
-          and(
-            eq(jobRequirementsToSkills.jobRequirementId, link.jobRequirementId),
-            eq(jobRequirementsToSkills.skillId, targetId),
-          ),
-        )
-        .get()
-      if (targetLink) {
-        tx.delete(jobRequirementsToSkills)
-          .where(
-            and(
-              eq(jobRequirementsToSkills.jobRequirementId, link.jobRequirementId),
-              eq(jobRequirementsToSkills.skillId, sourceId),
-            ),
-          )
-          .run()
-        continue
-      }
-      tx.update(jobRequirementsToSkills)
-        .set({ skillId: targetId })
-        .where(
-          and(
-            eq(jobRequirementsToSkills.jobRequirementId, link.jobRequirementId),
-            eq(jobRequirementsToSkills.skillId, sourceId),
-          ),
-        )
+    for (const mention of sourceMentions) {
+      tx.update(jobRequirementSkillMentions)
+        .set({ resolvedSkillId: targetId, updatedAt: date })
+        .where(eq(jobRequirementSkillMentions.id, mention.id))
         .run()
     }
 

@@ -150,8 +150,7 @@ describe('career dataset import and export', () => {
     expect(rowCount(sqlite, 'career_skills')).toBe(5)
     expect(rowCount(sqlite, 'career_portfolio_topics')).toBe(1)
     expect(rowCount(sqlite, 'career_directions')).toBe(3)
-    expect(rowCount(sqlite, 'career_candidate')).toBe(1)
-    expect(rowCount(sqlite, 'career_preferences')).toBe(1)
+    expect(rowCount(sqlite, 'career_profile')).toBe(1)
   })
 
   test('2. a repeat import is a no-op and does not change career_state.revision', () => {
@@ -366,8 +365,8 @@ describe('career dataset import and export', () => {
       'career_skills',
       'career_portfolio_topics',
       'career_directions',
-      'career_candidate',
-      'career_preferences',
+      'career_record_directions',
+      'career_profile',
       'skills',
       'skill_aliases',
     ]
