@@ -1,3 +1,4 @@
+import '../db/cli-database'
 import { Database } from 'bun:sqlite'
 import { existsSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { relative, resolve, sep } from 'node:path'
@@ -10,9 +11,12 @@ import { getArtifactsRoot } from '../lib/artifact-storage'
  * referenced by any `generated_artifacts` or `baseline_generated_artifacts`
  * row. By default it only reports; the destructive `--apply` flag deletes the
  * reported orphan files. The DeepSeek Harness must never run `--apply`.
+ *
+ * The target database is explicit: pass `--database <path>` or set
+ * `DB_FILE_NAME`.
  */
 
-const dbFile = process.env.DB_FILE_NAME ?? 'jobs.db'
+const dbFile = process.env.DB_FILE_NAME as string
 const root = resolve(getArtifactsRoot())
 
 function walk(directory: string): string[] {
@@ -44,9 +48,10 @@ function referencedFiles(sqlite: Database): Set<string> {
 
 function main() {
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
-    console.log('Usage: bun run src/cli/audit-orphan-artifacts.ts [--apply]')
+    console.log('Usage: bun run artifacts:audit [--database <path>] [--apply]')
     console.log('Reports physical artifact files no longer referenced by the database.')
-    console.log('--apply deletes them; never run this from the Harness.')
+    console.log('--database is required (or set DB_FILE_NAME). --apply deletes them; never')
+    console.log('run this from the Harness.')
     return
   }
   const apply = process.argv.includes('--apply')

@@ -1,3 +1,4 @@
+import '../db/cli-database'
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { listCareerDirections } from '../db/career-directions'
@@ -26,6 +27,7 @@ key is used in the file name, so no fact or contact detail is written to disk.
 
 Options:
   --direction <key>      Export one direction; repeat to select more than one
+  --database <path>      SQLite database (required; or set DB_FILE_NAME)
   --output <dir>         Output directory (default: ./chatgpt-context)
   --include-source-urls  Include private publication source URLs and project URLs
                          (excluded from the generated context by default)
@@ -60,7 +62,9 @@ export function parseChatGptContextOptions(
     index += 1
     if (option === '--direction') directionIds.push(value)
     else if (option === '--output') outputDirectory = resolve(value)
-    else throw new Error(`Unknown option: ${option}`)
+    else if (option === '--database') {
+      // Resolved and applied to DB_FILE_NAME by src/db/cli-database on import.
+    } else throw new Error(`Unknown option: ${option}`)
   }
 
   for (const id of directionIds)

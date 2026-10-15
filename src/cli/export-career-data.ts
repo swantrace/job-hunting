@@ -1,3 +1,4 @@
+import '../db/cli-database'
 import { Database } from 'bun:sqlite'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -8,8 +9,8 @@ import { buildCareerDataset, serializeCareerDataset } from '../lib/career-export
 /**
  * Exports a portable, versioned `career-dataset`.
  *
- *   bun run career:export --out career-export.json
- *   bun run career:export --out fullstack.json --direction fullstack
+ *   bun run career:export --database ./jobs.db --out career-export.json
+ *   bun run career:export --database ./jobs.db --out fullstack.json --direction fullstack
  *   bun run career:export --database ./jobs.db > career-export.json
  *
  * The export is logical: it carries editorial career facts and stable keys, never
@@ -31,7 +32,7 @@ function printHelp() {
 Options:
   --out <path>        Write the dataset to this file (default: stdout).
   --direction <key>   Export only this direction and the records linked to it.
-  --database <path>   SQLite database to export from (default: DB_FILE_NAME or ./jobs.db).
+  --database <path>   SQLite database to export from. Required: pass this or set DB_FILE_NAME.
   --help              Show this help.`)
 }
 
@@ -41,8 +42,7 @@ function main() {
     return
   }
 
-  const databaseArgument = flagValue('--database')
-  const databasePath = resolve(databaseArgument ?? process.env.DB_FILE_NAME ?? 'jobs.db')
+  const databasePath = resolve(process.env.DB_FILE_NAME as string)
   const direction = flagValue('--direction')
   const outputPath = flagValue('--out')
 

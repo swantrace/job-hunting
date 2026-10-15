@@ -49,7 +49,7 @@ rejects an increased todo count).
 | Stories/publications/portfolio/preferences roundtrip, private URL defaults, portfolio-only edits not staling documents | Step 9 | extend this directory |
 | Directions, bounded generation rules reaching drafting and validation, Base Resume draft/approval lifecycle | Step 10 | extend this directory |
 | Import/export UI revalidation, ChatGPT context privacy defaults, legacy v4 compatibility | Step 11 | extend this directory |
-| File-free restart, empty onboarding, Drive validation and confirmed pending uploads intact | Step 12 | extend this directory |
+| File-free restart, empty onboarding, schema-only setup/start, import-only env docs, missing career-table health message | Step 12 | `step12-cleanup.test.ts`, `tests/db/health.test.ts` |
 
 Existing suites that already carry part of this contract and must keep passing:
 

@@ -1,3 +1,4 @@
+import '../db/cli-database'
 import { Database } from 'bun:sqlite'
 import { existsSync, statSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -12,8 +13,8 @@ import {
 /**
  * Transactional career data import.
  *
- *   bun run career:import --source career-data            # dry run (default)
- *   bun run career:import --source dataset.json --apply   # write in one transaction
+ *   bun run career:import --source career-data --database ./jobs.db            # dry run (default)
+ *   bun run career:import --source dataset.json --database ./jobs.db --apply   # write in one transaction
  *   bun run career:import --source career-data --database ./jobs.db --apply
  *
  * `--source` is a directory (legacy `career-data/*.json` plus taxonomy and Base
@@ -33,7 +34,7 @@ function printHelp() {
 
 Options:
   --source <path>     Directory of legacy career JSON, or a career-dataset file. Required.
-  --database <path>   SQLite database to import into (default: DB_FILE_NAME or ./jobs.db).
+  --database <path>   SQLite database to import into. Required: pass this or set DB_FILE_NAME.
   --apply            Write the import in one transaction (default is a dry run).
   --help             Show this help.
 
@@ -67,7 +68,7 @@ function main() {
     return
   }
 
-  const databasePath = resolve(flagValue('--database') ?? process.env.DB_FILE_NAME ?? 'jobs.db')
+  const databasePath = resolve(process.env.DB_FILE_NAME as string)
   const apply = args.includes('--apply')
   const source: CareerImportSource = statSync(sourcePath).isDirectory()
     ? { kind: 'directory', directory: sourcePath }

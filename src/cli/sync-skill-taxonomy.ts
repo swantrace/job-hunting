@@ -1,6 +1,18 @@
+import '../db/cli-database'
 import { db } from '../db/client'
 import { syncSkillTaxonomy } from '../lib/skills/sync-taxonomy'
 import { loadSkillTaxonomy } from '../lib/skills/taxonomy'
+
+/**
+ * Legacy import-only taxonomy sync (retired in Step 12).
+ *
+ * `skill-taxonomy.json` is no longer a runtime source: categories live in
+ * `skill_categories` and are managed under Skills settings in the UI. This CLI
+ * remains only as an explicit one-off import of a JSON taxonomy file. Prefer
+ * `bun run career:import --source <dir>` for a full career dataset; nothing at
+ * boot runs this command. The target database is explicit: pass
+ * `--database <path>` or set `DB_FILE_NAME`.
+ */
 
 const args = process.argv.slice(2)
 const apply = args.includes('--apply')

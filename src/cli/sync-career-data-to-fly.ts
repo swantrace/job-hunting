@@ -1,7 +1,19 @@
+import '../db/cli-database'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, relative, resolve, sep } from 'node:path'
 import { careerDataDirectory } from '../lib/career-data'
 
+/**
+ * Legacy Fly career-data file sync (retired in Step 12).
+ *
+ * This uploads private career-data JSON/Markdown files to a Fly volume. Runtime
+ * career facts now live in SQLite, so the supported migration path is a
+ * consistent mounted-SQLite backup plus `bun run career:import` against the
+ * existing volume files — not file-by-file volume sync. Kept for explicit,
+ * one-off use only; `setup`/`start` never call it. See `docs/migrations.md`.
+ * The target database is explicit: pass `--database <path>` or set
+ * `DB_FILE_NAME`.
+ */
 const projectRoot = resolve(import.meta.dir, '../..')
 const allowedRoots = ['career-data'] as const
 
@@ -17,14 +29,18 @@ type FlyMachine = { id?: string; state?: string }
 function usage() {
   return `Usage: bun run fly:sync-career-data -- [options] [selections...]
 
+Legacy import-only tool (retired in Step 12). Runtime facts live in SQLite; the
+supported migration path is a consistent SQLite backup plus career:import.
+
 Selections (default: career-data):
-  career-data                         Upload runtime JSON and Base Resume files from CAREER_DATA_DIR
+  career-data                         Upload legacy JSON and Base Resume files from CAREER_DATA_DIR
   career-data/skills.json             Upload one career-data file
   career-data/base-resumes            Upload the approved Base Resume Markdown and manifest
 
 Options:
   --app <name>                         Fly app (default: FLY_APP_NAME or fly.toml)
   --machine <id>                       Target one Machine explicitly
+  --database <path>                    SQLite database (required; or set DB_FILE_NAME)
   --sync-db                            Run taxonomy and career-skill DB sync after upload
   --help                               Show this help
 `
@@ -51,6 +67,13 @@ export function parseOptions(args: string[]): Options {
     }
     if (arg === '--sync-db') {
       syncDb = true
+      continue
+    }
+    if (arg === '--database') {
+      // Resolved and applied to DB_FILE_NAME by src/db/cli-database on import.
+      const value = args[index + 1]?.trim()
+      if (!value || value.startsWith('--')) throw new Error('--database requires a path value.')
+      index += 1
       continue
     }
     if (arg === '--app' || arg === '--machine') {

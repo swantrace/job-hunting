@@ -1,3 +1,4 @@
+import '../db/cli-database'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { approveBaseResume, baseResumesDirectory } from '../lib/base-resumes'
@@ -17,14 +18,17 @@ type Options = {
 function usage() {
   return `Usage: bun run resume:import -- [options]
 
-Imports a supplied Base Resume (PDF, Markdown, or text) into the private
+Imports a supplied Base Resume (PDF, Markdown, or text) into the import-only
 approved Base Resume store at career-data/base-resumes/<direction>.md and
-updates manifest.json. PDF extraction runs locally via Ghostscript; production
-never extracts PDFs.
+updates manifest.json. Load it into SQLite afterwards with
+\`bun run career:import --source <career-data dir> --database <path> --apply\`;
+the running app reads approved versions from the database, not this directory.
+PDF extraction runs locally via Ghostscript; production never extracts PDFs.
 
 Required:
   --direction <id>     Career direction (e.g. fullstack, fhir)
   --input <path>       PDF, Markdown, or text file
+  --database <path>    SQLite database used to validate the direction (or set DB_FILE_NAME)
 
 Options:
   --version <label>    Version label (default: the current date)
@@ -61,7 +65,9 @@ export function parseOptions(
     else if (option === '--input') inputPath = resolve(projectRoot, value)
     else if (option === '--version') version = value
     else if (option === '--output') outputDirectory = resolve(projectRoot, value)
-    else throw new Error(`Unknown option: ${option}`)
+    else if (option === '--database') {
+      // Resolved and applied to DB_FILE_NAME by src/db/cli-database on import.
+    } else throw new Error(`Unknown option: ${option}`)
   }
 
   if (!direction) throw new Error('--direction is required.')
