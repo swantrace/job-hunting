@@ -21,7 +21,6 @@ export function CareerRecordActions({
     | 'skills'
     | 'stories'
     | 'publications'
-    | 'portfolio'
   id: number
   retired: boolean
   includeRetired: boolean

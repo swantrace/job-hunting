@@ -18,13 +18,11 @@ const requiredTables = [
   'career_stories',
   'career_publications',
   'career_skills',
-  'career_portfolio_topics',
   'career_base_resumes',
   'career_achievement_skills',
   'career_project_skills',
   'career_publication_projects',
   'career_achievement_publications',
-  'career_portfolio_topic_projects',
   'career_record_directions',
   'job_requirement_skill_mentions',
 ]

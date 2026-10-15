@@ -2,12 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import {
   createCareerAchievement,
-  createCareerPortfolioTopic,
   createCareerProject,
   createCareerPublication,
   createCareerStory,
   listCareerAchievements,
-  listCareerPortfolioTopics,
   listCareerProjects,
   listCareerPublications,
   listCareerStories,
@@ -45,7 +43,7 @@ function directionKeys(
 }
 
 describe('career_record_directions exclusive arc', () => {
-  test('round-trips one ordered direction list for each of the five record types', () => {
+  test('round-trips one ordered direction list for each of the four record types', () => {
     const { sqlite, db } = database()
     try {
       const achievement = createCareerAchievement(db, {
@@ -71,23 +69,16 @@ describe('career_record_directions exclusive arc', () => {
         status: 'published',
         directions: ['data', 'fullstack'],
       })
-      const topic = createCareerPortfolioTopic(db, {
-        stableKey: 'topic-1',
-        title: 'Topic',
-        directions: ['data', 'fullstack'],
-      })
-
       expect(listCareerAchievements(db)[0].directions).toEqual(['data', 'fullstack'])
       expect(listCareerProjects(db)[0].directions).toEqual(['data', 'fullstack'])
       expect(listCareerStories(db)[0].directions).toEqual(['data', 'fullstack'])
       expect(listCareerPublications(db)[0].directions).toEqual(['data', 'fullstack'])
-      expect(listCareerPortfolioTopics(db)[0].directions).toEqual(['data', 'fullstack'])
 
       // One arc row per link, addressed by the right record column.
       expect(
         sqlite
           .query(
-            'SELECT achievement_id, project_id, story_id, publication_id, topic_id, direction_key, position FROM career_record_directions ORDER BY id',
+            'SELECT achievement_id, project_id, story_id, publication_id, direction_key, position FROM career_record_directions ORDER BY id',
           )
           .all(),
       ).toEqual([
@@ -96,7 +87,6 @@ describe('career_record_directions exclusive arc', () => {
           project_id: null,
           story_id: null,
           publication_id: null,
-          topic_id: null,
           direction_key: 'data',
           position: 0,
         },
@@ -105,7 +95,6 @@ describe('career_record_directions exclusive arc', () => {
           project_id: null,
           story_id: null,
           publication_id: null,
-          topic_id: null,
           direction_key: 'fullstack',
           position: 1,
         },
@@ -114,7 +103,6 @@ describe('career_record_directions exclusive arc', () => {
           project_id: project.id,
           story_id: null,
           publication_id: null,
-          topic_id: null,
           direction_key: 'data',
           position: 0,
         },
@@ -123,7 +111,6 @@ describe('career_record_directions exclusive arc', () => {
           project_id: project.id,
           story_id: null,
           publication_id: null,
-          topic_id: null,
           direction_key: 'fullstack',
           position: 1,
         },
@@ -132,7 +119,6 @@ describe('career_record_directions exclusive arc', () => {
           project_id: null,
           story_id: story.id,
           publication_id: null,
-          topic_id: null,
           direction_key: 'data',
           position: 0,
         },
@@ -141,7 +127,6 @@ describe('career_record_directions exclusive arc', () => {
           project_id: null,
           story_id: story.id,
           publication_id: null,
-          topic_id: null,
           direction_key: 'fullstack',
           position: 1,
         },
@@ -150,7 +135,6 @@ describe('career_record_directions exclusive arc', () => {
           project_id: null,
           story_id: null,
           publication_id: publication.id,
-          topic_id: null,
           direction_key: 'data',
           position: 0,
         },
@@ -159,25 +143,6 @@ describe('career_record_directions exclusive arc', () => {
           project_id: null,
           story_id: null,
           publication_id: publication.id,
-          topic_id: null,
-          direction_key: 'fullstack',
-          position: 1,
-        },
-        {
-          achievement_id: null,
-          project_id: null,
-          story_id: null,
-          publication_id: null,
-          topic_id: topic.id,
-          direction_key: 'data',
-          position: 0,
-        },
-        {
-          achievement_id: null,
-          project_id: null,
-          story_id: null,
-          publication_id: null,
-          topic_id: topic.id,
           direction_key: 'fullstack',
           position: 1,
         },

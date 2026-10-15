@@ -900,28 +900,6 @@ export const careerSkills = sqliteTable(
   ],
 )
 
-export const careerPortfolioTopics = sqliteTable(
-  'career_portfolio_topics',
-  {
-    id: integer('id').primaryKey({ autoIncrement: true }),
-    stableKey: text('stable_key').notNull(),
-    title: text('title').notNull(),
-    status: text('status').notNull().default('draft'),
-    sortOrder: integer('sort_order').notNull().default(0),
-    outlineJson: text('outline_json').notNull().default('[]'),
-    detailsJson: text('details_json'),
-    retiredAt: text('retired_at'),
-    revision: integer('revision').notNull().default(1),
-    createdAt: text('created_at').notNull(),
-    updatedAt: text('updated_at').notNull(),
-  },
-  (table) => [
-    uniqueIndex('career_portfolio_topics_stable_key_unique_idx').on(table.stableKey),
-    index('career_portfolio_topics_sort_order_idx').on(table.sortOrder),
-    check('career_portfolio_topics_revision_check', sql`${table.revision} > 0`),
-  ],
-)
-
 export const careerBaseResumes = sqliteTable(
   'career_base_resumes',
   {
@@ -1016,20 +994,6 @@ export const careerAchievementPublications = sqliteTable(
   (table) => [primaryKey({ columns: [table.achievementId, table.publicationId] })],
 )
 
-export const careerPortfolioTopicProjects = sqliteTable(
-  'career_portfolio_topic_projects',
-  {
-    topicId: integer('topic_id')
-      .notNull()
-      .references(() => careerPortfolioTopics.id, { onDelete: 'cascade' }),
-    projectId: integer('project_id')
-      .notNull()
-      .references(() => careerProjects.id, { onDelete: 'cascade' }),
-    position: integer('position').notNull().default(0),
-  },
-  (table) => [primaryKey({ columns: [table.topicId, table.projectId] })],
-)
-
 /**
  * One exclusive-arc junction for every record-to-direction link (migration
  * 0027), replacing the five identical per-record tables. Exactly one record
@@ -1051,15 +1015,12 @@ export const careerRecordDirections = sqliteTable(
     publicationId: integer('publication_id').references(() => careerPublications.id, {
       onDelete: 'cascade',
     }),
-    topicId: integer('topic_id').references(() => careerPortfolioTopics.id, {
-      onDelete: 'cascade',
-    }),
     position: integer('position').notNull().default(0),
   },
   (table) => [
     check(
       'career_record_directions_exactly_one_check',
-      sql`(${table.achievementId} is not null) + (${table.projectId} is not null) + (${table.storyId} is not null) + (${table.publicationId} is not null) + (${table.topicId} is not null) = 1`,
+      sql`(${table.achievementId} is not null) + (${table.projectId} is not null) + (${table.storyId} is not null) + (${table.publicationId} is not null) = 1`,
     ),
     uniqueIndex('career_record_directions_achievement_unique_idx')
       .on(table.achievementId, table.directionKey)
@@ -1073,9 +1034,6 @@ export const careerRecordDirections = sqliteTable(
     uniqueIndex('career_record_directions_publication_unique_idx')
       .on(table.publicationId, table.directionKey)
       .where(sql`${table.publicationId} is not null`),
-    uniqueIndex('career_record_directions_topic_unique_idx')
-      .on(table.topicId, table.directionKey)
-      .where(sql`${table.topicId} is not null`),
   ],
 )
 
@@ -1140,15 +1098,12 @@ export type CareerPublication = typeof careerPublications.$inferSelect
 export type NewCareerPublication = typeof careerPublications.$inferInsert
 export type CareerSkill = typeof careerSkills.$inferSelect
 export type NewCareerSkill = typeof careerSkills.$inferInsert
-export type CareerPortfolioTopic = typeof careerPortfolioTopics.$inferSelect
-export type NewCareerPortfolioTopic = typeof careerPortfolioTopics.$inferInsert
 export type CareerBaseResume = typeof careerBaseResumes.$inferSelect
 export type NewCareerBaseResume = typeof careerBaseResumes.$inferInsert
 export type CareerAchievementSkill = typeof careerAchievementSkills.$inferSelect
 export type CareerProjectSkill = typeof careerProjectSkills.$inferSelect
 export type CareerPublicationProject = typeof careerPublicationProjects.$inferSelect
 export type CareerAchievementPublication = typeof careerAchievementPublications.$inferSelect
-export type CareerPortfolioTopicProject = typeof careerPortfolioTopicProjects.$inferSelect
 export type CareerRecordDirection = typeof careerRecordDirections.$inferSelect
 export type NewCareerRecordDirection = typeof careerRecordDirections.$inferInsert
 export type JobRequirementSkillMention = typeof jobRequirementSkillMentions.$inferSelect

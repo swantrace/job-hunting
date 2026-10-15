@@ -8,7 +8,6 @@ import {
   listCareerAchievements,
   listCareerEducation,
   listCareerExperiences,
-  listCareerPortfolioTopics,
   listCareerProjects,
   listCareerPublications,
   listCareerStories,
@@ -123,13 +122,6 @@ const preferencesSchema = documentSchema
     ),
   })
   .loose()
-const portfolioSchema = documentSchema
-  .extend({
-    topics: z.array(
-      z.looseObject({ id: idSchema, projects: referenceIdsSchema, directions: referenceIdsSchema }),
-    ),
-  })
-  .loose()
 
 export type CanonicalCareerData = {
   candidate: z.infer<typeof candidateSchema>
@@ -140,7 +132,6 @@ export type CanonicalCareerData = {
   skills: z.infer<typeof skillsSchema>
   stories: z.infer<typeof storiesSchema>
   preferences: z.infer<typeof preferencesSchema>
-  portfolio: z.infer<typeof portfolioSchema>
 }
 
 /**
@@ -265,11 +256,6 @@ export function validateCareerData(
     'stories',
     data.stories.stories.map((item) => item.id),
   )
-  assertUnique(
-    'portfolio topics',
-    data.portfolio.topics.map((item) => item.id),
-  )
-
   for (const item of data.achievements.achievements) {
     if (item.experienceId)
       assertReferences(`achievement ${item.id}`, [item.experienceId], experienceIds)
@@ -295,10 +281,6 @@ export function validateCareerData(
     if (item.experienceId) assertReferences(`story ${item.id}`, [item.experienceId], experienceIds)
     assertReferences(`story ${item.id} directions`, item.directions, directionIds)
   }
-  for (const item of data.portfolio.topics) {
-    assertReferences(`portfolio topic ${item.id} projects`, item.projects, projectIds)
-    assertReferences(`portfolio topic ${item.id} directions`, item.directions, directionIds)
-  }
   if (directionIds.size === 0)
     throw new Error('preferences.directionDefinitions must define at least one direction.')
   return data
@@ -321,6 +303,11 @@ const careerDataFiles = [
  * or stripping. The explicit importer uses this so every original fact and
  * authored extension field survives the write into SQLite; `loadCareerData`
  * is the database assembler the runtime uses.
+ *
+ * `portfolio-content.json` is read here even though the portfolio-topic feature
+ * was removed in migration 0028: the raw document is still preserved verbatim in
+ * `career_state.legacy_documents_json`, so the original source is never lost.
+ * Only the structured/canonical portfolio path is gone.
  *
  * `publications.json` is optional (matching the loader) and falls back to the
  * empty versioned document.
@@ -359,7 +346,6 @@ export function readCareerDataDirectory(directory: string): CanonicalCareerData 
     skills: skillsSchema.parse(readJson(resolve(directory, 'skills.json'))),
     stories: storiesSchema.parse(readJson(resolve(directory, 'stories.json'))),
     preferences: preferencesSchema.parse(readJson(resolve(directory, 'preferences.json'))),
-    portfolio: portfolioSchema.parse(readJson(resolve(directory, 'portfolio-content.json'))),
   }
   const taxonomyPath = resolve(directory, 'skill-taxonomy.json')
   const categories = existsSync(taxonomyPath)
@@ -428,7 +414,6 @@ export function loadCareerDataFromDatabase(executor: DbExecutor = db): Canonical
   const projects = listCareerProjects(executor)
   const publications = listCareerPublications(executor)
   const stories = listCareerStories(executor)
-  const portfolioTopics = listCareerPortfolioTopics(executor)
 
   const jobSkills = listCareerSkills(executor)
   // Junction rows may reference catalog entries the candidate does not possess,
@@ -617,20 +602,6 @@ export function loadCareerDataFromDatabase(executor: DbExecutor = db): Canonical
           }
         : {}),
       ...extension('preferences', '$'),
-    },
-    portfolio: {
-      ...documentMeta(legacyDocuments, 'portfolio-content.json', fallbackDate),
-      topics: portfolioTopics.map((row) => ({
-        id: row.stableKey,
-        title: row.title,
-        status: row.status,
-        sortOrder: row.sortOrder,
-        projects: row.projectIds.map(projectKey).filter(isDefined),
-        directions: row.directions,
-        outline: row.outline,
-        details: row.details,
-        ...extension('portfolioTopics', row.stableKey),
-      })),
     },
   } as CanonicalCareerData
 }

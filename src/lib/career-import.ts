@@ -25,35 +25,30 @@ import {
   createCareerAchievement,
   createCareerEducation,
   createCareerExperience,
-  createCareerPortfolioTopic,
   createCareerProject,
   createCareerPublication,
   createCareerStory,
   listCareerAchievements,
   listCareerEducation,
   listCareerExperiences,
-  listCareerPortfolioTopics,
   listCareerProjects,
   listCareerPublications,
   listCareerStories,
   restoreCareerAchievement,
   restoreCareerEducation,
   restoreCareerExperience,
-  restoreCareerPortfolioTopic,
   restoreCareerProject,
   restoreCareerPublication,
   restoreCareerStory,
   retireCareerAchievement,
   retireCareerEducation,
   retireCareerExperience,
-  retireCareerPortfolioTopic,
   retireCareerProject,
   retireCareerPublication,
   retireCareerStory,
   updateCareerAchievement,
   updateCareerEducation,
   updateCareerExperience,
-  updateCareerPortfolioTopic,
   updateCareerProject,
   updateCareerPublication,
   updateCareerStory,
@@ -382,17 +377,6 @@ const rawPublicationFields = new Set([
   'sourceUrls',
   'safeToUse',
 ])
-const rawPortfolioFields = new Set([
-  'id',
-  'title',
-  'status',
-  'sortOrder',
-  'projects',
-  'projectIds',
-  'directions',
-  'outline',
-  'details',
-])
 // `directions` is absent on purpose: personal skills have no direction junction,
 // so the field is preserved as an extension rather than silently discarded.
 const rawPersonalSkillFields = new Set([
@@ -587,24 +571,6 @@ function datasetFromDirectory(snapshot: DirectorySnapshot): CareerDataset {
     },
   )
 
-  const portfolioTopics = asArray(asRecord(documents['portfolio-content.json']).topics).map(
-    (item, index) => {
-      const row = asRecord(item)
-      return {
-        stableKey: row.id,
-        title: row.title,
-        status: row.status ?? 'draft',
-        sortOrder: row.sortOrder ?? index,
-        outline: asStringArray(row.outline),
-        details: row.details ?? null,
-        projectKeys: asStringArray(row.projects ?? row.projectIds),
-        directionKeys: asStringArray(row.directions),
-        retiredAt: null,
-        extensions: extensionsOrUndefined(row, rawPortfolioFields),
-      }
-    },
-  )
-
   const knownDirectionIds = new Set(directions.map((direction) => direction.key))
   const baseResumes = snapshot.manifest
     ? parseBaseResumeManifest(snapshot.manifest, knownDirectionIds).resumes.map((entry) => ({
@@ -657,7 +623,6 @@ function datasetFromDirectory(snapshot: DirectorySnapshot): CareerDataset {
     publications,
     personalSkills,
     directions,
-    portfolioTopics,
     baseResumes,
     state: { legacyDocuments: documents, extensions: {} },
     excluded: careerDatasetExcluded,
@@ -755,11 +720,6 @@ export function validateCareerImport(executor: DbExecutor, dataset: CareerDatase
   checkDuplicates(
     'publications',
     dataset.publications.map((entry) => entry.stableKey),
-    conflicts,
-  )
-  checkDuplicates(
-    'portfolioTopics',
-    dataset.portfolioTopics.map((entry) => entry.stableKey),
     conflicts,
   )
   checkDuplicates(
@@ -968,11 +928,6 @@ export function validateCareerImport(executor: DbExecutor, dataset: CareerDatase
     checkRef(label, entry.projectKeys, knownProjectKeys, 'project')
     checkRef(label, entry.directionKeys, knownDirectionKeys, 'direction')
   }
-  for (const entry of dataset.portfolioTopics) {
-    const label = `Portfolio topic "${entry.stableKey}"`
-    checkRef(label, entry.projectKeys, knownProjectKeys, 'project')
-    checkRef(label, entry.directionKeys, knownDirectionKeys, 'direction')
-  }
   for (const entry of dataset.personalSkills) {
     const label = `Personal skill "${entry.skillKey}"`
     if (!knownSkillKeys.has(entry.skillKey)) {
@@ -1167,18 +1122,6 @@ const directionFields = new Set([
   'targetTitles',
   'rules',
   'sortOrder',
-  'retiredAt',
-  'extensions',
-])
-const portfolioTopicFields = new Set([
-  'stableKey',
-  'title',
-  'status',
-  'sortOrder',
-  'outline',
-  'details',
-  'projectKeys',
-  'directionKeys',
   'retiredAt',
   'extensions',
 ])
@@ -1714,48 +1657,6 @@ export function applyCareerDataset(executor: CareerDb, dataset: CareerDataset): 
     )
     if (retired && action !== 'inserted') action = 'updated'
     addCount(report, 'stories', action)
-  }
-
-  // Portfolio topics.
-  const existingTopics = new Map(
-    listCareerPortfolioTopics(executor, { includeRetired: true }).map((row) => [
-      row.stableKey,
-      row,
-    ]),
-  )
-  for (const entry of dataset.portfolioTopics) {
-    setExtensions('portfolioTopics', entry.stableKey, mergeExtensions(entry, portfolioTopicFields))
-    const input = {
-      stableKey: entry.stableKey,
-      title: entry.title,
-      status: entry.status ?? 'draft',
-      sortOrder: entry.sortOrder ?? 0,
-      outline: entry.outline ?? [],
-      details: entry.details ?? null,
-      projectIds: (entry.projectKeys ?? []).map((key) =>
-        resolveId(projectIdByKey, key, 'Project'),
-      ) as number[],
-      directions: entry.directionKeys ?? [],
-    }
-    const current = existingTopics.get(entry.stableKey)
-    let id: number
-    let action: Action
-    if (!current) {
-      id = createCareerPortfolioTopic(executor, input).id
-      action = 'inserted'
-    } else {
-      const result = updateCareerPortfolioTopic(executor, current.id, input)
-      id = current.id
-      action = result.changed ? 'updated' : 'unchanged'
-    }
-    const retired = syncRetirement(
-      current?.retiredAt ?? null,
-      entry.retiredAt,
-      () => retireCareerPortfolioTopic(executor, id),
-      () => restoreCareerPortfolioTopic(executor, id),
-    )
-    if (retired && action !== 'inserted') action = 'updated'
-    addCount(report, 'portfolioTopics', action)
   }
 
   // Personal skills.

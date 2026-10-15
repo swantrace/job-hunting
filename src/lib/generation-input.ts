@@ -64,9 +64,9 @@ export function coverLetterModelId() {
 
 /**
  * Career evidence identity: the safe generation-relevant facts assembled from
- * the database. Portfolio-only edits and category display ordering are
- * deliberately outside this identity, so they never mark unrelated documents
- * stale.
+ * the database. Data outside the document shape — preserved legacy documents and
+ * category display ordering — is deliberately outside this identity, so it never
+ * marks unrelated documents stale.
  */
 function evidenceSourceHash() {
   return canonicalHash(safeCareerData(loadCareerData()))

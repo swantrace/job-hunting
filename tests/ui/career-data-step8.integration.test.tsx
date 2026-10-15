@@ -187,7 +187,7 @@ describe('career data step 8 page and fragment boundaries', () => {
     const { parseCareerDataTab, careerDataTabs } = await import(
       '../../app/components/career/CareerDataTabs'
     )
-    // Step 9 appends stories/publications/portfolio/preferences and Step 10 adds
+    // Step 9 appends stories/publications/preferences and Step 10 adds
     // directions/base-resumes; the exact registry is updated here the same way
     // Step 8 updated the Step 7 tabs.
     expect(careerDataTabs.map((tab) => tab.key)).toEqual([
@@ -199,7 +199,6 @@ describe('career data step 8 page and fragment boundaries', () => {
       'skills',
       'stories',
       'publications',
-      'portfolio',
       'preferences',
       'directions',
       'base-resumes',

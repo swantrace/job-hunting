@@ -5,7 +5,6 @@ import { readCareerPreferences } from '../../src/db/career-facts'
 import {
   createCareerExperience,
   createCareerProject,
-  listCareerPortfolioTopics,
   listCareerPublications,
   listCareerStories,
   retireCareerExperience,
@@ -18,8 +17,7 @@ import { documentSafeCareerData, loadCareerDataFromDatabase } from '../../src/li
 import { recordsFor } from './support/html-contract'
 
 /**
- * Step 9 route acceptance for the stories, publications, portfolio and
- * preferences tabs.
+ * Step 9 route acceptance for the stories, publications and preferences tabs.
  *
  * Every route resolves the real `db` singleton, so the acceptance criteria are
  * proved end to end through the Step 2 repositories. Fixture rows use the
@@ -64,15 +62,9 @@ function markerPublications() {
   )
 }
 
-function markerTopics() {
-  return listCareerPortfolioTopics(db, { includeRetired: true }).filter((row) =>
-    row.stableKey.startsWith(keyPrefix),
-  )
-}
-
 function clearExtensions() {
   let records = readCareerStateDocuments(db).records
-  for (const kind of ['stories', 'publications', 'portfolioTopics']) {
+  for (const kind of ['stories', 'publications']) {
     for (const key of Object.keys(records[kind] ?? {})) {
       if (key.startsWith(keyPrefix)) records = applyExtensionFields(records, kind, key, null)
     }
@@ -84,7 +76,6 @@ function cleanup() {
   clearExtensions()
   sqlite.query(`DELETE FROM career_stories WHERE stable_key LIKE '${keyPrefix}%'`).run()
   sqlite.query(`DELETE FROM career_publications WHERE stable_key LIKE '${keyPrefix}%'`).run()
-  sqlite.query(`DELETE FROM career_portfolio_topics WHERE stable_key LIKE '${keyPrefix}%'`).run()
   sqlite.query(`DELETE FROM career_projects WHERE stable_key LIKE '${keyPrefix}%'`).run()
   sqlite.query(`DELETE FROM career_experiences WHERE stable_key LIKE '${keyPrefix}%'`).run()
   sqlite.query(`DELETE FROM career_directions WHERE key LIKE '${keyPrefix}%'`).run()
@@ -117,10 +108,6 @@ async function harness() {
   const publicationEdit = await import('../../app/routes/career-data/publications/[id]/form')
   const publicationRetire = await import('../../app/routes/career-data/publications/[id]/retire')
   const publicationAuthors = await import('../../app/routes/career-data/publications/authors/order')
-  const portfolio = (await import('../../app/routes/career-data/portfolio/index')).default
-  const portfolioForm = await import('../../app/routes/career-data/portfolio/form')
-  const portfolioEdit = await import('../../app/routes/career-data/portfolio/[id]/form')
-  const portfolioRetire = await import('../../app/routes/career-data/portfolio/[id]/retire')
   const preferences = (await import('../../app/routes/career-data/preferences/index')).default
   const preferencesForm = await import('../../app/routes/career-data/preferences/form')
 
@@ -139,12 +126,6 @@ async function harness() {
   mount(app, 'post', '/career-data/publications/:id/form', publicationEdit.POST)
   mount(app, 'post', '/career-data/publications/:id/retire', publicationRetire.POST)
   mount(app, 'post', '/career-data/publications/authors/order', publicationAuthors.POST)
-  mount(app, 'get', '/career-data/portfolio', portfolio)
-  mount(app, 'get', '/career-data/portfolio/form', portfolioForm.GET)
-  mount(app, 'post', '/career-data/portfolio/form', portfolioForm.POST)
-  mount(app, 'get', '/career-data/portfolio/:id/form', portfolioEdit.GET)
-  mount(app, 'post', '/career-data/portfolio/:id/form', portfolioEdit.POST)
-  mount(app, 'post', '/career-data/portfolio/:id/retire', portfolioRetire.POST)
   mount(app, 'get', '/career-data/preferences', preferences)
   mount(app, 'get', '/career-data/preferences/form', preferencesForm.GET)
   mount(app, 'post', '/career-data/preferences/form', preferencesForm.POST)
@@ -162,7 +143,7 @@ function post(app: Hono, path: string, entries: Array<[string, string]>, headers
 }
 
 describe('career data step 9 page and fragment boundaries', () => {
-  test('the tab registry gains stories, publications, portfolio and preferences', async () => {
+  test('the tab registry gains stories, publications and preferences', async () => {
     const { parseCareerDataTab, careerDataTabs } = await import(
       '../../app/components/career/CareerDataTabs'
     )
@@ -176,19 +157,18 @@ describe('career data step 9 page and fragment boundaries', () => {
       'skills',
       'stories',
       'publications',
-      'portfolio',
       'preferences',
       'directions',
       'base-resumes',
       'transfer',
     ])
-    expect(parseCareerDataTab('portfolio')).toBe('portfolio')
+    expect(parseCareerDataTab('preferences')).toBe('preferences')
     expect(parseCareerDataTab('forged')).toBe('identity')
   })
 
   test('each new full page renders the AppShell once with the active tab', async () => {
     const app = await harness()
-    for (const tab of ['stories', 'publications', 'portfolio', 'preferences']) {
+    for (const tab of ['stories', 'publications', 'preferences']) {
       const response = await app.request(`/career-data/${tab}`)
       const html = await response.text()
       expect(response.status).toBe(200)
@@ -203,7 +183,7 @@ describe('career data step 9 page and fragment boundaries', () => {
 
   test('each new section fragment never renders the AppShell and refreshes tabs OOB', async () => {
     const app = await harness()
-    for (const tab of ['stories', 'publications', 'portfolio', 'preferences']) {
+    for (const tab of ['stories', 'publications', 'preferences']) {
       const response = await app.request(`/career-data/${tab}`, {
         headers: { 'HX-Request': 'true' },
       })
@@ -548,108 +528,6 @@ describe('publication form', () => {
     expect(
       markerPublications().find((row) => row.title === `${marker} Links a retired project`),
     ).toBeUndefined()
-  })
-})
-
-describe('portfolio form', () => {
-  test('create persists outline, details, order and project links', async () => {
-    const direction = seedDirection()
-    const project = seedProject()
-    const app = await harness()
-    const response = await post(app, '/career-data/portfolio/form', [
-      ['title', `${marker} Synthetic topic`],
-      ['status', 'draft'],
-      ['sortOrder', '3'],
-      ['projectIds', String(project.id)],
-      ['directions', direction],
-      ['outline', 'Synthetic problem statement\nSynthetic approach'],
-      ['details', 'Synthetic portfolio detail text.'],
-      ['extensionFields', 'importSource = legacy portfolio-content.json'],
-      ['expectedRevision', '0'],
-    ])
-    const html = await response.text()
-    expect(response.status).toBe(200)
-    const record = markerTopics().find((row) => row.title === `${marker} Synthetic topic`)
-    expect(record?.stableKey).toBe('career-ui9-synthetic-topic')
-    expect(record?.sortOrder).toBe(3)
-    expect(record?.outline).toEqual(['Synthetic problem statement', 'Synthetic approach'])
-    expect(record?.details).toBe('Synthetic portfolio detail text.')
-    expect(record?.projectIds).toEqual([project.id])
-    expect(record?.directions).toEqual([direction])
-    expect(recordsFor(html, `career-portfolio-${record?.id}-form`)).toEqual([
-      expect.objectContaining({ depth: 0, oob: undefined }),
-    ])
-    expect(recordsFor(html, 'career-portfolio-list')).toEqual([
-      expect.objectContaining({ depth: 0, oob: 'outerHTML' }),
-    ])
-
-    const edit = await (await app.request(`/career-data/portfolio/${record?.id}/form`)).text()
-    expect(edit).toContain('importSource = legacy portfolio-content.json')
-    expect(edit).toContain('Synthetic approach')
-  })
-
-  test('a missing title is a 422 that returns only the form', async () => {
-    const app = await harness()
-    const response = await post(app, '/career-data/portfolio/form', [
-      ['title', ''],
-      ['expectedRevision', '0'],
-    ])
-    const html = await response.text()
-    expect(response.status).toBe(422)
-    expect(response.headers.get('HX-Retarget')).toBe('#career-portfolio-form')
-    expect(recordsFor(html, 'career-portfolio-form')).toEqual([
-      expect.objectContaining({ depth: 0, oob: undefined }),
-    ])
-    expect(html).toContain('Topic title is required.')
-    expect(markerTopics()).toHaveLength(0)
-  })
-
-  test('re-saving identical portfolio content is a no-op that does not bump the revision', async () => {
-    const app = await harness()
-    await post(app, '/career-data/portfolio/form', [
-      ['title', `${marker} Unchanged`],
-      ['status', 'draft'],
-      ['sortOrder', '0'],
-      ['expectedRevision', '0'],
-    ])
-    const created = markerTopics().find((row) => row.title === `${marker} Unchanged`)
-    expect(created?.revision).toBe(1)
-
-    const noop = await post(app, `/career-data/portfolio/${created?.id}/form`, [
-      ['title', `${marker} Unchanged`],
-      ['status', 'draft'],
-      ['sortOrder', '0'],
-      ['expectedRevision', String(created?.revision ?? 1)],
-    ])
-    expect(noop.status).toBe(200)
-    // The repository guarantees no-op invisibility: revision and stored row are identical.
-    expect(markerTopics().find((row) => row.id === created?.id)?.revision).toBe(created?.revision)
-  })
-
-  test('a stale topic submit is a 409 fragment and retire returns the list only', async () => {
-    const app = await harness()
-    await post(app, '/career-data/portfolio/form', [
-      ['title', `${marker} Keep`],
-      ['expectedRevision', '0'],
-    ])
-    const record = markerTopics().find((row) => row.title === `${marker} Keep`)
-    const id = record?.id
-
-    const stale = await post(app, `/career-data/portfolio/${id}/form`, [
-      ['title', 'Stale topic'],
-      ['expectedRevision', '999999'],
-    ])
-    expect(stale.status).toBe(409)
-    expect(await stale.text()).toContain('This record changed since you opened it')
-
-    const retired = await post(app, `/career-data/portfolio/${id}/retire?showRetired=1`, [
-      ['action', 'retire'],
-    ])
-    expect(recordsFor(await retired.text(), 'career-portfolio-list')).toEqual([
-      expect.objectContaining({ depth: 0, oob: undefined }),
-    ])
-    expect(markerTopics().find((row) => row.id === id)?.retiredAt).not.toBeNull()
-    expect(markerTopics().find((row) => row.id === id)?.title).toBe(`${marker} Keep`)
   })
 })
 

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { baseResumeTextHash } from '../../src/lib/base-resumes'
 import { canonicalHash } from '../../src/lib/canonical-hash'
+import { careerImportDocumentFiles } from '../../src/lib/career-import'
 import { loadCareerDataFrom } from '../support/career-data'
 import {
   approvedBaseResumeManifest,
@@ -151,18 +152,14 @@ describe('synthetic career fixtures', () => {
     )
     for (const field of ['locations', 'workModes', 'availability', 'compensation'])
       expect(preferences).toHaveProperty(field)
+  })
 
-    const topic = fixtureItem('portfolio-content.json', 'topics')
-    for (const field of [
-      'title',
-      'status',
-      'sortOrder',
-      'projects',
-      'directions',
-      'outline',
-      'details',
-    ])
-      expect(topic).toHaveProperty(field)
+  test('keep the raw portfolio document in the import set with no topics', () => {
+    // The portfolio-topic feature is gone, but the legacy directory still ships
+    // the raw document so the importer preserves it verbatim. It must be empty:
+    // a fixture topic would imply the removed structured path still exists.
+    expect(asRecord(syntheticCareerDocuments['portfolio-content.json']).topics).toEqual([])
+    expect(careerImportDocumentFiles).toContain('portfolio-content.json')
   })
 
   test('keep approved catalog entries separate from personal skill possession', () => {

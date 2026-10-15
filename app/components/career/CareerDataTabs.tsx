@@ -13,7 +13,6 @@ export const careerDataTabs = [
   { key: 'skills', label: 'Skills' },
   { key: 'stories', label: 'Stories' },
   { key: 'publications', label: 'Publications' },
-  { key: 'portfolio', label: 'Portfolio' },
   { key: 'preferences', label: 'Preferences' },
   { key: 'directions', label: 'Directions' },
   { key: 'base-resumes', label: 'Base resumes' },

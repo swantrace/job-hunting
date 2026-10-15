@@ -11,6 +11,12 @@ import { z } from 'zod'
  *
  * `excluded` is deliberately part of the payload: a logical export can never be
  * a complete operational backup, and the note names what it cannot carry.
+ *
+ * Compatibility: a dataset exported before migration 0028 still carries a
+ * top-level `portfolioTopics` array. That key is deliberately no longer part of
+ * this schema and is ignored on import, so an older export (including the
+ * checked-in `career-data.example` and any operator backup) imports without
+ * error instead of failing validation.
  */
 
 export const careerDatasetFormat = 'career-dataset'
@@ -198,19 +204,6 @@ const directionSchema = z.looseObject({
   retiredAt: nullableText.optional(),
 })
 
-const portfolioTopicSchema = z.looseObject({
-  stableKey: stableKeySchema,
-  title: z.string().trim().min(1),
-  status: z.string().optional(),
-  sortOrder: z.number().int().optional(),
-  outline: z.array(z.string()).optional(),
-  details: z.unknown().optional(),
-  projectKeys: z.array(stableKeySchema).optional(),
-  directionKeys: z.array(stableKeySchema).optional(),
-  retiredAt: nullableText.optional(),
-  extensions: extensionsSchema.optional(),
-})
-
 const baseResumeSchema = z.looseObject({
   directionKey: stableKeySchema,
   version: z.string().trim().min(1),
@@ -242,7 +235,6 @@ export const careerDatasetSchema = z.looseObject({
   publications: z.array(publicationSchema),
   personalSkills: z.array(personalSkillSchema),
   directions: z.array(directionSchema),
-  portfolioTopics: z.array(portfolioTopicSchema),
   baseResumes: z.array(baseResumeSchema),
   state: careerStateSchema,
   excluded: z.looseObject({ kinds: z.array(z.string()), reason: z.string() }),
@@ -259,7 +251,6 @@ export type CareerDatasetStory = z.infer<typeof storySchema>
 export type CareerDatasetPublication = z.infer<typeof publicationSchema>
 export type CareerDatasetPersonalSkill = z.infer<typeof personalSkillSchema>
 export type CareerDatasetDirection = z.infer<typeof directionSchema>
-export type CareerDatasetPortfolioTopic = z.infer<typeof portfolioTopicSchema>
 export type CareerDatasetBaseResume = z.infer<typeof baseResumeSchema>
 
 /** Parses and validates a serialized or already-parsed `career-dataset` payload. */

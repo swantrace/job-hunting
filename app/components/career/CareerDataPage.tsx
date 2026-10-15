@@ -11,7 +11,6 @@ import { DirectionsSection } from './DirectionsSection'
 import { EducationSection } from './EducationSection'
 import { ExperienceSection } from './ExperienceSection'
 import { IdentitySection } from './IdentitySection'
-import { PortfolioSection } from './PortfolioSection'
 import { PreferencesSection } from './PreferencesSection'
 import { ProjectSection } from './ProjectSection'
 import { PublicationSection } from './PublicationSection'
@@ -77,15 +76,6 @@ function renderActiveSection(
           publications={view.publications}
           includeRetired={includeRetired}
           experiences={view.allExperiences}
-          projects={view.allProjects}
-          directions={view.allDirections}
-        />
-      )
-    case 'portfolio':
-      return (
-        <PortfolioSection
-          topics={view.portfolioTopics}
-          includeRetired={includeRetired}
           projects={view.allProjects}
           directions={view.allDirections}
         />

@@ -126,7 +126,7 @@ bun run skills:sync --database ./jobs.db --check # non-zero exit when conflicts 
 
 Database career records are the canonical, factual source used to generate documents. Stable keys survive rename: a direction references the underlying experience, achievement, project, or skill records by key, and editing them in the UI bumps the career revision so dependent documents become visibly stale.
 
-- Identity, education, experiences, achievements, projects, publications, stories, personal skills, directions, preferences and portfolio topics are edited under **Career Data**. Publications keep a display-ready citation and structured authors, including an `isCandidate` marker.
+- Identity, education, experiences, achievements, projects, publications, stories, personal skills, directions and preferences are edited under **Career Data**. Publications keep a display-ready citation and structured authors, including an `isCandidate` marker.
 - Directions carry their `label` and `targetTitles`; bounded generation rules are edited per direction.
 - Legacy `career-data/` JSON is an import source only. Every original field, including authored extension fields, is preserved in the database and remains editable in the UI.
 

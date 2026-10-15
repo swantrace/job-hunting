@@ -23,7 +23,6 @@ import {
   type CareerAchievement,
   type CareerEducation,
   type CareerExperience,
-  type CareerPortfolioTopic,
   type CareerProject,
   type CareerPublication,
   type CareerStory,
@@ -33,8 +32,6 @@ import {
   careerDirections,
   careerEducation,
   careerExperiences,
-  careerPortfolioTopicProjects,
-  careerPortfolioTopics,
   careerProjectSkills,
   careerProjects,
   careerPublicationProjects,
@@ -47,7 +44,7 @@ import type { DbExecutor } from './skill-queries'
 
 /**
  * Editorial career records: education, experiences, achievements, projects,
- * stories, publications and portfolio topics. Every write inside this module:
+ * stories and publications. Every write inside this module:
  *
  * - compares the complete logical content (including ordered junctions) and is
  *   completely invisible when nothing changed: no revision bump, no
@@ -135,11 +132,11 @@ function requireDirectionKeys(tx: CareerDb, keys: string[]): void {
 }
 
 /**
- * The five record columns of the exclusive-arc `career_record_directions`
+ * The four record columns of the exclusive-arc `career_record_directions`
  * junction. Exactly one is set per row, so every direction list is addressed by
  * its record column plus that record's id.
  */
-type DirectionRecordColumn = 'achievementId' | 'projectId' | 'storyId' | 'publicationId' | 'topicId'
+type DirectionRecordColumn = 'achievementId' | 'projectId' | 'storyId' | 'publicationId'
 
 function directionRecordColumn(column: DirectionRecordColumn) {
   return {
@@ -147,7 +144,6 @@ function directionRecordColumn(column: DirectionRecordColumn) {
     projectId: careerRecordDirections.projectId,
     storyId: careerRecordDirections.storyId,
     publicationId: careerRecordDirections.publicationId,
-    topicId: careerRecordDirections.topicId,
   }[column]
 }
 
@@ -157,7 +153,6 @@ function directionRecordValues(column: DirectionRecordColumn, recordId: number) 
     projectId: column === 'projectId' ? recordId : null,
     storyId: column === 'storyId' ? recordId : null,
     publicationId: column === 'publicationId' ? recordId : null,
-    topicId: column === 'topicId' ? recordId : null,
   }
 }
 
@@ -1661,235 +1656,4 @@ export function retireCareerPublication(executor: CareerDb, id: number): CareerW
 
 export function restoreCareerPublication(executor: CareerDb, id: number): CareerWriteResult {
   return setPublicationRetired(executor, id, false)
-}
-
-// ---------------------------------------------------------------------------
-// Portfolio topics
-// ---------------------------------------------------------------------------
-
-export type CareerPortfolioTopicInput = {
-  stableKey: string
-  title: string
-  status?: string
-  sortOrder?: number
-  outline?: string[]
-  details?: unknown
-  projectIds?: number[]
-  directions?: string[]
-}
-
-export type CareerPortfolioTopicRecord = Omit<
-  CareerPortfolioTopic,
-  'outlineJson' | 'detailsJson'
-> & {
-  outline: string[]
-  details: unknown
-  projectIds: number[]
-  directions: string[]
-}
-
-type TopicLinks = { projectIds: number[]; directions: string[] }
-
-function topicContent(
-  source: CareerPortfolioTopicInput | CareerPortfolioTopicRecord,
-  links?: TopicLinks,
-) {
-  const resolved: TopicLinks =
-    links ??
-    (source.projectIds !== undefined || source.directions !== undefined
-      ? { projectIds: source.projectIds ?? [], directions: source.directions ?? [] }
-      : { projectIds: [], directions: [] })
-  return {
-    stableKey: source.stableKey,
-    title: source.title,
-    status: source.status ?? 'draft',
-    sortOrder: source.sortOrder ?? 0,
-    outline: source.outline ?? [],
-    details: source.details ?? null,
-    ...resolved,
-  }
-}
-
-function topicColumns(content: ReturnType<typeof topicContent>) {
-  return {
-    stableKey: content.stableKey,
-    title: content.title,
-    status: content.status,
-    sortOrder: content.sortOrder,
-    outlineJson: serializeJsonColumn(stringListSchema.parse(content.outline)),
-    detailsJson: content.details === null ? null : serializeJsonColumn(content.details),
-  }
-}
-
-function topicLinks(executor: DbExecutor, topicId: number): TopicLinks {
-  return {
-    projectIds: executor
-      .select()
-      .from(careerPortfolioTopicProjects)
-      .where(eq(careerPortfolioTopicProjects.topicId, topicId))
-      .orderBy(asc(careerPortfolioTopicProjects.position))
-      .all()
-      .map((row) => row.projectId),
-    directions: readDirectionKeys(executor, 'topicId', topicId),
-  }
-}
-
-function topicToRecord(row: CareerPortfolioTopic, links: TopicLinks): CareerPortfolioTopicRecord {
-  return {
-    ...row,
-    outline: parseJsonColumn(
-      row.outlineJson,
-      stringListSchema,
-      [],
-      'career_portfolio_topics.outline_json',
-    ),
-    details: parseJsonColumn(
-      row.detailsJson,
-      jsonValueSchema,
-      null,
-      'career_portfolio_topics.details_json',
-    ),
-    ...links,
-  }
-}
-
-function requireTopic(tx: CareerDb, id: number): CareerPortfolioTopic {
-  const row = tx.select().from(careerPortfolioTopics).where(eq(careerPortfolioTopics.id, id)).get()
-  if (!row) throw new CareerReferenceError(`Career portfolio topic ${id} does not exist.`)
-  return row
-}
-
-function replaceTopicLinks(tx: CareerDb, topicId: number, links: TopicLinks): void {
-  tx.delete(careerPortfolioTopicProjects)
-    .where(eq(careerPortfolioTopicProjects.topicId, topicId))
-    .run()
-  if (links.projectIds.length) {
-    insertLinks(
-      links.projectIds.map((projectId, position) => ({ topicId, projectId, position })),
-      (row) => tx.insert(careerPortfolioTopicProjects).values(row).run(),
-    )
-  }
-  replaceDirectionLinks(tx, 'topicId', topicId, links.directions)
-}
-
-function inputTopicLinks(input: CareerPortfolioTopicInput): TopicLinks {
-  return {
-    projectIds: input.projectIds ?? [],
-    directions: dedupeDirections(input.directions ?? []),
-  }
-}
-
-export function listCareerPortfolioTopics(
-  executor: DbExecutor = db,
-  options: ListOptions = {},
-): CareerPortfolioTopicRecord[] {
-  return executor
-    .select()
-    .from(careerPortfolioTopics)
-    .orderBy(asc(careerPortfolioTopics.sortOrder), asc(careerPortfolioTopics.id))
-    .all()
-    .filter((row) => options.includeRetired || row.retiredAt === null)
-    .map((row) => topicToRecord(row, topicLinks(executor, row.id)))
-}
-
-export function createCareerPortfolioTopic(
-  executor: CareerDb,
-  input: CareerPortfolioTopicInput,
-): CareerWriteResult {
-  return executor.transaction((tx) => {
-    if (input.title.trim() === '')
-      throw new CareerReferenceError('Portfolio topic title is required.')
-    const links = inputTopicLinks(input)
-    requireProjectIds(tx, links.projectIds)
-    requireDirectionKeys(tx, links.directions)
-    const content = topicContent(input, links)
-    content.stableKey = requireText(content.stableKey, 'Portfolio topic stable_key')
-    const duplicate = tx
-      .select()
-      .from(careerPortfolioTopics)
-      .where(eq(careerPortfolioTopics.stableKey, content.stableKey))
-      .get()
-    if (duplicate) {
-      throw new CareerReferenceError(
-        `Career portfolio topic with stable_key "${content.stableKey}" already exists.`,
-      )
-    }
-    const now = nowISO()
-    const inserted = tx
-      .insert(careerPortfolioTopics)
-      .values({ ...topicColumns(content), createdAt: now, updatedAt: now })
-      .returning({ id: careerPortfolioTopics.id })
-      .get()
-    replaceTopicLinks(tx, inserted.id, links)
-    recordCareerChange(tx, stableFingerprint(content))
-    return { id: inserted.id, changed: true, revision: 1 }
-  })
-}
-
-export function updateCareerPortfolioTopic(
-  executor: CareerDb,
-  id: number,
-  input: CareerPortfolioTopicInput,
-  options: UpdateOptions = {},
-): CareerWriteResult {
-  return executor.transaction((tx) => {
-    const existing = requireTopic(tx, id)
-    assertStableKey('Career portfolio topic', existing.stableKey, input.stableKey)
-    assertExpectedRevision(
-      'Career portfolio topic',
-      id,
-      options.expectedRevision,
-      existing.revision,
-    )
-    const links = inputTopicLinks(input)
-    requireProjectIds(tx, links.projectIds)
-    requireDirectionKeys(tx, links.directions)
-    const content = topicContent(input, links)
-    const result = commitRecordWrite({
-      tx,
-      current: existing,
-      currentContent: topicContent(topicToRecord(existing, topicLinks(tx, id))),
-      nextContent: content,
-    })
-    if (!result.changed) return { id, ...result }
-    tx.update(careerPortfolioTopics)
-      .set({
-        ...topicColumns(content),
-        stableKey: existing.stableKey,
-        revision: result.revision,
-        updatedAt: nowISO(),
-      })
-      .where(eq(careerPortfolioTopics.id, id))
-      .run()
-    replaceTopicLinks(tx, id, links)
-    return { id, ...result }
-  })
-}
-
-function setTopicRetired(executor: CareerDb, id: number, retired: boolean): CareerWriteResult {
-  return executor.transaction((tx) => {
-    const existing = requireTopic(tx, id)
-    const current = topicContent(topicToRecord(existing, topicLinks(tx, id)))
-    const next = { ...current, retiredAt: retired ? nowISO() : null }
-    const result = commitRecordWrite({
-      tx,
-      current: existing,
-      currentContent: { ...current, retiredAt: existing.retiredAt },
-      nextContent: next,
-    })
-    if (!result.changed) return { id, changed: false, revision: result.revision }
-    tx.update(careerPortfolioTopics)
-      .set({ retiredAt: next.retiredAt, revision: result.revision, updatedAt: nowISO() })
-      .where(eq(careerPortfolioTopics.id, id))
-      .run()
-    return { id, changed: true, revision: result.revision }
-  })
-}
-
-export function retireCareerPortfolioTopic(executor: CareerDb, id: number): CareerWriteResult {
-  return setTopicRetired(executor, id, true)
-}
-
-export function restoreCareerPortfolioTopic(executor: CareerDb, id: number): CareerWriteResult {
-  return setTopicRetired(executor, id, false)
 }

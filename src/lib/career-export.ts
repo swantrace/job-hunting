@@ -6,7 +6,6 @@ import {
   listCareerAchievements,
   listCareerEducation,
   listCareerExperiences,
-  listCareerPortfolioTopics,
   listCareerProjects,
   listCareerPublications,
   listCareerStories,
@@ -78,7 +77,6 @@ function selectDirectionalRecordKeys(
     publications: DirectionalRecord[]
     achievements: DirectionalRecord[]
     stories: DirectionalRecord[]
-    portfolioTopics: DirectionalRecord[]
   },
 ) {
   const experienceKeyById = new Map(records.experiences.map((row) => [row.id, row.stableKey]))
@@ -92,7 +90,6 @@ function selectDirectionalRecordKeys(
   const publicationKeys = new Set<string>()
   const achievementKeys = new Set<string>()
   const storyKeys = new Set<string>()
-  const topicKeys = new Set<string>()
 
   const addExperience = (id: number | null | undefined) => {
     const key = id === null || id === undefined ? undefined : experienceKeyById.get(id)
@@ -127,13 +124,7 @@ function selectDirectionalRecordKeys(
     storyKeys.add(record.stableKey)
     addExperience(record.experienceId)
   }
-  for (const record of records.portfolioTopics) {
-    if (!record.directions?.includes(directionKey)) continue
-    topicKeys.add(record.stableKey)
-    for (const projectId of record.projectIds ?? []) addProject(projectKeyById.get(projectId))
-  }
-
-  return { experienceKeys, projectKeys, publicationKeys, achievementKeys, storyKeys, topicKeys }
+  return { experienceKeys, projectKeys, publicationKeys, achievementKeys, storyKeys }
 }
 
 export function buildCareerDataset(
@@ -186,7 +177,6 @@ export function buildCareerDataset(
   const allPublications = listCareerPublications(executor, { includeRetired: true })
   const allAchievements = listCareerAchievements(executor, { includeRetired: true })
   const allStories = listCareerStories(executor, { includeRetired: true })
-  const allTopics = listCareerPortfolioTopics(executor, { includeRetired: true })
 
   const selected =
     directionKey === null
@@ -197,7 +187,6 @@ export function buildCareerDataset(
           publications: allPublications,
           achievements: allAchievements,
           stories: allStories,
-          portfolioTopics: allTopics,
         })
   const keep = (keys: Set<string> | undefined, stableKey: string) =>
     keys === undefined || keys.has(stableKey)
@@ -324,21 +313,6 @@ export function buildCareerDataset(
       extensions: recordExtensions('stories', row.stableKey),
     }))
 
-  const portfolioTopics = allTopics
-    .filter((row) => keep(selected?.topicKeys, row.stableKey))
-    .map((row) => ({
-      stableKey: row.stableKey,
-      title: row.title,
-      status: row.status,
-      sortOrder: row.sortOrder,
-      outline: row.outline,
-      details: row.details,
-      projectKeys: row.projectIds.map(projectKey).filter((key): key is string => Boolean(key)),
-      directionKeys: row.directions,
-      retiredAt: row.retiredAt,
-      extensions: recordExtensions('portfolioTopics', row.stableKey),
-    }))
-
   const personalSkills = listCareerSkills(executor, { includeRetired: true }).map((row) => ({
     skillKey: row.skillKey,
     level: row.level,
@@ -414,7 +388,6 @@ export function buildCareerDataset(
     publications,
     personalSkills,
     directions,
-    portfolioTopics,
     baseResumes,
     state: {
       legacyDocuments: state.legacyDocuments,

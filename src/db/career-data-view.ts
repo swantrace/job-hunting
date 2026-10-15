@@ -13,14 +13,12 @@ import {
   type CareerAchievementRecord,
   type CareerEducationRecord,
   type CareerExperienceRecord,
-  type CareerPortfolioTopicRecord,
   type CareerProjectRecord,
   type CareerPublicationRecord,
   type CareerStoryRecord,
   listCareerAchievements,
   listCareerEducation,
   listCareerExperiences,
-  listCareerPortfolioTopics,
   listCareerProjects,
   listCareerPublications,
   listCareerStories,
@@ -73,7 +71,6 @@ export type CareerDataView = {
   projects: CareerProjectRecord[]
   stories: CareerStoryRecord[]
   publications: CareerPublicationRecord[]
-  portfolioTopics: CareerPortfolioTopicRecord[]
   /** Directions in stored order; retired ones only when requested. */
   directions: CareerDirectionRecord[]
   /** Every Base Resume version, including superseded history. */
@@ -126,9 +123,6 @@ export function loadCareerDataView(
     projects: visible(allProjects),
     stories: listCareerStories(executor, { includeRetired: options.includeRetired }),
     publications: listCareerPublications(executor, { includeRetired: options.includeRetired }),
-    portfolioTopics: listCareerPortfolioTopics(executor, {
-      includeRetired: options.includeRetired,
-    }),
     directions: visible(allDirections),
     baseResumes: listAllBaseResumeVersions(executor),
     preferences: readCareerPreferences(executor),

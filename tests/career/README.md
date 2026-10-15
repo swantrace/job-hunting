@@ -14,7 +14,7 @@ authority for their shape.
 
 | Fixture | Purpose |
 | --- | --- |
-| `syntheticCareerDocuments` | Full canonical dataset: candidate/authorization/career break/truth rules, education with date precision, experiences, achievements, projects, personal skills, stories, publications, directions, career preferences, portfolio topics, all with authored extension fields. |
+| `syntheticCareerDocuments` | Full canonical dataset: candidate/authorization/career break/truth rules, education with date precision, experiences, achievements, projects, personal skills, stories, publications, directions, career preferences, all with authored extension fields. `portfolio-content.json` is still present (with `topics: []`) because the raw legacy document survives import even though the portfolio-topic feature was removed in migration 0028. |
 | `catalogOnlySkills` | Approved catalog entries the candidate does not possess, used to prove mapping never implies possession. |
 | `documentsWithAmbiguousAlias` | An alias that collides with another catalog entry's display name. |
 | `syntheticRequirementTerms` | Composite, ambiguous, unknown, repeated, broad and curated-alias JD terms plus both composite orderings. |
@@ -46,7 +46,7 @@ rejects an increased todo count).
 | Mapping UI: Create new, explicit Skip, Remember alias, forged IDs, remap/unskip, readiness chaining | Step 6 | `tests/ui/*` mapping boundaries |
 | Identity/experience/education persistence, key survival across rename, stale-form conflict, retirement | Step 7 | extend this directory |
 | Achievements/projects/personal skills eligibility, unsafe sources never prove a match | Step 8 | extend this directory |
-| Stories/publications/portfolio/preferences roundtrip, private URL defaults, portfolio-only edits not staling documents | Step 9 | extend this directory |
+| Stories/publications/preferences roundtrip, private URL defaults, edits outside the document shape (a preserved legacy document) not staling documents | Step 9 | extend this directory |
 | Directions, bounded generation rules reaching drafting and validation, Base Resume draft/approval lifecycle | Step 10 | extend this directory |
 | Import/export UI revalidation, ChatGPT context privacy defaults, legacy v4 compatibility | Step 11 | extend this directory |
 | File-free restart, empty onboarding, schema-only setup/start, import-only env docs, missing career-table health message | Step 12 | `step12-cleanup.test.ts`, `tests/db/health.test.ts` |

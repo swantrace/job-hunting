@@ -5,13 +5,12 @@ import { resolve } from 'node:path'
 import { candidateFitSchemaVersion } from '../../src/ai/schemas/candidate-fit'
 import { jobAnalysisSchemaVersion } from '../../src/ai/schemas/job-analysis'
 import { completeAnalysisRun, createAnalysisRun } from '../../src/db/analysis'
+import { listCareerAchievements, updateCareerAchievement } from '../../src/db/career-records'
 import {
-  listCareerAchievements,
-  listCareerPortfolioTopics,
-  updateCareerAchievement,
-  updateCareerPortfolioTopic,
-} from '../../src/db/career-records'
-import { readCareerState } from '../../src/db/career-state'
+  readCareerState,
+  readCareerStateDocuments,
+  writeCareerStateDocuments,
+} from '../../src/db/career-state'
 import { db } from '../../src/db/client'
 import { companies, jobApplications, jobPostingAnalyses, jobPostings } from '../../src/db/schema'
 import {
@@ -39,6 +38,7 @@ import {
 } from '../../src/lib/generation-input'
 import { enqueueGeneration } from '../../src/lib/generation-queue'
 import { currentJobAnalysisHash } from '../../src/lib/job-analysis-input'
+import { syncSkillTaxonomy } from '../../src/lib/skills/sync-taxonomy'
 import { writeSyntheticCareerData } from '../career/fixtures'
 import {
   type CareerTestDatabase,
@@ -270,26 +270,40 @@ describe('database-owned runtime career reads', () => {
     expect(generationStalenessReasons(legacy, legacy)).toEqual([])
   })
 
-  test('5. portfolio and category-order edits do not stale unrelated documents', () => {
+  test('5. a category display-order edit does not stale unrelated documents', () => {
     const stored = buildGenerationInput(applicationId)
     expect(stored).not.toBeNull()
     const storedSnapshot = stored!.snapshot
     const currentCandidateHash = currentCandidateAnalysisHash(applicationId)
     const revisionBefore = readCareerState(db).revision
 
-    const topic = listCareerPortfolioTopics(db)[0]
-    updateCareerPortfolioTopic(db, topic.id, {
-      stableKey: topic.stableKey,
-      title: `${topic.title} (edited)`,
-      status: topic.status,
-      sortOrder: topic.sortOrder,
-      outline: topic.outline,
-      details: topic.details,
-      projectIds: topic.projectIds,
-      directions: topic.directions,
+    // A category display-order edit changes the catalog, never the facts. The
+    // catalog has no dedicated revision counter, so the write that must be
+    // invisible is paired with a preserved legacy-document edit (which does bump
+    // `career_state.revision`): the hashes below must still be untouched.
+    const categories = database.sqlite
+      .query('SELECT key, label, sort_order FROM skill_categories ORDER BY sort_order')
+      .all() as Array<{ key: string; label: string; sort_order: number }>
+    syncSkillTaxonomy(
+      db,
+      categories.map((row) => ({
+        key: row.key,
+        label: row.label,
+        sortOrder: 1_000 - row.sort_order,
+      })),
+      { apply: true },
+    )
+    const legacy = readCareerStateDocuments(db).legacyDocuments as Record<string, unknown>
+    writeCareerStateDocuments(db, {
+      legacyDocuments: {
+        ...legacy,
+        'portfolio-content.json': {
+          schemaVersion: 1,
+          lastUpdated: '2026-10-20',
+          topics: [{ id: 'a-preserved-topic', title: 'Preserved raw topic' }],
+        },
+      },
     })
-    // A category display-order edit changes the catalog, never the facts.
-    database.sqlite.query('UPDATE skill_categories SET sort_order = sort_order + 1000').run()
     expect(readCareerState(db).revision).toBeGreaterThan(revisionBefore)
 
     const current = buildGenerationInput(applicationId)

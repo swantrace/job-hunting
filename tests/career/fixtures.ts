@@ -313,24 +313,19 @@ const preferencesDocument = {
   },
 }
 
+/**
+ * The removed portfolio-topic feature no longer has a structured reader, but the
+ * raw document is still part of the legacy directory so the directory-import
+ * round-trip keeps proving that the original file is preserved verbatim in
+ * `career_state.legacy_documents_json`. It holds no topics.
+ */
 const portfolioDocument = {
   schemaVersion: 1,
   lastUpdated: '2026-10-14',
-  topics: [
-    {
-      id: 'synthetic-topic',
-      title: 'Synthetic reporting architecture',
-      status: 'draft',
-      sortOrder: 1,
-      projects: ['synthetic-tracker'],
-      directions: ['fullstack'],
-      outline: ['Synthetic problem statement', 'Synthetic approach'],
-      details: 'Synthetic portfolio detail text.',
-    },
-  ],
+  topics: [],
 }
 
-/** The nine checked-in document documents, keyed by their file name. */
+/** The nine checked-in legacy documents, keyed by their file name. */
 export const syntheticCareerDocuments: Record<string, unknown> = {
   'candidate.json': candidateDocument,
   'experiences.json': experiencesDocument,

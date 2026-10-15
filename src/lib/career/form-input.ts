@@ -6,7 +6,6 @@ import type {
   CareerDatePrecision,
   CareerEducationInput,
   CareerExperienceInput,
-  CareerPortfolioTopicInput,
   CareerProjectInput,
   CareerPublicationInput,
   CareerPublicationStatus,
@@ -534,22 +533,6 @@ export const publicationFormSchema = z
     refineHttpUrlLines(value.sourceUrls, 'sourceUrls', ctx)
   })
 
-/** Portfolio topic form: title, status, order, project links, outline, details. */
-export const portfolioTopicFormSchema = z.object({
-  title: requiredLine('Topic title', 200),
-  status: z.preprocess(
-    (value) => (typeof value === 'string' && value.trim() !== '' ? value : 'draft'),
-    z.string().trim().max(80),
-  ),
-  sortOrder: optionalInteger(-10000, 10000, 'Sort order'),
-  projectIds: pickerIdList,
-  directions: pickerKeyList,
-  outline: optionalText(6000),
-  details: optionalText(6000),
-  extensionFields: optionalText(4000),
-  expectedRevision: revisionField,
-})
-
 /** Story form: the STAR narrative plus an experience link and directions. */
 export const storyFormSchema = z.object({
   title: requiredLine('Story title', 200),
@@ -684,7 +667,6 @@ export type ProjectFormValues = z.infer<typeof projectFormSchema>
 export type PersonalSkillFormValues = z.infer<typeof personalSkillFormSchema>
 export type StoryFormValues = z.infer<typeof storyFormSchema>
 export type PublicationFormValues = z.infer<typeof publicationFormSchema>
-export type PortfolioTopicFormValues = z.infer<typeof portfolioTopicFormSchema>
 export type PreferencesFormValues = z.infer<typeof preferencesFormSchema>
 
 /**
@@ -879,22 +861,6 @@ export function publicationInput(
     authorListTruncated: values.authorListIsTruncated,
     contributions: parseLineList(values.contributions),
     sourceUrls: parseLineList(values.sourceUrls),
-    projectIds: values.projectIds,
-    directions: values.directions,
-  }
-}
-
-export function portfolioTopicInput(
-  values: PortfolioTopicFormValues,
-  options: { stableKey: string; details: unknown },
-): CareerPortfolioTopicInput {
-  return {
-    stableKey: options.stableKey,
-    title: values.title,
-    status: values.status,
-    sortOrder: values.sortOrder ?? 0,
-    outline: parseLineList(values.outline),
-    details: options.details,
     projectIds: values.projectIds,
     directions: values.directions,
   }
@@ -1213,17 +1179,6 @@ export type PublicationFormSource = {
   revision?: number
 }
 
-export type PortfolioTopicFormSource = {
-  title?: string
-  status?: string | null
-  sortOrder?: number
-  outline?: string[]
-  details?: unknown
-  projectIds?: number[]
-  directions?: string[]
-  revision?: number
-}
-
 export type PreferencesFormSource = {
   locations?: string[]
   workModes?: string[]
@@ -1315,23 +1270,6 @@ export function parsePublicationForm(raw: Record<string, unknown>): PublicationF
   const errors: FieldErrors = parsed.success ? {} : parsed.error.flatten().fieldErrors
   if (!authors.success) errors.authors = authors.error.issues.map((issue) => issue.message)
   return { success: false, errors }
-}
-
-export function portfolioTopicFormValues(
-  record: PortfolioTopicFormSource | null,
-  extensions: unknown,
-): Record<string, string> {
-  return {
-    title: record?.title ?? '',
-    status: record?.status ?? 'draft',
-    sortOrder: record?.sortOrder === undefined ? '0' : String(record.sortOrder),
-    outline: formatLineList(record?.outline),
-    details: formatFieldValue(record?.details),
-    projectIds: pickerSelection(record?.projectIds),
-    directions: pickerSelection(record?.directions),
-    extensionFields: formatExtensionLines(extensions),
-    expectedRevision: String(record?.revision ?? 0),
-  }
 }
 
 export function preferencesFormValues(

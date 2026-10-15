@@ -49,7 +49,7 @@ export const truthfulnessSchema = z.union([
 
 /**
  * Ordered string collections: coursework, responsibilities, evidence,
- * evidence narratives, limitations, contributions, outlines, locations and
+ * evidence narratives, limitations, contributions, locations and
  * work modes. Order is editorial data and is preserved.
  */
 export const stringListSchema = z.array(z.string())
@@ -59,7 +59,7 @@ export const authorsSchema = z.array(z.looseObject({ name: z.string(), isCandida
 
 const httpUrlSchema = z.url({ protocol: /^https?$/, normalize: false })
 
-/** Project/portfolio URLs. Only http(s) is a citable public source. */
+/** Project URLs. Only http(s) is a citable public source. */
 export const urlListSchema = z.array(httpUrlSchema)
 
 /** Publication source URLs; same http(s) restriction as project URLs. */

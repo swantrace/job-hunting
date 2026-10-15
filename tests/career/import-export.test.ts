@@ -139,7 +139,6 @@ describe('career dataset import and export', () => {
     expect(report.byKind.directions).toEqual({ inserted: 3, updated: 0, unchanged: 0 })
     expect(report.byKind.candidate).toEqual({ inserted: 1, updated: 0, unchanged: 0 })
     expect(report.byKind.preferences).toEqual({ inserted: 1, updated: 0, unchanged: 0 })
-    expect(report.byKind.portfolioTopics).toEqual({ inserted: 1, updated: 0, unchanged: 0 })
 
     expect(rowCount(sqlite, 'career_education')).toBe(2)
     expect(rowCount(sqlite, 'career_experiences')).toBe(2)
@@ -148,7 +147,6 @@ describe('career dataset import and export', () => {
     expect(rowCount(sqlite, 'career_stories')).toBe(1)
     expect(rowCount(sqlite, 'career_publications')).toBe(1)
     expect(rowCount(sqlite, 'career_skills')).toBe(5)
-    expect(rowCount(sqlite, 'career_portfolio_topics')).toBe(1)
     expect(rowCount(sqlite, 'career_directions')).toBe(3)
     expect(rowCount(sqlite, 'career_profile')).toBe(1)
   })
@@ -363,7 +361,6 @@ describe('career dataset import and export', () => {
       'career_stories',
       'career_publications',
       'career_skills',
-      'career_portfolio_topics',
       'career_directions',
       'career_record_directions',
       'career_profile',

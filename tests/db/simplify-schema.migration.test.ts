@@ -23,13 +23,11 @@ const preservedCareerTables = [
   'career_projects',
   'career_stories',
   'career_publications',
-  'career_portfolio_topics',
   'career_skills',
   'career_achievement_skills',
   'career_project_skills',
   'career_publication_projects',
   'career_achievement_publications',
-  'career_portfolio_topic_projects',
   'career_base_resumes',
 ] as const
 
@@ -93,8 +91,7 @@ function directionLinks(sqlite: Database) {
           WHEN achievement_id IS NOT NULL THEN 'achievement:' || achievement_id
           WHEN project_id IS NOT NULL THEN 'project:' || project_id
           WHEN story_id IS NOT NULL THEN 'story:' || story_id
-          WHEN publication_id IS NOT NULL THEN 'publication:' || publication_id
-          ELSE 'topic:' || topic_id
+          ELSE 'publication:' || publication_id
         END AS record
        FROM career_record_directions ORDER BY id`,
     )
@@ -210,13 +207,6 @@ function seedCareerFacts(sqlite: Database) {
        VALUES ('pub-1', 'Paper One', 'Example citation.', 2025, 'published', ?, ?) RETURNING id`,
     )
     .get(T, T) as { id: number }
-  const topic = sqlite
-    .query(
-      `INSERT INTO career_portfolio_topics (stable_key, title, created_at, updated_at)
-       VALUES ('topic-1', 'Topic One', ?, ?) RETURNING id`,
-    )
-    .get(T, T) as { id: number }
-
   sqlite
     .query(
       `INSERT INTO career_skills (skill_id, level, created_at, updated_at) VALUES (?, 'expert', ?, ?)`,
@@ -245,14 +235,9 @@ function seedCareerFacts(sqlite: Database) {
       'INSERT INTO career_publication_projects (publication_id, project_id, position) VALUES (?, ?, 0)',
     )
     .run(publication.id, projectOne.id)
-  sqlite
-    .query(
-      'INSERT INTO career_portfolio_topic_projects (topic_id, project_id, position) VALUES (?, ?, 0)',
-    )
-    .run(topic.id, projectOne.id)
 
-  // Direction links across all five record types; the achievement keeps two in
-  // editorial order.
+  // Direction links across all four surviving record types; the achievement
+  // keeps two in editorial order.
   const insertDirection = sqlite.query(
     'INSERT INTO career_achievement_directions (achievement_id, direction_key, position) VALUES (?, ?, ?)',
   )
@@ -273,12 +258,6 @@ function seedCareerFacts(sqlite: Database) {
       'INSERT INTO career_publication_directions (publication_id, direction_key, position) VALUES (?, ?, 0)',
     )
     .run(publication.id, 'fullstack')
-  sqlite
-    .query(
-      'INSERT INTO career_portfolio_topic_directions (topic_id, direction_key, position) VALUES (?, ?, 0)',
-    )
-    .run(topic.id, 'data')
-
   sqlite
     .query(
       `INSERT INTO career_base_resumes (
@@ -423,14 +402,13 @@ describe('schema simplification migration (0027)', () => {
         expect(count(sqlite, table)).toBe(before.get(table) ?? -1)
       }
       expect(count(sqlite, 'career_achievements')).toBe(2)
-      expect(count(sqlite, 'career_record_directions')).toBe(6)
+      expect(count(sqlite, 'career_record_directions')).toBe(5)
       expect(directionLinks(sqlite)).toEqual([
         { direction_key: 'fullstack', record: 'achievement:1', position: 0 },
         { direction_key: 'data', record: 'achievement:1', position: 1 },
         { direction_key: 'fullstack', record: 'project:1', position: 0 },
         { direction_key: 'data', record: 'story:1', position: 0 },
         { direction_key: 'fullstack', record: 'publication:1', position: 0 },
-        { direction_key: 'data', record: 'topic:1', position: 0 },
       ])
 
       // The merged singleton keeps both halves, with the newest revision.
@@ -472,8 +450,9 @@ describe('schema simplification migration (0027)', () => {
       const tables = tableNames(sqlite)
       for (const table of droppedTables) expect(tables).not.toContain(table)
 
-      // 39 application tables plus the junction as a view.
-      expect(tables).toHaveLength(39)
+      // 37 application tables plus the junction as a view: 0027 left 39, and
+      // 0028 then drops the two portfolio tables.
+      expect(tables).toHaveLength(37)
       expect(
         sqlite
           .query("SELECT type FROM sqlite_master WHERE name = 'job_requirements_to_skills'")
