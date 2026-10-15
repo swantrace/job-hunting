@@ -31,11 +31,21 @@ export const careerBreakSchema = z.looseObject({
   reason: z.string().nullable().optional(),
 })
 
-export const truthfulnessSchema = z.looseObject({
-  neverClaimUnexperiencedSkill: z.boolean().optional(),
-  requireAccurateDates: z.boolean().optional(),
-  notes: z.string().nullable().optional(),
-})
+/**
+ * Truthfulness rules are a bounded rules collection, and real career data
+ * expresses them either as a loose object of named flags or as an ordered list
+ * of rule statements. Both forms are preserved verbatim: the plan requires every
+ * original fact and extension field to survive import, and narrowing this to one
+ * shape would silently reject the other.
+ */
+export const truthfulnessSchema = z.union([
+  z.looseObject({
+    neverClaimUnexperiencedSkill: z.boolean().optional(),
+    requireAccurateDates: z.boolean().optional(),
+    notes: z.string().nullable().optional(),
+  }),
+  z.array(z.string().trim().min(1)).max(100),
+])
 
 /**
  * Ordered string collections: coursework, responsibilities, evidence,
@@ -100,6 +110,27 @@ export const compensationSchema = z.looseObject({
 export type Authorization = z.infer<typeof authorizationSchema>
 export type CareerBreak = z.infer<typeof careerBreakSchema>
 export type TruthfulnessRules = z.infer<typeof truthfulnessSchema>
+
+/** Either supported truthfulness shape, still in its original form. */
+export type TruthfulnessView = {
+  shape: 'rules' | 'flags'
+  rules: string[]
+  flags: {
+    neverClaimUnexperiencedSkill?: boolean
+    requireAccurateDates?: boolean
+    notes?: string | null
+  } | null
+}
+
+/**
+ * Reads either truthfulness shape for display and editing. The editor keeps the
+ * stored shape: a rules list stays a list, an object stays an object, so saving
+ * an untouched record never rewrites the author's chosen form.
+ */
+export function truthfulnessView(value: TruthfulnessRules | null | undefined): TruthfulnessView {
+  if (Array.isArray(value)) return { shape: 'rules', rules: value, flags: null }
+  return { shape: 'flags', rules: [], flags: value ?? null }
+}
 export type PublicationAuthor = z.infer<typeof authorsSchema>[number]
 export type SourceOccurrence = z.infer<typeof occurrencesSchema>[number]
 export type GenerationRules = z.infer<typeof generationRulesSchema>
@@ -137,6 +168,24 @@ export function parseJsonColumn<T>(
 /** Serializes a validated JSON column value for storage. */
 export function serializeJsonColumn(value: unknown): string {
   return JSON.stringify(value) ?? 'null'
+}
+
+/**
+ * Validates an already-decoded JSON column value and names the column in the
+ * failure. Repository writes receive decoded values rather than the stored text,
+ * so a shape mismatch (for example a rules collection arriving as an array where
+ * an object was assumed) must still report which column rejected it instead of
+ * surfacing a bare ZodError.
+ */
+export function parseJsonValue<T>(value: unknown, schema: z.ZodType<T>, column: string): T {
+  const result = schema.safeParse(value)
+  if (!result.success) {
+    const issues = result.error.issues
+      .map((issue) => `${issue.path.map(String).join('.') || '<root>'}: ${issue.message}`)
+      .join('; ')
+    throw new Error(`Invalid JSON in ${column}: ${issues}`)
+  }
+  return result.data
 }
 
 /**

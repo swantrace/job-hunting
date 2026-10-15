@@ -7,6 +7,7 @@ import {
   careerBreakSchema,
   compensationSchema,
   parseJsonColumn,
+  parseJsonValue,
   serializeJsonColumn,
   stringListSchema,
   type TruthfulnessRules,
@@ -102,11 +103,27 @@ function candidateColumns(content: ReturnType<typeof candidateContent>) {
     linkedinUrl: contact.linkedinUrl,
     githubUrl: contact.githubUrl,
     authorizationJson:
-      authorization === null ? null : serializeJsonColumn(authorizationSchema.parse(authorization)),
+      authorization === null
+        ? null
+        : serializeJsonColumn(
+            parseJsonValue(
+              authorization,
+              authorizationSchema,
+              'career_candidate.authorization_json',
+            ),
+          ),
     careerBreakJson:
-      careerBreak === null ? null : serializeJsonColumn(careerBreakSchema.parse(careerBreak)),
+      careerBreak === null
+        ? null
+        : serializeJsonColumn(
+            parseJsonValue(careerBreak, careerBreakSchema, 'career_candidate.career_break_json'),
+          ),
     truthfulnessJson:
-      truthfulness === null ? null : serializeJsonColumn(truthfulnessSchema.parse(truthfulness)),
+      truthfulness === null
+        ? null
+        : serializeJsonColumn(
+            parseJsonValue(truthfulness, truthfulnessSchema, 'career_candidate.truthfulness_json'),
+          ),
   }
 }
 
@@ -191,13 +208,23 @@ function preferencesContent(source: CareerPreferencesInput | CareerPreferencesRe
 
 function preferencesColumns(content: ReturnType<typeof preferencesContent>) {
   return {
-    locationsJson: serializeJsonColumn(stringListSchema.parse(content.locations)),
-    workModesJson: serializeJsonColumn(stringListSchema.parse(content.workModes)),
+    locationsJson: serializeJsonColumn(
+      parseJsonValue(content.locations, stringListSchema, 'career_preferences.locations_json'),
+    ),
+    workModesJson: serializeJsonColumn(
+      parseJsonValue(content.workModes, stringListSchema, 'career_preferences.work_modes_json'),
+    ),
     availability: content.availability,
     compensationJson:
       content.compensation === null
         ? null
-        : serializeJsonColumn(compensationSchema.parse(content.compensation)),
+        : serializeJsonColumn(
+            parseJsonValue(
+              content.compensation,
+              compensationSchema,
+              'career_preferences.compensation_json',
+            ),
+          ),
     notes: content.notes,
   }
 }

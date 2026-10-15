@@ -30,6 +30,7 @@ import {
   parseExtensionLines,
   resolveFieldValue,
 } from '../../src/lib/career/form-input'
+import { truthfulnessView } from '../../src/lib/career/json-schemas'
 import { loadCareerDataFromDatabase } from '../../src/lib/career-data'
 import { migratedDatabase } from '../support/sqlite'
 
@@ -87,7 +88,7 @@ describe('career data read model', () => {
       expect(view.candidate?.careerBreak?.datePrecision).toBe('month')
       expect(view.candidate?.careerBreak?.startDate).toBe('2024-02')
       expect(view.candidate?.authorization?.requiresSponsorship).toBe(false)
-      expect(view.candidate?.truthfulness?.requireAccurateDates).toBe(true)
+      expect(truthfulnessView(view.candidate?.truthfulness).flags?.requireAccurateDates).toBe(true)
     } finally {
       sqlite.close()
     }

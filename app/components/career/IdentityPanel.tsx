@@ -1,6 +1,7 @@
 import type { Child } from 'hono/jsx'
 import type { CareerCandidateRecord } from '../../../src/db/career-facts'
 import { formatFieldValue } from '../../../src/lib/career/form-input'
+import { truthfulnessView } from '../../../src/lib/career/json-schemas'
 import { EmptyState } from '../ui/EmptyState'
 import { httpUrl } from './helpers'
 
@@ -37,6 +38,7 @@ export function IdentityPanel({
   extensions: Record<string, unknown> | null
   oob?: boolean
 }) {
+  const truthfulness = truthfulnessView(candidate?.truthfulness)
   const contact: Array<[string, Child]> = candidate
     ? [
         ['Full name', candidate.fullName],
@@ -137,21 +139,27 @@ export function IdentityPanel({
 
             <div>
               <h3 class="text-sm font-semibold">Truthfulness rules</h3>
-              {candidate.truthfulness ? (
+              {truthfulness.shape === 'rules' ? (
+                <ul class="list-disc pl-5 text-sm text-base-content/80">
+                  {truthfulness.rules.map((rule) => (
+                    <li key={rule}>{rule}</li>
+                  ))}
+                </ul>
+              ) : truthfulness.flags ? (
                 <div class="flex flex-wrap gap-1">
                   <span class="badge badge-outline badge-sm whitespace-nowrap">
                     Never claim an unexperienced skill:{' '}
-                    {ruleState(candidate.truthfulness.neverClaimUnexperiencedSkill)}
+                    {ruleState(truthfulness.flags.neverClaimUnexperiencedSkill)}
                   </span>
                   <span class="badge badge-outline badge-sm whitespace-nowrap">
-                    Require accurate dates: {ruleState(candidate.truthfulness.requireAccurateDates)}
+                    Require accurate dates: {ruleState(truthfulness.flags.requireAccurateDates)}
                   </span>
                 </div>
               ) : (
                 <p class="text-sm text-base-content/60">Not recorded.</p>
               )}
-              {candidate.truthfulness?.notes ? (
-                <p class="mt-1 text-sm text-base-content/70">{candidate.truthfulness.notes}</p>
+              {truthfulness.flags?.notes ? (
+                <p class="mt-1 text-sm text-base-content/70">{truthfulness.flags.notes}</p>
               ) : null}
             </div>
 

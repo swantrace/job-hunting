@@ -182,25 +182,39 @@ export function IdentityForm({
 
         <fieldset class="fieldset">
           <legend class="fieldset-legend">Truthfulness rules</legend>
-          <CheckboxField
-            name="neverClaimUnexperiencedSkill"
-            label="Never claim a skill without experience"
-            checked={values.neverClaimUnexperiencedSkill === 'on'}
-            error={errors?.neverClaimUnexperiencedSkill?.[0]}
-          />
-          <CheckboxField
-            name="requireAccurateDates"
-            label="Require accurate dates"
-            checked={values.requireAccurateDates === 'on'}
-            error={errors?.requireAccurateDates?.[0]}
-          />
-          <TextareaField
-            name="truthfulnessNotes"
-            label="Rule notes"
-            value={values.truthfulnessNotes}
-            rows={3}
-            error={errors?.truthfulnessNotes?.[0]}
-          />
+          <input type="hidden" name="truthfulnessShape" value={values.truthfulnessShape} />
+          {values.truthfulnessShape === 'rules' ? (
+            <TextareaField
+              name="truthfulnessRules"
+              label="Rules (one per line)"
+              value={values.truthfulnessRules}
+              rows={5}
+              help="Each line is one truthfulness rule, kept in the order you write them."
+              error={errors?.truthfulnessRules?.[0]}
+            />
+          ) : (
+            <>
+              <CheckboxField
+                name="neverClaimUnexperiencedSkill"
+                label="Never claim a skill without experience"
+                checked={values.neverClaimUnexperiencedSkill === 'on'}
+                error={errors?.neverClaimUnexperiencedSkill?.[0]}
+              />
+              <CheckboxField
+                name="requireAccurateDates"
+                label="Require accurate dates"
+                checked={values.requireAccurateDates === 'on'}
+                error={errors?.requireAccurateDates?.[0]}
+              />
+              <TextareaField
+                name="truthfulnessNotes"
+                label="Rule notes"
+                value={values.truthfulnessNotes}
+                rows={3}
+                error={errors?.truthfulnessNotes?.[0]}
+              />
+            </>
+          )}
         </fieldset>
 
         <fieldset class="fieldset">

@@ -16,7 +16,13 @@ import type { CareerSkillInput, CareerSkillUpdateInput } from '../../db/career-s
 import type { CareerStateExtensionRecords } from '../../db/career-state'
 import { documentDraftPolicy } from '../document-draft-policy'
 import type { FieldErrors } from '../validation'
-import { type Compensation, extensionObjectOrNull, type GenerationRules } from './json-schemas'
+import {
+  type Compensation,
+  extensionObjectOrNull,
+  type GenerationRules,
+  type TruthfulnessRules,
+  truthfulnessView,
+} from './json-schemas'
 
 /**
  * Structured input for the career data tabs (identity, experience, education).
@@ -293,9 +299,14 @@ export const candidateFormSchema = z
     careerBreakEndDate: optionalText(10),
     careerBreakPrecision: precisionField,
     careerBreakReason: optionalText(2000),
+    truthfulnessShape: z.preprocess(
+      (value) => (value === 'rules' ? 'rules' : 'flags'),
+      z.enum(['rules', 'flags']),
+    ),
     neverClaimUnexperiencedSkill: checkbox,
     requireAccurateDates: checkbox,
     truthfulnessNotes: optionalText(2000),
+    truthfulnessRules: optionalText(4000),
     extensionFields: optionalText(4000),
     expectedRevision: revisionField,
   })
@@ -676,6 +687,31 @@ export type PublicationFormValues = z.infer<typeof publicationFormSchema>
 export type PortfolioTopicFormValues = z.infer<typeof portfolioTopicFormSchema>
 export type PreferencesFormValues = z.infer<typeof preferencesFormSchema>
 
+/**
+ * Rebuilds the truthfulness value in the shape the record already used. A rules
+ * list stays a list; the flag object stays an object; an empty result is null so
+ * clearing the field does not invent an empty rule.
+ */
+function truthfulnessInput(values: CandidateFormValues): TruthfulnessRules | null {
+  if (values.truthfulnessShape === 'rules') {
+    const rules = (values.truthfulnessRules ?? '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+    return rules.length > 0 ? rules : null
+  }
+  const flags = {
+    neverClaimUnexperiencedSkill: values.neverClaimUnexperiencedSkill,
+    requireAccurateDates: values.requireAccurateDates,
+    notes: values.truthfulnessNotes ?? null,
+  }
+  const hasFlag =
+    flags.neverClaimUnexperiencedSkill === true ||
+    flags.requireAccurateDates === true ||
+    (flags.notes !== null && flags.notes !== '')
+  return hasFlag ? flags : null
+}
+
 export function candidateInput(values: CandidateFormValues): CareerCandidateInput {
   const authorization = {
     workAuthorization: values.workAuthorization ?? null,
@@ -703,11 +739,7 @@ export function candidateInput(values: CandidateFormValues): CareerCandidateInpu
             datePrecision: values.careerBreakPrecision,
             reason: values.hasCareerBreak === 'yes' ? (values.careerBreakReason ?? null) : null,
           },
-    truthfulness: {
-      neverClaimUnexperiencedSkill: values.neverClaimUnexperiencedSkill,
-      requireAccurateDates: values.requireAccurateDates,
-      notes: values.truthfulnessNotes ?? null,
-    },
+    truthfulness: truthfulnessInput(values),
   }
 }
 
@@ -945,6 +977,7 @@ export function candidateFormValues(
   candidate: (CareerCandidateInput & { revision?: number }) | null,
   extensions: unknown,
 ): Record<string, string> {
+  const truthfulness = truthfulnessView(candidate?.truthfulness)
   return {
     fullName: candidate?.fullName ?? '',
     email: candidate?.email ?? '',
@@ -971,11 +1004,11 @@ export function candidateFormValues(
     careerBreakEndDate: candidate?.careerBreak?.endDate ?? '',
     careerBreakPrecision: candidate?.careerBreak?.datePrecision ?? 'day',
     careerBreakReason: candidate?.careerBreak?.reason ?? '',
-    neverClaimUnexperiencedSkill: checkboxValue(
-      candidate?.truthfulness?.neverClaimUnexperiencedSkill,
-    ),
-    requireAccurateDates: checkboxValue(candidate?.truthfulness?.requireAccurateDates),
-    truthfulnessNotes: candidate?.truthfulness?.notes ?? '',
+    truthfulnessShape: truthfulness.shape,
+    neverClaimUnexperiencedSkill: checkboxValue(truthfulness.flags?.neverClaimUnexperiencedSkill),
+    requireAccurateDates: checkboxValue(truthfulness.flags?.requireAccurateDates),
+    truthfulnessNotes: truthfulness.flags?.notes ?? '',
+    truthfulnessRules: truthfulness.rules.join('\n'),
     extensionFields: formatExtensionLines(extensions),
     expectedRevision: String(candidate?.revision ?? 0),
   }
