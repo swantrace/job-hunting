@@ -43,9 +43,15 @@ describe('canonical skill storage', () => {
         .all()
         .map((row) => String((row as { name: string }).name))
       expect(tables).toContain('skills')
-      expect(tables).toContain('job_requirements_to_skills')
+      expect(tables).toContain('job_requirement_skill_mentions')
       expect(tables).toContain('job_postings')
       expect(tables).not.toContain('job_applications_to_skills')
+      // Migration 0027 turned the duplicate junction into a read-only view.
+      expect(
+        sqlite
+          .query("SELECT type FROM sqlite_master WHERE name = 'job_requirements_to_skills'")
+          .get(),
+      ).toEqual({ type: 'view' })
     } finally {
       sqlite.close()
     }
@@ -143,7 +149,12 @@ describe('canonical skill storage', () => {
         .query("SELECT name FROM sqlite_master WHERE type = 'table'")
         .all()
         .map((row) => String((row as { name: string }).name))
-      expect(tables).toContain('job_requirements_to_skills')
+      expect(tables).toContain('job_requirement_skill_mentions')
+      expect(
+        sqlite
+          .query("SELECT type FROM sqlite_master WHERE name = 'job_requirements_to_skills'")
+          .get(),
+      ).toEqual({ type: 'view' })
       expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
       expect(sqlite.query('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
     } finally {

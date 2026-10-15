@@ -1,6 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { asc } from 'drizzle-orm'
 import { z } from 'zod'
+import { db } from '../../db/client'
+import { skillCategories } from '../../db/schema'
+import type { DbExecutor } from '../../db/skill-queries'
 
 const keySchema = z
   .string()
@@ -56,6 +60,11 @@ export type SkillCategoryDefinition = z.infer<typeof categorySchema>
 export type SkillTaxonomy = z.infer<typeof taxonomySchema>
 export type SkillCategory = string
 
+/**
+ * Import-only file resolution for `skill-taxonomy.json`. The Step 3 importer and
+ * the retired Step 12 taxonomy sync CLI read the file on purpose; the runtime
+ * reads `skill_categories` from the database instead.
+ */
 function taxonomyPath() {
   const configuredDirectory = process.env.CAREER_DATA_DIR?.trim()
   if (configuredDirectory) {
@@ -87,26 +96,50 @@ function taxonomyPath() {
   return path
 }
 
+export function parseSkillTaxonomy(json: unknown): SkillTaxonomy {
+  return taxonomySchema.parse(json)
+}
+
+/** Import-only taxonomy file reader, used by the importer and sync CLIs. */
 export function loadSkillTaxonomy(): SkillTaxonomy {
-  return taxonomySchema.parse(JSON.parse(readFileSync(taxonomyPath(), 'utf8')))
+  return parseSkillTaxonomy(JSON.parse(readFileSync(taxonomyPath(), 'utf8')))
 }
 
-export function skillCategoryDefinitions(): SkillCategoryDefinition[] {
-  return [...loadSkillTaxonomy().categories].sort((left, right) => left.sortOrder - right.sortOrder)
+/**
+ * The database-owned category vocabulary. `skill_categories` is authoritative at
+ * runtime; the JSON taxonomy is only an import source. An empty database yields
+ * an empty vocabulary (onboarding), never an error.
+ */
+export function skillCategoryDefinitions(executor: DbExecutor = db): SkillCategoryDefinition[] {
+  return executor
+    .select({
+      key: skillCategories.key,
+      label: skillCategories.label,
+      sortOrder: skillCategories.sortOrder,
+    })
+    .from(skillCategories)
+    .orderBy(asc(skillCategories.sortOrder), asc(skillCategories.key))
+    .all()
 }
 
-export function skillCategoryKeys(): string[] {
-  return skillCategoryDefinitions().map((category) => category.key)
+export function skillCategoryKeys(executor: DbExecutor = db): string[] {
+  return skillCategoryDefinitions(executor).map((category) => category.key)
 }
 
-export function hasSkillCategory(category: string): boolean {
-  return skillCategoryKeys().includes(category)
+export function hasSkillCategory(category: string, executor: DbExecutor = db): boolean {
+  return skillCategoryKeys(executor).includes(category)
 }
 
-export function skillCategoryLabel(category: string): string | undefined {
-  return skillCategoryDefinitions().find((item) => item.key === category)?.label
+export function skillCategoryLabel(
+  category: string,
+  executor: DbExecutor = db,
+): string | undefined {
+  return skillCategoryDefinitions(executor).find((item) => item.key === category)?.label
 }
 
-export function skillCategorySortOrder(category: string): number | undefined {
-  return skillCategoryDefinitions().find((item) => item.key === category)?.sortOrder
+export function skillCategorySortOrder(
+  category: string,
+  executor: DbExecutor = db,
+): number | undefined {
+  return skillCategoryDefinitions(executor).find((item) => item.key === category)?.sortOrder
 }

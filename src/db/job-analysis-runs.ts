@@ -4,10 +4,11 @@ import { type JobAnalysis, jobAnalysisSchemaVersion } from '../ai/schemas/job-an
 import type { ParsedJobResult } from '../lib/ai'
 import { type AnalysisRunState, classifyAnalysisRunState } from '../lib/analysis-run-state'
 import { nowISO, todayISO } from '../lib/date'
+import { frozenSuppliedCatalog } from '../lib/job-analysis-input'
+import type { CareerDb } from './career-shared'
 import type { db } from './client'
 import { persistJobRequirements } from './job-analysis'
 import { type JobPostingAnalysis, jobApplications, jobPostingAnalyses, jobPostings } from './schema'
-import { type DbExecutor } from './skill-queries'
 
 export type JobAnalysisDb = Pick<
   typeof db,
@@ -164,7 +165,15 @@ export function completeJobAnalysisRun(db: JobAnalysisDb, runId: number, parsed:
       .where(eq(jobApplications.id, posting.jobApplicationId))
       .run()
 
-    persistJobRequirements(tx, runId, analysis.requirements, date)
+    // Resolve against the catalog already frozen for this run, so persistence
+    // and the paid prompt can never disagree about what was supplied.
+    persistJobRequirements(
+      tx,
+      runId,
+      analysis.requirements,
+      date,
+      frozenSuppliedCatalog(run.frozenInputJson),
+    )
   })
 }
 
@@ -184,7 +193,7 @@ export type CompletedJobAnalysisInput = {
  * identity. No LLM is called; the reviewed draft already produced the validated
  * analysis.
  */
-export function persistCompletedJobAnalysis(tx: DbExecutor, input: CompletedJobAnalysisInput) {
+export function persistCompletedJobAnalysis(tx: CareerDb, input: CompletedJobAnalysisInput) {
   const analysis = input.analysis
   const saved = tx
     .insert(jobPostingAnalyses)
@@ -204,7 +213,13 @@ export function persistCompletedJobAnalysis(tx: DbExecutor, input: CompletedJobA
     .returning()
     .get()
   if (analysis.requirements.length) {
-    persistJobRequirements(tx, saved.id, analysis.requirements, input.date)
+    persistJobRequirements(
+      tx,
+      saved.id,
+      analysis.requirements,
+      input.date,
+      frozenSuppliedCatalog(input.frozenInputJson),
+    )
   }
   return saved
 }

@@ -23,6 +23,10 @@ export type InputFieldProps = FieldBaseProps & {
   dataPrimaryInput?: boolean
 }
 
+export type CheckboxFieldProps = FieldBaseProps & {
+  checked?: boolean
+}
+
 export type SelectFieldProps = FieldBaseProps & {
   multiple?: boolean
   children: Child

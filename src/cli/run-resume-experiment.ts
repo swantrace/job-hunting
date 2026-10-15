@@ -1,5 +1,7 @@
+import '../db/cli-database'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { extname, resolve } from 'node:path'
+import { loadApprovedBaseResume } from '../lib/base-resumes'
 import { loadCareerData } from '../lib/career-data'
 import {
   basicResumeMetrics,
@@ -22,7 +24,7 @@ const defaultBaselinePrompt =
 
 type Options = {
   jdPath?: string
-  baseResumePath: string
+  baseResumePath?: string
   direction: string
   methods: ResumeExperimentMethod[]
   model: string
@@ -35,13 +37,14 @@ type Options = {
 function usage() {
   return `Usage: bun run resume:experiment -- [options]
 
-Required:
-  --base-resume <path>         Base resume as PDF, Markdown, or text
-
 Options:
+  --base-resume <path>         Base resume as PDF, Markdown, or text. Optional:
+                               defaults to the direction's selected approved
+                               Base Resume in the database.
   --jd <path>                  Job description text file. When omitted, runs the
                                the three baseline methods only.
   --direction <id>             Career direction (default: fullstack)
+  --database <path>            SQLite database (required; or set DB_FILE_NAME)
   --methods <csv>              Methods to run (default: all)
                                ${resumeExperimentMethods.join(', ')}
   --model <id>                 Model (default: RESUME_EXPERIMENT_MODEL,
@@ -91,7 +94,9 @@ export function parseOptions(args: string[]): Options {
     if (option === '--jd') jdPath = resolve(projectRoot, value)
     else if (option === '--base-resume') baseResumePath = resolve(projectRoot, value)
     else if (option === '--direction') direction = value
-    else if (option === '--model') model = value
+    else if (option === '--database') {
+      // Resolved and applied to DB_FILE_NAME by src/db/cli-database on import.
+    } else if (option === '--model') model = value
     else if (option === '--name') name = value
     else if (option === '--output') outputRoot = resolve(projectRoot, value)
     else if (option === '--prompt') originalPrompt = value
@@ -106,9 +111,9 @@ export function parseOptions(args: string[]): Options {
     } else throw new Error(`Unknown option: ${option}`)
   }
 
-  if (!baseResumePath) throw new Error('--base-resume is required.')
   if (jdPath && !existsSync(jdPath)) throw new Error(`JD file does not exist: ${jdPath}`)
-  if (!existsSync(baseResumePath)) throw new Error(`Base resume does not exist: ${baseResumePath}`)
+  if (baseResumePath && !existsSync(baseResumePath))
+    throw new Error(`Base resume does not exist: ${baseResumePath}`)
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(direction))
     throw new Error(`Invalid direction: ${direction}`)
   if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(model)) throw new Error(`Invalid model: ${model}`)
@@ -124,7 +129,7 @@ export function parseOptions(args: string[]): Options {
   }
   return {
     jdPath: jdPath || undefined,
-    baseResumePath,
+    baseResumePath: baseResumePath || undefined,
     direction,
     methods,
     model,
@@ -175,17 +180,35 @@ async function createResponse(apiKey: string, model: string, instructions: strin
   return (await response.json()) as ResponsePayload
 }
 
+/**
+ * The Base Resume for an experiment comes from the database by default: the
+ * direction's selected approved version. An explicit `--base-resume <path>` is
+ * still honored so a candidate file can be compared without importing it.
+ */
+function resolveBaseResume(options: Options, directionIds: ReadonlySet<string>) {
+  if (options.baseResumePath) return readExperimentDocument(options.baseResumePath)
+  const approved = loadApprovedBaseResume(options.direction, directionIds)
+  if (!approved)
+    throw new Error(
+      `Direction "${options.direction}" has no approved Base Resume in the database. ` +
+        'Approve one in Career Data, or pass --base-resume <path>.',
+    )
+  return Promise.resolve(approved.text)
+}
+
 export async function main(args = process.argv.slice(2)) {
   const options = parseOptions(args)
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!options.dryRun && !apiKey)
     throw new Error('OPENAI_API_KEY is required for a live experiment.')
 
+  const careerData = loadCareerData()
+  const directionIds = new Set(Object.keys(careerData.preferences.directionDefinitions))
+  const careerContext = canonicalCareerContext(careerData, options.direction)
   const [jd, baseResume] = await Promise.all([
     options.jdPath ? readExperimentDocument(options.jdPath) : Promise.resolve(''),
-    readExperimentDocument(options.baseResumePath),
+    resolveBaseResume(options, directionIds),
   ])
-  const careerContext = canonicalCareerContext(loadCareerData(), options.direction)
   const outputDirectory = resolve(options.outputRoot, options.name)
   if (existsSync(outputDirectory)) throw new Error(`Output already exists: ${outputDirectory}`)
   mkdirSync(outputDirectory, { recursive: true })

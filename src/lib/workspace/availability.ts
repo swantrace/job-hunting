@@ -3,14 +3,16 @@ import { db } from '../../db/client'
 import { getGenerationState } from '../../db/generation'
 import { getJobAnalysisState } from '../../db/job-analysis-runs'
 import { getApplication } from '../../db/queries'
+import { careerOnboardingRequired } from '../application-readiness'
 import { getCandidateAnalysisState } from '../candidate-analysis'
 import { currentJobAnalysisHash } from '../job-analysis-input'
 import type { WorkspaceAvailability } from './state'
 
 /**
- * Computes the current workspace progression state from live run history.
- * Current inputs are compared lazily here so career-data file updates
- * are detected on every workspace/readiness load.
+ * Computes the current workspace progression state from live run history and
+ * the database-owned career facts. Current inputs are compared lazily here so
+ * career changes are detected on every workspace/readiness load, and an empty
+ * career database reports onboarding rather than throwing.
  */
 export function computeWorkspaceAvailability(jobId: number): WorkspaceAvailability {
   const job = getApplication(jobId)
@@ -22,6 +24,7 @@ export function computeWorkspaceAvailability(jobId: number): WorkspaceAvailabili
   const current = candidateState.currentCompleted
   const reviewReady = !!current && !hasPendingRunDecisions(db, current.id)
   return {
+    careerDataReady: !careerOnboardingRequired(),
     jobAnalysisCurrent: !!jobState?.currentCompleted,
     reviewReady,
     hasHistoricalReview: candidateState.latestCompleted !== null,

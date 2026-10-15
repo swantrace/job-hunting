@@ -1,4 +1,5 @@
 import type { Queue, Worker } from 'bunqueue/client'
+import { db } from '../db/client'
 import {
   completeBaselineGenerationRun,
   completeGenerationRun,
@@ -124,16 +125,21 @@ export async function startGenerationWorker() {
 }
 
 export async function enqueueGeneration(jobApplicationId: number) {
-  const built = buildGenerationInput(jobApplicationId)
-  if (!built) return null
-  const run = createGenerationRun({
-    applicationAnalysisRunId: built.snapshot.candidateAnalysisRunId,
-    inputHash: built.inputHash,
-    frozenInputJson: JSON.stringify(built.snapshot),
-    resumeModel: built.snapshot.resumeModel,
-    coverLetterModel: built.snapshot.coverLetterModel,
-    promptVersion: built.snapshot.generationPromptVersion,
-    schemaVersion: built.snapshot.generationSchemaVersion,
+  // Build the identity AND freeze the exact drafting input in one read
+  // transaction, so a queued run drafts from what the user reviewed even if
+  // career facts change before the worker starts.
+  const run = db.transaction(() => {
+    const built = buildGenerationInput(jobApplicationId)
+    if (!built) return null
+    return createGenerationRun({
+      applicationAnalysisRunId: built.snapshot.candidateAnalysisRunId,
+      inputHash: built.inputHash,
+      frozenInputJson: JSON.stringify(built.snapshot),
+      resumeModel: built.snapshot.resumeModel,
+      coverLetterModel: built.snapshot.coverLetterModel,
+      promptVersion: built.snapshot.generationPromptVersion,
+      schemaVersion: built.snapshot.generationSchemaVersion,
+    })
   })
   if (!run) return null
   const persistentQueue = await getQueue()

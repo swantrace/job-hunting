@@ -1,7 +1,4 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { resolve } from 'node:path'
 import { baseResumeTextHash } from '../../src/lib/base-resumes'
 import {
   baseResumeIdentity,
@@ -9,51 +6,18 @@ import {
   buildBaselineDocumentDraftSnapshot,
   buildDocumentDraftSnapshot,
 } from '../../src/lib/document-draft-input'
+import { approvedBaseResumeMarkdown } from '../career/fixtures'
+import { type CareerTestDatabase, careerTestDatabase } from '../support/career-db'
 
-const baseResumeText = '# Candidate\n\n## Summary\n\nSenior engineer.\n'
-
-let fixtureRoot = ''
-let baseResumesDir = ''
-const previous = {
-  data: process.env.CAREER_DATA_DIR,
-  base: process.env.CAREER_BASE_RESUMES_DIR,
-}
+let database: CareerTestDatabase
 
 beforeAll(() => {
-  fixtureRoot = mkdtempSync(resolve(tmpdir(), 'job-tracker-draft-input-'))
-  baseResumesDir = resolve(fixtureRoot, 'base-resumes')
-  process.env.CAREER_DATA_DIR = resolve(process.cwd(), 'career-data.example')
-  process.env.CAREER_BASE_RESUMES_DIR = baseResumesDir
-  mkdirSync(baseResumesDir, { recursive: true })
-  writeFileSync(
-    resolve(baseResumesDir, 'manifest.json'),
-    `${JSON.stringify({
-      schemaVersion: 1,
-      lastUpdated: '2026-08-31',
-      resumes: [
-        {
-          direction: 'fullstack',
-          fileName: 'fullstack.md',
-          version: 'v1',
-          approvedAt: '2026-08-31',
-          sha256: baseResumeTextHash(baseResumeText),
-        },
-      ],
-    })}\n`,
-  )
-  writeFileSync(resolve(baseResumesDir, 'fullstack.md'), baseResumeText)
+  database = careerTestDatabase()
 })
 
 afterAll(() => {
-  rmSync(fixtureRoot, { force: true, recursive: true })
-  restoreEnv('CAREER_DATA_DIR', previous.data)
-  restoreEnv('CAREER_BASE_RESUMES_DIR', previous.base)
+  database.cleanup()
 })
-
-function restoreEnv(name: string, value: string | undefined) {
-  if (value === undefined) delete process.env[name]
-  else process.env[name] = value
-}
 
 const applicationSource = {
   application: {
@@ -100,10 +64,10 @@ const applicationSource = {
 describe('base-grounded document draft input', () => {
   test('exposes Base Resume identity for freshness without a filesystem path', () => {
     const identity = baseResumeIdentity('fullstack')
-    expect(identity.baseResumeHash).toBe(baseResumeTextHash(baseResumeText))
+    expect(identity.baseResumeHash).toBe(baseResumeTextHash(approvedBaseResumeMarkdown))
     expect(identity.baseResumeVersion).toBe('v1')
     expect(baseResumeIdentity('fhir')).toEqual({ baseResumeHash: null, baseResumeVersion: null })
-    expect(baseResumeSourceFor('fullstack')?.text).toContain('Senior engineer')
+    expect(baseResumeSourceFor('fullstack')?.text).toContain('Synthetic approved Base Resume')
   })
 
   test('application snapshot combines JD, metadata, decisions, and complete safe career data', () => {

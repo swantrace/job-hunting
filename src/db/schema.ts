@@ -7,6 +7,7 @@ import {
   primaryKey,
   real,
   sqliteTable,
+  sqliteView,
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
@@ -79,7 +80,6 @@ export const skills = sqliteTable(
     uniqueIndex('skills_key_unique_idx').on(table.key),
     index('skills_review_status_idx').on(table.reviewStatus),
     index('skills_category_idx').on(table.category),
-    index('skills_origin_idx').on(table.origin),
     index('skills_merged_into_idx').on(table.mergedIntoSkillId),
     check(
       'skills_review_status_check',
@@ -128,7 +128,6 @@ export const contacts = sqliteTable(
     updatedAt: text('updated_at').notNull(),
   },
   (table) => [
-    index('contacts_company_idx').on(table.companyId),
     uniqueIndex('contacts_company_email_nocase_idx').on(
       table.companyId,
       sql`lower(${table.email})`,
@@ -173,7 +172,6 @@ export const jobApplications = sqliteTable(
       'apply_today_target_check',
       sql`${table.status} != 'Apply Today' or ${table.applyTodayTargetDate} is not null`,
     ),
-    index('jobs_status_idx').on(table.status),
     index('jobs_priority_idx').on(table.priority),
     index('jobs_company_idx').on(table.companyId),
     index('jobs_posted_date_idx').on(table.postedDate),
@@ -268,7 +266,6 @@ export const jobRequirements = sqliteTable(
       table.jobPostingAnalysisId,
       table.sequence,
     ),
-    index('job_requirements_analysis_idx').on(table.jobPostingAnalysisId),
     index('job_requirements_type_idx').on(table.requirementType),
     index('job_requirements_importance_idx').on(table.importance),
     check('job_requirements_sequence_check', sql`${table.sequence} > 0`),
@@ -295,26 +292,19 @@ export const jobRequirements = sqliteTable(
   ],
 )
 
-export const jobRequirementsToSkills = sqliteTable(
-  'job_requirements_to_skills',
-  {
-    jobRequirementId: integer('job_requirement_id')
-      .notNull()
-      .references(() => jobRequirements.id, { onDelete: 'cascade' }),
-    skillId: integer('skill_id')
-      .notNull()
-      .references(() => skills.id, { onDelete: 'restrict' }),
-    rawLabel: text('raw_label'),
-    confidence: real('confidence'),
-  },
-  (table) => [
-    primaryKey({ columns: [table.jobRequirementId, table.skillId] }),
-    check(
-      'job_requirements_to_skills_confidence_check',
-      sql`${table.confidence} is null or (${table.confidence} >= 0 and ${table.confidence} <= 1)`,
-    ),
-  ],
-)
+/**
+ * Requirement-to-skill mapping is derived from the mention that owns it.
+ * Migration 0027 replaced the physical duplicate table with this read-only
+ * view, so mapping writes only ever touch `job_requirement_skill_mentions`:
+ * `raw_label` mirrors the mention's `raw_term` and `confidence` is extracted
+ * from its `occurrences_json`.
+ */
+export const jobRequirementsToSkills = sqliteView('job_requirements_to_skills', {
+  jobRequirementId: integer('job_requirement_id').notNull(),
+  skillId: integer('skill_id').notNull(),
+  rawLabel: text('raw_label'),
+  confidence: real('confidence'),
+}).existing()
 
 export const applicationAnalysisRuns = sqliteTable(
   'application_analysis_runs',
@@ -376,7 +366,6 @@ export const analysisRunDecisions = sqliteTable(
       table.applicationAnalysisRunId,
       table.skillId,
     ),
-    index('analysis_run_decisions_run_idx').on(table.applicationAnalysisRunId),
     check(
       'analysis_run_decisions_decision_check',
       sql`${table.decision} in ('pending', 'skip', 'include')`,
@@ -388,18 +377,37 @@ export const analysisRunDecisions = sqliteTable(
   ],
 )
 
+/**
+ * One row per document-generation attempt, for both pipelines. `kind`
+ * discriminates an application run (which carries the candidate-analysis FK)
+ * from a baseline run (which stores its `{ direction, targetTitle,
+ * targetKeywords }` descriptor in `baseline_json` and has no analysis run).
+ * The former 1:1 result and evidence-snapshot side tables are folded into
+ * columns here.
+ */
 export const generationRuns = sqliteTable(
   'generation_runs',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
-    applicationAnalysisRunId: integer('application_analysis_run_id')
-      .notNull()
-      .references(() => applicationAnalysisRuns.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull().default('application'),
+    applicationAnalysisRunId: integer('application_analysis_run_id').references(
+      () => applicationAnalysisRuns.id,
+      { onDelete: 'cascade' },
+    ),
+    inputHash: text('input_hash'),
+    frozenInputJson: text('frozen_input_json'),
+    baselineJson: text('baseline_json'),
+    evidenceSnapshotJson: text('evidence_snapshot_json'),
+    resumeJson: text('resume_json'),
+    coverLetterJson: text('cover_letter_json'),
+    atsAuditJson: text('ats_audit_json'),
+    resumeMarkdown: text('resume_markdown'),
+    coverLetterMarkdown: text('cover_letter_markdown'),
+    draftValidationJson: text('draft_validation_json'),
+    rendererVersion: text('renderer_version'),
     status: text('status', { enum: runStatuses }).notNull().default('Queued'),
     queueJobId: text('queue_job_id').notNull(),
     attempts: integer('attempts').notNull().default(0),
-    inputHash: text('input_hash'),
-    frozenInputJson: text('frozen_input_json'),
     resumeModel: text('resume_model'),
     coverLetterModel: text('cover_letter_model'),
     promptVersion: text('prompt_version'),
@@ -411,9 +419,18 @@ export const generationRuns = sqliteTable(
     completedAt: text('completed_at'),
   },
   (table) => [
+    check('generation_runs_kind_check', sql`${table.kind} in ('application','baseline')`),
     check(
       'generation_runs_status_check',
       sql`${table.status} in ('Queued', 'Processing', 'Completed', 'Failed')`,
+    ),
+    check(
+      'generation_runs_completed_check',
+      sql`${table.status} != 'Completed' or ${table.completedAt} is not null`,
+    ),
+    check(
+      'generation_runs_kind_source_check',
+      sql`(${table.kind} = 'application' and ${table.applicationAnalysisRunId} is not null) or (${table.kind} = 'baseline' and ${table.applicationAnalysisRunId} is null)`,
     ),
     uniqueIndex('generation_runs_queue_job_unique_idx').on(table.queueJobId),
     index('generation_runs_analysis_created_idx').on(
@@ -421,9 +438,10 @@ export const generationRuns = sqliteTable(
       table.createdAt,
     ),
     index('generation_runs_status_idx').on(table.status),
+    index('generation_runs_kind_idx').on(table.kind),
     uniqueIndex('generation_runs_inflight_unique_idx')
       .on(table.applicationAnalysisRunId, table.inputHash)
-      .where(sql`${table.status} in ('Queued', 'Processing')`),
+      .where(sql`${table.status} in ('Queued', 'Processing') and ${table.kind} = 'application'`),
   ],
 )
 
@@ -461,37 +479,6 @@ export const googleDriveConnections = sqliteTable('google_drive_connections', {
   updatedAt: text('updated_at').notNull(),
 })
 
-export const generationEvidenceSnapshots = sqliteTable(
-  'generation_evidence_snapshots',
-  {
-    generationRunId: integer('generation_run_id')
-      .primaryKey()
-      .references(() => generationRuns.id, { onDelete: 'cascade' }),
-    snapshotJson: text('snapshot_json').notNull(),
-    createdAt: text('created_at').notNull(),
-  },
-  (table) => [],
-)
-
-export const generationRunResults = sqliteTable(
-  'generation_run_results',
-  {
-    generationRunId: integer('generation_run_id')
-      .primaryKey()
-      .references(() => generationRuns.id, { onDelete: 'cascade' }),
-    resumeJson: text('resume_json'),
-    coverLetterJson: text('cover_letter_json'),
-    atsAuditJson: text('ats_audit_json'),
-    resumeMarkdown: text('resume_markdown'),
-    coverLetterMarkdown: text('cover_letter_markdown'),
-    draftValidationJson: text('draft_validation_json'),
-    rendererVersion: text('renderer_version'),
-    createdAt: text('created_at').notNull(),
-    updatedAt: text('updated_at').notNull(),
-  },
-  (table) => [],
-)
-
 export const documentReviews = sqliteTable(
   'document_reviews',
   {
@@ -524,82 +511,6 @@ export const documentReviews = sqliteTable(
   ],
 )
 
-export const baselineGenerationRuns = sqliteTable(
-  'baseline_generation_runs',
-  {
-    id: integer('id').primaryKey({ autoIncrement: true }),
-    direction: text('direction').notNull(),
-    targetTitle: text('target_title').notNull(),
-    targetKeywords: text('target_keywords').notNull().default('[]'),
-    status: text('status', { enum: runStatuses }).notNull().default('Queued'),
-    queueJobId: text('queue_job_id').notNull(),
-    attempts: integer('attempts').notNull().default(0),
-    errorMessage: text('error_message'),
-    createdAt: text('created_at').notNull(),
-    updatedAt: text('updated_at').notNull(),
-    startedAt: text('started_at'),
-    completedAt: text('completed_at'),
-  },
-  (table) => [
-    check(
-      'baseline_generation_runs_status_check',
-      sql`${table.status} in ('Queued', 'Processing', 'Completed', 'Failed')`,
-    ),
-    uniqueIndex('baseline_generation_runs_queue_job_unique_idx').on(table.queueJobId),
-    index('baseline_generation_runs_direction_created_idx').on(table.direction, table.createdAt),
-    index('baseline_generation_runs_status_idx').on(table.status),
-  ],
-)
-
-export const baselineGeneratedArtifacts = sqliteTable(
-  'baseline_generated_artifacts',
-  {
-    id: integer('id').primaryKey({ autoIncrement: true }),
-    baselineGenerationRunId: integer('baseline_generation_run_id')
-      .notNull()
-      .references(() => baselineGenerationRuns.id, { onDelete: 'cascade' }),
-    type: text('type', { enum: generatedArtifactTypes }).notNull(),
-    fileName: text('file_name').notNull(),
-    filePath: text('file_path').notNull(),
-    mimeType: text('mime_type').notNull(),
-    createdAt: text('created_at').notNull(),
-  },
-  (table) => [
-    check('baseline_generated_artifacts_type_check', sql`${table.type} = 'resume'`),
-    uniqueIndex('baseline_generated_artifacts_run_type_unique_idx').on(
-      table.baselineGenerationRunId,
-      table.type,
-    ),
-  ],
-)
-
-export const baselineGenerationEvidenceSnapshots = sqliteTable(
-  'baseline_generation_evidence_snapshots',
-  {
-    baselineGenerationRunId: integer('baseline_generation_run_id')
-      .primaryKey()
-      .references(() => baselineGenerationRuns.id, { onDelete: 'cascade' }),
-    snapshotJson: text('snapshot_json').notNull(),
-    createdAt: text('created_at').notNull(),
-  },
-  (table) => [],
-)
-
-export const baselineGenerationResults = sqliteTable(
-  'baseline_generation_results',
-  {
-    baselineGenerationRunId: integer('baseline_generation_run_id')
-      .primaryKey()
-      .references(() => baselineGenerationRuns.id, { onDelete: 'cascade' }),
-    resumeMarkdown: text('resume_markdown'),
-    draftValidationJson: text('draft_validation_json'),
-    rendererVersion: text('renderer_version'),
-    createdAt: text('created_at').notNull(),
-    updatedAt: text('updated_at').notNull(),
-  },
-  (table) => [],
-)
-
 export const jobApplicationsToContacts = sqliteTable(
   'job_applications_to_contacts',
   {
@@ -609,17 +520,12 @@ export const jobApplicationsToContacts = sqliteTable(
     contactId: integer('contact_id')
       .notNull()
       .references(() => contacts.id, { onDelete: 'cascade' }),
-    relationshipType: text('relationship_type'),
-    isPrimary: integer('is_primary', { mode: 'boolean' }),
     notes: text('notes'),
     createdAt: text('created_at'),
   },
   (table) => [
     primaryKey({ columns: [table.jobApplicationId, table.contactId] }),
     index('job_applications_to_contacts_contact_idx').on(table.contactId),
-    uniqueIndex('job_applications_to_contacts_primary_unique_idx')
-      .on(table.jobApplicationId)
-      .where(sql`${table.isPrimary} = 1`),
   ],
 )
 
@@ -702,16 +608,507 @@ export const jobIntakeItems = sqliteTable(
   ],
 )
 
+// ---------------------------------------------------------------------------
+// Database-owned career facts (migrations 0026_career_facts.sql and
+// 0027_simplify_schema.sql). These definitions mirror those migrations exactly:
+// names, nullability, defaults, foreign keys, CHECK constraint names and
+// partial/unique indexes.
+// ---------------------------------------------------------------------------
+
+/**
+ * The single career-profile row (migration 0027 folded the old
+ * `career_candidate` and `career_preferences` singletons into this one table).
+ * Both the identity and the preference columns live here and share one
+ * `revision`, so a stale form for either half conflicts.
+ */
+export const careerProfile = sqliteTable(
+  'career_profile',
+  {
+    id: integer('id').primaryKey(),
+    fullName: text('full_name').notNull().default(''),
+    email: text('email'),
+    phone: text('phone'),
+    location: text('location'),
+    website: text('website'),
+    linkedinUrl: text('linkedin_url'),
+    githubUrl: text('github_url'),
+    authorizationJson: text('authorization_json'),
+    careerBreakJson: text('career_break_json'),
+    truthfulnessJson: text('truthfulness_json'),
+    locationsJson: text('locations_json').notNull().default('[]'),
+    workModesJson: text('work_modes_json').notNull().default('[]'),
+    availability: text('availability'),
+    compensationJson: text('compensation_json'),
+    notes: text('notes'),
+    revision: integer('revision').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    // Added by 0029: the profile singleton now owns the career-level authored
+    // fields the schema does not model (the old `career_state` archive) and the
+    // per-source-document root values, keyed by file name.
+    extensionJson: text('extension_json'),
+    documentsJson: text('documents_json'),
+  },
+  (table) => [
+    check('career_profile_singleton_check', sql`${table.id} = 1`),
+    check('career_profile_revision_check', sql`${table.revision} > 0`),
+  ],
+)
+
+export const careerDirections = sqliteTable(
+  'career_directions',
+  {
+    key: text('key').primaryKey(),
+    label: text('label').notNull(),
+    targetTitlesJson: text('target_titles_json').notNull().default('[]'),
+    rulesJson: text('rules_json'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    retiredAt: text('retired_at'),
+    revision: integer('revision').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    check('career_directions_key_check', sql`length(trim(${table.key})) > 0`),
+    check('career_directions_revision_check', sql`${table.revision} > 0`),
+    index('career_directions_sort_order_idx').on(table.sortOrder),
+  ],
+)
+
+export const careerEducation = sqliteTable(
+  'career_education',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    stableKey: text('stable_key').notNull(),
+    degree: text('degree').notNull(),
+    school: text('school').notNull(),
+    startDate: text('start_date'),
+    endDate: text('end_date'),
+    datePrecision: text('date_precision').notNull().default('day'),
+    displayDates: text('display_dates'),
+    year: integer('year'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    courseworkJson: text('coursework_json').notNull().default('[]'),
+    detailsJson: text('details_json'),
+    retiredAt: text('retired_at'),
+    revision: integer('revision').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
+  },
+  (table) => [
+    uniqueIndex('career_education_stable_key_unique_idx').on(table.stableKey),
+    index('career_education_sort_order_idx').on(table.sortOrder),
+    check(
+      'career_education_date_precision_check',
+      sql`${table.datePrecision} in ('day','month','year')`,
+    ),
+    check(
+      'career_education_year_check',
+      sql`${table.year} is null or (${table.year} >= 1900 and ${table.year} <= 2100)`,
+    ),
+    check('career_education_revision_check', sql`${table.revision} > 0`),
+  ],
+)
+
+export const careerExperiences = sqliteTable(
+  'career_experiences',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    stableKey: text('stable_key').notNull(),
+    company: text('company').notNull(),
+    role: text('role').notNull(),
+    employmentNature: text('employment_nature'),
+    startDate: text('start_date'),
+    endDate: text('end_date'),
+    datePrecision: text('date_precision').notNull().default('day'),
+    displayDates: text('display_dates'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    context: text('context'),
+    responsibilitiesJson: text('responsibilities_json').notNull().default('[]'),
+    extensionJson: text('extension_json'),
+    retiredAt: text('retired_at'),
+    revision: integer('revision').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('career_experiences_stable_key_unique_idx').on(table.stableKey),
+    index('career_experiences_sort_order_idx').on(table.sortOrder),
+    check(
+      'career_experiences_date_precision_check',
+      sql`${table.datePrecision} in ('day','month','year')`,
+    ),
+    check('career_experiences_revision_check', sql`${table.revision} > 0`),
+  ],
+)
+
+export const careerAchievements = sqliteTable(
+  'career_achievements',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    stableKey: text('stable_key').notNull(),
+    experienceId: integer('experience_id').references(() => careerExperiences.id, {
+      onDelete: 'set null',
+    }),
+    claim: text('claim').notNull(),
+    safeToUse: integer('safe_to_use', { mode: 'boolean' }).notNull().default(true),
+    evidenceJson: text('evidence_json').notNull().default('[]'),
+    evidenceNarrativesJson: text('evidence_narratives_json').notNull().default('[]'),
+    limitationsJson: text('limitations_json').notNull().default('[]'),
+    retiredAt: text('retired_at'),
+    revision: integer('revision').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
+  },
+  (table) => [
+    uniqueIndex('career_achievements_stable_key_unique_idx').on(table.stableKey),
+    index('career_achievements_experience_idx').on(table.experienceId),
+    check('career_achievements_safe_check', sql`${table.safeToUse} in (0,1)`),
+    check('career_achievements_revision_check', sql`${table.revision} > 0`),
+  ],
+)
+
+export const careerProjects = sqliteTable(
+  'career_projects',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    stableKey: text('stable_key').notNull(),
+    name: text('name').notNull(),
+    experienceId: integer('experience_id').references(() => careerExperiences.id, {
+      onDelete: 'set null',
+    }),
+    ownership: text('ownership'),
+    eligibility: text('eligibility').notNull().default('resume-eligible'),
+    completion: text('completion'),
+    urlsJson: text('urls_json').notNull().default('[]'),
+    safeWording: text('safe_wording'),
+    limitationsJson: text('limitations_json').notNull().default('[]'),
+    retiredAt: text('retired_at'),
+    revision: integer('revision').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
+  },
+  (table) => [
+    uniqueIndex('career_projects_stable_key_unique_idx').on(table.stableKey),
+    index('career_projects_experience_idx').on(table.experienceId),
+    check(
+      'career_projects_eligibility_check',
+      sql`${table.eligibility} in ('resume-eligible','not-eligible')`,
+    ),
+    check('career_projects_revision_check', sql`${table.revision} > 0`),
+  ],
+)
+
+export const careerStories = sqliteTable(
+  'career_stories',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    stableKey: text('stable_key').notNull(),
+    experienceId: integer('experience_id').references(() => careerExperiences.id, {
+      onDelete: 'set null',
+    }),
+    title: text('title').notNull(),
+    context: text('context'),
+    situation: text('situation'),
+    task: text('task'),
+    action: text('action'),
+    result: text('result'),
+    narrative: text('narrative'),
+    retiredAt: text('retired_at'),
+    revision: integer('revision').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
+  },
+  (table) => [
+    uniqueIndex('career_stories_stable_key_unique_idx').on(table.stableKey),
+    index('career_stories_experience_idx').on(table.experienceId),
+    check('career_stories_revision_check', sql`${table.revision} > 0`),
+  ],
+)
+
+export const careerPublications = sqliteTable(
+  'career_publications',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    stableKey: text('stable_key').notNull(),
+    title: text('title').notNull(),
+    citation: text('citation').notNull(),
+    year: integer('year').notNull(),
+    status: text('status').notNull(),
+    safeToUse: integer('safe_to_use', { mode: 'boolean' }).notNull().default(true),
+    experienceId: integer('experience_id').references(() => careerExperiences.id, {
+      onDelete: 'set null',
+    }),
+    authorsJson: text('authors_json').notNull().default('[]'),
+    authorListTruncated: integer('author_list_truncated', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    contributionsJson: text('contributions_json').notNull().default('[]'),
+    sourceUrlsJson: text('source_urls_json').notNull().default('[]'),
+    retiredAt: text('retired_at'),
+    revision: integer('revision').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
+  },
+  (table) => [
+    uniqueIndex('career_publications_stable_key_unique_idx').on(table.stableKey),
+    index('career_publications_experience_idx').on(table.experienceId),
+    check('career_publications_year_check', sql`${table.year} >= 1900 and ${table.year} <= 2100`),
+    check(
+      'career_publications_status_check',
+      sql`${table.status} in ('published','in-review','preprint','needs-verification')`,
+    ),
+    check('career_publications_safe_check', sql`${table.safeToUse} in (0,1)`),
+    check('career_publications_truncated_check', sql`${table.authorListTruncated} in (0,1)`),
+    check('career_publications_revision_check', sql`${table.revision} > 0`),
+  ],
+)
+
+export const careerSkills = sqliteTable(
+  'career_skills',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    skillId: integer('skill_id')
+      .notNull()
+      .references(() => skills.id, { onDelete: 'restrict' }),
+    level: text('level'),
+    resumeEligible: integer('resume_eligible', { mode: 'boolean' }).notNull().default(true),
+    explanation: text('explanation'),
+    notes: text('notes'),
+    evidenceJson: text('evidence_json').notNull().default('[]'),
+    retiredAt: text('retired_at'),
+    revision: integer('revision').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
+  },
+  (table) => [
+    uniqueIndex('career_skills_skill_unique_idx').on(table.skillId),
+    check('career_skills_resume_eligible_check', sql`${table.resumeEligible} in (0,1)`),
+    check('career_skills_revision_check', sql`${table.revision} > 0`),
+  ],
+)
+
+export const careerBaseResumes = sqliteTable(
+  'career_base_resumes',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    directionKey: text('direction_key')
+      .notNull()
+      .references(() => careerDirections.key, { onDelete: 'restrict' }),
+    version: text('version').notNull(),
+    status: text('status').notNull().default('draft'),
+    markdown: text('markdown').notNull(),
+    contentHash: text('content_hash').notNull(),
+    approvedAt: text('approved_at'),
+    revision: integer('revision').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    extensionJson: text('extension_json'),
+  },
+  (table) => [
+    uniqueIndex('career_base_resumes_direction_version_unique_idx').on(
+      table.directionKey,
+      table.version,
+    ),
+    uniqueIndex('career_base_resumes_approved_unique_idx')
+      .on(table.directionKey)
+      .where(sql`${table.status} = 'approved'`),
+    index('career_base_resumes_direction_status_idx').on(table.directionKey, table.status),
+    check(
+      'career_base_resumes_status_check',
+      sql`${table.status} in ('draft','approved','superseded')`,
+    ),
+    check(
+      'career_base_resumes_approved_at_check',
+      sql`${table.status} != 'approved' or ${table.approvedAt} is not null`,
+    ),
+    check('career_base_resumes_markdown_check', sql`length(trim(${table.markdown})) > 0`),
+    check('career_base_resumes_revision_check', sql`${table.revision} > 0`),
+  ],
+)
+
+export const careerAchievementSkills = sqliteTable(
+  'career_achievement_skills',
+  {
+    achievementId: integer('achievement_id')
+      .notNull()
+      .references(() => careerAchievements.id, { onDelete: 'cascade' }),
+    skillId: integer('skill_id')
+      .notNull()
+      .references(() => skills.id, { onDelete: 'restrict' }),
+    position: integer('position').notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.achievementId, table.skillId] })],
+)
+
+export const careerProjectSkills = sqliteTable(
+  'career_project_skills',
+  {
+    projectId: integer('project_id')
+      .notNull()
+      .references(() => careerProjects.id, { onDelete: 'cascade' }),
+    skillId: integer('skill_id')
+      .notNull()
+      .references(() => skills.id, { onDelete: 'restrict' }),
+    position: integer('position').notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.projectId, table.skillId] })],
+)
+
+export const careerPublicationProjects = sqliteTable(
+  'career_publication_projects',
+  {
+    publicationId: integer('publication_id')
+      .notNull()
+      .references(() => careerPublications.id, { onDelete: 'cascade' }),
+    projectId: integer('project_id')
+      .notNull()
+      .references(() => careerProjects.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.publicationId, table.projectId] })],
+)
+
+export const careerAchievementPublications = sqliteTable(
+  'career_achievement_publications',
+  {
+    achievementId: integer('achievement_id')
+      .notNull()
+      .references(() => careerAchievements.id, { onDelete: 'cascade' }),
+    publicationId: integer('publication_id')
+      .notNull()
+      .references(() => careerPublications.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull().default(0),
+  },
+  (table) => [primaryKey({ columns: [table.achievementId, table.publicationId] })],
+)
+
+/**
+ * One exclusive-arc junction for every record-to-direction link (migration
+ * 0027), replacing the five identical per-record tables. Exactly one record
+ * column is set (database CHECK) and the partial unique indexes keep each
+ * record's direction list unique. `position` preserves editorial order.
+ */
+export const careerRecordDirections = sqliteTable(
+  'career_record_directions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    directionKey: text('direction_key')
+      .notNull()
+      .references(() => careerDirections.key, { onDelete: 'restrict' }),
+    achievementId: integer('achievement_id').references(() => careerAchievements.id, {
+      onDelete: 'cascade',
+    }),
+    projectId: integer('project_id').references(() => careerProjects.id, { onDelete: 'cascade' }),
+    storyId: integer('story_id').references(() => careerStories.id, { onDelete: 'cascade' }),
+    publicationId: integer('publication_id').references(() => careerPublications.id, {
+      onDelete: 'cascade',
+    }),
+    position: integer('position').notNull().default(0),
+  },
+  (table) => [
+    check(
+      'career_record_directions_exactly_one_check',
+      sql`(${table.achievementId} is not null) + (${table.projectId} is not null) + (${table.storyId} is not null) + (${table.publicationId} is not null) = 1`,
+    ),
+    uniqueIndex('career_record_directions_achievement_unique_idx')
+      .on(table.achievementId, table.directionKey)
+      .where(sql`${table.achievementId} is not null`),
+    uniqueIndex('career_record_directions_project_unique_idx')
+      .on(table.projectId, table.directionKey)
+      .where(sql`${table.projectId} is not null`),
+    uniqueIndex('career_record_directions_story_unique_idx')
+      .on(table.storyId, table.directionKey)
+      .where(sql`${table.storyId} is not null`),
+    uniqueIndex('career_record_directions_publication_unique_idx')
+      .on(table.publicationId, table.directionKey)
+      .where(sql`${table.publicationId} is not null`),
+  ],
+)
+
+export const jobRequirementSkillMentions = sqliteTable(
+  'job_requirement_skill_mentions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    jobRequirementId: integer('job_requirement_id')
+      .notNull()
+      .references(() => jobRequirements.id, { onDelete: 'cascade' }),
+    rawTerm: text('raw_term').notNull(),
+    normalizedTerm: text('normalized_term').notNull(),
+    mappingState: text('mapping_state').notNull().default('pending'),
+    resolvedSkillId: integer('resolved_skill_id').references(() => skills.id, {
+      onDelete: 'restrict',
+    }),
+    occurrencesJson: text('occurrences_json').notNull().default('[]'),
+    revision: integer('revision').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('job_requirement_skill_mentions_requirement_term_unique_idx').on(
+      table.jobRequirementId,
+      table.normalizedTerm,
+    ),
+    index('job_requirement_skill_mentions_resolved_skill_idx').on(table.resolvedSkillId),
+    index('job_requirement_skill_mentions_state_idx').on(table.mappingState),
+    check(
+      'job_requirement_skill_mentions_state_check',
+      sql`${table.mappingState} in ('pending','mapped','skipped')`,
+    ),
+    check(
+      'job_requirement_skill_mentions_resolution_check',
+      sql`(${table.mappingState} = 'mapped' and ${table.resolvedSkillId} is not null) or (${table.mappingState} != 'mapped' and ${table.resolvedSkillId} is null)`,
+    ),
+    check(
+      'job_requirement_skill_mentions_term_check',
+      sql`length(trim(${table.rawTerm})) > 0 and length(trim(${table.normalizedTerm})) > 0`,
+    ),
+    check('job_requirement_skill_mentions_revision_check', sql`${table.revision} > 0`),
+  ],
+)
+
+export type CareerProfile = typeof careerProfile.$inferSelect
+export type NewCareerProfile = typeof careerProfile.$inferInsert
+export type CareerDirection = typeof careerDirections.$inferSelect
+export type NewCareerDirection = typeof careerDirections.$inferInsert
+export type CareerEducation = typeof careerEducation.$inferSelect
+export type NewCareerEducation = typeof careerEducation.$inferInsert
+export type CareerExperience = typeof careerExperiences.$inferSelect
+export type NewCareerExperience = typeof careerExperiences.$inferInsert
+export type CareerAchievement = typeof careerAchievements.$inferSelect
+export type NewCareerAchievement = typeof careerAchievements.$inferInsert
+export type CareerProject = typeof careerProjects.$inferSelect
+export type NewCareerProject = typeof careerProjects.$inferInsert
+export type CareerStory = typeof careerStories.$inferSelect
+export type NewCareerStory = typeof careerStories.$inferInsert
+export type CareerPublication = typeof careerPublications.$inferSelect
+export type NewCareerPublication = typeof careerPublications.$inferInsert
+export type CareerSkill = typeof careerSkills.$inferSelect
+export type NewCareerSkill = typeof careerSkills.$inferInsert
+export type CareerBaseResume = typeof careerBaseResumes.$inferSelect
+export type NewCareerBaseResume = typeof careerBaseResumes.$inferInsert
+export type CareerAchievementSkill = typeof careerAchievementSkills.$inferSelect
+export type CareerProjectSkill = typeof careerProjectSkills.$inferSelect
+export type CareerPublicationProject = typeof careerPublicationProjects.$inferSelect
+export type CareerAchievementPublication = typeof careerAchievementPublications.$inferSelect
+export type CareerRecordDirection = typeof careerRecordDirections.$inferSelect
+export type NewCareerRecordDirection = typeof careerRecordDirections.$inferInsert
+export type JobRequirementSkillMention = typeof jobRequirementSkillMentions.$inferSelect
+export type NewJobRequirementSkillMention = typeof jobRequirementSkillMentions.$inferInsert
+
 export type JobApplication = typeof jobApplications.$inferSelect
 export type Contact = typeof contacts.$inferSelect
 export type JobPosting = typeof jobPostings.$inferSelect
 export type JobPostingAnalysis = typeof jobPostingAnalyses.$inferSelect
 export type JobRequirement = typeof jobRequirements.$inferSelect
 export type GenerationRun = typeof generationRuns.$inferSelect
-export type GenerationRunResult = typeof generationRunResults.$inferSelect
 export type DocumentReview = typeof documentReviews.$inferSelect
-export type BaselineGenerationRun = typeof baselineGenerationRuns.$inferSelect
-export type BaselineGenerationResult = typeof baselineGenerationResults.$inferSelect
 export type ApplicationAnalysisRun = typeof applicationAnalysisRuns.$inferSelect
 export type AnalysisRunDecision = typeof analysisRunDecisions.$inferSelect
 export type Skill = typeof skills.$inferSelect

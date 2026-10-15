@@ -38,6 +38,8 @@ export const workspaceBoundaryIds = [
 export type WorkspaceBoundaryId = (typeof workspaceBoundaryIds)[number]
 
 export type WorkspaceAvailability = {
+  /** The career database has at least a candidate or a direction (onboarding). */
+  careerDataReady: boolean
   /** A current structured Job Analysis has completed. */
   jobAnalysisCurrent: boolean
   /** The current Review is ready: current Candidate Analysis and all decisions. */

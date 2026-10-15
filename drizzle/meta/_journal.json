@@ -183,6 +183,34 @@
       "when": 1788400000000,
       "tag": "0025_drop_profile_selection",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1788500000000,
+      "tag": "0026_career_facts",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1788600000000,
+      "tag": "0027_simplify_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1788700000000,
+      "tag": "0028_drop_portfolio",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1788800000000,
+      "tag": "0029_collapse_career_state",
+      "breakpoints": true
     }
   ]
 }

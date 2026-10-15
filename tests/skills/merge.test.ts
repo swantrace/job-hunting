@@ -61,8 +61,13 @@ function seedRequirementLink(
     )
     .get(analysis.id) as { id: number }
   sqlite
-    .query('INSERT INTO job_requirements_to_skills (job_requirement_id, skill_id) VALUES (?, ?)')
-    .run(requirement.id, skillId)
+    .query(
+      `INSERT INTO job_requirement_skill_mentions (
+        job_requirement_id, raw_term, normalized_term, mapping_state, resolved_skill_id,
+        occurrences_json, created_at, updated_at
+      ) VALUES (?, 'Skill requirement.', ?, 'mapped', ?, '[]', '2026-08-28', '2026-08-28')`,
+    )
+    .run(requirement.id, `term-${skillId}`, skillId)
   return requirement.id
 }
 
@@ -140,7 +145,7 @@ describe('transactional skill review and merge services', () => {
     }
   })
 
-  test('deduplicates requirement-link collisions', () => {
+  test('moves a colliding mapping onto the target without a unique-index error', () => {
     const { sqlite, db } = database()
     try {
       const source = seedSkill(sqlite, 'react', 'React')
@@ -148,17 +153,22 @@ describe('transactional skill review and merge services', () => {
       const requirementId = seedRequirementLink(sqlite, source.id)
       sqlite
         .query(
-          'INSERT INTO job_requirements_to_skills (job_requirement_id, skill_id) VALUES (?, ?)',
+          `INSERT INTO job_requirement_skill_mentions (
+            job_requirement_id, raw_term, normalized_term, mapping_state, resolved_skill_id,
+            occurrences_json, created_at, updated_at
+          ) VALUES (?, 'React.js', ?, 'mapped', ?, '[]', '2026-08-28', '2026-08-28')`,
         )
-        .run(requirementId, target.id)
+        .run(requirementId, `term-${target.id}`, target.id)
 
       mergeSkills(source.id, target.id, db)
 
       const links = sqlite
         .query('SELECT skill_id FROM job_requirements_to_skills WHERE job_requirement_id = ?')
         .all(requirementId) as Array<{ skill_id: number }>
-      expect(links).toHaveLength(1)
-      expect(links[0].skill_id).toBe(target.id)
+      // Every mention that pointed at the source now points at the target; the
+      // update never rewrites `normalized_term`, so no unique index collides.
+      expect(links).toHaveLength(2)
+      expect(links.every((link) => link.skill_id === target.id)).toBe(true)
     } finally {
       sqlite.close()
     }

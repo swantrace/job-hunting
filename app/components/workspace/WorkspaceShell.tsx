@@ -85,6 +85,7 @@ export function WorkspaceShell({
           readiness={readiness}
           jobAnalysis={review.jobAnalysis}
           jobAnalysisCurrent={review.jobAnalysisCurrent}
+          mapping={review.mapping}
         />
       </div>
     </div>

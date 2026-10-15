@@ -1,6 +1,5 @@
 import { type JobAnalysis, roleTypes, seniorities } from '../../src/ai/schemas/job-analysis'
 import { requirementImportances, requirementTypes } from '../../src/lib/job-requirements/constants'
-import { skillCategoryDefinitions } from '../../src/lib/skills/taxonomy'
 
 const emphasisFields = [
   ['frontend', 'Frontend'],
@@ -18,14 +17,16 @@ const listSections = [
   ['benefits', 'Benefits', 'data-ja-benefit'],
 ] as const
 
-const categories = skillCategoryDefinitions()
-
 /**
  * Server-rendered editor for the structured, candidate-independent job
- * analysis. Editable classification, requirement wording, per-requirement skill
- * references, and evidence lists sync into the hidden `jobAnalysis` JSON field
- * via `updateJobAnalysis`; source excerpts stay read-only so editing a reviewed
- * statement never rewrites the original quote.
+ * analysis. Editable classification, requirement wording and evidence lists sync
+ * into the hidden `jobAnalysis` JSON field via `updateJobAnalysis`; source
+ * excerpts stay read-only so editing a reviewed statement never rewrites the
+ * original quote.
+ *
+ * Each requirement's skill terms are the parser's raw wording and stay
+ * read-only here: the server resolves them against the curated catalog, and a
+ * human confirms or skips each unresolved term in Review.
  */
 export function JobAnalysisDraft({ analysis }: { analysis: JobAnalysis }) {
   const emphasis = analysis.classification.functionalEmphasis
@@ -184,57 +185,31 @@ export function JobAnalysisDraft({ analysis }: { analysis: JobAnalysis }) {
                 />
               )}
               <div class="mt-2 space-y-2">
-                <p class="text-xs font-medium">Skills mapped to this requirement</p>
-                {requirement.skillReferences.map((reference, skillIndex) => (
-                  <div
-                    data-ja-skill-ref
-                    class="grid gap-2 rounded-lg border border-base-200 bg-base-200/40 p-2 md:grid-cols-4"
-                  >
-                    <input type="hidden" data-ja-skill-raw value={reference.rawLabel} />
-                    <div>
-                      <label class="label">Canonical name</label>
-                      <input
-                        class="input input-sm w-full"
-                        data-ja-skill-canonical
-                        value={reference.canonicalLabel}
-                        oninput="updateJobAnalysis()"
-                      />
-                    </div>
-                    <div>
-                      <label class="label">Category</label>
-                      <select
-                        class="select select-sm w-full"
-                        data-ja-skill-category
-                        onchange="updateJobAnalysis()"
-                      >
-                        {categories.map((category) => (
-                          <option
-                            value={category.key}
-                            selected={reference.category === category.key}
-                          >
-                            {category.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label class="label">Confidence</label>
-                      <input
-                        type="number"
-                        class="input input-sm w-full"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        data-ja-skill-confidence
-                        value={reference.confidence}
-                        oninput="updateJobAnalysis()"
-                      />
-                    </div>
-                    <div class="flex items-end">
-                      <span class="text-xs text-base-content/60">Raw: “{reference.rawLabel}”</span>
-                    </div>
-                  </div>
-                ))}
+                <p class="text-xs font-medium">Skill terms stated by this requirement</p>
+                <input type="hidden" data-ja-terms value={JSON.stringify(requirement.terms)} />
+                {requirement.terms.length === 0 ? (
+                  <p class="text-xs text-base-content/50">No specific skill terms.</p>
+                ) : (
+                  <ul class="flex flex-wrap gap-2">
+                    {requirement.terms.map((term) => (
+                      <li class="badge badge-outline badge-sm gap-1" data-ja-term>
+                        <span data-ja-term-value>{term.term}</span>
+                        {typeof term.confidence === 'number' ? (
+                          <span class="opacity-60">{term.confidence}</span>
+                        ) : null}
+                        {term.key ? (
+                          <span class="opacity-60" data-ja-term-key>
+                            {term.key}
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p class="text-xs text-base-content/60">
+                  These stay raw terms until you map or skip them in Review. The server only maps an
+                  exact catalog key, curated alias or verified catalog match.
+                </p>
               </div>
             </div>
           ))}

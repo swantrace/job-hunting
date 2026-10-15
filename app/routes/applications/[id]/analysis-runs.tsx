@@ -5,11 +5,12 @@ import { enqueueCandidateAnalysis } from '../../../../src/lib/analysis-queue'
 import { getApplicationReadiness } from '../../../../src/lib/application-readiness'
 import { careerSkillEvidenceMap } from '../../../../src/lib/career-data'
 import { parseFilters, parseId } from '../../../../src/lib/request'
+import { skillCategoryDefinitions } from '../../../../src/lib/skills/taxonomy'
 import { FitRecommendation } from '../../../components/workspace/FitRecommendation'
 import { query } from '../../../components/workspace/helpers'
 import { RequirementEvidenceMatrix } from '../../../components/workspace/RequirementEvidenceMatrix'
 import { ReviewReadiness } from '../../../components/workspace/ReviewReadiness'
-import { SkillGapPanel } from '../../../components/workspace/SkillGapPanel'
+import { SkillReviewPanel } from '../../../components/workspace/SkillReviewPanel'
 
 function hasCurrentJobAnalysis(jobId: number) {
   return loadReviewData(jobId).jobAnalysisCurrent
@@ -92,11 +93,14 @@ function statusFragment(jobId: number, filters: ReturnType<typeof parseFilters>)
         <>
           <FitRecommendation run={run} oob />
           <RequirementEvidenceMatrix run={run} requirements={review.requirements} oob />
-          <SkillGapPanel
+          <SkillReviewPanel
             job={job}
             filters={filters}
             requirements={review.requirementSkills}
             careerEvidence={careerSkillEvidenceMap()}
+            mapping={review.mapping}
+            categories={skillCategoryDefinitions()}
+            canMap={review.jobAnalysisCurrent}
             canDecide={review.state.state === 'current' && !!review.state.currentCompleted}
             oob
           />

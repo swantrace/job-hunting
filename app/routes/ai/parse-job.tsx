@@ -1,10 +1,12 @@
 import { createRoute } from 'honox/factory'
+import { db } from '../../../src/db/client'
 import {
   OpenAIRequestError,
   OpenAIRequestTimeoutError,
   parseJobDescription,
 } from '../../../src/lib/ai'
 import { parseFilters } from '../../../src/lib/request'
+import { buildCatalogContext } from '../../../src/lib/skills/catalog-context'
 import { AiParser } from '../../components/AiParser'
 import { ParsedJobDraft } from '../../components/ParsedJobDraft'
 
@@ -22,7 +24,10 @@ export const POST = createRoute(async (c) => {
       ...process.env,
       ...(c.env ?? {}),
     } as Record<string, string | undefined>
-    const parsed = await parseJobDescription(runtimeEnv, description.trim())
+    // Bounded, deterministic candidates retrieved from the pasted text. The
+    // pre-save path rebuilds the identical set from the stored raw text.
+    const suppliedCatalog = buildCatalogContext(db, { text: description.trim() }).entries
+    const parsed = await parseJobDescription(runtimeEnv, description.trim(), suppliedCatalog)
     return c.html(
       <ParsedJobDraft parsed={parsed} filters={filters} jobPostText={description.trim()} />,
     )

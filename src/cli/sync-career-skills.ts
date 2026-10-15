@@ -1,11 +1,18 @@
+import '../db/cli-database'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { db } from '../db/client'
-import { loadCareerData } from '../lib/career-data'
+import { readCareerDataDirectory } from '../lib/career-data'
 import { syncCareerSkills } from '../lib/skills/sync-career-skills'
 
 /**
- * One-way career-data -> SQLite taxonomy sync.
+ * Legacy import-only career-data -> SQLite skill sync (retired in Step 12).
+ *
+ * Personal skills, their catalog entries and aliases are edited in the Career
+ * Data UI and imported transactionally with `bun run career:import`. This CLI is
+ * kept as an explicit one-off import from a legacy `career-data/` directory;
+ * boot (`setup`/`start`) never runs it. The target database is explicit: pass
+ * `--database <path>` or set `DB_FILE_NAME`.
  *
  *   bun run skills:sync            # dry-run (default)
  *   bun run skills:sync --apply    # write inside a transaction
@@ -41,7 +48,7 @@ function main() {
 
   let data
   try {
-    data = loadCareerData()
+    data = readCareerDataDirectory(canonicalCareerDataDir()!)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (ifPresent) {

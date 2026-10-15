@@ -2,13 +2,19 @@ import { describe, expect, test } from 'bun:test'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { jobPostingAnalysisIdForCandidateRun } from '../../src/db/analysis-lineage'
 import { persistJobRequirements } from '../../src/db/job-analysis'
+import * as schema from '../../src/db/schema'
 import { listRequirementSkillMappings } from '../../src/db/skill-queries'
+import type { CatalogContextEntry } from '../../src/lib/skills/catalog-context'
 import { skillDecisionSchema } from '../../src/lib/validation'
 import { migratedDatabase } from '../support/sqlite'
 
+const suppliedCatalog: CatalogContextEntry[] = [
+  { key: 'react', name: 'React', category: 'frontend', aliases: ['React.js'] },
+]
+
 function database() {
   const sqlite = migratedDatabase()
-  return { sqlite, db: drizzle({ client: sqlite }) }
+  return { sqlite, db: drizzle({ client: sqlite, schema }) }
 }
 
 function seedAnalysis(sqlite: ReturnType<typeof database>['sqlite']): number {
@@ -37,10 +43,16 @@ function seedAnalysis(sqlite: ReturnType<typeof database>['sqlite']): number {
 }
 
 describe('canonical requirement-skill persistence', () => {
-  test('persists requirement-owned skills into the canonical junction', () => {
+  test('maps a verified requirement term into the canonical junction', () => {
     const { sqlite, db } = database()
     try {
       const analysisId = seedAnalysis(sqlite)
+      sqlite
+        .query(
+          `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
+           VALUES ('react', 'React', 'frontend', 'approved', 'career-data', '2026-08-28', '2026-08-28')`,
+        )
+        .run()
       persistJobRequirements(
         db,
         analysisId,
@@ -52,16 +64,16 @@ describe('canonical requirement-skill persistence', () => {
             statement: 'React experience.',
             sourceText: 'React experience',
             inferenceRationale: null,
-            skillReferences: [
-              { rawLabel: 'React', canonicalLabel: 'React', category: 'frontend', confidence: 0.9 },
-            ],
+            terms: [{ term: 'React', sourceText: 'React experience', confidence: 0.9 }],
           },
         ],
         '2026-08-28',
+        suppliedCatalog,
       )
       const mappings = listRequirementSkillMappings(analysisId, db)
       expect(mappings).toHaveLength(1)
       expect(mappings[0].skillName).toBe('React')
+      expect(mappings[0].rawLabel).toBe('React')
     } finally {
       sqlite.close()
     }
@@ -82,9 +94,7 @@ describe('canonical requirement-skill persistence', () => {
             statement: 'React experience.',
             sourceText: 'React experience',
             inferenceRationale: null,
-            skillReferences: [
-              { rawLabel: 'React', canonicalLabel: 'React', category: 'frontend', confidence: 0.9 },
-            ],
+            terms: [{ term: 'React', sourceText: 'React experience', confidence: 0.9 }],
           },
         ],
         '2026-08-28',

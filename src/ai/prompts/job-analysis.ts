@@ -1,4 +1,32 @@
-export const jobAnalysisPromptVersion = '4.0.0'
+export const jobAnalysisPromptVersion = '5.1.0'
+
+/**
+ * A supplied catalog entry, as rendered into the prompt. Only these bounded
+ * entries are ever sent: the model may propose a `key` from this list and
+ * nothing else.
+ */
+export type CatalogPromptEntry = {
+  key: string
+  name: string
+  category: string | null
+  aliases: readonly string[]
+}
+
+/**
+ * Renders the bounded approved catalog block for one run. Exactly the supplied
+ * entries are listed, so the model can only propose a key that this run
+ * actually retrieved from the posting. An empty list says so explicitly instead
+ * of leaving the model to assume a catalog exists.
+ */
+export function jobAnalysisCatalogBlock(entries: readonly CatalogPromptEntry[]): string {
+  if (entries.length === 0)
+    return 'Approved catalog entries supplied for this posting: none. Use null for every term "key"; never invent one.'
+  const lines = entries.map(
+    (entry) =>
+      `- key: ${entry.key} | name: ${entry.name} | category: ${entry.category ?? 'uncategorised'} | aliases: ${entry.aliases.length > 0 ? entry.aliases.join(', ') : 'none'}`,
+  )
+  return `Approved catalog entries supplied for this posting (the only keys you may propose):\n${lines.join('\n')}`
+}
 
 /**
  * Candidate-independent job analysis boundary. This prompt receives job-posting
@@ -22,7 +50,9 @@ Analysis rules:
 - classification.functionalEmphasis must be integer percentages that total exactly 100.
 - Every requirement must carry a bounded source excerpt in sourceText. An inferred requirement must also carry a concise inference rationale; an explicit requirement must use a null inference rationale.
 - requirement.type uses only the controlled values; requirement.importance is required, preferred, or mentioned; requirement.basis is explicit or inferred.
-- Each requirement carries its own skillReferences array. Map a technology or practice to the requirement that states it, never to a parallel top-level list. Each reference has an exact rawLabel, a concise canonicalLabel, one controlled category, and a confidence between 0 and 1. Leave skillReferences empty for requirements that are not about a specific skill.
+- Each requirement carries its own "terms" array. Put a technology or practice in the requirement that states it, never in a parallel top-level list, and never invent a skill the posting does not name. Each term has the posting's own wording, an optional short source excerpt, and an optional confidence between 0 and 1.
+- A term's optional "key" is a proposal only. Use it only when the wording exactly matches an entry of the bounded catalog snapshot supplied for this run; otherwise use null. The server ignores any key that is not in that snapshot, so never guess a key and never expect the server to create a catalog entry from your output.
+- Leave "terms" empty for a requirement that is not about a specific skill. A broad concept that names no specific technology (for example "API Integration" or "Frontend Development") belongs in "terms" as a raw term; the server keeps it unresolved.
 - Do not classify location, remote/hybrid/onsite arrangements, benefits, personality adjectives, or general responsibilities as skills.
 - painPoints, culture, redFlags, successMetrics, and benefits list only evidence-backed signals; use an empty array when unsupported. notes carries short factual context not represented elsewhere, or null.
 - interviewQuestions are role-focused and grounded in the posting; they must not ask about the candidate's background.

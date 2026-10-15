@@ -19,6 +19,7 @@ describe('versioned workflow end-to-end invariants', () => {
 
   test('Contact and Activities remain available regardless of AI readiness', () => {
     const locked = {
+      careerDataReady: true,
       jobAnalysisCurrent: false,
       reviewReady: false,
       hasHistoricalReview: false,

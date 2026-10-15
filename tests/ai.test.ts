@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { jobParserPromptVersion, jobParserSystemPrompt } from '../src/ai/prompts/job-parser'
-import { skillReferenceSchema } from '../src/ai/schemas/job-analysis'
+import { requirementTermSchema } from '../src/ai/schemas/job-analysis'
 import { jobParserResponseSchema } from '../src/ai/schemas/job-parser'
 import { parsedJobSchema } from '../src/lib/ai'
 
@@ -30,31 +30,22 @@ describe('AI job parser output', () => {
     expect(parserSchema.properties.direction.enum).toEqual(['fullstack', 'frontend'])
   })
 
-  test('rejects malformed skill confidence and source excerpts', () => {
-    const valid = skillReferenceSchema.safeParse({
-      rawLabel: 'Kafka',
-      canonicalLabel: 'Kafka',
-      category: 'messaging-async',
+  test('accepts a raw requirement term and rejects a malformed one', () => {
+    // Step 5: the parser emits raw terms with source context, never a canonical
+    // label or a category. A proposed catalog key stays an optional hint.
+    const valid = requirementTermSchema.safeParse({
+      term: 'Kafka',
+      sourceText: 'Experience with Apache Kafka',
       confidence: 0.96,
+      key: 'kafka',
     })
     expect(valid.success).toBe(true)
 
+    expect(requirementTermSchema.safeParse({ term: 'Kafka', confidence: 1.2 }).success).toBe(false)
+    expect(requirementTermSchema.safeParse({ term: '   ' }).success).toBe(false)
+    // Unknown keys are still rejected: the model cannot smuggle a canonical label.
     expect(
-      skillReferenceSchema.safeParse({
-        rawLabel: 'Kafka',
-        canonicalLabel: 'Kafka',
-        category: 'messaging-async',
-        confidence: 1.2,
-      }).success,
-    ).toBe(false)
-
-    expect(
-      skillReferenceSchema.safeParse({
-        rawLabel: 'Kafka',
-        canonicalLabel: 'Kafka',
-        category: 'miscellaneous',
-        confidence: 0.96,
-      }).success,
+      requirementTermSchema.safeParse({ term: 'Kafka', canonicalLabel: 'Kafka' }).success,
     ).toBe(false)
   })
 })

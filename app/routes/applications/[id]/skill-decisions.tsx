@@ -3,28 +3,40 @@ import {
   decideRunSkill,
   skipRemainingRunDecisions,
 } from '../../../../src/db/analysis-decision-service'
+import { jobPostingAnalysisIdForCandidateRun } from '../../../../src/db/analysis-lineage'
+import { db } from '../../../../src/db/client'
 import type { Filters } from '../../../../src/db/queries'
 import { getApplication, type JobCardData } from '../../../../src/db/queries'
+import {
+  loadAnalysisMapping,
+  searchApprovedCatalog,
+} from '../../../../src/db/skill-mapping-service'
 import { listRunSkillReviews } from '../../../../src/db/skill-queries'
 import { getApplicationReadiness } from '../../../../src/lib/application-readiness'
 import { getCandidateAnalysisState } from '../../../../src/lib/candidate-analysis'
 import { careerSkillEvidenceMap } from '../../../../src/lib/career-data'
 import { parseFilters, parseForm, parseId } from '../../../../src/lib/request'
+import { skillCategoryDefinitions } from '../../../../src/lib/skills/taxonomy'
 import { skillDecisionSchema } from '../../../../src/lib/validation'
 import { computeWorkspaceAvailability } from '../../../../src/lib/workspace/availability'
 import { tabAvailability } from '../../../../src/lib/workspace/state'
 import { ReviewReadiness } from '../../../components/workspace/ReviewReadiness'
 import { SkillDecisionForm } from '../../../components/workspace/SkillDecisionForm'
-import { SkillGapPanel } from '../../../components/workspace/SkillGapPanel'
+import { SkillReviewPanel } from '../../../components/workspace/SkillReviewPanel'
 import { WorkspaceTabs } from '../../../components/workspace/WorkspaceTabs'
 
 function reviewPanel(job: JobCardData, filters: Filters, runId: number) {
+  const jobPostingAnalysisId = jobPostingAnalysisIdForCandidateRun(runId, db)
   return (
-    <SkillGapPanel
+    <SkillReviewPanel
       job={job}
       filters={filters}
       requirements={listRunSkillReviews(runId)}
       careerEvidence={careerSkillEvidenceMap()}
+      mapping={loadAnalysisMapping(db, jobPostingAnalysisId)}
+      categories={skillCategoryDefinitions()}
+      searchCatalog={(term, limit) => searchApprovedCatalog(db, term, limit)}
+      canMap={jobPostingAnalysisId !== null}
     />
   )
 }

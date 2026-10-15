@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { completeJobAnalysisRun, createJobAnalysisRun } from '../../src/db/job-analysis-runs'
 import * as schema from '../../src/db/schema'
 import { listRequirementSkillMappings } from '../../src/db/skill-queries'
+import { jobAnalysisInputFromContent } from '../../src/lib/job-analysis-input'
 import { migratedDatabase } from '../support/sqlite'
 
 /**
@@ -37,11 +38,18 @@ describe('canonical application workflow', () => {
     try {
       const db = drizzle({ client: sqlite, schema })
       const postingId = seedPosting(sqlite)
+      sqlite
+        .query(
+          `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
+           VALUES ('kafka', 'Kafka', 'messaging-async', 'approved', 'career-data', '2026-08-28', '2026-08-28')`,
+        )
+        .run()
 
+      const identity = jobAnalysisInputFromContent('hash', 'Engineer role with Kafka.', db)
       const jobRun = createJobAnalysisRun(db, {
         jobPostingId: postingId,
-        inputHash: 'job-input-hash',
-        frozenInputJson: '{}',
+        inputHash: identity.inputHash,
+        frozenInputJson: JSON.stringify(identity.snapshot),
         model: 'gpt-test',
         promptVersion: '3.0.0',
         schemaVersion: '4.0.0',
@@ -75,13 +83,8 @@ describe('canonical application workflow', () => {
               statement: 'Kafka experience.',
               sourceText: 'Kafka experience',
               inferenceRationale: null,
-              skillReferences: [
-                {
-                  rawLabel: 'Kafka',
-                  canonicalLabel: 'Kafka',
-                  category: 'messaging-async',
-                  confidence: 0.9,
-                },
+              terms: [
+                { term: 'Kafka', sourceText: 'Kafka experience', confidence: 0.9, key: null },
               ],
             },
           ],
@@ -116,8 +119,8 @@ describe('canonical application workflow', () => {
       const generationRun = sqlite
         .query(
           `INSERT INTO generation_runs (
-            application_analysis_run_id, status, queue_job_id, created_at, updated_at
-          ) VALUES (?, 'Completed', 'generation-1', '2026-08-28', '2026-08-28') RETURNING id`,
+            kind, application_analysis_run_id, status, queue_job_id, created_at, updated_at, completed_at
+          ) VALUES ('application', ?, 'Completed', 'generation-1', '2026-08-28', '2026-08-28', '2026-08-28') RETURNING id`,
         )
         .get(candidateRun.id) as { id: number }
       expect(

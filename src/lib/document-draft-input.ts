@@ -1,14 +1,16 @@
+import { listCareerDirections, readCareerDirection } from '../db/career-directions'
+import { db } from '../db/client'
+import type { DbExecutor } from '../db/skill-queries'
 import {
-  baseResumesDirectory,
   type FrozenBaseResumeSource,
   frozenBaseResumeSource,
   loadApprovedBaseResume,
 } from './base-resumes'
 import { canonicalHash } from './canonical-hash'
-import { type CanonicalCareerData, loadCareerData } from './career-data'
+import { type CanonicalCareerData, documentSafeCareerData, loadCareerData } from './career-data'
 import { todayISO } from './date'
-import { directionTargetTitles, listDirections } from './directions'
-import { documentDraftPolicy } from './document-draft-policy'
+import { directionTargetTitles } from './directions'
+import { type DocumentDraftPolicy, effectiveDocumentDraftPolicy } from './document-draft-policy'
 import {
   generationEligibleRequirements,
   isGenerationEligible,
@@ -56,37 +58,54 @@ export type DocumentDraftSnapshot = {
   }>
   requirements: DocumentDraftRequirement[]
   excludedSkills: string[]
-  documentPolicy: typeof documentDraftPolicy
+  documentPolicy: DocumentDraftPolicy
   careerData: ReturnType<typeof safeCareerData>
 }
 
-export function safeCareerData(data: CanonicalCareerData) {
-  return {
-    candidate: data.candidate,
-    experiences: data.experiences.experiences,
-    achievements: data.achievements.achievements.filter((item) => item.safeToUse),
-    publications: data.publications.publications.filter((item) => item.safeToUse),
-    projects: data.projects.projects,
-    skills: data.skills.skills,
-    stories: data.stories.stories,
-  }
+export function safeCareerData(
+  data: CanonicalCareerData,
+  options: { includeSourceUrls?: boolean } = {},
+) {
+  return documentSafeCareerData(data, options)
 }
 
-function knownDirectionIds() {
-  return new Set(listDirections().map((direction) => direction.id))
+/**
+ * The effective drafting policy for a direction. Stored direction rules override
+ * the documented default, and the resolved policy is what both the prompt and
+ * deterministic validation consume, so the two can never disagree.
+ */
+export function directionDocumentPolicy(
+  direction: string,
+  executor: DbExecutor = db,
+): DocumentDraftPolicy {
+  return effectiveDocumentDraftPolicy(readCareerDirection(executor, direction)?.rules ?? null)
+}
+
+/**
+ * Active direction keys, read straight from the database repository. The
+ * drafting path must not depend on a wrapper that a UI test can stub.
+ */
+function knownDirectionIds(executor: DbExecutor) {
+  return new Set(listCareerDirections(executor).map((direction) => direction.key))
 }
 
 /** Loads the frozen approved Base Resume for a direction, or null when absent. */
-export function baseResumeSourceFor(direction: string): FrozenBaseResumeSource | null {
-  const resume = loadApprovedBaseResume(baseResumesDirectory(), direction, knownDirectionIds())
+export function baseResumeSourceFor(
+  direction: string,
+  executor: DbExecutor = db,
+): FrozenBaseResumeSource | null {
+  const resume = loadApprovedBaseResume(direction, knownDirectionIds(executor), executor)
   return resume ? frozenBaseResumeSource(resume) : null
 }
 
-export function baseResumeIdentity(direction: string): {
+export function baseResumeIdentity(
+  direction: string,
+  executor: DbExecutor = db,
+): {
   baseResumeHash: string | null
   baseResumeVersion: string | null
 } {
-  const source = baseResumeSourceFor(direction)
+  const source = baseResumeSourceFor(direction, executor)
   return {
     baseResumeHash: source?.sha256 ?? null,
     baseResumeVersion: source?.version ?? null,
@@ -122,9 +141,12 @@ type GenerationSourceLike = {
   }>
 }
 
-export function buildDocumentDraftSnapshot(source: GenerationSourceLike): DocumentDraftSnapshot {
-  const data = loadCareerData()
-  const baseResume = baseResumeSourceFor(source.application.direction)
+export function buildDocumentDraftSnapshot(
+  source: GenerationSourceLike,
+  executor: DbExecutor = db,
+): DocumentDraftSnapshot {
+  const data = loadCareerData(executor)
+  const baseResume = baseResumeSourceFor(source.application.direction, executor)
   if (!baseResume)
     throw new Error(
       `No approved Base Resume for direction "${source.application.direction}". Import one before generating documents.`,
@@ -138,7 +160,7 @@ export function buildDocumentDraftSnapshot(source: GenerationSourceLike): Docume
     generatedAt: todayISO(),
     kind: 'application',
     direction: source.application.direction,
-    targetTitles: directionTargetTitles(source.application.direction),
+    targetTitles: directionTargetTitles(source.application.direction, executor),
     baseResume,
     application: {
       id: source.application.id,
@@ -168,7 +190,7 @@ export function buildDocumentDraftSnapshot(source: GenerationSourceLike): Docume
       sourceText: item.requirementStatement ?? null,
     })),
     excludedSkills: [...new Set(excludedSkills)],
-    documentPolicy: documentDraftPolicy,
+    documentPolicy: directionDocumentPolicy(source.application.direction, executor),
     careerData: safeCareerData(data),
   }
 }
@@ -178,11 +200,14 @@ type BaselineRunLike = {
   targetTitle: string
 }
 
-export function buildBaselineDocumentDraftSnapshot(run: BaselineRunLike): DocumentDraftSnapshot {
-  const data = loadCareerData()
-  const baseResume = baseResumeSourceFor(run.direction)
+export function buildBaselineDocumentDraftSnapshot(
+  run: BaselineRunLike,
+  executor: DbExecutor = db,
+): DocumentDraftSnapshot {
+  const data = loadCareerData(executor)
+  const baseResume = baseResumeSourceFor(run.direction, executor)
   if (!baseResume) throw new Error(`No approved Base Resume for direction "${run.direction}".`)
-  const configured = directionTargetTitles(run.direction)
+  const configured = directionTargetTitles(run.direction, executor)
   return {
     version: 2,
     generatedAt: todayISO(),
@@ -195,7 +220,7 @@ export function buildBaselineDocumentDraftSnapshot(run: BaselineRunLike): Docume
     jobRequirements: [],
     requirements: [],
     excludedSkills: [],
-    documentPolicy: documentDraftPolicy,
+    documentPolicy: directionDocumentPolicy(run.direction, executor),
     careerData: safeCareerData(data),
   }
 }

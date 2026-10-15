@@ -194,4 +194,22 @@ export const statusesFromFilters = (filters: { statuses: string; today: string }
 export const workspaceTabSchema = z.enum(workspaceTabs).catch('application')
 
 export type FieldErrors = Record<string, string[] | undefined>
-export const formObject = (form: FormData) => Object.fromEntries(form.entries())
+
+/**
+ * Converts submitted form data into an object. A name submitted more than once
+ * (the ordered checkbox list a `RelationPicker` renders) becomes a string array
+ * in submission order; a name submitted once keeps its single value, so every
+ * existing one-value-per-name form is unchanged. The loose value type matches
+ * the previous `Object.fromEntries(form.entries())` contract callers rely on.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: preserves the previous FormData entry contract.
+export function formObject(form: FormData): Record<string, any> {
+  const values: Record<string, any> = {}
+  for (const [key, value] of form.entries()) {
+    const existing = values[key]
+    if (existing === undefined) values[key] = value
+    else if (Array.isArray(existing)) existing.push(value)
+    else values[key] = [existing, value]
+  }
+  return values
+}

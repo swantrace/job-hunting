@@ -27,7 +27,12 @@ describe('destructive contract migration', () => {
     const sqlite = migratedDatabase()
     try {
       expect(tableNames(sqlite)).not.toContain('job_applications_to_skills')
-      expect(tableNames(sqlite)).toContain('job_requirements_to_skills')
+      // Migration 0027 replaced the physical junction with a read-only view.
+      expect(
+        sqlite
+          .query("SELECT type FROM sqlite_master WHERE name = 'job_requirements_to_skills'")
+          .get(),
+      ).toEqual({ type: 'view' })
       expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
       expect(sqlite.query('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
     } finally {
@@ -40,7 +45,15 @@ describe('destructive contract migration', () => {
     const sqlite = migratedAt(folder)
     try {
       const fixture = seedPreCleanupFixture(sqlite)
-      migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
+      // Scoped before the 0027 simplification: 0022 finally clears the legacy
+      // skill rows, and 0027 deliberately wipes operational job-search rows and
+      // has its own migration suite.
+      const contractFolder = migrationFolderUpTo(22)
+      try {
+        migrate(drizzle({ client: sqlite }), { migrationsFolder: contractFolder })
+      } finally {
+        removeTempDir(contractFolder)
+      }
 
       // Core preserved facts.
       expect(

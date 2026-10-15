@@ -14,9 +14,10 @@ import {
   resetStaleProcessingJobAnalysisRuns,
 } from '../db/job-analysis-runs'
 import { jobPostings } from '../db/schema'
+import { countPendingMentions } from '../db/skill-mentions'
 import { parseJobDescription } from './ai'
 import { autoChainCandidateAnalysis } from './analysis-chain'
-import { buildJobAnalysisInput } from './job-analysis-input'
+import { buildJobAnalysisInput, frozenSuppliedCatalog } from './job-analysis-input'
 
 type JobAnalysisQueueJob = { runId: number }
 
@@ -63,14 +64,21 @@ async function processJobAnalysis(
   try {
     const posting = db.select().from(jobPostings).where(eq(jobPostings.id, run.jobPostingId)).get()
     if (!posting) throw new Error('Job posting no longer exists.')
+    // The bounded catalog was retrieved from this posting when the run was
+    // enqueued; the prompt receives exactly that set and completion resolves
+    // against it, so prompt and resolution cannot disagree.
     const parsed = await parseJobDescription(
       process.env as Record<string, string | undefined>,
       posting.rawText,
+      frozenSuppliedCatalog(run.frozenInputJson),
     )
     completeJobAnalysisRun(db, run.id, parsed)
-    // Auto-chain the read-only Candidate Analysis. Profile confirmation and
-    // Include/Skip decisions remain explicit user actions.
-    await autoChainCandidateAnalysis(posting.jobApplicationId)
+    // Auto-chain the read-only Candidate Analysis only when no requirement term
+    // is still unresolved: a pending mention needs an explicit human mapping
+    // first, and mapping never requires another paid JD parse. Profile
+    // confirmation and Include/Skip decisions remain explicit user actions.
+    if (countPendingMentions(db, run.id) === 0)
+      await autoChainCandidateAnalysis(posting.jobApplicationId)
     await updateProgress(100, 'Complete')
     return { runId: run.id }
   } catch (error) {
@@ -106,26 +114,33 @@ export type EnqueueJobAnalysisResult =
 
 /**
  * Persists the frozen input before queueing and returns immediately for
- * polling. A queued or processing run with the same input hash is reused;
- * an explicit rerun after completion creates a new append-only record.
+ * polling. The identity is built and the run row written in one read
+ * transaction, so a concurrent career or catalog write cannot produce a run
+ * whose stored snapshot disagrees with its hash. A queued or processing run
+ * with the same input hash is reused; an explicit rerun after completion
+ * creates a new append-only record.
  */
 export async function enqueueJobAnalysis(jobPostingId: number): Promise<EnqueueJobAnalysisResult> {
-  const built = buildJobAnalysisInput(db, jobPostingId)
-  if (!built) return { run: null, reused: false, reason: 'missing-posting' }
-
-  const reusable = findReusableJobAnalysisRun(db, jobPostingId, built.inputHash)
-  if (reusable) return { run: reusable, reused: true }
-
-  const model =
-    process.env.OPENAI_MODEL_JOB_PARSER ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
-  const run = createJobAnalysisRun(db, {
-    jobPostingId,
-    inputHash: built.inputHash,
-    frozenInputJson: JSON.stringify(built.snapshot),
-    model,
-    promptVersion: jobParserPromptVersion,
-    schemaVersion: jobAnalysisSchemaVersion,
+  const outcome = db.transaction(() => {
+    const built = buildJobAnalysisInput(db, jobPostingId)
+    if (!built) return { kind: 'missing' as const }
+    const reusable = findReusableJobAnalysisRun(db, jobPostingId, built.inputHash)
+    if (reusable) return { kind: 'reused' as const, run: reusable }
+    const model =
+      process.env.OPENAI_MODEL_JOB_PARSER ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
+    const run = createJobAnalysisRun(db, {
+      jobPostingId,
+      inputHash: built.inputHash,
+      frozenInputJson: JSON.stringify(built.snapshot),
+      model,
+      promptVersion: jobParserPromptVersion,
+      schemaVersion: jobAnalysisSchemaVersion,
+    })
+    return { kind: 'created' as const, run }
   })
+  if (outcome.kind === 'missing') return { run: null, reused: false, reason: 'missing-posting' }
+  if (outcome.kind === 'reused') return { run: outcome.run, reused: true }
+  const run = outcome.run
 
   const persistentQueue = await getQueue()
   if (!persistentQueue) {

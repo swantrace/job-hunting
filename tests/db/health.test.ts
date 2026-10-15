@@ -21,4 +21,33 @@ describe('startup schema readiness', () => {
       sqlite.close()
     }
   })
+
+  test('names the missing career table and the migration command', () => {
+    const sqlite = migratedDatabase()
+    try {
+      sqlite.exec('DROP TABLE career_record_directions')
+      let message = ''
+      try {
+        assertDatabaseReady(sqlite)
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error)
+      }
+      expect(message).toContain('career_record_directions')
+      expect(message).toContain('bun run db:migrate')
+    } finally {
+      sqlite.close()
+    }
+  })
+
+  test('a migrated but empty career database is ready', () => {
+    const sqlite = migratedDatabase()
+    try {
+      expect(() => assertDatabaseReady(sqlite)).not.toThrow()
+      expect(
+        sqlite.query("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'career_profile'").get(),
+      ).toEqual({ n: 1 })
+    } finally {
+      sqlite.close()
+    }
+  })
 })

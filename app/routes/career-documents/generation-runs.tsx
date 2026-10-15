@@ -1,6 +1,6 @@
 import { createRoute } from 'honox/factory'
 import { listBaselineGenerationRuns } from '../../../src/db/generation'
-import { baseResumesDirectory, loadApprovedBaseResume } from '../../../src/lib/base-resumes'
+import { loadApprovedBaseResume } from '../../../src/lib/base-resumes'
 import { directionLabel, listDirections } from '../../../src/lib/directions'
 import { enqueueBaselineGeneration } from '../../../src/lib/generation-queue'
 import { parseForm } from '../../../src/lib/request'
@@ -14,7 +14,6 @@ export default createRoute((c) =>
 function approvedBaseResumeError(direction: string): string | null {
   try {
     const resume = loadApprovedBaseResume(
-      baseResumesDirectory(),
       direction,
       new Set(listDirections().map((item) => item.id)),
     )

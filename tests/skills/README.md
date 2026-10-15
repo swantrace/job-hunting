@@ -19,6 +19,7 @@ These tests preserve the completed skill-intelligence foundation used by the cur
 | `job-analysis.contract.test.ts` | the parser JSON schema changes skill items to objects |
 | `gap-decisions.contract.test.ts` | `skillDecisionSchema` and/or `src/lib/skills/score.ts` exist |
 | `tests/ui/resource-pages.contract.test.tsx` | all three resource index routes exist |
+| `tests/career/*` | plan `career-database-v1`; see `tests/career/README.md` for the per-step activation table |
 
 ## Commands
 

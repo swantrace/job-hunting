@@ -11,6 +11,7 @@ import {
 } from '../../src/lib/workspace/state'
 
 const locked: WorkspaceAvailability = {
+  careerDataReady: false,
   jobAnalysisCurrent: false,
   reviewReady: false,
   hasHistoricalReview: false,
@@ -18,6 +19,7 @@ const locked: WorkspaceAvailability = {
 }
 
 const ready: WorkspaceAvailability = {
+  careerDataReady: true,
   jobAnalysisCurrent: true,
   reviewReady: true,
   hasHistoricalReview: true,

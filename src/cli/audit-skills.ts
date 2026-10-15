@@ -1,3 +1,4 @@
+import '../db/cli-database'
 import { Database } from 'bun:sqlite'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
 
@@ -8,9 +9,12 @@ import { normalizeSkillAlias } from '../lib/skills/normalize'
  * application relationships, and likely non-skill values. It never mutates the
  * database: the connection is opened read-only and no write statements run.
  * Similarity findings are suggestions for manual review and are never merged.
+ *
+ * The target database is explicit: pass `--database <path>` or set
+ * `DB_FILE_NAME`; the guard runs before this module opens anything.
  */
 
-const dbFile = process.env.DB_FILE_NAME ?? 'jobs.db'
+const dbFile = process.env.DB_FILE_NAME as string
 
 type SkillRow = { id: number; name: string; applications: number }
 

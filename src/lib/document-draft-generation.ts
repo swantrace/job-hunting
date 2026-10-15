@@ -1,10 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import {
-  baselineDraftSystemPrompt,
-  coverLetterDraftSystemPrompt,
+  baselineDraftSystemPromptFor,
+  coverLetterDraftSystemPromptFor,
   documentDraftPromptVersion,
-  resumeDraftSystemPrompt,
+  resumeDraftSystemPromptFor,
 } from '../ai/prompts/document-draft'
 import {
   documentMarkdownResponseSchema,
@@ -12,6 +12,7 @@ import {
 } from '../ai/schemas/document-draft'
 import {
   getBaselineGenerationRun,
+  getGenerationRun,
   getGenerationSource,
   saveBaselineGenerationEvidenceSnapshot,
   saveBaselineGenerationResults,
@@ -26,14 +27,13 @@ import {
   buildDocumentDraftSnapshot,
   type DocumentDraftSnapshot,
 } from './document-draft-input'
-import { documentDraftPolicy } from './document-draft-policy'
 import { extractMetricClaims, validateDocumentDraft } from './document-draft-validation'
 import { renderCoverLetterDocx } from './docx/cover-letter-renderer'
 import { type DocumentIdentity } from './docx/render-common'
 import { renderResumeDocx } from './docx/resume-renderer'
 import { docxRendererVersion } from './docx/styles'
 import type { GeneratedArtifactType } from './generation/constants'
-import { coverLetterModelId, resumeModelId } from './generation-input'
+import { coverLetterModelId, frozenDraftSnapshotFromRun, resumeModelId } from './generation-input'
 import { stripMarkdownFence } from './resume-experiment'
 
 type ArtifactOutput = {
@@ -126,24 +126,26 @@ function educationEntries(snapshot: DocumentDraftSnapshot) {
 }
 
 function validateResumeDraft(draft: DocumentDraft, snapshot: DocumentDraftSnapshot) {
+  const policy = snapshot.documentPolicy.resume
   return validateDocumentDraft(draft, {
     education: educationEntries(snapshot),
     supportedMetrics: supportedMetrics(snapshot),
     excludedSkills: snapshot.excludedSkills,
-    maxWords: documentDraftPolicy.resume.maxWords,
-    maxBullets: documentDraftPolicy.resume.maxBullets,
+    maxWords: policy.maxWords,
+    maxBullets: policy.maxBullets,
     sectionContract: {
       required: ['summary', 'skills', 'experience', 'education'],
       order: ['summary', 'skills', 'experience', 'projects', 'publications', 'education'],
     },
-    sectionWordBudgets: { summary: documentDraftPolicy.resume.summaryMaxWords },
+    sectionWordBudgets: { ...policy.sectionWordBudgets, summary: policy.summaryMaxWords },
   })
 }
 
 function validateCoverLetterDraft(draft: DocumentDraft, snapshot: DocumentDraftSnapshot) {
+  const policy = snapshot.documentPolicy.coverLetter
   return validateDocumentDraft(draft, {
     salutation: sectionText(draft, 'salutation'),
-    maxWords: documentDraftPolicy.coverLetter.maxWords,
+    maxWords: policy.maxWords,
     maxBullets: 0,
     supportedMetrics: supportedMetrics(snapshot),
     excludedSkills: snapshot.excludedSkills,
@@ -153,8 +155,8 @@ function validateCoverLetterDraft(draft: DocumentDraft, snapshot: DocumentDraftS
     },
     sectionBlockBudgets: {
       evidence: {
-        min: documentDraftPolicy.coverLetter.minEvidenceParagraphs,
-        max: documentDraftPolicy.coverLetter.maxEvidenceParagraphs,
+        min: policy.minEvidenceParagraphs,
+        max: policy.maxEvidenceParagraphs,
       },
     },
   })
@@ -208,9 +210,17 @@ async function writeDraftArtifacts(
 const docxMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
 export async function generateApplicationDrafts(runId: number): Promise<ArtifactOutput[]> {
-  const source = getGenerationSource(runId)
-  if (!source) throw new Error('Generation source no longer exists.')
-  const snapshot = buildDocumentDraftSnapshot(source)
+  const run = getGenerationRun(runId)
+  if (!run) throw new Error('Generation run no longer exists.')
+  // A queued run drafts from the input frozen at enqueue, so career edits made
+  // while it waited cannot change the document. Legacy snapshots rebuild.
+  const snapshot =
+    frozenDraftSnapshotFromRun(run.frozenInputJson) ??
+    (() => {
+      const source = getGenerationSource(runId)
+      if (!source) throw new Error('Generation source no longer exists.')
+      return buildDocumentDraftSnapshot(source)
+    })()
   saveGenerationEvidenceSnapshot(runId, JSON.stringify(snapshot, null, 2))
 
   const apiKey = process.env.OPENAI_API_KEY
@@ -218,13 +228,13 @@ export async function generateApplicationDrafts(runId: number): Promise<Artifact
   const resumeMarkdown = await callMarkdown({
     apiKey,
     model: resumeModelId(),
-    system: resumeDraftSystemPrompt,
+    system: resumeDraftSystemPromptFor(snapshot.documentPolicy),
     input: snapshot,
   })
   const coverLetterMarkdown = await callMarkdown({
     apiKey,
     model: coverLetterModelId(),
-    system: coverLetterDraftSystemPrompt,
+    system: coverLetterDraftSystemPromptFor(snapshot.documentPolicy),
     input: snapshot,
   })
 
@@ -245,17 +255,19 @@ export async function generateApplicationDrafts(runId: number): Promise<Artifact
   })
 
   const identity = renderIdentity(snapshot)
+  const frozenApplication = snapshot.application
+  if (!frozenApplication) throw new Error('Generation snapshot has no application context.')
   const [resumeDocx, coverLetterDocx] = await Promise.all([
-    renderResumeDocx(resumeDraft, { identity, targetTitle: source.application.jobTitle }),
+    renderResumeDocx(resumeDraft, { identity, targetTitle: frozenApplication.jobTitle }),
     renderCoverLetterDocx(coverLetterDraft, {
       identity,
-      company: source.company.name,
+      company: frozenApplication.company,
       date: todayISO(),
-      targetTitle: source.application.jobTitle,
+      targetTitle: frozenApplication.jobTitle,
     }),
   ])
 
-  const baseName = `${filenamePart(source.company.name)}-${filenamePart(source.application.jobTitle)}`
+  const baseName = `${filenamePart(frozenApplication.company)}-${filenamePart(frozenApplication.jobTitle)}`
   const directory = `run-${runId}`
   return writeDraftArtifacts(directory, [
     {
@@ -290,7 +302,7 @@ export async function generateBaselineDraft(runId: number) {
   const resumeMarkdown = await callMarkdown({
     apiKey,
     model: resumeModelId(),
-    system: baselineDraftSystemPrompt,
+    system: baselineDraftSystemPromptFor(snapshot.documentPolicy),
     input: snapshot,
   })
   const draft = parseDocumentDraft(resumeMarkdown, 'resume')

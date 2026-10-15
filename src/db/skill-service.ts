@@ -1,11 +1,12 @@
-import { and, eq } from 'drizzle-orm'
-import { todayISO } from '../lib/date'
+import { eq } from 'drizzle-orm'
+import { nowISO } from '../lib/date'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
 import { resolveSkillInput, type SkillResolver } from '../lib/skills/resolve'
 import type { SkillCategory } from '../lib/skills/taxonomy'
 import { db } from './client'
 import {
   analysisRunDecisions,
+  jobRequirementSkillMentions,
   jobRequirementsToSkills,
   type Skill,
   skillAliases,
@@ -48,7 +49,7 @@ function requireActiveSkill(tx: DbExecutor, id: number): Skill {
 export function approveSkill(id: number, executor: SkillDb = db) {
   executor
     .update(skills)
-    .set({ reviewStatus: 'approved', updatedAt: todayISO() })
+    .set({ reviewStatus: 'approved', updatedAt: nowISO() })
     .where(eq(skills.id, id))
     .run()
 }
@@ -56,17 +57,17 @@ export function approveSkill(id: number, executor: SkillDb = db) {
 export function rejectSkill(id: number, executor: SkillDb = db) {
   executor
     .update(skills)
-    .set({ reviewStatus: 'rejected', updatedAt: todayISO() })
+    .set({ reviewStatus: 'rejected', updatedAt: nowISO() })
     .where(eq(skills.id, id))
     .run()
 }
 
 export function recategorizeSkill(id: number, category: SkillCategory, executor: SkillDb = db) {
-  executor.update(skills).set({ category, updatedAt: todayISO() }).where(eq(skills.id, id)).run()
+  executor.update(skills).set({ category, updatedAt: nowISO() }).where(eq(skills.id, id)).run()
 }
 
 export function renameSkill(id: number, name: string, executor: SkillDb = db) {
-  const date = todayISO()
+  const date = nowISO()
   executor.transaction((tx) => {
     const skill = requireActiveSkill(tx, id)
     tx.update(skills).set({ name, updatedAt: date }).where(eq(skills.id, id)).run()
@@ -96,7 +97,7 @@ export function addSkillAlias(
       alias,
       normalizedAlias: normalized,
       origin,
-      createdAt: todayISO(),
+      createdAt: nowISO(),
     })
     .run()
 }
@@ -153,7 +154,7 @@ export function mergeSkills(sourceId: number, targetId: number, executor: SkillD
   const conflicts = previewMerge(sourceId, targetId, executor).conflicts
   if (conflicts.length) throw new MergeConflictError(conflicts)
 
-  const date = todayISO()
+  const date = nowISO()
   return executor.transaction((tx) => {
     const source = requireActiveSkill(tx, sourceId)
     const target = requireActiveSkill(tx, targetId)
@@ -175,41 +176,19 @@ export function mergeSkills(sourceId: number, targetId: number, executor: SkillD
       tx.update(skillAliases).set({ skillId: targetId }).where(eq(skillAliases.id, alias.id)).run()
     }
 
-    const sourceLinks = tx
+    // Requirement mappings are owned by the mentions; moving the mention's
+    // resolved skill is enough and never rewrites `normalized_term`, so the
+    // (job_requirement_id, normalized_term) unique index cannot collide even
+    // when the requirement already maps a different term to the target.
+    const sourceMentions = tx
       .select()
-      .from(jobRequirementsToSkills)
-      .where(eq(jobRequirementsToSkills.skillId, sourceId))
+      .from(jobRequirementSkillMentions)
+      .where(eq(jobRequirementSkillMentions.resolvedSkillId, sourceId))
       .all()
-    for (const link of sourceLinks) {
-      const targetLink = tx
-        .select()
-        .from(jobRequirementsToSkills)
-        .where(
-          and(
-            eq(jobRequirementsToSkills.jobRequirementId, link.jobRequirementId),
-            eq(jobRequirementsToSkills.skillId, targetId),
-          ),
-        )
-        .get()
-      if (targetLink) {
-        tx.delete(jobRequirementsToSkills)
-          .where(
-            and(
-              eq(jobRequirementsToSkills.jobRequirementId, link.jobRequirementId),
-              eq(jobRequirementsToSkills.skillId, sourceId),
-            ),
-          )
-          .run()
-        continue
-      }
-      tx.update(jobRequirementsToSkills)
-        .set({ skillId: targetId })
-        .where(
-          and(
-            eq(jobRequirementsToSkills.jobRequirementId, link.jobRequirementId),
-            eq(jobRequirementsToSkills.skillId, sourceId),
-          ),
-        )
+    for (const mention of sourceMentions) {
+      tx.update(jobRequirementSkillMentions)
+        .set({ resolvedSkillId: targetId, updatedAt: date })
+        .where(eq(jobRequirementSkillMentions.id, mention.id))
         .run()
     }
 

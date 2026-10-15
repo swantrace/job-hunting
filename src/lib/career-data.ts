@@ -1,8 +1,26 @@
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { asc, eq } from 'drizzle-orm'
 import { z } from 'zod'
+import { listCareerDirections } from '../db/career-directions'
+import { readCareerCandidate, readCareerPreferences } from '../db/career-facts'
+import {
+  listCareerAchievements,
+  listCareerEducation,
+  listCareerExperiences,
+  listCareerProjects,
+  listCareerPublications,
+  listCareerStories,
+} from '../db/career-records'
+import { careerContentProbe, readCareerContentProbe } from '../db/career-shared'
+import { listCareerSkills } from '../db/career-skills'
+import { db } from '../db/client'
+import { careerProfile, skillAliases, skills } from '../db/schema'
+import type { DbExecutor } from '../db/skill-queries'
+import { extensionSchema, parseJsonColumn } from './career/json-schemas'
+import { isISODate } from './date'
 import { normalizeSkillAlias } from './skills/normalize'
-import { hasSkillCategory } from './skills/taxonomy'
+import { parseSkillTaxonomy, skillCategoryKeys } from './skills/taxonomy'
 
 const idSchema = z
   .string()
@@ -21,7 +39,9 @@ const candidateSchema = documentSchema
   .extend({
     identity: z.looseObject({ fullName: z.string().min(1), email: z.email().min(1) }),
     education: z.array(
-      z.object({ id: idSchema, degree: z.string().min(1), school: z.string().min(1) }),
+      // Loose on purpose: education rows carry authored extension fields such as
+      // `datePrecision` and `coursework`. A strict object silently stripped them.
+      z.looseObject({ id: idSchema, degree: z.string().min(1), school: z.string().min(1) }),
     ),
   })
   .loose()
@@ -80,11 +100,7 @@ const skillsSchema = documentSchema.extend({
     z.looseObject({
       id: idSchema,
       label: z.string().min(1),
-      category: z
-        .string()
-        .trim()
-        .min(1)
-        .refine(hasSkillCategory, 'Choose a category from career-data/skill-taxonomy.json.'),
+      category: z.string().trim().min(1),
       aliases: z.array(z.string().trim().min(1).max(120)).default([]),
       directions: referenceIdsSchema,
     }),
@@ -107,13 +123,6 @@ const preferencesSchema = documentSchema
     ),
   })
   .loose()
-const portfolioSchema = documentSchema
-  .extend({
-    topics: z.array(
-      z.looseObject({ id: idSchema, projects: referenceIdsSchema, directions: referenceIdsSchema }),
-    ),
-  })
-  .loose()
 
 export type CanonicalCareerData = {
   candidate: z.infer<typeof candidateSchema>
@@ -124,9 +133,15 @@ export type CanonicalCareerData = {
   skills: z.infer<typeof skillsSchema>
   stories: z.infer<typeof storiesSchema>
   preferences: z.infer<typeof preferencesSchema>
-  portfolio: z.infer<typeof portfolioSchema>
 }
 
+/**
+ * Resolves the import-only career-data directory from an explicit
+ * `CAREER_DATA_DIR` or the conventional locations. Runtime code never calls
+ * this: it exists for the Step 3 importer CLI and the retired Step 12 sync
+ * tools, which read files on purpose. The database, not this directory, is the
+ * runtime authority.
+ */
 export function careerDataDirectory(env: Record<string, string | undefined> = process.env) {
   const configuredPath = env.CAREER_DATA_DIR?.trim()
   const paths = [
@@ -155,7 +170,15 @@ function assertReferences(label: string, values: string[], known: Set<string>) {
     if (!known.has(value)) throw new Error(`${label} references unknown ID "${value}".`)
 }
 
-export function validateCareerData(data: CanonicalCareerData) {
+/**
+ * Cross-reference validation for the canonical shape. `categoryKeys` defaults
+ * to the database-owned catalog categories; the import-only directory reader
+ * passes the categories from the taxonomy file it was pointed at.
+ */
+export function validateCareerData(
+  data: CanonicalCareerData,
+  categoryKeys: ReadonlySet<string> | null = new Set(skillCategoryKeys()),
+) {
   const directionIds = new Set(Object.keys(data.preferences.directionDefinitions))
   const experienceIds = new Set(data.experiences.experiences.map((item) => item.id))
   const achievementIds = new Set(data.achievements.achievements.map((item) => item.id))
@@ -191,7 +214,7 @@ export function validateCareerData(data: CanonicalCareerData) {
   const normalizedSkillIds = new Map<string, string>()
   const normalizedSkillLabels = new Map<string, string>()
   for (const skill of data.skills.skills) {
-    if (!hasSkillCategory(skill.category))
+    if (categoryKeys !== null && !categoryKeys.has(skill.category))
       throw new Error(`Skill "${skill.id}" has an invalid category "${skill.category}".`)
     const normalizedId = normalizeSkillAlias(skill.id)
     const idOwner = normalizedSkillIds.get(normalizedId)
@@ -234,11 +257,6 @@ export function validateCareerData(data: CanonicalCareerData) {
     'stories',
     data.stories.stories.map((item) => item.id),
   )
-  assertUnique(
-    'portfolio topics',
-    data.portfolio.topics.map((item) => item.id),
-  )
-
   for (const item of data.achievements.achievements) {
     if (item.experienceId)
       assertReferences(`achievement ${item.id}`, [item.experienceId], experienceIds)
@@ -264,10 +282,6 @@ export function validateCareerData(data: CanonicalCareerData) {
     if (item.experienceId) assertReferences(`story ${item.id}`, [item.experienceId], experienceIds)
     assertReferences(`story ${item.id} directions`, item.directions, directionIds)
   }
-  for (const item of data.portfolio.topics) {
-    assertReferences(`portfolio topic ${item.id} projects`, item.projects, projectIds)
-    assertReferences(`portfolio topic ${item.id} directions`, item.directions, directionIds)
-  }
   if (directionIds.size === 0)
     throw new Error('preferences.directionDefinitions must define at least one direction.')
   return data
@@ -285,60 +299,367 @@ const careerDataFiles = [
   'portfolio-content.json',
 ] as const
 
-let careerDataCache: { signature: string; data: CanonicalCareerData } | null = null
-
-function careerDataSignature(dir: string): string {
-  return careerDataFiles
-    .map((file) => {
-      const filePath = resolve(dir, file)
-      if (!existsSync(filePath)) return ''
-      try {
-        return statSync(filePath).mtimeMs
-      } catch {
-        return ''
+/**
+ * Reads the nine career documents as raw parsed JSON, without any zod coercion
+ * or stripping. The explicit importer uses this so every original fact and
+ * authored extension field survives the write into SQLite; `loadCareerData`
+ * is the database assembler the runtime uses.
+ *
+ * `portfolio-content.json` is read here even though the portfolio-topic feature
+ * was removed in migration 0028: the directory importer still accepts the file,
+ * and only its document-root values without a relational home are carried into
+ * `career_profile.documents_json`. The structured/canonical portfolio path is
+ * gone and the verbatim blob is no longer stored.
+ *
+ * `publications.json` is optional (matching the loader) and falls back to the
+ * empty versioned document.
+ */
+export function readCareerDocuments(directory: string): Record<string, unknown> {
+  return Object.fromEntries(
+    careerDataFiles.map((file) => {
+      const path = resolve(directory, file)
+      if (!existsSync(path)) {
+        if (file === 'publications.json') {
+          return [file, { schemaVersion: 1, lastUpdated: '1970-01-01', publications: [] }]
+        }
+        throw new Error(`Career data document "${file}" was not found in ${directory}.`)
       }
-    })
-    .join('|')
-}
-
-function readCareerData(dir: string): CanonicalCareerData {
-  const parsed: CanonicalCareerData = {
-    candidate: candidateSchema.parse(readJson(resolve(dir, 'candidate.json'))),
-    experiences: experiencesSchema.parse(readJson(resolve(dir, 'experiences.json'))),
-    achievements: achievementsSchema.parse(readJson(resolve(dir, 'achievements.json'))),
-    publications: publicationsSchema.parse(
-      existsSync(resolve(dir, 'publications.json'))
-        ? readJson(resolve(dir, 'publications.json'))
-        : { schemaVersion: 1, lastUpdated: '1970-01-01', publications: [] },
-    ),
-    projects: projectsSchema.parse(readJson(resolve(dir, 'projects.json'))),
-    skills: skillsSchema.parse(readJson(resolve(dir, 'skills.json'))),
-    stories: storiesSchema.parse(readJson(resolve(dir, 'stories.json'))),
-    preferences: preferencesSchema.parse(readJson(resolve(dir, 'preferences.json'))),
-    portfolio: portfolioSchema.parse(readJson(resolve(dir, 'portfolio-content.json'))),
-  }
-  return validateCareerData(parsed)
+      return [file, readJson(path)]
+    }),
+  )
 }
 
 /**
- * Reads, parses, and validates the canonical career data once, then caches the
- * result until any source file's mtime changes. `loadCareerData` is called many
- * times per request (availability, review data, readiness, evidence) and the
- * parse + cross-reference validation is the dominant synchronous cost of the
- * workspace route, so the cache keeps repeated loads cheap.
+ * Import-only reader: parses and cross-reference-validates one career-data
+ * directory (plus its `skill-taxonomy.json` categories). Nothing at runtime
+ * reads a directory implicitly; the database assembler below is authoritative.
  */
-export function loadCareerData(): CanonicalCareerData {
-  const dir = careerDataDirectory()
-  const signature = careerDataSignature(dir)
-  if (careerDataCache && careerDataCache.signature === signature) return careerDataCache.data
-  const data = readCareerData(dir)
-  careerDataCache = { signature, data }
+export function readCareerDataDirectory(directory: string): CanonicalCareerData {
+  const parsed: CanonicalCareerData = {
+    candidate: candidateSchema.parse(readJson(resolve(directory, 'candidate.json'))),
+    experiences: experiencesSchema.parse(readJson(resolve(directory, 'experiences.json'))),
+    achievements: achievementsSchema.parse(readJson(resolve(directory, 'achievements.json'))),
+    publications: publicationsSchema.parse(
+      existsSync(resolve(directory, 'publications.json'))
+        ? readJson(resolve(directory, 'publications.json'))
+        : { schemaVersion: 1, lastUpdated: '1970-01-01', publications: [] },
+    ),
+    projects: projectsSchema.parse(readJson(resolve(directory, 'projects.json'))),
+    skills: skillsSchema.parse(readJson(resolve(directory, 'skills.json'))),
+    stories: storiesSchema.parse(readJson(resolve(directory, 'stories.json'))),
+    preferences: preferencesSchema.parse(readJson(resolve(directory, 'preferences.json'))),
+  }
+  const taxonomyPath = resolve(directory, 'skill-taxonomy.json')
+  const categories = existsSync(taxonomyPath)
+    ? new Set(parseSkillTaxonomy(readJson(taxonomyPath)).categories.map((item) => item.key))
+    : null
+  return validateCareerData(parsed, categories)
+}
+
+// ---------------------------------------------------------------------------
+// Database assembler
+// ---------------------------------------------------------------------------
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function nonEmptyRecord(value: unknown): Record<string, unknown> {
+  const record = asRecord(value)
+  return Object.keys(record).length > 0 ? record : {}
+}
+
+/**
+ * Document-level metadata (`schemaVersion`, `lastUpdated`) that the relational
+ * schema does not model. The document roots are stored on the `career_profile`
+ * singleton by the importer, so reading them here is still a database read —
+ * never a filesystem fallback.
+ */
+function documentMeta(
+  documents: Record<string, unknown>,
+  file: string,
+  fallbackDate: string,
+): { schemaVersion: 1; lastUpdated: string } {
+  const document = asRecord(documents[file])
+  const lastUpdated =
+    typeof document.lastUpdated === 'string' && isISODate(document.lastUpdated)
+      ? document.lastUpdated
+      : fallbackDate
+  return { schemaVersion: 1, lastUpdated }
+}
+
+/** Parses one row's `extension_json` column into preserved authored fields. */
+function rowExtension(value: string | null): Record<string, unknown> {
+  if (value === null || value.trim() === '') return {}
+  return nonEmptyRecord(parseJsonColumn(value, extensionSchema, {}, 'extension_json'))
+}
+
+/**
+ * Assembles the canonical career shape from the relational career tables so no
+ * prompt, renderer or schema has to change. Every junction is rendered back
+ * into the array field it came from, in stored `position` order, using stable
+ * keys; unknown authored fields are read back from each row's `extension_json`
+ * column (and the `career_profile` singleton's) so a database round trip never
+ * drops an extension field.
+ */
+export function loadCareerDataFromDatabase(executor: DbExecutor = db): CanonicalCareerData {
+  const probe = readCareerContentProbe(executor)
+  const profile = executor
+    .select({
+      extensionJson: careerProfile.extensionJson,
+      documentsJson: careerProfile.documentsJson,
+    })
+    .from(careerProfile)
+    .where(eq(careerProfile.id, 1))
+    .get()
+  const profileExtension = rowExtension(profile?.extensionJson ?? null)
+  const documents = asRecord(
+    parseJsonColumn(
+      profile?.documentsJson ?? null,
+      z.record(z.string(), z.unknown()),
+      {},
+      'career_profile.documents_json',
+    ),
+  )
+  const fallbackDate = isISODate(probe.updatedAt.slice(0, 10))
+    ? probe.updatedAt.slice(0, 10)
+    : '1970-01-01'
+
+  const candidateRow = readCareerCandidate(executor)
+  const preferencesRow = readCareerPreferences(executor)
+  const directions = listCareerDirections(executor)
+
+  const education = listCareerEducation(executor)
+  const experiences = listCareerExperiences(executor)
+  const achievements = listCareerAchievements(executor)
+  const projects = listCareerProjects(executor)
+  const publications = listCareerPublications(executor)
+  const stories = listCareerStories(executor)
+
+  const jobSkills = listCareerSkills(executor)
+  // Junction rows may reference catalog entries the candidate does not possess,
+  // so keys resolve against the whole catalog, not only personal skills.
+  const catalogKeyById = new Map(
+    executor
+      .select({ id: skills.id, key: skills.key })
+      .from(skills)
+      .all()
+      .map((row) => [row.id, row.key] as const),
+  )
+  const skillKey = (id: number) => catalogKeyById.get(id)
+  const aliasRows = executor.select().from(skillAliases).orderBy(asc(skillAliases.id)).all()
+  const aliasesBySkillId = new Map<number, string[]>()
+  for (const alias of aliasRows) {
+    const list = aliasesBySkillId.get(alias.skillId) ?? []
+    list.push(alias.alias)
+    aliasesBySkillId.set(alias.skillId, list)
+  }
+
+  const projectKeyById = new Map(projects.map((row) => [row.id, row.stableKey]))
+  const publicationKeyById = new Map(publications.map((row) => [row.id, row.stableKey]))
+  const experienceKeyById = new Map(experiences.map((row) => [row.id, row.stableKey]))
+  const projectKey = (id: number) => projectKeyById.get(id)
+  const publicationKey = (id: number) => publicationKeyById.get(id)
+  const experienceKey = (id: number | null) =>
+    id === null ? null : (experienceKeyById.get(id) ?? null)
+
+  const candidate = {
+    ...documentMeta(documents, 'candidate.json', fallbackDate),
+    identity: {
+      fullName: candidateRow?.fullName ?? '',
+      email: candidateRow?.email ?? '',
+      phone: candidateRow?.phone ?? null,
+      location: candidateRow?.location ?? null,
+      website: candidateRow?.website ?? null,
+      linkedinUrl: candidateRow?.linkedinUrl ?? null,
+      githubUrl: candidateRow?.githubUrl ?? null,
+      ...profileExtension,
+    },
+    authorization: candidateRow?.authorization ?? null,
+    careerBreak: candidateRow?.careerBreak ?? null,
+    truthfulnessRules: candidateRow?.truthfulness ?? null,
+    education: education.map((row) => ({
+      id: row.stableKey,
+      degree: row.degree,
+      school: row.school,
+      startDate: row.startDate,
+      endDate: row.endDate,
+      datePrecision: row.datePrecision,
+      displayDates: row.displayDates,
+      year: row.year,
+      sortOrder: row.sortOrder,
+      coursework: row.coursework,
+      ...(row.details === null ? {} : { details: row.details }),
+      ...rowExtension(row.extensionJson),
+    })),
+  }
+
+  return {
+    candidate,
+    experiences: {
+      ...documentMeta(documents, 'experiences.json', fallbackDate),
+      experiences: experiences.map((row) => ({
+        id: row.stableKey,
+        company: row.company,
+        role: row.role,
+        employmentNature: row.employmentNature,
+        startDate: row.startDate,
+        endDate: row.endDate,
+        datePrecision: row.datePrecision,
+        displayDates: row.displayDates,
+        sortOrder: row.sortOrder,
+        context: row.context,
+        responsibilities: row.responsibilities,
+        ...nonEmptyRecord(row.extension),
+        ...nonEmptyRecord(row.extension),
+      })),
+    },
+    achievements: {
+      ...documentMeta(documents, 'achievements.json', fallbackDate),
+      achievements: achievements.map((row) => ({
+        id: row.stableKey,
+        experienceId: experienceKey(row.experienceId),
+        claim: row.claim,
+        safeToUse: row.safeToUse,
+        evidence: row.evidence,
+        evidenceNarratives: row.evidenceNarratives,
+        limitations: row.limitations,
+        skills: row.skills.map(skillKey).filter(isDefined),
+        directions: row.directions,
+        publicationIds: row.publicationIds.map(publicationKey).filter(isDefined),
+        ...rowExtension(row.extensionJson),
+      })),
+    },
+    publications: {
+      ...documentMeta(documents, 'publications.json', fallbackDate),
+      publications: publications.map((row) => {
+        const extension = rowExtension(row.extensionJson)
+        return {
+          id: row.stableKey,
+          title: row.title,
+          citation: row.citation,
+          year: row.year,
+          publicationType: String(extension.publicationType ?? 'other'),
+          status: row.status,
+          safeToUse: row.safeToUse,
+          experienceId: experienceKey(row.experienceId),
+          authors: row.authors,
+          authorListIsTruncated: row.authorListTruncated,
+          contributions: row.contributions,
+          sourceUrls: row.sourceUrls,
+          projectIds: row.projectIds.map(projectKey).filter(isDefined),
+          directions: row.directions,
+          ...extension,
+        }
+      }),
+    },
+    projects: {
+      ...documentMeta(documents, 'projects.json', fallbackDate),
+      projects: projects.map((row) => ({
+        id: row.stableKey,
+        name: row.name,
+        experienceId: experienceKey(row.experienceId),
+        skills: row.skills.map(skillKey).filter(isDefined),
+        directions: row.directions,
+        ownership: row.ownership,
+        eligibility: row.eligibility,
+        completion: row.completion,
+        urls: row.urls,
+        safeWording: row.safeWording,
+        limitations: row.limitations,
+        ...rowExtension(row.extensionJson),
+      })),
+    },
+    skills: {
+      ...documentMeta(documents, 'skills.json', fallbackDate),
+      skills: jobSkills.map((row) => ({
+        id: row.skillKey,
+        label: row.skillName,
+        category: row.category ?? '',
+        aliases: aliasesBySkillId.get(row.skillId) ?? [],
+        directions: [],
+        level: row.level,
+        resumeEligible: row.resumeEligible,
+        personalExplanation: row.explanation,
+        notes: row.notes,
+        evidence: row.evidence,
+        ...nonEmptyRecord(row.extension),
+      })),
+    },
+    stories: {
+      ...documentMeta(documents, 'stories.json', fallbackDate),
+      stories: stories.map((row) => ({
+        id: row.stableKey,
+        experienceId: experienceKey(row.experienceId),
+        title: row.title,
+        context: row.context,
+        situation: row.situation,
+        task: row.task,
+        action: row.action,
+        result: row.result,
+        narrative: row.narrative,
+        directions: row.directions,
+        ...rowExtension(row.extensionJson),
+      })),
+    },
+    preferences: {
+      ...documentMeta(documents, 'preferences.json', fallbackDate),
+      directionDefinitions: Object.fromEntries(
+        [...directions]
+          .sort(
+            (left, right) =>
+              left.sortOrder - right.sortOrder || left.label.localeCompare(right.label),
+          )
+          .map((row) => [row.key, { label: row.label, targetTitles: row.targetTitles }]),
+      ),
+      ...(preferencesRow
+        ? {
+            careerPreferences: {
+              locations: preferencesRow.locations,
+              workModes: preferencesRow.workModes,
+              availability: preferencesRow.availability,
+              compensation: preferencesRow.compensation,
+              notes: preferencesRow.notes,
+            },
+          }
+        : {}),
+      ...profileExtension,
+    },
+  } as CanonicalCareerData
+}
+
+function isDefined<T>(value: T | undefined): value is T {
+  return value !== undefined
+}
+
+let careerDataCache: {
+  probe: string
+  data: CanonicalCareerData
+} | null = null
+
+/**
+ * Database-owned canonical career data. The relational tables are the sole
+ * runtime authority; the result is memoized on the computed change probe
+ * (`careerContentProbe`) so a workspace render does not re-query the whole
+ * dataset, and any career, catalog, category or junction write refreshes it on
+ * the next call. An empty database yields a well-formed empty shape rather than
+ * an error.
+ */
+export function loadCareerData(executor: DbExecutor = db): CanonicalCareerData {
+  const probe = careerContentProbe(executor)
+  if (careerDataCache && careerDataCache.probe === probe) {
+    return careerDataCache.data
+  }
+  const data = loadCareerDataFromDatabase(executor)
+  careerDataCache = { probe, data }
   return data
 }
 
-export function careerSkillEvidenceMap(): Record<string, string[]> {
+export function careerSkillEvidenceMap(executor: DbExecutor = db): Record<string, string[]> {
   try {
-    const data = loadCareerData()
+    const data = loadCareerData(executor)
     return Object.fromEntries(
       data.skills.skills.map((skill) => {
         const evidence = (skill as Record<string, unknown>).evidence
@@ -351,9 +672,55 @@ export function careerSkillEvidenceMap(): Record<string, string[]> {
 }
 
 /**
+ * Resume-ineligible projects are editorial drafts: they exist in the career data
+ * but must never reach a generated document or an evidence allowlist.
+ */
+export function documentEligibleProjects<T>(projects: T[]): T[] {
+  return projects.filter(
+    (project) => (project as { eligibility?: unknown }).eligibility === 'resume-eligible',
+  )
+}
+
+/**
+ * The career sources a new document, analysis or ChatGPT context may cite.
+ * Retired records never reach `loadCareerDataFromDatabase`, and unsafe
+ * achievements/publications plus resume-ineligible projects are removed here, so
+ * no prompt, snapshot or evidence allowlist can see them. Narrative text stays
+ * attached to its record; only whole ineligible records are dropped.
+ *
+ * Publication `sourceUrls` and project `urls` are private by default: the stored
+ * career record keeps them, but every generated context derived from this
+ * function excludes them unless the caller opts in explicitly. Blanking them
+ * here (rather than at each consumer) means a new consumer cannot publish a
+ * private link by accident, and the identity hashes built from this shape change
+ * when the option changes. Pass `includeSourceUrls: true` only for an export the
+ * user deliberately asked to contain the links.
+ */
+export function documentSafeCareerData(
+  data: CanonicalCareerData,
+  options: { includeSourceUrls?: boolean } = {},
+) {
+  const includeSourceUrls = options.includeSourceUrls === true
+  return {
+    candidate: data.candidate,
+    experiences: data.experiences.experiences,
+    achievements: data.achievements.achievements.filter((item) => item.safeToUse),
+    publications: data.publications.publications
+      .filter((item) => item.safeToUse)
+      .map((item) => (includeSourceUrls ? item : { ...item, sourceUrls: [] })),
+    projects: documentEligibleProjects(data.projects.projects).map((item) =>
+      includeSourceUrls ? item : { ...item, urls: [] },
+    ),
+    skills: data.skills.skills,
+    stories: data.stories.stories,
+  }
+}
+
+/**
  * Reusable catalog of canonical source IDs. Achievements and publications are
- * included only when safeToUse; every other catalog is included in full so the
- * candidate-fit service can reject references to unsafe or ineligible sources.
+ * included only when safeToUse, projects only when resume-eligible; every other
+ * catalog is included in full so the candidate-fit service can reject references
+ * to unsafe or ineligible sources.
  */
 export function careerEvidenceIds(data: CanonicalCareerData) {
   return {
@@ -361,7 +728,7 @@ export function careerEvidenceIds(data: CanonicalCareerData) {
     achievement: new Set(
       data.achievements.achievements.filter((item) => item.safeToUse).map((item) => item.id),
     ),
-    project: new Set(data.projects.projects.map((item) => item.id)),
+    project: new Set(documentEligibleProjects(data.projects.projects).map((item) => item.id)),
     publication: new Set(
       data.publications.publications.filter((item) => item.safeToUse).map((item) => item.id),
     ),
