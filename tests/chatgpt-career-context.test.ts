@@ -1,10 +1,16 @@
 import { describe, expect, test } from 'bun:test'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { parseChatGptContextOptions } from '../src/cli/export-chatgpt-career-context'
+import {
+  exportChatGptCareerContexts,
+  parseChatGptContextOptions,
+} from '../src/cli/export-chatgpt-career-context'
 import type { FrozenBaseResumeSource } from '../src/lib/base-resumes'
 import type { CanonicalCareerData } from '../src/lib/career-data'
 import { buildChatGptCareerContext } from '../src/lib/chatgpt-career-context'
 import { loadExampleCareerData } from './support/career-data'
+import { createCareerTestDatabase } from './support/career-db'
 
 const resume: FrozenBaseResumeSource = {
   direction: 'fullstack',
@@ -120,7 +126,7 @@ describe('ChatGPT career context export', () => {
     expect(markdown).not.toContain('deliberately excluded from this file because they are private')
   })
 
-  test('selects repeatable directions and defaults output beside canonical data', () => {
+  test('selects repeatable directions and defaults output to a repository-relative directory', () => {
     const careerDataDirectory = resolve(process.cwd(), 'career-data.example')
     expect(
       parseChatGptContextOptions(
@@ -129,7 +135,7 @@ describe('ChatGPT career context export', () => {
       ),
     ).toEqual({
       directionIds: ['fhir', 'frontend'],
-      outputDirectory: resolve(careerDataDirectory, 'chatgpt-context'),
+      outputDirectory: resolve(process.cwd(), 'chatgpt-context'),
       includeSourceUrls: false,
     })
     expect(
@@ -137,5 +143,46 @@ describe('ChatGPT career context export', () => {
         CAREER_DATA_DIR: careerDataDirectory,
       }),
     ).toMatchObject({ includeSourceUrls: true })
+  })
+})
+
+describe('ChatGPT career context CLI (database-backed)', () => {
+  test('writes one valid JSON context per direction from the database', () => {
+    const database = createCareerTestDatabase()
+    const outputDirectory = mkdtempSync(resolve(tmpdir(), 'job-tracker-context-cli-'))
+    try {
+      const paths = exportChatGptCareerContexts(
+        { directionIds: [], outputDirectory, includeSourceUrls: false },
+        database.executor,
+      )
+      expect(paths).toHaveLength(1)
+      expect(paths[0]).toBe(resolve(outputDirectory, 'fullstack.json'))
+      const payload = JSON.parse(readFileSync(paths[0] as string, 'utf8')) as Record<
+        string,
+        unknown
+      >
+      expect(payload.format).toBe('chatgpt-career-context')
+      expect((payload.sourceIdentities as { baseResumes: unknown[] }).baseResumes).toHaveLength(1)
+      expect(readFileSync(paths[0] as string, 'utf8')).not.toContain('jordan.rivera@example.test')
+    } finally {
+      rmSync(outputDirectory, { force: true, recursive: true })
+      database.cleanup()
+    }
+  })
+
+  test('an unknown direction is refused before anything is written', () => {
+    const database = createCareerTestDatabase()
+    const outputDirectory = mkdtempSync(resolve(tmpdir(), 'job-tracker-context-cli-'))
+    try {
+      expect(() =>
+        exportChatGptCareerContexts(
+          { directionIds: ['not-a-direction'], outputDirectory, includeSourceUrls: false },
+          database.executor,
+        ),
+      ).toThrow('not defined in the career database')
+    } finally {
+      rmSync(outputDirectory, { force: true, recursive: true })
+      database.cleanup()
+    }
   })
 })

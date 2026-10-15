@@ -1,9 +1,13 @@
 import { mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { frozenBaseResumeSource, loadApprovedBaseResume } from '../lib/base-resumes'
-import { careerDataDirectory, loadCareerData } from '../lib/career-data'
-import { buildChatGptCareerContext } from '../lib/chatgpt-career-context'
-import { listDirections } from '../lib/directions'
+import { listCareerDirections } from '../db/career-directions'
+import { db } from '../db/client'
+import type { DbExecutor } from '../db/skill-queries'
+import {
+  buildChatGptContextJson,
+  chatGptContextFormat,
+  serializeChatGptContext,
+} from '../lib/career/chatgpt-context'
 
 type Options = {
   directionIds: string[]
@@ -15,17 +19,20 @@ type Options = {
 function usage() {
   return `Usage: bun run career:export-chatgpt-context -- [options]
 
-Exports one self-contained Markdown context per career direction. Each file
-combines the direction's approved Base Resume with safe canonical Career Data
-for use in ChatGPT or another interactive LLM workspace.
+Exports one versioned JSON ChatGPT context per career direction (${chatGptContextFormat}).
+Each file combines the direction's approved Base Resume with the safe career facts
+stored in SQLite and the direction's effective editing rules. Only the direction
+key is used in the file name, so no fact or contact detail is written to disk.
 
 Options:
-  --direction <id>       Export one direction; repeat to select more than one
-  --output <dir>         Output directory (default: <CAREER_DATA_DIR>/chatgpt-context)
+  --direction <key>      Export one direction; repeat to select more than one
+  --output <dir>         Output directory (default: ./chatgpt-context)
   --include-source-urls  Include private publication source URLs and project URLs
                          (excluded from the generated context by default)
   --help                 Show help
-`
+
+The generator never reads the legacy career-data directory and never calls
+ChatGPT. Contact details stay out of the export unless the UI explicitly opts in.`
 }
 
 function requiredValue(args: string[], index: number, option: string) {
@@ -61,49 +68,53 @@ export function parseChatGptContextOptions(
 
   return {
     directionIds: [...new Set(directionIds)],
-    outputDirectory: outputDirectory || resolve(careerDataDirectory(env), 'chatgpt-context'),
+    outputDirectory:
+      outputDirectory || resolve(env.CHATGPT_CONTEXT_DIR?.trim() || '.', 'chatgpt-context'),
     includeSourceUrls,
   }
 }
 
-export function exportChatGptCareerContexts(options: Options): string[] {
-  const careerData = loadCareerData()
-  const directions = listDirections()
-  const knownIds = new Set(directions.map((direction) => direction.id))
-  const requested = options.directionIds.length
-    ? options.directionIds.map((id) => {
-        const direction = directions.find((candidate) => candidate.id === id)
-        if (!direction)
-          throw new Error(`Direction "${id}" is not defined in preferences.directionDefinitions.`)
-        return direction
-      })
-    : directions
+/** One JSON context, direction-scoped, built from the database. */
+function contextFor(executor: DbExecutor, directionKey: string, includeSourceUrls: boolean) {
+  return serializeChatGptContext(
+    buildChatGptContextJson(executor, { directionKey, includeSourceUrls }),
+  )
+}
 
-  const documents = requested.map((direction) => {
-    const approved = loadApprovedBaseResume(direction.id, knownIds)
-    if (!approved)
-      throw new Error(`No approved Base Resume exists for direction "${direction.id}".`)
-    if (approved.stale)
-      throw new Error(
-        `Base Resume for direction "${direction.id}" changed after approval. Re-import it before exporting ChatGPT context.`,
-      )
-    return {
-      fileName: `${direction.id}.md`,
-      markdown: buildChatGptCareerContext({
-        careerData,
-        direction,
-        baseResume: frozenBaseResumeSource(approved),
-        includeSourceUrls: options.includeSourceUrls,
-      }),
+/**
+ * Exports one JSON context per requested direction. A direction without an
+ * approved Base Resume is skipped with a warning instead of failing the whole
+ * run, matching the UI preview, which states exactly which directions it omits.
+ */
+export function exportChatGptCareerContexts(options: Options, executor: DbExecutor = db): string[] {
+  const directions = listCareerDirections(executor)
+  const known = new Set(directions.map((direction) => direction.key))
+  const requested = options.directionIds.length
+    ? options.directionIds
+    : directions.map((direction) => direction.key)
+  for (const id of requested)
+    if (!known.has(id)) throw new Error(`Direction "${id}" is not defined in the career database.`)
+  const documents: Array<{ fileName: string; json: string }> = []
+  for (const directionKey of requested) {
+    try {
+      documents.push({
+        fileName: `${directionKey}.json`,
+        json: contextFor(executor, directionKey, options.includeSourceUrls),
+      })
+    } catch (error) {
+      console.warn(error instanceof Error ? error.message : error)
     }
-  })
+  }
+  if (documents.length === 0) {
+    throw new Error('No requested direction has an approved Base Resume, so nothing was exported.')
+  }
 
   mkdirSync(options.outputDirectory, { recursive: true })
-  return documents.map(({ fileName, markdown }) => {
+  return documents.map(({ fileName, json }) => {
     const destination = resolve(options.outputDirectory, fileName)
     const temporary = `${destination}.tmp-${process.pid}`
     try {
-      writeFileSync(temporary, markdown)
+      writeFileSync(temporary, json)
       renameSync(temporary, destination)
     } finally {
       rmSync(temporary, { force: true })

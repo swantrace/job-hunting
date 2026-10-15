@@ -198,3 +198,41 @@ describe('JSON import format', () => {
     expect(parsed.analysisRunDecisions).toEqual([])
   })
 })
+
+describe('legacy v4 application backup stays distinct from the career imports', () => {
+  test('a v4 portable-core payload keeps its own meaning and marker', () => {
+    const parsed = importPayloadSchema.parse({
+      schemaVersion: 4,
+      exportedAt: '2026-10-14T00:00:00.000Z',
+      companies: [{ id: 1, name: 'Acme' }],
+      skills: [{ id: 1, name: 'TypeScript' }],
+      skillAliases: [{ skillId: 1, alias: 'TS', normalizedAlias: 'ts' }],
+      contacts: [
+        { id: 1, name: 'Alex', email: 'alex@example.com', companyId: 1, companyName: 'Acme' },
+      ],
+      applications: [{ id: 1, companyId: 1, jobTitle: 'Engineer', status: 'Saved' }],
+      applicationContacts: [{ jobApplicationId: 1, contactId: 1 }],
+      followUps: [],
+      interviews: [],
+    })
+    // The v4 payload meaning is unchanged: it is still `schemaVersion: 4` with the
+    // same portable core collections, and legacy tag exports still normalize.
+    expect(parsed.schemaVersion).toBe(4)
+    expect(parsed.applications[0]).toMatchObject({ jobTitle: 'Engineer', status: 'Saved' })
+    expect(parsed.skillAliases[0]).toMatchObject({ normalizedAlias: 'ts' })
+    expect(parsed.jobPostings).toEqual([])
+    expect(parsed.applicationAnalysisRuns).toEqual([])
+  })
+
+  test('neither career format is a v4 payload', () => {
+    for (const careerFormat of ['career-dataset', 'chatgpt-career-context']) {
+      expect(() =>
+        importPayloadSchema.parse({
+          format: careerFormat,
+          schemaVersion: 1,
+          exportedAt: '2026-10-14T00:00:00.000Z',
+        }),
+      ).toThrow()
+    }
+  })
+})

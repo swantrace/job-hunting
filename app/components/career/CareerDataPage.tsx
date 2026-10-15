@@ -1,10 +1,12 @@
 import type { CareerDataView } from '../../../src/db/career-data-view'
 import { extensionObjectOrNull } from '../../../src/lib/career/json-schemas'
+import type { CareerTransferOptions } from '../../../src/lib/career/transfer-options'
 import { AppShell } from '../layout/AppShell'
 import { AchievementSection } from './AchievementSection'
 import { BaseResumeSection } from './BaseResumeSection'
 import { CareerDataSection } from './CareerDataSection'
 import { type CareerDataTab, CareerDataTabs } from './CareerDataTabs'
+import { CareerTransferSection } from './CareerTransferSection'
 import { DirectionsSection } from './DirectionsSection'
 import { EducationSection } from './EducationSection'
 import { ExperienceSection } from './ExperienceSection'
@@ -23,6 +25,7 @@ function renderActiveSection(
   includeRetired: boolean,
   skillsView: SkillView,
   view: CareerDataView,
+  transfer: CareerTransferOptions | undefined,
 ) {
   switch (activeTab) {
     case 'experience':
@@ -104,6 +107,8 @@ function renderActiveSection(
           includeRetired={includeRetired}
         />
       )
+    case 'transfer':
+      return transfer ? <CareerTransferSection {...transfer} /> : null
     default:
       return <IdentitySection candidate={view.candidate} extensions={view.candidateExtensions} />
   }
@@ -119,17 +124,20 @@ export function CareerDataPage({
   includeRetired,
   view,
   skillsView = 'mine',
+  transfer,
 }: {
   activeTab: CareerDataTab
   includeRetired: boolean
   view: CareerDataView
   skillsView?: SkillView
+  /** Import/export options; only the `transfer` tab renders them. */
+  transfer?: CareerTransferOptions
 }) {
   return (
     <AppShell title="Career data" currentPath="/career-data">
       <CareerDataTabs activeTab={activeTab} />
       <CareerDataSection activeTab={activeTab} onboardingRequired={view.onboardingRequired}>
-        {renderActiveSection(activeTab, includeRetired, skillsView, view)}
+        {renderActiveSection(activeTab, includeRetired, skillsView, view, transfer)}
       </CareerDataSection>
     </AppShell>
   )

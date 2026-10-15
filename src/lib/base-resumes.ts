@@ -146,7 +146,12 @@ export type ApprovedBaseResume = {
   stale: boolean
 }
 
-function toApprovedBaseResume(row: CareerBaseResume): ApprovedBaseResume {
+/**
+ * Projects one stored Base Resume version onto the approved-resume shape that
+ * generation, snapshots and exports consume. Shared so a database-backed export
+ * never re-derives the text/hash/stale rules by hand.
+ */
+export function toApprovedBaseResume(row: CareerBaseResume): ApprovedBaseResume {
   const sha256 = baseResumeTextHash(row.markdown)
   return {
     direction: row.directionKey,

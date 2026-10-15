@@ -7,6 +7,10 @@ export const importPayloadSchema = z
   .object({
     schemaVersion: z.number().int().positive(),
     exportedAt: z.string().optional(),
+    // A versioned career import declares its own `format` marker. A v4 application
+    // backup never has one, so rejecting it here stops a `career-dataset` or
+    // ChatGPT context from being silently parsed as an empty application backup.
+    format: z.never().optional(),
     companies: z.array(record).default([]),
     skills: z.array(record).default([]),
     skillAliases: z.array(record).default([]),

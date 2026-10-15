@@ -124,6 +124,13 @@ import { parseSkillTaxonomy } from './skills/taxonomy'
 export type CareerImportSource =
   | { kind: 'directory'; directory: string }
   | { kind: 'dataset'; json: unknown; path?: string }
+  /**
+   * An uploaded legacy career directory, already read into memory as a file map.
+   * The importer never extracts to disk: an uploaded archive is decoded by the
+   * caller and handed over as plain data, so uploaded content can never be
+   * executed or written outside the intended store.
+   */
+  | { kind: 'upload'; files: Record<string, string | null> }
 
 export type CareerImportKindCounts = { inserted: number; updated: number; unchanged: number }
 
@@ -162,6 +169,25 @@ type DirectorySnapshot = {
   files: Record<string, string | null>
 }
 
+/**
+ * The legacy career directory files the importer understands, relative to the
+ * directory root. Kept here so the filesystem reader and an uploaded archive
+ * agree on exactly which entries matter and which are ignored.
+ */
+export const careerImportDocumentFiles = [
+  'candidate.json',
+  'experiences.json',
+  'achievements.json',
+  'publications.json',
+  'projects.json',
+  'skills.json',
+  'stories.json',
+  'preferences.json',
+  'portfolio-content.json',
+] as const
+
+export const careerImportTaxonomyFile = 'skill-taxonomy.json'
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -192,19 +218,66 @@ function mergeExtensions(record: unknown, known: ReadonlySet<string>): Record<st
   return { ...asRecord(source.extensions), ...splitUnknown(source, known) }
 }
 
+/**
+ * Turns an in-memory file map (a legacy directory on disk, or the entries of an
+ * uploaded archive) into the same snapshot the directory reader produces. Every
+ * value here is inert data: a missing file is named, a file that is not valid
+ * JSON throws, and no entry is ever evaluated or written.
+ */
+function snapshotFromFiles(
+  files: Record<string, string | null>,
+  missingFile: (file: string) => string,
+): DirectorySnapshot {
+  const documents: Record<string, unknown> = {}
+  for (const file of careerImportDocumentFiles) {
+    const content = files[file]
+    if (content === undefined) {
+      if (file === 'publications.json') {
+        documents[file] = { schemaVersion: 1, lastUpdated: '1970-01-01', publications: [] }
+        continue
+      }
+      throw new Error(missingFile(file))
+    }
+    // A present-but-unreadable document is treated as absent, matching the
+    // directory reader's `existsSync` semantics for declared Base Resume files.
+    if (content === null) throw new Error(missingFile(file))
+    documents[file] = JSON.parse(content)
+  }
+  const taxonomy = files[careerImportTaxonomyFile]
+  const manifest = files[`${baseResumeDirectoryName}/${baseResumeManifestFileName}`]
+  return {
+    documents,
+    taxonomy: taxonomy ? JSON.parse(taxonomy) : null,
+    manifest: manifest ? JSON.parse(manifest) : null,
+    files,
+  }
+}
+
 function readDirectorySnapshot(directory: string): DirectorySnapshot {
   const documents = readCareerDocuments(directory)
-  const taxonomyPath = resolve(directory, 'skill-taxonomy.json')
+  const taxonomyPath = resolve(directory, careerImportTaxonomyFile)
   const taxonomy = existsSync(taxonomyPath) ? JSON.parse(readFileSync(taxonomyPath, 'utf8')) : null
   const baseResumesDirectory = resolve(directory, baseResumeDirectoryName)
   const manifestPath = resolve(baseResumesDirectory, baseResumeManifestFileName)
   const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : null
   const files: Record<string, string | null> = {}
+  for (const file of careerImportDocumentFiles) {
+    const path = resolve(directory, file)
+    if (existsSync(path)) files[file] = readFileSync(path, 'utf8')
+  }
+  if (taxonomy !== null) files[careerImportTaxonomyFile] = readFileSync(taxonomyPath, 'utf8')
+  if (manifest !== null)
+    files[`${baseResumeDirectoryName}/${baseResumeManifestFileName}`] = readFileSync(
+      manifestPath,
+      'utf8',
+    )
   const parsedManifest = baseResumeManifestSchema.safeParse(manifest)
   if (parsedManifest.success) {
     for (const entry of parsedManifest.data.resumes) {
       const path = resolve(baseResumesDirectory, entry.fileName)
-      files[entry.fileName] = existsSync(path) ? readFileSync(path, 'utf8') : null
+      files[`${baseResumeDirectoryName}/${entry.fileName}`] = existsSync(path)
+        ? readFileSync(path, 'utf8')
+        : null
     }
   }
   return { documents, taxonomy, manifest, files }
@@ -538,7 +611,7 @@ function datasetFromDirectory(snapshot: DirectorySnapshot): CareerDataset {
         directionKey: entry.direction,
         version: entry.version,
         status: 'approved' as const,
-        markdown: snapshot.files[entry.fileName] ?? '',
+        markdown: snapshot.files[`${baseResumeDirectoryName}/${entry.fileName}`] ?? '',
         contentHash: entry.sha256,
         approvedAt: entry.approvedAt,
       }))
@@ -591,20 +664,31 @@ function datasetFromDirectory(snapshot: DirectorySnapshot): CareerDataset {
   })
 }
 
+const uploadedMissingFile = (file: string) => `The uploaded career directory is missing "${file}".`
+
+function sourceSnapshot(source: CareerImportSource): DirectorySnapshot | null {
+  if (source.kind === 'directory') return readDirectorySnapshot(source.directory)
+  if (source.kind === 'upload') return snapshotFromFiles(source.files, uploadedMissingFile)
+  return null
+}
+
 function readSource(source: CareerImportSource): { dataset: CareerDataset; sourceHash: string } {
-  if (source.kind === 'directory') {
-    const snapshot = readDirectorySnapshot(source.directory)
+  const snapshot = sourceSnapshot(source)
+  if (snapshot) {
     return {
       dataset: datasetFromDirectory(snapshot),
       sourceHash: stableFingerprint(snapshot),
     }
   }
+  if (source.kind !== 'dataset') throw new Error('Unsupported career import source.')
   const json = source.path ? JSON.parse(readFileSync(source.path, 'utf8')) : source.json
   return { dataset: parseCareerDataset(json), sourceHash: stableFingerprint(json) }
 }
 
 function careerSourceHash(source: CareerImportSource): string {
-  if (source.kind === 'directory') return stableFingerprint(readDirectorySnapshot(source.directory))
+  const snapshot = sourceSnapshot(source)
+  if (snapshot) return stableFingerprint(snapshot)
+  if (source.kind !== 'dataset') throw new Error('Unsupported career import source.')
   const json = source.path ? JSON.parse(readFileSync(source.path, 'utf8')) : source.json
   return stableFingerprint(json)
 }

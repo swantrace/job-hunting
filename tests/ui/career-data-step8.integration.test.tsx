@@ -203,6 +203,7 @@ describe('career data step 8 page and fragment boundaries', () => {
       'preferences',
       'directions',
       'base-resumes',
+      'transfer',
     ])
     expect(parseCareerDataTab('achievements')).toBe('achievements')
     expect(parseCareerDataTab('forged')).toBe('identity')

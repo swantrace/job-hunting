@@ -25,7 +25,7 @@ function json(value: unknown): string {
   return JSON.stringify(value, null, 2)
 }
 
-function directionEvidenceIndex(data: CanonicalCareerData, directionId: string) {
+export function directionEvidenceIndex(data: CanonicalCareerData, directionId: string) {
   const appliesToDirection = (item: { directions: string[] }) =>
     item.directions.includes(directionId)
 
