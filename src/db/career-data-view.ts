@@ -2,18 +2,27 @@ import { asc, eq } from 'drizzle-orm'
 import { careerOnboardingRequired } from '../lib/application-readiness'
 import { extensionObjectOrNull } from '../lib/career/json-schemas'
 import { type CareerDirectionRecord, listCareerDirections } from './career-directions'
-import { type CareerCandidateRecord, readCareerCandidate } from './career-facts'
+import {
+  type CareerCandidateRecord,
+  type CareerPreferencesRecord,
+  readCareerCandidate,
+  readCareerPreferences,
+} from './career-facts'
 import {
   type CareerAchievementRecord,
   type CareerEducationRecord,
   type CareerExperienceRecord,
+  type CareerPortfolioTopicRecord,
   type CareerProjectRecord,
   type CareerPublicationRecord,
+  type CareerStoryRecord,
   listCareerAchievements,
   listCareerEducation,
   listCareerExperiences,
+  listCareerPortfolioTopics,
   listCareerProjects,
   listCareerPublications,
+  listCareerStories,
 } from './career-records'
 import { type CareerSkillRecord, listCareerSkills } from './career-skills'
 import { type CareerStateExtensionRecords, readCareerStateDocuments } from './career-state'
@@ -61,6 +70,11 @@ export type CareerDataView = {
   experiences: CareerExperienceRecord[]
   achievements: CareerAchievementRecord[]
   projects: CareerProjectRecord[]
+  stories: CareerStoryRecord[]
+  publications: CareerPublicationRecord[]
+  portfolioTopics: CareerPortfolioTopicRecord[]
+  /** The preferences singleton, or null before it is first saved. */
+  preferences: CareerPreferencesRecord | null
   /** Personal ("My skills") records; retired ones only when requested. */
   personalSkills: CareerSkillRecord[]
   /** The approved catalog a personal skill or record link may select. */
@@ -72,6 +86,7 @@ export type CareerDataView = {
   referenceExperiences: CareerExperienceRecord[]
   referenceDirections: CareerDirectionRecord[]
   referencePublications: CareerPublicationRecord[]
+  referenceProjects: CareerProjectRecord[]
   /**
    * Every target, including retired history, so a link already stored on a
    * record still resolves to a name in the list.
@@ -79,6 +94,7 @@ export type CareerDataView = {
   allExperiences: CareerExperienceRecord[]
   allDirections: CareerDirectionRecord[]
   allPublications: CareerPublicationRecord[]
+  allProjects: CareerProjectRecord[]
 }
 
 export function loadCareerDataView(
@@ -89,6 +105,7 @@ export function loadCareerDataView(
   const allExperiences = listCareerExperiences(executor, { includeRetired: true })
   const allDirections = listCareerDirections(executor, { includeRetired: true })
   const allPublications = listCareerPublications(executor, { includeRetired: true })
+  const allProjects = listCareerProjects(executor, { includeRetired: true })
   const activeOnly = <T extends { retiredAt: string | null }>(rows: T[]): T[] =>
     rows.filter((row) => row.retiredAt === null)
   const visible = <T extends { retiredAt: string | null }>(rows: T[]): T[] =>
@@ -101,14 +118,22 @@ export function loadCareerDataView(
     education: listCareerEducation(executor, { includeRetired: options.includeRetired }),
     experiences: visible(allExperiences),
     achievements: listCareerAchievements(executor, { includeRetired: options.includeRetired }),
-    projects: listCareerProjects(executor, { includeRetired: options.includeRetired }),
+    projects: visible(allProjects),
+    stories: listCareerStories(executor, { includeRetired: options.includeRetired }),
+    publications: listCareerPublications(executor, { includeRetired: options.includeRetired }),
+    portfolioTopics: listCareerPortfolioTopics(executor, {
+      includeRetired: options.includeRetired,
+    }),
+    preferences: readCareerPreferences(executor),
     personalSkills: listCareerSkills(executor, { includeRetired: options.includeRetired }),
     catalogSkills: listApprovedCatalogSkills(executor),
     referenceExperiences: activeOnly(allExperiences),
     referenceDirections: activeOnly(allDirections),
     referencePublications: activeOnly(allPublications),
+    referenceProjects: activeOnly(allProjects),
     allExperiences,
     allDirections,
     allPublications,
+    allProjects,
   }
 }

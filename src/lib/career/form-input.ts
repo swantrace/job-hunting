@@ -1,15 +1,20 @@
 import { z } from 'zod'
-import type { CareerCandidateInput } from '../../db/career-facts'
+import type { CareerCandidateInput, CareerPreferencesInput } from '../../db/career-facts'
 import type {
   CareerAchievementInput,
   CareerDatePrecision,
   CareerEducationInput,
   CareerExperienceInput,
+  CareerPortfolioTopicInput,
   CareerProjectInput,
+  CareerPublicationInput,
+  CareerPublicationStatus,
+  CareerStoryInput,
 } from '../../db/career-records'
 import type { CareerSkillInput, CareerSkillUpdateInput } from '../../db/career-skills'
 import type { CareerStateExtensionRecords } from '../../db/career-state'
-import { extensionObjectOrNull } from './json-schemas'
+import type { FieldErrors } from '../validation'
+import { type Compensation, extensionObjectOrNull } from './json-schemas'
 
 /**
  * Structured input for the career data tabs (identity, experience, education).
@@ -105,13 +110,35 @@ const optionalBoolean = z.preprocess(
 
 const optionalInteger = (min: number, max: number, label: string) =>
   z.preprocess(
-    emptyToUndefined,
-    z.coerce
-      .number()
+    (value) => {
+      if (typeof value !== 'string') return value
+      if (value.trim() === '') return undefined
+      const parsed = Number(value)
+      // A numeric string is coerced; anything else stays a string so the
+      // failure names the field instead of reporting an anonymous NaN.
+      return Number.isFinite(parsed) ? parsed : value
+    },
+    z
+      .number({ error: `${label} must be a number.` })
       .int(`${label} must be a whole number.`)
       .min(min, `${label} must be at least ${min}.`)
       .max(max, `${label} must be at most ${max}.`)
       .optional(),
+  )
+
+const requiredInteger = (min: number, max: number, label: string) =>
+  z.preprocess(
+    (value) => {
+      if (typeof value === 'number') return value
+      if (typeof value !== 'string' || value.trim() === '') return undefined
+      const parsed = Number(value)
+      return Number.isFinite(parsed) ? parsed : undefined
+    },
+    z
+      .number({ error: `${label} is required.` })
+      .int(`${label} must be a whole number.`)
+      .min(min, `${label} must be at least ${min}.`)
+      .max(max, `${label} must be at most ${max}.`),
   )
 
 const precisionField = z.preprocess(
@@ -351,11 +378,38 @@ const optionalPickerId = z.preprocess((value) => {
   return Number.isInteger(id) && id > 0 ? id : undefined
 }, z.number().int().positive().optional())
 
-/** A required single picker (the approved catalog skill a personal skill uses). */
+/**
+ * A required single picker (the approved catalog skill a personal skill uses).
+ */
 const requiredPickerId = z.preprocess((value) => {
   const id = Number(value)
   return Number.isInteger(id) && id > 0 ? id : undefined
 }, z.number({ error: 'Choose an approved catalog skill.' }).int().positive())
+
+/**
+ * Every URL line must be a real http(s) address, so an invalid source is an
+ * inline 422 instead of a repository serialization error, and a `javascript:`
+ * or other scheme can never be stored as a citable source.
+ */
+function refineHttpUrlLines(text: string | undefined, path: string, ctx: z.RefinementCtx): void {
+  for (const [index, line] of parseLineList(text).entries()) {
+    let usable = /^https?:\/\//i.test(line)
+    if (usable) {
+      try {
+        new URL(line)
+      } catch {
+        usable = false
+      }
+    }
+    if (!usable) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [path],
+        message: `URL ${index + 1} must be a valid http:// or https:// address.`,
+      })
+    }
+  }
+}
 
 /**
  * Achievement form: a claim with validated source links (experience, catalog
@@ -397,24 +451,124 @@ export const projectFormSchema = z
     expectedRevision: revisionField,
   })
   .superRefine((value, ctx) => {
-    for (const [index, line] of parseLineList(value.urls).entries()) {
-      let usable = /^https?:\/\//i.test(line)
-      if (usable) {
-        try {
-          new URL(line)
-        } catch {
-          usable = false
-        }
-      }
-      if (!usable) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['urls'],
-          message: `URL ${index + 1} must be a valid http:// or https:// address.`,
-        })
-      }
-    }
+    refineHttpUrlLines(value.urls, 'urls', ctx)
   })
+
+/**
+ * Publication author rows. The `RelationPicker`-style parallel inputs are one
+ * `authorName` per row in display order plus one `authorCandidate` index per
+ * checked row; exactly one author must be the candidate, so the authored claim
+ * of authorship is never ambiguous.
+ */
+const publicationAuthorRowSchema = z.object({
+  name: requiredLine('Author name'),
+  isCandidate: z.boolean(),
+})
+
+export const publicationAuthorsSchema = z
+  .array(publicationAuthorRowSchema)
+  .min(1, 'Add at least one author.')
+  .superRefine((rows, ctx) => {
+    if (rows.filter((row) => row.isCandidate).length !== 1)
+      ctx.addIssue({ code: 'custom', message: 'Mark exactly one author as the candidate.' })
+  })
+
+export type PublicationAuthorFormValues = z.infer<typeof publicationAuthorRowSchema>
+
+/** Reads the parallel author inputs back into ordered author rows. */
+export function parseAuthorRows(raw: Record<string, unknown>): PublicationAuthorFormValues[] {
+  const list = (value: unknown): string[] =>
+    value === undefined ? [] : Array.isArray(value) ? value.map(String) : [String(value)]
+  const candidates = new Set(list(raw.authorCandidate).map((entry) => Number(entry)))
+  return list(raw.authorName)
+    .map((name, index) => ({ name: name.trim(), isCandidate: candidates.has(index) }))
+    .filter((row) => row.name !== '')
+}
+
+/** Keeps the author rows a rejected submit carried so a 422 never loses edits. */
+export function submittedAuthorValues(
+  raw: Record<string, unknown>,
+  fallback: PublicationAuthorFormValues[],
+): PublicationAuthorFormValues[] {
+  return raw.authorName === undefined ? fallback : parseAuthorRows(raw)
+}
+
+/**
+ * Publication form. The authors are validated separately (they arrive as
+ * parallel inputs), while the http(s)-only source URLs are checked here so an
+ * unusable source is an inline 422.
+ */
+export const publicationFormSchema = z
+  .object({
+    title: requiredLine('Title', 300),
+    citation: requiredLine('Citation', 1000),
+    year: requiredInteger(1900, 2100, 'Year'),
+    status: z.preprocess(
+      (value) => (typeof value === 'string' && value !== '' ? value : 'needs-verification'),
+      z.enum(['published', 'in-review', 'preprint', 'needs-verification']),
+    ),
+    safeToUse: checkbox,
+    experienceId: optionalPickerId,
+    authorListIsTruncated: checkbox,
+    contributions: optionalText(6000),
+    sourceUrls: optionalText(6000),
+    projectIds: pickerIdList,
+    directions: pickerKeyList,
+    extensionFields: optionalText(4000),
+    expectedRevision: revisionField,
+  })
+  .superRefine((value, ctx) => {
+    refineHttpUrlLines(value.sourceUrls, 'sourceUrls', ctx)
+  })
+
+/** Portfolio topic form: title, status, order, project links, outline, details. */
+export const portfolioTopicFormSchema = z.object({
+  title: requiredLine('Topic title', 200),
+  status: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() !== '' ? value : 'draft'),
+    z.string().trim().max(80),
+  ),
+  sortOrder: optionalInteger(-10000, 10000, 'Sort order'),
+  projectIds: pickerIdList,
+  directions: pickerKeyList,
+  outline: optionalText(6000),
+  details: optionalText(6000),
+  extensionFields: optionalText(4000),
+  expectedRevision: revisionField,
+})
+
+/** Story form: the STAR narrative plus an experience link and directions. */
+export const storyFormSchema = z.object({
+  title: requiredLine('Story title', 200),
+  experienceId: optionalPickerId,
+  context: optionalText(4000),
+  situation: optionalText(4000),
+  task: optionalText(4000),
+  action: optionalText(4000),
+  result: optionalText(4000),
+  narrative: optionalText(12000),
+  directions: pickerKeyList,
+  extensionFields: optionalText(4000),
+  expectedRevision: revisionField,
+})
+
+/**
+ * Career preferences singleton. Locations and work modes are repeatable text,
+ * compensation keeps its currency/minimum/maximum/notes values (never a raw
+ * JSON control), and blank controls clear the stored value.
+ */
+export const preferencesFormSchema = z.object({
+  locations: optionalText(6000),
+  workModes: optionalText(6000),
+  availability: optionalText(600),
+  compensationCurrency: optionalText(20),
+  compensationMinimum: optionalInteger(0, 100_000_000, 'Compensation minimum'),
+  compensationMaximum: optionalInteger(0, 100_000_000, 'Compensation maximum'),
+  compensationNotes: optionalText(2000),
+  notes: optionalText(6000),
+  extensionFields: optionalText(4000),
+  expectedRevision: revisionField,
+})
 
 /** Personal skill form: an approved catalog entry plus the candidate's own detail. */
 export const personalSkillFormSchema = z.object({
@@ -433,6 +587,10 @@ export type EducationFormValues = z.infer<typeof educationFormSchema>
 export type AchievementFormValues = z.infer<typeof achievementFormSchema>
 export type ProjectFormValues = z.infer<typeof projectFormSchema>
 export type PersonalSkillFormValues = z.infer<typeof personalSkillFormSchema>
+export type StoryFormValues = z.infer<typeof storyFormSchema>
+export type PublicationFormValues = z.infer<typeof publicationFormSchema>
+export type PortfolioTopicFormValues = z.infer<typeof portfolioTopicFormSchema>
+export type PreferencesFormValues = z.infer<typeof preferencesFormSchema>
 
 export function candidateInput(values: CandidateFormValues): CareerCandidateInput {
   const authorization = {
@@ -567,6 +725,91 @@ export function personalSkillUpdateInput(values: PersonalSkillFormValues): Caree
     explanation: values.explanation ?? null,
     notes: values.notes ?? null,
     evidence: parseLineList(values.evidence),
+  }
+}
+
+export function storyInput(
+  values: StoryFormValues,
+  options: { stableKey: string },
+): CareerStoryInput {
+  return {
+    stableKey: options.stableKey,
+    experienceId: values.experienceId ?? null,
+    title: values.title,
+    context: values.context ?? null,
+    situation: values.situation ?? null,
+    task: values.task ?? null,
+    action: values.action ?? null,
+    result: values.result ?? null,
+    narrative: values.narrative ?? null,
+    directions: values.directions,
+  }
+}
+
+/** The authors are validated separately; everything else comes from the schema. */
+export function publicationInput(
+  values: PublicationFormValues,
+  options: { stableKey: string; authors: PublicationAuthorFormValues[] },
+): CareerPublicationInput {
+  return {
+    stableKey: options.stableKey,
+    title: values.title,
+    citation: values.citation,
+    year: values.year,
+    status: values.status as CareerPublicationStatus,
+    safeToUse: values.safeToUse,
+    experienceId: values.experienceId ?? null,
+    authors: options.authors,
+    authorListTruncated: values.authorListIsTruncated,
+    contributions: parseLineList(values.contributions),
+    sourceUrls: parseLineList(values.sourceUrls),
+    projectIds: values.projectIds,
+    directions: values.directions,
+  }
+}
+
+export function portfolioTopicInput(
+  values: PortfolioTopicFormValues,
+  options: { stableKey: string; details: unknown },
+): CareerPortfolioTopicInput {
+  return {
+    stableKey: options.stableKey,
+    title: values.title,
+    status: values.status,
+    sortOrder: values.sortOrder ?? 0,
+    outline: parseLineList(values.outline),
+    details: options.details,
+    projectIds: values.projectIds,
+    directions: values.directions,
+  }
+}
+
+/**
+ * Builds the preferences input. Known compensation controls overwrite their
+ * value (blank clears it) while unknown preserved compensation keys stay, so a
+ * save never silently drops an imported field.
+ */
+export function preferencesInput(
+  values: PreferencesFormValues,
+  options: { compensation?: Compensation | null } = {},
+): CareerPreferencesInput {
+  const compensation: Record<string, unknown> = { ...(options.compensation ?? {}) }
+  const known: Array<[string, string | number | undefined]> = [
+    ['currency', values.compensationCurrency],
+    ['minimum', values.compensationMinimum],
+    ['maximum', values.compensationMaximum],
+    ['notes', values.compensationNotes],
+  ]
+  for (const [key, value] of known) {
+    if (value === undefined || value === '') delete compensation[key]
+    else compensation[key] = value
+  }
+  return {
+    locations: parseLineList(values.locations),
+    workModes: parseLineList(values.workModes),
+    availability: values.availability ?? null,
+    compensation: Object.keys(compensation).length > 0 ? compensation : null,
+    notes: values.notes ?? null,
   }
 }
 
@@ -779,6 +1022,177 @@ export function personalSkillFormValues(
     explanation: record?.explanation ?? '',
     notes: record?.notes ?? '',
     evidence: formatLineList(record?.evidence),
+    expectedRevision: String(record?.revision ?? 0),
+  }
+}
+
+export type StoryFormSource = {
+  title?: string
+  experienceId?: number | null
+  context?: string | null
+  situation?: string | null
+  task?: string | null
+  action?: string | null
+  result?: string | null
+  narrative?: string | null
+  directions?: string[]
+  extension?: unknown
+  revision?: number
+}
+
+export type PublicationFormSource = {
+  title?: string
+  citation?: string
+  year?: number
+  status?: string | null
+  safeToUse?: boolean
+  experienceId?: number | null
+  authors?: Array<{ name: string; isCandidate: boolean }>
+  authorListTruncated?: boolean
+  contributions?: string[]
+  sourceUrls?: string[]
+  projectIds?: number[]
+  directions?: string[]
+  revision?: number
+}
+
+export type PortfolioTopicFormSource = {
+  title?: string
+  status?: string | null
+  sortOrder?: number
+  outline?: string[]
+  details?: unknown
+  projectIds?: number[]
+  directions?: string[]
+  revision?: number
+}
+
+export type PreferencesFormSource = {
+  locations?: string[]
+  workModes?: string[]
+  availability?: string | null
+  compensation?: Compensation | null
+  notes?: string | null
+  revision?: number
+}
+
+const PUBLICATION_STATUSES = ['published', 'in-review', 'preprint', 'needs-verification'] as const
+
+/** Only the four stored statuses are selectable; anything else is unverified. */
+function asPublicationStatus(value: string | null | undefined): CareerPublicationStatus {
+  return (PUBLICATION_STATUSES as readonly string[]).includes(value ?? '')
+    ? (value as CareerPublicationStatus)
+    : 'needs-verification'
+}
+
+export function storyFormValues(
+  record: StoryFormSource | null,
+  extensions: unknown,
+): Record<string, string> {
+  return {
+    title: record?.title ?? '',
+    experienceId:
+      record?.experienceId === null || record?.experienceId === undefined
+        ? ''
+        : String(record.experienceId),
+    context: record?.context ?? '',
+    situation: record?.situation ?? '',
+    task: record?.task ?? '',
+    action: record?.action ?? '',
+    result: record?.result ?? '',
+    narrative: record?.narrative ?? '',
+    directions: pickerSelection(record?.directions),
+    extensionFields: formatExtensionLines(extensions),
+    expectedRevision: String(record?.revision ?? 0),
+  }
+}
+
+export function publicationFormValues(
+  record: PublicationFormSource | null,
+  extensions: unknown,
+): Record<string, string> {
+  return {
+    title: record?.title ?? '',
+    citation: record?.citation ?? '',
+    year: record?.year === undefined ? '' : String(record.year),
+    status: asPublicationStatus(record?.status),
+    safeToUse: record === null || record.safeToUse !== false ? 'on' : '',
+    experienceId:
+      record?.experienceId === null || record?.experienceId === undefined
+        ? ''
+        : String(record.experienceId),
+    authorListIsTruncated: record?.authorListTruncated ? 'on' : '',
+    contributions: formatLineList(record?.contributions),
+    sourceUrls: formatLineList(record?.sourceUrls),
+    projectIds: pickerSelection(record?.projectIds),
+    directions: pickerSelection(record?.directions),
+    extensionFields: formatExtensionLines(extensions),
+    expectedRevision: String(record?.revision ?? 0),
+  }
+}
+
+/** Ordered author rows as the author editor renders them. */
+export function publicationAuthorValues(
+  record: PublicationFormSource | null,
+): PublicationAuthorFormValues[] {
+  return (record?.authors ?? []).map((author) => ({
+    name: author.name,
+    isCandidate: author.isCandidate,
+  }))
+}
+
+export type PublicationFormParse =
+  | { success: true; values: PublicationFormValues; authors: PublicationAuthorFormValues[] }
+  | { success: false; errors: FieldErrors }
+
+/**
+ * Validates a publication form together with its separately-encoded authors, so
+ * a missing or duplicated candidate author is reported as an inline error on the
+ * author control rather than a repository failure.
+ */
+export function parsePublicationForm(raw: Record<string, unknown>): PublicationFormParse {
+  const parsed = publicationFormSchema.safeParse(raw)
+  const authors = publicationAuthorsSchema.safeParse(parseAuthorRows(raw))
+  if (parsed.success && authors.success)
+    return { success: true, values: parsed.data, authors: authors.data }
+  const errors: FieldErrors = parsed.success ? {} : parsed.error.flatten().fieldErrors
+  if (!authors.success) errors.authors = authors.error.issues.map((issue) => issue.message)
+  return { success: false, errors }
+}
+
+export function portfolioTopicFormValues(
+  record: PortfolioTopicFormSource | null,
+  extensions: unknown,
+): Record<string, string> {
+  return {
+    title: record?.title ?? '',
+    status: record?.status ?? 'draft',
+    sortOrder: record?.sortOrder === undefined ? '0' : String(record.sortOrder),
+    outline: formatLineList(record?.outline),
+    details: formatFieldValue(record?.details),
+    projectIds: pickerSelection(record?.projectIds),
+    directions: pickerSelection(record?.directions),
+    extensionFields: formatExtensionLines(extensions),
+    expectedRevision: String(record?.revision ?? 0),
+  }
+}
+
+export function preferencesFormValues(
+  record: PreferencesFormSource | null,
+  extensions: unknown,
+): Record<string, string> {
+  const number = (value: number | null | undefined) =>
+    value === null || value === undefined ? '' : String(value)
+  return {
+    locations: formatLineList(record?.locations),
+    workModes: formatLineList(record?.workModes),
+    availability: record?.availability ?? '',
+    compensationCurrency: record?.compensation?.currency ?? '',
+    compensationMinimum: number(record?.compensation?.minimum),
+    compensationMaximum: number(record?.compensation?.maximum),
+    compensationNotes: record?.compensation?.notes ?? '',
+    notes: record?.notes ?? '',
+    extensionFields: formatExtensionLines(extensions),
     expectedRevision: String(record?.revision ?? 0),
   }
 }

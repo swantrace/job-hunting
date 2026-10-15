@@ -8,6 +8,8 @@ import { listDirections } from '../lib/directions'
 type Options = {
   directionIds: string[]
   outputDirectory: string
+  /** Opt-in: private publication source URLs and project URLs stay excluded by default. */
+  includeSourceUrls: boolean
 }
 
 function usage() {
@@ -18,9 +20,11 @@ combines the direction's approved Base Resume with safe canonical Career Data
 for use in ChatGPT or another interactive LLM workspace.
 
 Options:
-  --direction <id>  Export one direction; repeat to select more than one
-  --output <dir>    Output directory (default: <CAREER_DATA_DIR>/chatgpt-context)
-  --help            Show help
+  --direction <id>       Export one direction; repeat to select more than one
+  --output <dir>         Output directory (default: <CAREER_DATA_DIR>/chatgpt-context)
+  --include-source-urls  Include private publication source URLs and project URLs
+                         (excluded from the generated context by default)
+  --help                 Show help
 `
 }
 
@@ -36,10 +40,15 @@ export function parseChatGptContextOptions(
 ): Options | null {
   const directionIds: string[] = []
   let outputDirectory = ''
+  let includeSourceUrls = false
 
   for (let index = 0; index < args.length; index += 1) {
     const option = args[index]
     if (option === '--help' || option === '-h') return null
+    if (option === '--include-source-urls') {
+      includeSourceUrls = true
+      continue
+    }
     const value = requiredValue(args, index, option)
     index += 1
     if (option === '--direction') directionIds.push(value)
@@ -53,6 +62,7 @@ export function parseChatGptContextOptions(
   return {
     directionIds: [...new Set(directionIds)],
     outputDirectory: outputDirectory || resolve(careerDataDirectory(env), 'chatgpt-context'),
+    includeSourceUrls,
   }
 }
 
@@ -83,6 +93,7 @@ export function exportChatGptCareerContexts(options: Options): string[] {
         careerData,
         direction,
         baseResume: frozenBaseResumeSource(approved),
+        includeSourceUrls: options.includeSourceUrls,
       }),
     }
   })

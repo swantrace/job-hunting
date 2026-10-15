@@ -696,14 +696,30 @@ export function documentEligibleProjects<T>(projects: T[]): T[] {
  * achievements/publications plus resume-ineligible projects are removed here, so
  * no prompt, snapshot or evidence allowlist can see them. Narrative text stays
  * attached to its record; only whole ineligible records are dropped.
+ *
+ * Publication `sourceUrls` and project `urls` are private by default: the stored
+ * career record keeps them, but every generated context derived from this
+ * function excludes them unless the caller opts in explicitly. Blanking them
+ * here (rather than at each consumer) means a new consumer cannot publish a
+ * private link by accident, and the identity hashes built from this shape change
+ * when the option changes. Pass `includeSourceUrls: true` only for an export the
+ * user deliberately asked to contain the links.
  */
-export function documentSafeCareerData(data: CanonicalCareerData) {
+export function documentSafeCareerData(
+  data: CanonicalCareerData,
+  options: { includeSourceUrls?: boolean } = {},
+) {
+  const includeSourceUrls = options.includeSourceUrls === true
   return {
     candidate: data.candidate,
     experiences: data.experiences.experiences,
     achievements: data.achievements.achievements.filter((item) => item.safeToUse),
-    publications: data.publications.publications.filter((item) => item.safeToUse),
-    projects: documentEligibleProjects(data.projects.projects),
+    publications: data.publications.publications
+      .filter((item) => item.safeToUse)
+      .map((item) => (includeSourceUrls ? item : { ...item, sourceUrls: [] })),
+    projects: documentEligibleProjects(data.projects.projects).map((item) =>
+      includeSourceUrls ? item : { ...item, urls: [] },
+    ),
     skills: data.skills.skills,
     stories: data.stories.stories,
   }

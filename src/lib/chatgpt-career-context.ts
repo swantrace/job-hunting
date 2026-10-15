@@ -13,6 +13,12 @@ export type ChatGptCareerContextInput = {
   careerData: CanonicalCareerData
   direction: CareerContextDirection
   baseResume: FrozenBaseResumeSource
+  /**
+   * Publication source URLs and project URLs are private by default. Set this to
+   * `true` only when the person exporting deliberately wants those links in the
+   * file; otherwise they are excluded and the model is told not to invent them.
+   */
+  includeSourceUrls?: boolean
 }
 
 function json(value: unknown): string {
@@ -51,7 +57,8 @@ export function buildChatGptCareerContext(input: ChatGptCareerContextInput): str
       `Base Resume direction "${baseResume.direction}" does not match "${direction.id}".`,
     )
 
-  const safeData = safeCareerData(careerData)
+  const includeSourceUrls = input.includeSourceUrls === true
+  const safeData = safeCareerData(careerData, { includeSourceUrls })
   const sourceVersions = {
     candidate: careerData.candidate.lastUpdated,
     experiences: careerData.experiences.lastUpdated,
@@ -74,6 +81,11 @@ export function buildChatGptCareerContext(input: ChatGptCareerContextInput): str
     '- Canonical Career Data is the factual authority. The approved Base Resume is an editorial starting point, not a competing fact source.',
     '- Do not invent employers, dates, titles, responsibilities, metrics, skills, credentials, or outcomes.',
     '- Use only achievements and publications marked safe for use; unsafe entries have already been excluded from this file.',
+    ...(includeSourceUrls
+      ? []
+      : [
+          '- Publication source URLs and project URLs were deliberately excluded from this file because they are private. Do not invent, guess or reconstruct any URL, DOI, repository or link.',
+        ]),
     '- Prioritize the direction-specific evidence index, but use other supplied evidence when it is truthful and relevant.',
     '- If a requested claim is unsupported, identify the gap or ask for clarification instead of guessing.',
     '- Tailor wording, ordering, and emphasis to the supplied job description. Do not merely copy the Base Resume unchanged.',

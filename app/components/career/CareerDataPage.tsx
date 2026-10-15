@@ -1,4 +1,5 @@
 import type { CareerDataView } from '../../../src/db/career-data-view'
+import { extensionObjectOrNull } from '../../../src/lib/career/json-schemas'
 import { AppShell } from '../layout/AppShell'
 import { AchievementSection } from './AchievementSection'
 import { CareerDataSection } from './CareerDataSection'
@@ -6,9 +7,13 @@ import { type CareerDataTab, CareerDataTabs } from './CareerDataTabs'
 import { EducationSection } from './EducationSection'
 import { ExperienceSection } from './ExperienceSection'
 import { IdentitySection } from './IdentitySection'
+import { PortfolioSection } from './PortfolioSection'
+import { PreferencesSection } from './PreferencesSection'
 import { ProjectSection } from './ProjectSection'
+import { PublicationSection } from './PublicationSection'
 import { SkillsSection } from './SkillsSection'
 import type { SkillView } from './SkillViewTabs'
+import { StorySection } from './StorySection'
 
 /** The panel content for one active tab, rendered by the page and section routes. */
 function renderActiveSection(
@@ -50,6 +55,41 @@ function renderActiveSection(
           personalSkills={view.personalSkills}
           catalogSkills={view.catalogSkills}
           includeRetired={includeRetired}
+        />
+      )
+    case 'stories':
+      return (
+        <StorySection
+          stories={view.stories}
+          includeRetired={includeRetired}
+          experiences={view.allExperiences}
+          directions={view.allDirections}
+        />
+      )
+    case 'publications':
+      return (
+        <PublicationSection
+          publications={view.publications}
+          includeRetired={includeRetired}
+          experiences={view.allExperiences}
+          projects={view.allProjects}
+          directions={view.allDirections}
+        />
+      )
+    case 'portfolio':
+      return (
+        <PortfolioSection
+          topics={view.portfolioTopics}
+          includeRetired={includeRetired}
+          projects={view.allProjects}
+          directions={view.allDirections}
+        />
+      )
+    case 'preferences':
+      return (
+        <PreferencesSection
+          preferences={view.preferences}
+          extensions={extensionObjectOrNull(view.extensionRecords.preferences?.['$'])}
         />
       )
     default:

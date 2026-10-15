@@ -24,7 +24,11 @@ import {
 } from '../../src/db/career-skills'
 import { CareerReferenceError, CareerRevisionConflictError } from '../../src/db/career-state'
 import * as schema from '../../src/db/schema'
-import { careerEvidenceIds, loadCareerDataFromDatabase } from '../../src/lib/career-data'
+import {
+  careerEvidenceIds,
+  documentSafeCareerData,
+  loadCareerDataFromDatabase,
+} from '../../src/lib/career-data'
 import { safeCareerData } from '../../src/lib/document-draft-input'
 import { migratedDatabase } from '../support/sqlite'
 
@@ -380,6 +384,53 @@ describe('document inputs exclude unsafe, retired and ineligible sources', () =>
       expect(safe.projects.map((item) => item.id)).toEqual(['eligible'])
       expect(JSON.stringify(safe)).not.toContain('Unsafe claim.')
       expect(JSON.stringify(safe)).not.toContain('Ineligible')
+    } finally {
+      sqlite.close()
+    }
+  })
+
+  test('private publication and project URLs are excluded from documents unless explicitly included', () => {
+    const { sqlite, db } = database()
+    try {
+      createCareerPublication(db, {
+        stableKey: 'private-preprint',
+        title: 'Private preprint',
+        citation: 'Example, 2026.',
+        year: 2026,
+        status: 'preprint',
+        authors: [{ name: 'Example Candidate', isCandidate: true }],
+        sourceUrls: ['https://example.test/private-publication'],
+      })
+      createCareerProject(db, {
+        stableKey: 'private-project',
+        name: 'Private project',
+        eligibility: 'resume-eligible',
+        urls: ['https://example.test/private-project'],
+      })
+
+      // The stored record and the runtime canonical read keep the private links.
+      expect(listCareerPublications(db)[0]?.sourceUrls).toEqual([
+        'https://example.test/private-publication',
+      ])
+      const data = loadCareerDataFromDatabase(db)
+      expect(data.publications.publications[0]?.sourceUrls).toEqual([
+        'https://example.test/private-publication',
+      ])
+      expect(data.projects.projects[0]?.urls).toEqual(['https://example.test/private-project'])
+
+      // Every generated context derived from the safe shape excludes them.
+      const safe = documentSafeCareerData(data)
+      expect(safe.publications[0]?.sourceUrls).toEqual([])
+      expect(safe.projects[0]?.urls).toEqual([])
+      expect(JSON.stringify(safe)).not.toContain('private-publication')
+      expect(JSON.stringify(safe.projects)).not.toContain('https://example.test/private-project')
+
+      // The explicit opt-in still exposes them.
+      const optedIn = documentSafeCareerData(data, { includeSourceUrls: true })
+      expect(optedIn.publications[0]?.sourceUrls).toEqual([
+        'https://example.test/private-publication',
+      ])
+      expect(optedIn.projects[0]?.urls).toEqual(['https://example.test/private-project'])
     } finally {
       sqlite.close()
     }

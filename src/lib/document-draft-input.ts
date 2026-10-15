@@ -61,8 +61,11 @@ export type DocumentDraftSnapshot = {
   careerData: ReturnType<typeof safeCareerData>
 }
 
-export function safeCareerData(data: CanonicalCareerData) {
-  return documentSafeCareerData(data)
+export function safeCareerData(
+  data: CanonicalCareerData,
+  options: { includeSourceUrls?: boolean } = {},
+) {
+  return documentSafeCareerData(data, options)
 }
 
 function knownDirectionIds(executor: DbExecutor) {

@@ -13,7 +13,15 @@ export function CareerRecordActions({
   includeRetired,
   includeOrder = true,
 }: {
-  section: 'experience' | 'education' | 'achievements' | 'projects' | 'skills'
+  section:
+    | 'experience'
+    | 'education'
+    | 'achievements'
+    | 'projects'
+    | 'skills'
+    | 'stories'
+    | 'publications'
+    | 'portfolio'
   id: number
   retired: boolean
   includeRetired: boolean
