@@ -80,6 +80,21 @@ A database backup covers only `jobs.db`. Back up generated artifacts, queued
 work and legacy career-data files separately when a complete environment
 snapshot is required.
 
+### Running commands on the machine
+
+`fly ssh console` **without** `-C` opens a real shell, so multi-line scripts,
+`cd`, pipes and globs all work there. `fly ssh console -C '<command>'` does **not**
+use a shell — it execs the words directly, so `cd /app && ...`, pipes, `;` and
+globs fail with `exec: "cd": executable file not found in $PATH`. Wrap those:
+
+```sh
+fly ssh console -a job-hunting -C 'sh -c "cd /app && ls -lh /data/jobs.db*"'
+```
+
+For multi-line probes, prefer an interactive console and paste the script, and use
+an absolute path (`bun --no-install /app/src/cli/<tool>.ts`) when a single command
+is enough.
+
 ## Creating a migration
 
 1. Change `src/db/schema.ts`.
@@ -240,13 +255,18 @@ with local data, and do not import a local dataset into production.
 
    ```sh
    cd /app
-   bun run career:import --source /data/career-data --database /data/jobs.db
+   bun --no-install src/cli/import-career-data.ts --source /data/career-data --database /data/jobs.db
    ```
+
+   Run the CLI file directly rather than through `bun run`: the production image
+   installs without devDependencies, and `bun run`'s auto-install can block on the
+   network when a module is missing. Add `timeout 120` while diagnosing so a stall
+   fails instead of waiting.
 
    Importing from a dataset JSON file works the same way:
 
    ```sh
-   bun run career:import --source /data/career-data/career-dataset.json --database /data/jobs.db
+   bun --no-install src/cli/import-career-data.ts --source /data/career-data/career-dataset.json --database /data/jobs.db
    ```
 
 5. **Review conflicts and counts.** Any reported conflict blocks the whole
@@ -258,7 +278,7 @@ with local data, and do not import a local dataset into production.
 
    ```sh
    cd /app
-   bun run career:import --source /data/career-data --database /data/jobs.db --apply
+   bun --no-install src/cli/import-career-data.ts --source /data/career-data --database /data/jobs.db --apply
    ```
 
    The apply is transactional; on any validation error nothing is written.
