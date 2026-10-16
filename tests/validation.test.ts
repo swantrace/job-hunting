@@ -1,5 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { filterSchema, managedSkillSchema, quickCollectSchema } from '../src/lib/validation'
+import {
+  applicationSchema,
+  filterSchema,
+  managedSkillSchema,
+  quickCollectSchema,
+} from '../src/lib/validation'
 import { type CareerTestDatabase, careerTestDatabase } from './support/career-db'
 
 // Directions and skill categories are database-owned, so payload validation is
@@ -15,6 +20,21 @@ afterAll(() => {
 })
 
 describe('request validation', () => {
+  test('accepts 500-character compensation text in both application forms, but rejects 501', () => {
+    const payload = {
+      jobTitle: 'Engineer',
+      companyName: 'Acme',
+      direction: 'fullstack',
+      postedDate: '2026-07-12',
+      appliedDate: null,
+      priority: 'B',
+    }
+    for (const schema of [quickCollectSchema, applicationSchema]) {
+      expect(schema.parse({ ...payload, salary: 'x'.repeat(500) }).salary).toBe('x'.repeat(500))
+      expect(schema.safeParse({ ...payload, salary: 'x'.repeat(501) }).success).toBe(false)
+      expect(schema.parse({ ...payload, salary: '' }).salary).toBeNull()
+    }
+  })
   test('accepts a valid quick collect payload', () => {
     const result = quickCollectSchema.safeParse({
       jobTitle: 'Engineer',

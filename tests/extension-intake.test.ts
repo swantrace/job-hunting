@@ -86,6 +86,25 @@ describe('extension intake contract and identity', () => {
 })
 
 describe('extension API persistence', () => {
+  test('preserves 500-character compensation text from capture through application storage', () => {
+    const salary = `${'Compensation includes salary, bonus, and benefits. '.repeat(11).slice(0, 499)}.`
+    const payload = { ...item(), suggestedMetadata: { salary } }
+    expect(captureItemSchema.parse(payload).suggestedMetadata?.salary).toBe(salary)
+    expect(
+      captureItemSchema.safeParse({ ...payload, suggestedMetadata: { salary: 'x'.repeat(501) } })
+        .success,
+    ).toBe(false)
+    const accepted = acceptExtensionBatch(envelope([payload]), crypto.randomUUID())
+    const captured = extensionBatchStatus(accepted.batchId)!.items[0]
+    const prepared = prepareExtensionItem(captured.itemId)
+    expect(
+      db
+        .select()
+        .from(jobApplications)
+        .where(eq(jobApplications.id, prepared.jobApplicationId!))
+        .get()?.salary,
+    ).toBe(salary)
+  })
   test('replays identical submissions, isolates rejected items and rejects conflicting retries', () => {
     const data = envelope([item(), { ...item(), rawText: '' }])
     const key = crypto.randomUUID()

@@ -56,7 +56,7 @@ export const quickCollectSchema = z.object({
   location: optionalText(200),
   url: optionalUrl,
   postedDate: z.preprocess(emptyToNull, isoDate.nullable()),
-  salary: optionalText(150),
+  salary: optionalText(500),
   applicationSource: optionalText(150),
   jobPostText: optionalText(100000),
   parserModel: optionalText(100),
@@ -76,7 +76,7 @@ export const applicationSchema = z.object({
   priority: z.enum(priorities),
   appliedDate: z.preprocess(emptyToNull, isoDate.nullable()),
   applicationSource: optionalText(150),
-  salary: optionalText(150),
+  salary: optionalText(500),
   notes: optionalText(5000),
 })
 
