@@ -258,6 +258,30 @@ Copy `.env.example` to `.env` for local development. `.env` is ignored by Git.
 Every application route also applies same-origin CSRF validation, security
 headers, and `Cache-Control: no-store`.
 
+### Model selection
+
+Each AI stage reads its own variable and falls back to `OPENAI_MODEL_DEFAULT`; the
+defaults live in `src/ai/models.ts` and nowhere else. This repository targets the
+GPT-6 family: `gpt-6-astra` (highest intelligence), `gpt-6.1-sol` (balanced,
+near-Astra performance at lower cost — the current default) and `gpt-6-luna`
+(fastest and cheapest). No request sets `reasoning.effort`, so the `none` and
+`minimal` efforts that Astra and 6.1 Sol reject are never asked for.
+
+| Stage | Variable | What a weaker model costs you |
+| --- | --- | --- |
+| Job Description parsing and requirement extraction | `OPENAI_MODEL_JOB_PARSER` | Everything downstream is built on the extracted requirements. |
+| Candidate-fit evidence status | `OPENAI_MODEL_CANDIDATE_FIT` | Evidence status decides what the drafts may claim; a wrong `direct` breaks the truthfulness rule. |
+| Resume drafting | `OPENAI_MODEL_RESUME` | Quality of the document you send. |
+| Cover letter drafting | `OPENAI_MODEL_COVER_LETTER` | Quality of the document you send. |
+| Document review | `OPENAI_MODEL_DOCUMENT_REVIEW` | Advisory findings only; it never writes to the database. |
+
+Switching `OPENAI_MODEL_RESUME` or `OPENAI_MODEL_COVER_LETTER` marks existing
+generated documents stale (`generation-model-changed`). The analysis stages do
+**not** track the model in their input hash: switching their model leaves earlier
+analyses looking current. Bump the relevant prompt version constant in the same
+change when you want dependent data re-run, and note that the keyword audit of
+generated drafts is deterministic and costs no model call.
+
 ## Local development
 
 ```sh

@@ -1,4 +1,5 @@
 import type { Queue, Worker } from 'bunqueue/client'
+import { candidateFitModelId } from '../../ai/models'
 import { candidateFitPromptVersion } from '../../ai/prompts/candidate-fit'
 import { candidateFitSchemaVersion } from '../../ai/schemas/candidate-fit'
 import {
@@ -106,8 +107,7 @@ export async function enqueueCandidateAnalysis(
     if (!built) return null
     const reusable = findReusableAnalysisRun(jobApplicationId, built.inputHash)
     if (reusable) return { reusable: true as const, run: reusable }
-    const model =
-      process.env.OPENAI_MODEL_CANDIDATE_FIT ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
+    const model = candidateFitModelId()
     const run = createAnalysisRun({
       jobPostingAnalysisId: built.snapshot.jobAnalysis.runId,
       inputHash: built.inputHash,

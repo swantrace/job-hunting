@@ -1,6 +1,7 @@
 import type { Queue, Worker } from 'bunqueue/client'
 import { eq } from 'drizzle-orm'
 import { parseJobDescription } from '../../ai/client'
+import { jobParserModelId } from '../../ai/models'
 import { jobParserPromptVersion } from '../../ai/prompts/job-parser'
 import { jobAnalysisSchemaVersion } from '../../ai/schemas/job-analysis'
 import { db } from '../../db/client'
@@ -126,8 +127,7 @@ export async function enqueueJobAnalysis(jobPostingId: number): Promise<EnqueueJ
     if (!built) return { kind: 'missing' as const }
     const reusable = findReusableJobAnalysisRun(db, jobPostingId, built.inputHash)
     if (reusable) return { kind: 'reused' as const, run: reusable }
-    const model =
-      process.env.OPENAI_MODEL_JOB_PARSER ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
+    const model = jobParserModelId()
     const run = createJobAnalysisRun(db, {
       jobPostingId,
       inputHash: built.inputHash,

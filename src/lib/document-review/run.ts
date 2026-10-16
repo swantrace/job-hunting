@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { documentReviewModelId } from '../../ai/models'
 import {
   documentReviewPromptVersion,
   documentReviewSystemPrompt,
@@ -52,10 +53,7 @@ export async function runDocumentReview(reviewId: number): Promise<DocumentRevie
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     signal: AbortSignal.timeout(180_000),
     body: JSON.stringify({
-      model:
-        process.env.OPENAI_MODEL_DOCUMENT_REVIEW ??
-        process.env.OPENAI_MODEL_DEFAULT ??
-        'gpt-5.6-terra',
+      model: documentReviewModelId(),
       input: [
         {
           role: 'system',

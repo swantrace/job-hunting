@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { coverLetterModelId, resumeModelId } from '../../ai/models'
 import {
   baselineDraftSystemPromptFor,
   coverLetterDraftSystemPromptFor,
@@ -27,7 +28,7 @@ import { type DocumentIdentity } from '../docx/render-common'
 import { renderResumeDocx } from '../docx/resume-renderer'
 import { docxRendererVersion } from '../docx/styles'
 import type { GeneratedArtifactType } from '../generation/constants'
-import { coverLetterModelId, frozenDraftSnapshotFromRun, resumeModelId } from '../generation/input'
+import { frozenDraftSnapshotFromRun } from '../generation/input'
 import { type DocumentDraft, parseDocumentDraft } from './definition'
 import { stripMarkdownFence } from './experiment'
 import {

@@ -1,3 +1,4 @@
+import { coverLetterModelId, resumeModelId } from '../../ai/models'
 import { documentDraftPromptVersion } from '../../ai/prompts/document-draft'
 import { documentDraftSchemaVersion } from '../../ai/schemas/document-draft'
 import { listRunDecisions } from '../../db/analysis-decisions'
@@ -50,16 +51,6 @@ export type GenerationInputSnapshot = GenerationInput & {
 
 export function canonicalGenerationInputHash(input: GenerationInputParts): string {
   return canonicalHash(input)
-}
-
-export function resumeModelId() {
-  return process.env.OPENAI_MODEL_RESUME ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-sol'
-}
-
-export function coverLetterModelId() {
-  return (
-    process.env.OPENAI_MODEL_COVER_LETTER ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
-  )
 }
 
 /**

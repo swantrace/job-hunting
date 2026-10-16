@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { candidateFitModelId } from '../../ai/models'
 import { candidateFitPromptVersion, candidateFitSystemPrompt } from '../../ai/prompts/candidate-fit'
 import {
   type CandidateFit,
@@ -332,8 +333,7 @@ export async function runCandidateAnalysis(runId: number) {
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.')
   const result = await structuredCandidateFit({
     apiKey,
-    model:
-      process.env.OPENAI_MODEL_CANDIDATE_FIT ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra',
+    model: candidateFitModelId(),
     input: snapshot,
   })
   return validateCandidateAnalysisResult(result, snapshot)
