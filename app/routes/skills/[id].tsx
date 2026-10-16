@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import { createRoute } from 'honox/factory'
-import { updateSkillDetails } from '../../../src/db/queries'
+import { deleteManagedItem, updateSkillDetails } from '../../../src/db/queries'
 import { listSkillsOverview } from '../../../src/db/resource-queries'
 import { parseForm } from '../../../src/lib/request'
 import { skillReviewStatuses } from '../../../src/lib/skills/constants'
@@ -43,6 +43,24 @@ export const GET = createRoute((c) => {
         <SkillEditForm skill={skill} filters={filters(c)} mergeTargets={mergeTargets(skill.id)} />,
       )
     : c.text('Not found.', 404)
+})
+
+export const DELETE = createRoute((c) => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isSafeInteger(id) || id < 1 || !selected(id)) return c.text('Not found.', 404)
+  const deleted = deleteManagedItem('skills', id)
+  const currentFilters = filters(c)
+  return c.html(
+    <>
+      <SkillsTable skills={results(currentFilters)} filters={currentFilters} />
+      <FlashMessage tone={deleted ? 'success' : 'warning'} autoDismiss={deleted}>
+        {deleted
+          ? 'Skill and its aliases deleted.'
+          : 'This skill is referenced by career data, job analyses, decisions, or merged skills. Use merge for duplicates, or remove its references first.'}
+      </FlashMessage>
+    </>,
+    deleted ? 200 : 409,
+  )
 })
 
 export const PUT = createRoute(async (c) => {

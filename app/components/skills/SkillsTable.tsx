@@ -92,6 +92,18 @@ export function SkillsTable({
                   >
                     Edit
                   </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm text-error"
+                    hx-delete={`/skills/${skill.id}?${query}`}
+                    hx-target="#skills-results"
+                    hx-swap="outerHTML"
+                    hx-confirm={`Delete skill "${skill.name}" and its aliases? Referenced skills cannot be deleted; use merge for duplicates.`}
+                    hx-disabled-elt="this"
+                    aria-label={`Delete skill ${skill.name}`}
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

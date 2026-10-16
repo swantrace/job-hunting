@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import { createRoute } from 'honox/factory'
-import { updateManagedItem } from '../../../src/db/queries'
+import { deleteManagedItem, updateManagedItem } from '../../../src/db/queries'
 import { listCompaniesOverview, listContactsOverview } from '../../../src/db/resource-queries'
 import { parseForm } from '../../../src/lib/request'
 import { managedContactSchema } from '../../../src/lib/validation'
@@ -40,6 +40,27 @@ export const GET = createRoute((c) => {
         />,
       )
     : c.text('Not found.', 404)
+})
+export const DELETE = createRoute((c) => {
+  const id = Number(c.req.param('id'))
+  if (!Number.isSafeInteger(id) || id < 1 || !selected(id)) return c.text('Not found.', 404)
+  const deleted = deleteManagedItem('contacts', id)
+  const currentFilters = filters(c)
+  return c.html(
+    <>
+      <ContactsTable
+        contacts={results(currentFilters)}
+        companies={listCompaniesOverview()}
+        filters={currentFilters}
+      />
+      <FlashMessage tone={deleted ? 'success' : 'warning'} autoDismiss={deleted}>
+        {deleted
+          ? 'Contact deleted. Application records were kept.'
+          : 'Unable to delete this contact. It may still be in use.'}
+      </FlashMessage>
+    </>,
+    deleted ? 200 : 409,
+  )
 })
 export const PUT = createRoute(async (c) => {
   const id = Number(c.req.param('id'))

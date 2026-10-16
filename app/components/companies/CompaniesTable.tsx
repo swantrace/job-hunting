@@ -85,6 +85,18 @@ export function CompaniesTable({
                   >
                     Edit
                   </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm text-error"
+                    hx-delete={`/companies/${company.id}?${query}`}
+                    hx-target="#companies-results"
+                    hx-swap="outerHTML"
+                    hx-confirm={`Delete company "${company.name}"? Companies linked to applications or contacts cannot be deleted.`}
+                    hx-disabled-elt="this"
+                    aria-label={`Delete company ${company.name}`}
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

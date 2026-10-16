@@ -112,6 +112,18 @@ export function ContactsTable({
                   >
                     Edit
                   </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm text-error"
+                    hx-delete={`/contacts/${contact.id}?${query}`}
+                    hx-target="#contacts-results"
+                    hx-swap="outerHTML"
+                    hx-confirm={`Delete contact "${contact.name}"? This removes their application links, not the applications.`}
+                    hx-disabled-elt="this"
+                    aria-label={`Delete contact ${contact.name}`}
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}
