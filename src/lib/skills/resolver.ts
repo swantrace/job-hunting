@@ -134,9 +134,7 @@ function mentionsForTerm(
       part,
       skillKey: resolveTerm(part, ownersByTerm, catalogKeys, null),
     }))
-    if (resolvedParts.every((part) => part.skillKey)) {
-      return resolvedParts.map((part) => finalize(part.part, part.skillKey))
-    }
+    return resolvedParts.map((part) => finalize(part.part, part.skillKey))
   }
   return [finalize(rawTerm, undefined)]
 }

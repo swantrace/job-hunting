@@ -80,7 +80,7 @@ function requirement(statement: string, term: string, confidence: number) {
 }
 
 describe('canonical requirement-term persistence', () => {
-  test('stores an unknown term as a pending mention and creates no catalog record', () => {
+  test('stores an unknown term with a pending catalog record, without personal evidence', () => {
     const sqlite = migratedDatabase()
     try {
       const db = drizzle({ client: sqlite, schema })
@@ -95,8 +95,8 @@ describe('canonical requirement-term persistence', () => {
         suppliedCatalog,
       )
 
-      expect(listRequirementSkillMappings(analysisId, db)).toEqual([])
-      expect(countPendingMentions(db, analysisId)).toBe(1)
+      expect(listRequirementSkillMappings(analysisId, db)).toHaveLength(1)
+      expect(countPendingMentions(db, analysisId)).toBe(0)
       const [mention] = listRequirementMentions(
         db,
         (sqlite.query('SELECT id FROM job_requirements').get() as { id: number }).id,
@@ -104,8 +104,8 @@ describe('canonical requirement-term persistence', () => {
       expect(mention).toMatchObject({
         rawTerm: 'Apache Kafka',
         normalizedTerm: 'apache kafka',
-        mappingState: 'pending',
-        resolvedSkillId: null,
+        mappingState: 'mapped',
+        resolvedSkillId: expect.any(Number),
       })
       expect(mention.occurrences[0]).toMatchObject({
         source: 'job-analysis',
@@ -113,7 +113,10 @@ describe('canonical requirement-term persistence', () => {
         context: 'Experience with Apache Kafka.',
         confidence: 0.96,
       })
-      expect(sqlite.query('SELECT count(*) AS count FROM skills').get()).toEqual({ count: 0 })
+      expect(sqlite.query('SELECT count(*) AS count FROM skills').get()).toEqual({ count: 1 })
+      expect(sqlite.query('SELECT review_status FROM skills').get()).toEqual({
+        review_status: 'pending',
+      })
       expect(sqlite.query('SELECT count(*) AS count FROM skill_aliases').get()).toEqual({
         count: 0,
       })
@@ -280,13 +283,13 @@ describe('canonical requirement-term persistence', () => {
       expect(completed.schema_version).toBe(jobAnalysisSchemaVersion)
 
       const mappings = listRequirementSkillMappings(run.id, db)
-      expect(mappings).toHaveLength(1)
+      expect(mappings).toHaveLength(2)
       expect(mappings[0].skillKey).toBe('kafka')
       // The forged Kubernetes key created no catalog record and stays pending.
-      expect(countPendingMentions(db, run.id)).toBe(1)
+      expect(countPendingMentions(db, run.id)).toBe(0)
       expect(
         sqlite.query("SELECT count(*) AS count FROM skills WHERE key = 'kubernetes'").get(),
-      ).toEqual({ count: 0 })
+      ).toEqual({ count: 1 })
 
       // The legacy application-skill table no longer exists.
       const tables = sqlite

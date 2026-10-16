@@ -4,7 +4,6 @@ import * as schema from '../../src/db/schema'
 import {
   addSkillAlias,
   approveSkill,
-  MergeConflictError,
   mergeSkills,
   previewMerge,
   recategorizeSkill,
@@ -108,13 +107,83 @@ function seedDecision(
     .query(
       `INSERT INTO analysis_run_decisions (
         application_analysis_run_id, skill_id, decision, reason, created_at, updated_at
-      ) VALUES (?, ?, ?, NULL, '2026-08-28', '2026-08-28')`,
+      ) VALUES (?, ?, ?, ?, '2026-08-28', '2026-08-28')`,
     )
-    .run(run.id, skillId, decision)
+    .run(run.id, skillId, decision, decision === 'include' ? 'Synthetic supporting evidence' : null)
   return run.id
 }
 
 describe('transactional skill review and merge services', () => {
+  test('requires an explicit personal-level choice and preserves both evidence sets', () => {
+    const { sqlite, db } = database()
+    try {
+      const source = seedSkill(sqlite, 'source-personal', 'Source Personal')
+      const target = seedSkill(sqlite, 'target-personal', 'Target Personal')
+      const insert = sqlite.query(
+        `INSERT INTO career_skills(skill_id,level,resume_eligible,evidence_json,created_at,updated_at) VALUES(?,?,?,?,?,?)`,
+      )
+      insert.run(source.id, 'advanced', 1, '["source evidence"]', '2026-10-01', '2026-10-01')
+      insert.run(target.id, 'learning', 0, '["target evidence"]', '2026-10-01', '2026-10-01')
+      expect(() => mergeSkills(source.id, target.id, db)).toThrow(
+        'Choose which personal skill settings',
+      )
+      expect(sqlite.query('SELECT review_status FROM skills WHERE id=?').get(source.id)).toEqual({
+        review_status: 'pending',
+      })
+      mergeSkills(source.id, target.id, db, 'target')
+      const personal = sqlite
+        .query(
+          'SELECT level,resume_eligible,evidence_json,extension_json FROM career_skills WHERE skill_id=?',
+        )
+        .get(target.id) as {
+        level: string
+        resume_eligible: number
+        evidence_json: string
+        extension_json: string
+      }
+      expect(personal.level).toBe('learning')
+      expect(personal.resume_eligible).toBe(0)
+      expect(JSON.parse(personal.evidence_json)).toEqual(['target evidence', 'source evidence'])
+      expect(JSON.parse(personal.extension_json).mergedSources[0].sourceSkillKey).toBe(
+        'source-personal',
+      )
+      expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
+    } finally {
+      sqlite.close()
+    }
+  })
+
+  test('merges two Include decisions without dropping either reason', () => {
+    const { sqlite, db } = database()
+    try {
+      const source = seedSkill(sqlite, 'include-source', 'Include Source')
+      const target = seedSkill(sqlite, 'include-target', 'Include Target')
+      const run = seedDecision(sqlite, source.id, 'include')
+      sqlite
+        .query('UPDATE analysis_run_decisions SET reason=? WHERE application_analysis_run_id=?')
+        .run('Source experience', run)
+      sqlite
+        .query(
+          `INSERT INTO analysis_run_decisions(application_analysis_run_id,skill_id,decision,reason,created_at,updated_at) VALUES(?,?,'include',?,'2026-10-01','2026-10-01')`,
+        )
+        .run(run, target.id, 'Target experience')
+      mergeSkills(source.id, target.id, db)
+      const decisions = sqlite
+        .query(
+          'SELECT skill_id,decision,reason FROM analysis_run_decisions WHERE application_analysis_run_id=?',
+        )
+        .all(run) as { skill_id: number; decision: string; reason: string }[]
+      expect(decisions).toHaveLength(1)
+      expect(decisions[0].skill_id).toBe(target.id)
+      expect(decisions[0].decision).toBe('include')
+      expect(decisions[0].reason).toContain('Source experience')
+      expect(decisions[0].reason).toContain('Target experience')
+      expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
+    } finally {
+      sqlite.close()
+    }
+  })
+
   test('moves aliases and requirement links without losing relations', () => {
     const { sqlite, db } = database()
     try {
@@ -174,7 +243,7 @@ describe('transactional skill review and merge services', () => {
     }
   })
 
-  test('blocks and reports conflicting run-scoped decisions without merging', () => {
+  test('merges conflicting decisions into an explicit pending choice without AI analysis', () => {
     const { sqlite, db } = database()
     try {
       const source = seedSkill(sqlite, 'kafka', 'Kafka')
@@ -191,13 +260,21 @@ describe('transactional skill review and merge services', () => {
       expect(previewMerge(source.id, target.id, db).conflicts).toEqual([
         { runId, sourceDecision: 'skip', targetDecision: 'include' },
       ])
-      expect(() => mergeSkills(source.id, target.id, db)).toThrow(MergeConflictError)
+      mergeSkills(source.id, target.id, db)
+      const decisions = sqlite
+        .query(
+          'SELECT decision, reason FROM analysis_run_decisions WHERE application_analysis_run_id = ?',
+        )
+        .all(runId) as { decision: string; reason: string | null }[]
+      expect(decisions).toHaveLength(1)
+      expect(decisions[0].decision).toBe('pending')
+      expect(decisions[0].reason).toContain('Used in a prototype')
 
       const sourceRow = sqlite
         .query('SELECT review_status, merged_into_skill_id FROM skills WHERE id = ?')
         .get(source.id) as { review_status: string; merged_into_skill_id: number | null }
-      expect(sourceRow.review_status).toBe('pending')
-      expect(sourceRow.merged_into_skill_id).toBeNull()
+      expect(sourceRow.review_status).toBe('merged')
+      expect(sourceRow.merged_into_skill_id).toBe(target.id)
     } finally {
       sqlite.close()
     }

@@ -4,6 +4,7 @@ import {
   documentReviewPromptVersion,
   documentReviewSystemPrompt,
 } from '../../ai/prompts/document-review'
+import { openAIRequest } from '../../ai/request'
 import {
   type DocumentReview as DocumentReviewResult,
   documentReviewResponseSchema,
@@ -48,10 +49,10 @@ export async function runDocumentReview(reviewId: number): Promise<DocumentRevie
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.')
 
-  const response = await fetch('https://api.openai.com/v1/responses', {
+  const response = await openAIRequest('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(180_000),
+    timeoutMs: 180_000,
     body: JSON.stringify({
       model: documentReviewModelId(),
       reasoning: { effort: stageReasoningEffort.documentReview },

@@ -62,7 +62,7 @@ describe('application generation readiness', () => {
     expect(result.reasons).toEqual([])
   })
 
-  test('blocks generation while requirement terms are still unresolved', () => {
+  test('catalog mapping is not a generation gate after candidate decisions are complete', () => {
     const result = assessApplicationReadiness({
       hasReviewedAnalysis: true,
       analysisStatus: 'completed',
@@ -70,9 +70,7 @@ describe('application generation readiness', () => {
       hasPendingSkillMentions: true,
     })
 
-    expect(result.ready).toBe(false)
-    expect(result.reasons).toContain(
-      'Resolve every unresolved job-skill term before generating documents.',
-    )
+    expect(result.ready).toBe(true)
+    expect(result.reasons).toEqual([])
   })
 })

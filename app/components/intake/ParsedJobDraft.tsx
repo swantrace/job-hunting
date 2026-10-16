@@ -26,7 +26,7 @@ export function ParsedJobDraft({
         values={{
           jobTitle: parsed.jobTitle,
           location: parsed.location ?? '',
-          postedDate: parsed.postedDate ?? todayISO(),
+          postedDate: parsed.postedDate ?? '',
           skills: '',
           salary: parsed.salary ?? '',
           direction: parsed.direction,

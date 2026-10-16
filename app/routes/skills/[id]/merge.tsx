@@ -50,7 +50,14 @@ export const POST = createRoute(async (c) => {
       422,
     )
   try {
-    mergeSkills(sourceId, targetId)
+    mergeSkills(
+      sourceId,
+      targetId,
+      undefined,
+      form.personalResolution === 'source' || form.personalResolution === 'target'
+        ? form.personalResolution
+        : undefined,
+    )
   } catch (error) {
     return c.html(
       <SkillEditForm

@@ -92,15 +92,19 @@ export async function processJobIntakeBatch(batchId: number) {
 }
 
 export function enqueueJobIntakeBatch(batchId: number) {
-  void processJobIntakeBatch(batchId).catch((error) =>
-    console.error('Job intake batch processing failed', error),
-  )
+  void import('./extension-queue')
+    .then(async ({ enqueueLegacyIntake }) => {
+      for (const item of listJobIntakeItems(batchId))
+        if (item.status === 'pending') await enqueueLegacyIntake(item.id)
+    })
+    .catch((error) => console.error('Job intake batch dispatch failed', error))
 }
 
 export async function recoverPendingJobIntakeItems() {
+  const { enqueueLegacyIntake } = await import('./extension-queue')
   for (const item of listPendingJobIntakeItems()) {
     try {
-      await processJobIntakeItem(item.id)
+      await enqueueLegacyIntake(item.id)
     } catch (error) {
       console.error('Job intake recovery failed', item.id, error)
     }

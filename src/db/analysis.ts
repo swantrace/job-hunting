@@ -1,5 +1,5 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
-import { todayISO } from '../lib/date'
+import { nowISO, todayISO } from '../lib/date'
 import { careerSkillKeys } from '../lib/skills/runtime-career-skills'
 import { seedPendingRunDecisions } from './analysis-decisions'
 import { db } from './client'
@@ -13,6 +13,7 @@ import {
   jobRequirementsToSkills,
   skills,
 } from './schema'
+import { listRunSkillReviews } from './skill-queries'
 
 export type { ApplicationAnalysisRun }
 
@@ -141,7 +142,7 @@ export function latestCompletedAnalysisRun(jobApplicationId: number) {
 }
 
 export function markAnalysisRunProcessing(runId: number) {
-  const date = todayISO()
+  const date = nowISO()
   db.update(applicationAnalysisRuns)
     .set({
       status: 'Processing',
@@ -181,23 +182,9 @@ export function completeAnalysisRun(runId: number, resultJson: string) {
     // explicit lineage seed no decisions.
     const jobPostingAnalysisId = run.jobPostingAnalysisId
     if (jobPostingAnalysisId !== null) {
-      const canonicalKeys = careerSkillKeys()
-      const missingSkillIds = [
-        ...new Set(
-          tx
-            .select({ skillId: jobRequirementsToSkills.skillId, skillKey: skills.key })
-            .from(jobRequirementsToSkills)
-            .innerJoin(
-              jobRequirements,
-              eq(jobRequirements.id, jobRequirementsToSkills.jobRequirementId),
-            )
-            .innerJoin(skills, eq(skills.id, jobRequirementsToSkills.skillId))
-            .where(eq(jobRequirements.jobPostingAnalysisId, jobPostingAnalysisId))
-            .all()
-            .filter((row) => !canonicalKeys.has(row.skillKey))
-            .map((row) => row.skillId),
-        ),
-      ]
+      const missingSkillIds = listRunSkillReviews(runId, tx)
+        .filter((row) => row.analysisResult === 'not-in-career-data')
+        .map((row) => row.skillId)
       seedPendingRunDecisions(tx, runId, missingSkillIds)
     }
   })

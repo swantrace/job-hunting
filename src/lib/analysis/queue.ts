@@ -42,7 +42,7 @@ async function getQueue() {
   queue ??= new bunQueue.Queue<AnalysisQueueJob>(queueName, {
     embedded: true,
     dataPath: queueDataPath(),
-    defaultJobOptions: { attempts: 3, backoff: 10_000, timeout: 240_000, durable: true },
+    defaultJobOptions: { attempts: 1, backoff: 10_000, timeout: 900_000, durable: true },
   })
   return queue
 }
@@ -54,6 +54,7 @@ async function processAnalysis(
   const run = getAnalysisRun(runId)
   if (!run) return { runId }
   if (run.status === 'Completed') return { runId: run.id }
+  if (run.status === 'Processing') return { runId: run.id }
   markAnalysisRunProcessing(run.id)
   await updateProgress(10, 'Running candidate analysis')
   try {
@@ -79,7 +80,7 @@ export async function startAnalysisWorker() {
     {
       embedded: true,
       dataPath: queueDataPath(),
-      concurrency: 1,
+      concurrency: 3,
       heartbeatInterval: 10_000,
     },
   )
@@ -98,6 +99,7 @@ export type EnqueueAnalysisResult =
  */
 export async function enqueueCandidateAnalysis(
   jobApplicationId: number,
+  persisted?: (run: { id: number }) => void,
 ): Promise<EnqueueAnalysisResult> {
   const { buildCandidateAnalysisInput } = await import('../candidate/analysis')
   // Build and persist the frozen snapshot in one read transaction: the worker
@@ -119,22 +121,28 @@ export async function enqueueCandidateAnalysis(
     return { reusable: false as const, run }
   })
   if (!outcome) return { run: null, reused: false, reason: 'missing-analysis' }
-  if (outcome.reusable) return { run: outcome.run, reused: true }
   const run = outcome.run
+  persisted?.(run)
+  await dispatchCandidateAnalysisRun(run.id)
+  return { run, reused: outcome.reusable }
+}
 
+/** Continue the exact frozen run after a failed outbox dispatch. */
+export async function dispatchCandidateAnalysisRun(runId: number) {
+  const run = getAnalysisRun(runId)
+  if (!run || run.status !== 'Queued') return
   const persistentQueue = await getQueue()
   if (!persistentQueue) {
     void processAnalysis(run.id, async () => undefined).catch((error) =>
       console.error('Development candidate analysis failed', error),
     )
-    return { run, reused: false }
+    return
   }
   await persistentQueue.add(
     'analyze-candidate',
     { runId: run.id },
     { jobId: run.queueJobId, durable: true },
   )
-  return { run, reused: false }
 }
 
 export async function recoverQueuedAnalysisRuns() {

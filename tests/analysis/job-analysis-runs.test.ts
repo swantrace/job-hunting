@@ -340,9 +340,9 @@ describe('job analysis completion transaction', () => {
           .from(schema.jobApplications)
           .where(eq(schema.jobApplications.id, application.id))
           .get()
-        expect(updated?.jobTitle).toBe('Senior Platform Engineer')
+        expect(updated?.jobTitle).toBe('Imported job')
         expect(updated?.location).toBe('Existing location')
-        expect(updated?.postedDate).toBe('2026-08-15')
+        expect(updated?.postedDate).toBe('2026-08-28')
         expect(updated?.salary).toBe('Existing salary')
       } finally {
         sqlite.close()

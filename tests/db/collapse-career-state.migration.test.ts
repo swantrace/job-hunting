@@ -226,7 +226,7 @@ describe('career_state collapse migration (0029)', () => {
 
       // The schema is 36 application tables and the singleton is gone.
       const tables = tableNames(sqlite)
-      expect(tables).toHaveLength(36)
+      expect(tables).toHaveLength(37)
       expect(tables).not.toContain('career_state')
 
       // Every career row count and direction link survives.
@@ -358,7 +358,7 @@ describe('career_state collapse migration (0029)', () => {
     try {
       migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
       const tables = tableNames(sqlite)
-      expect(tables).toHaveLength(36)
+      expect(tables).toHaveLength(37)
       expect(tables).not.toContain('career_state')
       const columns = (table: string) =>
         sqlite

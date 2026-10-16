@@ -1,5 +1,5 @@
 import { jsxRenderer } from 'hono/jsx-renderer'
-import { Link } from 'honox/server'
+import { Link, Script } from 'honox/server'
 
 export default jsxRenderer(({ children }) => (
   <html lang="en">
@@ -28,6 +28,7 @@ htmx.config.responseHandling = [
     <body>
       <div id="flash" class="toast toast-top toast-center z-50" aria-live="polite"></div>
       {children}
+      <Script src="/app/review.ts" />
       <script
         dangerouslySetInnerHTML={{
           __html: `

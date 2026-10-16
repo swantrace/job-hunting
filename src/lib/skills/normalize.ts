@@ -21,7 +21,7 @@ export function normalizeSkillAlias(value: string) {
  */
 export function splitCompositeSkillTerm(value: string): string[] {
   const parts = value
-    .split(/\s*(?:,|\/|&|\+| and | plus )\s*/i)
+    .split(/\s*(?:,|\/|&|(?<!\+)\+(?!\+)| and | plus )\s*/i)
     .map((part) => part.trim())
     .filter((part) => part !== '')
   const distinct = new Map<string, string>()

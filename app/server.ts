@@ -7,10 +7,12 @@ import {
 } from '../src/lib/document-review/queue'
 import { recoverQueuedGenerationRuns, startGenerationWorker } from '../src/lib/generation/queue'
 import { recoverQueuedJobAnalysisRuns, startJobAnalysisWorker } from '../src/lib/job-analysis/queue'
+import { startExtensionIntakeRecovery } from '../src/lib/job-intake/extension-queue'
 import { recoverPendingJobIntakeItems } from '../src/lib/job-intake/queue'
 
 console.log('run createApp')
 assertDatabaseReady()
+startExtensionIntakeRecovery()
 void startGenerationWorker()
 void startAnalysisWorker()
 void startJobAnalysisWorker()

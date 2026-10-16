@@ -7,6 +7,7 @@ import {
   jobAnalysisSystemPrompt,
 } from './prompts/job-analysis'
 import { jobParserPromptVersion, jobParserSystemPrompt } from './prompts/job-parser'
+import { openAIRequest } from './request'
 import type { JobAnalysis } from './schemas/job-analysis'
 import {
   jobAnalysisCombinedResponseSchema,
@@ -98,14 +99,14 @@ export async function parseJobDescription(
     .join(', ')
   let response: Response
   try {
-    response = await fetch('https://api.openai.com/v1/responses', {
+    response = await openAIRequest('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'X-Client-Request-Id': crypto.randomUUID(),
       },
-      signal: AbortSignal.timeout(timeoutMs),
+      timeoutMs: timeoutMs,
       body: JSON.stringify({
         model,
         reasoning: { effort: stageReasoningEffort.jobParser },

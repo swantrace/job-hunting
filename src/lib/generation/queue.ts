@@ -49,7 +49,7 @@ async function getQueue() {
   queue ??= new bunQueue.Queue<GenerationQueueJob>(queueName, {
     embedded: true,
     dataPath: queueDataPath(),
-    defaultJobOptions: { attempts: 3, backoff: 10_000, timeout: 180_000, durable: true },
+    defaultJobOptions: { attempts: 1, backoff: 10_000, timeout: 900_000, durable: true },
   })
   return queue
 }

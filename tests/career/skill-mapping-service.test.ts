@@ -137,6 +137,15 @@ function persistPending(
     '2026-10-14',
     [],
   )
+  // Explicitly seed the manual mapping state. Production intake now resolves
+  // or creates pending catalog entries automatically, without this UI gate.
+  for (const mention of loadAnalysisMapping(target.executor, analysisId).mentions) {
+    target.sqlite
+      .query(
+        "UPDATE job_requirement_skill_mentions SET mapping_state = 'pending', resolved_skill_id = NULL WHERE id = ?",
+      )
+      .run(mention.id)
+  }
 }
 
 function setup(): Seeded {
@@ -349,7 +358,7 @@ describe('explicit Skip and returning to pending', () => {
     }
   })
 
-  test('unmap and unskip both return a mention to pending and re-block readiness', () => {
+  test('unmap and unskip preserve pending mapping state without imposing a catalog gate', () => {
     const seeded = setup()
     try {
       const mention = mentionByTerm(seeded, 'Kubernetes')
@@ -361,9 +370,7 @@ describe('explicit Skip and returning to pending', () => {
           hasPendingSkillMentions:
             countPendingMentions(seeded.target.executor, seeded.analysisId) > 0,
         })
-      const blockedReason = 'Resolve every unresolved job-skill term before generating documents.'
-
-      expect(readiness()).toEqual({ ready: false, reasons: [blockedReason] })
+      expect(readiness()).toEqual({ ready: true, reasons: [] })
 
       saveMentionMapping(seeded.target.executor, mention.id, seeded.kubernetesId)
       expect(countPendingMentions(seeded.target.executor, seeded.analysisId)).toBe(1)
@@ -386,7 +393,7 @@ describe('explicit Skip and returning to pending', () => {
       expect(readiness()).toEqual({ ready: true, reasons: [] })
 
       resetMention(seeded.target.executor, mention.id)
-      expect(readiness()).toEqual({ ready: false, reasons: [blockedReason] })
+      expect(readiness()).toEqual({ ready: true, reasons: [] })
     } finally {
       seeded.target.cleanup()
     }

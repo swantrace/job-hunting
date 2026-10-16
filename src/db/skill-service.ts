@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { nowISO } from '../lib/date'
 import { normalizeSkillAlias } from '../lib/skills/normalize'
 import { resolveSkillInput, type SkillResolver } from '../lib/skills/resolve'
@@ -6,6 +6,9 @@ import type { SkillCategory } from '../lib/skills/taxonomy'
 import { db } from './client'
 import {
   analysisRunDecisions,
+  careerAchievementSkills,
+  careerProjectSkills,
+  careerSkills,
   jobRequirementSkillMentions,
   jobRequirementsToSkills,
   type Skill,
@@ -20,12 +23,6 @@ export type MergeConflict = {
   runId: number
   sourceDecision: 'skip' | 'include'
   targetDecision: 'skip' | 'include'
-}
-
-export class MergeConflictError extends Error {
-  constructor(readonly conflicts: MergeConflict[]) {
-    super('Cannot merge: one or more analysis runs have conflicting decisions.')
-  }
 }
 
 function resolverFor(tx: DbExecutor): SkillResolver {
@@ -149,15 +146,108 @@ export function previewMerge(sourceId: number, targetId: number, executor: Skill
   }
 }
 
-export function mergeSkills(sourceId: number, targetId: number, executor: SkillDb = db) {
+export function mergeSkills(
+  sourceId: number,
+  targetId: number,
+  executor: SkillDb = db,
+  personalResolution?: 'source' | 'target',
+) {
   if (sourceId === targetId) throw new Error('A skill cannot be merged into itself.')
-  const conflicts = previewMerge(sourceId, targetId, executor).conflicts
-  if (conflicts.length) throw new MergeConflictError(conflicts)
 
   const date = nowISO()
   return executor.transaction((tx) => {
     const source = requireActiveSkill(tx, sourceId)
     const target = requireActiveSkill(tx, targetId)
+    for (const label of [source.name, source.key]) {
+      const normalized = normalizeSkillAlias(label)
+      const owner = tx
+        .select()
+        .from(skillAliases)
+        .where(eq(skillAliases.normalizedAlias, normalized))
+        .get()
+      const keyOwner = tx.select().from(skills).where(eq(skills.key, normalized)).get()
+      if (
+        (owner && owner.skillId !== sourceId && owner.skillId !== targetId) ||
+        (keyOwner && keyOwner.id !== sourceId && keyOwner.id !== targetId)
+      )
+        throw new Error(`Alias "${label}" is owned by another skill.`)
+      if (!owner) addSkillAlias(targetId, label, 'manual', tx)
+    }
+
+    // Transfer concrete career FKs as well as requirement mappings.
+    for (const table of [careerAchievementSkills, careerProjectSkills]) {
+      const entityColumn = 'achievementId' in table ? table.achievementId : table.projectId
+      for (const link of tx.select().from(table).where(eq(table.skillId, sourceId)).all()) {
+        const entityId = 'achievementId' in link ? link.achievementId : link.projectId
+        const collision = tx
+          .select()
+          .from(table)
+          .where(and(eq(entityColumn, entityId), eq(table.skillId, targetId)))
+          .get()
+        if (collision)
+          tx.delete(table)
+            .where(and(eq(entityColumn, entityId), eq(table.skillId, sourceId)))
+            .run()
+        else
+          tx.update(table)
+            .set({ skillId: targetId })
+            .where(and(eq(entityColumn, entityId), eq(table.skillId, sourceId)))
+            .run()
+      }
+    }
+    const personalSource = tx
+      .select()
+      .from(careerSkills)
+      .where(eq(careerSkills.skillId, sourceId))
+      .get()
+    const personalTarget = tx
+      .select()
+      .from(careerSkills)
+      .where(eq(careerSkills.skillId, targetId))
+      .get()
+    if (personalSource && personalTarget) {
+      const differs =
+        personalSource.level !== personalTarget.level ||
+        personalSource.resumeEligible !== personalTarget.resumeEligible ||
+        personalSource.retiredAt !== personalTarget.retiredAt
+      if (differs && !personalResolution)
+        throw new Error(
+          'Personal proficiency or eligibility differs. Choose which personal skill settings to retain.',
+        )
+      const selected = personalResolution === 'source' ? personalSource : personalTarget
+      const sourceEvidence = JSON.parse(personalSource.evidenceJson) as string[]
+      const targetEvidence = JSON.parse(personalTarget.evidenceJson) as string[]
+      const extensions = JSON.parse(personalTarget.extensionJson ?? '{}') as Record<string, unknown>
+      const mergedSources = Array.isArray(extensions.mergedSources) ? extensions.mergedSources : []
+      tx.update(careerSkills)
+        .set({
+          level: selected.level,
+          resumeEligible: selected.resumeEligible,
+          retiredAt: selected.retiredAt,
+          evidenceJson: JSON.stringify([...new Set([...targetEvidence, ...sourceEvidence])]),
+          explanation:
+            [personalTarget.explanation, personalSource.explanation].filter(Boolean).join('\n\n') ||
+            null,
+          notes: [personalTarget.notes, personalSource.notes].filter(Boolean).join('\n\n') || null,
+          extensionJson: JSON.stringify({
+            ...extensions,
+            mergedSources: [
+              ...mergedSources,
+              { sourceSkillKey: source.key, record: personalSource },
+            ],
+          }),
+          revision: personalTarget.revision + 1,
+          updatedAt: date,
+        })
+        .where(eq(careerSkills.id, personalTarget.id))
+        .run()
+      tx.delete(careerSkills).where(eq(careerSkills.id, personalSource.id)).run()
+    } else if (personalSource) {
+      tx.update(careerSkills)
+        .set({ skillId: targetId, revision: personalSource.revision + 1, updatedAt: date })
+        .where(eq(careerSkills.id, personalSource.id))
+        .run()
+    }
 
     const sourceAliases = tx
       .select()
@@ -187,7 +277,7 @@ export function mergeSkills(sourceId: number, targetId: number, executor: SkillD
       .all()
     for (const mention of sourceMentions) {
       tx.update(jobRequirementSkillMentions)
-        .set({ resolvedSkillId: targetId, updatedAt: date })
+        .set({ resolvedSkillId: targetId, revision: mention.revision + 1, updatedAt: date })
         .where(eq(jobRequirementSkillMentions.id, mention.id))
         .run()
     }
@@ -198,6 +288,52 @@ export function mergeSkills(sourceId: number, targetId: number, executor: SkillD
       .where(eq(analysisRunDecisions.skillId, sourceId))
       .all()
     for (const decision of sourceDecisions) {
+      const targetDecision = tx
+        .select()
+        .from(analysisRunDecisions)
+        .where(
+          and(
+            eq(analysisRunDecisions.applicationAnalysisRunId, decision.applicationAnalysisRunId),
+            eq(analysisRunDecisions.skillId, targetId),
+          ),
+        )
+        .get()
+      if (targetDecision) {
+        const conflict =
+          isDecided(decision.decision) &&
+          isDecided(targetDecision.decision) &&
+          decision.decision !== targetDecision.decision
+        const selected = targetDecision.decision === 'pending' ? decision : targetDecision
+        // Keep the originating catalog/decision identities with every reason,
+        // even when the user supplied identical prose for both skills.
+        const reasons = [
+          { row: targetDecision, skill: target },
+          { row: decision, skill: source },
+        ]
+          .filter(({ row }) => !!row.reason)
+          .map(
+            ({ row, skill }) =>
+              `${skill.name} [${skill.key}; skill ${skill.id}; decision ${row.id}; ${row.decision}]:\n${row.reason}`,
+          )
+        const reason = conflict
+          ? `Merge conflict: ${source.name} was ${decision.decision}; ${target.name} was ${targetDecision.decision}.\n${reasons.join('\n\n')}`
+          : reasons.join('\n\n') || null
+        tx.update(analysisRunDecisions)
+          .set({ decision: conflict ? 'pending' : selected.decision, reason, updatedAt: date })
+          .where(eq(analysisRunDecisions.id, targetDecision.id))
+          .run()
+        tx.update(analysisRunDecisions)
+          .set({ previousDecisionId: targetDecision.id })
+          .where(
+            and(
+              eq(analysisRunDecisions.previousDecisionId, decision.id),
+              sql`${analysisRunDecisions.id} != ${targetDecision.id}`,
+            ),
+          )
+          .run()
+        tx.delete(analysisRunDecisions).where(eq(analysisRunDecisions.id, decision.id)).run()
+        continue
+      }
       tx.update(analysisRunDecisions)
         .set({ skillId: targetId, updatedAt: date })
         .where(eq(analysisRunDecisions.id, decision.id))

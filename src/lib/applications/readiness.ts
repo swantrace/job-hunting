@@ -6,6 +6,7 @@ import { getJobAnalysisState } from '../../db/job-analysis-runs'
 import { getApplication } from '../../db/queries'
 import { countPendingMentions } from '../../db/skill-mentions'
 import type { DbExecutor } from '../../db/skill-queries'
+import { listRunSkillReviews } from '../../db/skill-queries'
 import { getCandidateAnalysisState } from '../candidate/analysis'
 import { currentJobAnalysisHash } from '../job-analysis/input'
 
@@ -66,8 +67,6 @@ export function assessApplicationReadiness(input: ApplicationReadinessInput): Ap
     reasons.push('Candidate analysis is stale — re-run it before generating documents.')
   if (input.hasPendingSkillDecisions)
     reasons.push('Resolve every missing-skill decision before generating documents.')
-  if (input.hasPendingSkillMentions)
-    reasons.push('Resolve every unresolved job-skill term before generating documents.')
   return { ready: reasons.length === 0, reasons }
 }
 
@@ -92,7 +91,12 @@ export function getApplicationReadiness(jobId: number): ApplicationReadiness {
   return assessApplicationReadiness({
     hasReviewedAnalysis,
     analysisStatus,
-    hasPendingSkillDecisions: current ? hasPendingRunDecisions(db, current.id) : true,
+    hasPendingSkillDecisions: current
+      ? hasPendingRunDecisions(db, current.id) ||
+        listRunSkillReviews(current.id).some(
+          (r) => r.analysisResult !== 'proven-match' && r.decision === 'pending',
+        )
+      : true,
     hasPendingSkillMentions: jobState?.currentCompleted
       ? countPendingMentions(db, jobState.currentCompleted.id) > 0
       : false,

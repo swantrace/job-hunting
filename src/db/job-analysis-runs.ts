@@ -5,6 +5,7 @@ import { type JobAnalysis, jobAnalysisSchemaVersion } from '../ai/schemas/job-an
 import { type AnalysisRunState, classifyAnalysisRunState } from '../lib/analysis/run-state'
 import { nowISO, todayISO } from '../lib/date'
 import { frozenSuppliedCatalog } from '../lib/job-analysis/input'
+import { adoptAiFacts } from '../lib/job-intake/provenance'
 import type { CareerDb } from './career-shared'
 import type { db } from './client'
 import { persistJobRequirements } from './job-analysis'
@@ -98,7 +99,7 @@ export function findReusableJobAnalysisRun(
 }
 
 export function markJobAnalysisRunProcessing(db: JobAnalysisDb, runId: number) {
-  const date = todayISO()
+  const date = nowISO()
   db.update(jobPostingAnalyses)
     .set({
       status: 'Processing',
@@ -152,14 +153,23 @@ export function completeJobAnalysisRun(db: JobAnalysisDb, runId: number, parsed:
     // of them afterwards; the model only proposes. Unknown parser values never
     // overwrite an existing field, so batch-import placeholders keep working
     // while re-analysis never clears confirmed user data.
-    const applicationUpdates: Partial<typeof jobApplications.$inferInsert> = {
+    const application = tx
+      .select()
+      .from(jobApplications)
+      .where(eq(jobApplications.id, posting.jobApplicationId))
+      .get()!
+    const adopted = adoptAiFacts(application.fieldProvenanceJson, {
       direction: parsed.direction,
+      jobTitle: parsed.jobTitle,
+      location: parsed.location,
+      postedDate: parsed.postedDate,
+      salary: parsed.salary,
+    })
+    const applicationUpdates: Partial<typeof jobApplications.$inferInsert> = {
+      ...(adopted.updates as Partial<typeof jobApplications.$inferInsert>),
+      fieldProvenanceJson: adopted.json,
       updatedAt: date,
     }
-    if (parsed.jobTitle) applicationUpdates.jobTitle = parsed.jobTitle
-    if (parsed.location) applicationUpdates.location = parsed.location
-    if (parsed.postedDate) applicationUpdates.postedDate = parsed.postedDate
-    if (parsed.salary) applicationUpdates.salary = parsed.salary
     tx.update(jobApplications)
       .set(applicationUpdates)
       .where(eq(jobApplications.id, posting.jobApplicationId))

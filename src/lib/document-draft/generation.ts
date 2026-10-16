@@ -12,6 +12,7 @@ import {
   documentDraftPromptVersion,
   resumeDraftSystemPromptFor,
 } from '../../ai/prompts/document-draft'
+import { openAIRequest } from '../../ai/request'
 import {
   documentMarkdownResponseSchema,
   documentMarkdownSchema,
@@ -65,10 +66,10 @@ async function callMarkdown(args: {
   system: string
   input: DocumentDraftSnapshot
 }): Promise<string> {
-  const response = await fetch('https://api.openai.com/v1/responses', {
+  const response = await openAIRequest('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { Authorization: `Bearer ${args.apiKey}`, 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(180_000),
+    timeoutMs: 180_000,
     body: JSON.stringify({
       model: args.model,
       reasoning: { effort: args.effort },
