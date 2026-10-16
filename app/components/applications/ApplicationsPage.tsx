@@ -1,8 +1,10 @@
 import { type Filters, listApplications } from '../../../src/db/queries'
+import { latestAnalysisBatchId } from '../../../src/lib/analysis/batch'
 import { Board, Filters as FiltersForm, WorkspaceDrawer } from '../dashboard/Dashboard'
 import { AppShell } from '../layout/AppShell'
 import { Icon } from '../ui/Icon'
 import { AiParserModal } from './AiParserModal'
+import { BatchAnalysisStatus } from './BatchAnalysisStatus'
 import { QuickCollectDrawer } from './QuickCollectDrawer'
 
 export function ApplicationsPage({ filters }: { filters: Filters }) {
@@ -38,6 +40,7 @@ export function ApplicationsPage({ filters }: { filters: Filters }) {
       <WorkspaceDrawer>
         <QuickCollectDrawer filters={filters}>
           <FiltersForm filters={filters} />
+          <BatchAnalysisStatus batchId={latestAnalysisBatchId()} />
           <Board jobs={jobs} filters={filters} />
         </QuickCollectDrawer>
       </WorkspaceDrawer>

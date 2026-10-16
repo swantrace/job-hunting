@@ -1,5 +1,6 @@
 import { createApp } from 'honox/server'
 import { assertDatabaseReady } from '../src/db/health'
+import { startBatchAnalysisRecovery } from '../src/lib/analysis/batch'
 import { recoverQueuedAnalysisRuns, startAnalysisWorker } from '../src/lib/analysis/queue'
 import {
   recoverQueuedDocumentReviews,
@@ -12,6 +13,7 @@ import { recoverPendingJobIntakeItems } from '../src/lib/job-intake/queue'
 
 console.log('run createApp')
 assertDatabaseReady()
+startBatchAnalysisRecovery()
 startExtensionIntakeRecovery()
 void startGenerationWorker()
 void startAnalysisWorker()

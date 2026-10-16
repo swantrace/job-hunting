@@ -6,7 +6,7 @@ const source = readFileSync(new URL('../app/client.ts', import.meta.url), 'utf8'
 // Review has its own listeners; exercise the shared entry without importing a
 // browser module into Bun's process-global DOM. No DOM dependency is required.
 const javascript = new Bun.Transpiler({ loader: 'ts', target: 'browser' }).transformSync(
-  source.replace("import './review'", ''),
+  source.replace(/^import .*$/gm, ''),
 )
 
 function browser(readyState = 'loading') {
@@ -46,7 +46,7 @@ function browser(readyState = 'loading') {
       return elements.get(id) ?? null
     },
   }
-  const context = { window, document }
+  const context = { window, document, updateApplicationSelection: () => undefined }
   runInNewContext(javascript, context)
   return {
     context,

@@ -277,11 +277,11 @@ describe('portfolio removal migration (0028)', () => {
       // Apply only the frozen 0028 migration on top of the 0027 database.
       migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
 
-      // 1. The portfolio tables are gone and 0029 dissolved career_state: 36 tables.
+      // 1. The portfolio tables are gone; later migrations include batch analysis.
       const tables = tableNames(sqlite)
       expect(tables).not.toContain('career_portfolio_topics')
       expect(tables).not.toContain('career_portfolio_topic_projects')
-      expect(tables).toHaveLength(37)
+      expect(tables).toHaveLength(38)
       expect(tables).not.toContain('career_state')
 
       // 2. The rebuilt junction has no topic column and no topic unique index;

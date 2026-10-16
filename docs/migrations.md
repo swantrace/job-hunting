@@ -309,9 +309,9 @@ accepted on purpose.
 | `0029_collapse_career_state` | Drops `career_state`: authored fields without a column move to each row's `extension_json`, document-level values to `career_profile.documents_json`, and the stored version counter becomes a value computed from the data. |
 | `0030_drop_orphan_resume_strategies` | Drops `analysis_run_resume_strategies`, an orphan whose creating migration (`0023_run_scoped_resume_strategies`) disappeared when the chain was renumbered. Databases migrated by the older chain still carry it; databases built from the current chain never did, hence `DROP TABLE IF EXISTS`. |
 
-Result: **36 application tables plus the `job_requirements_to_skills` view**.
+Result through `0030`: **36 application tables plus the `job_requirements_to_skills` view**.
 
-A database count above 36 means an orphan table survived a removed migration. Before
+A database count above 36 at that migration boundary means an orphan table survived a removed migration. Before
 `0030` the known one was `analysis_run_resume_strategies` (carried by databases
 migrated before the chain renumbering); applying `0030` brings such a database to 36.
 Consult that table's migration history rather than assuming a failed migration.
@@ -364,8 +364,11 @@ Verify more than whether the home page loads:
 4. Confirm the career tables carry the imported facts, and confirm that the
    operational tables recorded before the cutover are empty by design (the
    `0027` migration discards them).
-5. Confirm the schema shape: 36 application tables plus the
+5. Confirm the current schema shape: 38 application tables plus the
    `job_requirements_to_skills` view, and no `career_state` table.
+   `0031` adds source identities and `0033_batch_analysis` adds durable batch
+   analysis items. `0033` is additive: it does not clear applications, career
+   facts, decisions, analysis history, or generated documents.
 6. Run `PRAGMA integrity_check` and `PRAGMA foreign_key_check` against the
    production database or a new post-deployment snapshot.
 7. Confirm Google Drive connection verification and user-confirmed pending

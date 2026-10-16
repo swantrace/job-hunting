@@ -1,4 +1,5 @@
 import './review'
+import { updateApplicationSelection } from './application-selection'
 
 type BouncerInstance = { destroy(): void }
 declare global {
@@ -124,6 +125,7 @@ window.updateJobAnalysis = () => {
 }
 
 function initialize() {
+  updateApplicationSelection()
   initBouncer()
   dismissFlash()
 }

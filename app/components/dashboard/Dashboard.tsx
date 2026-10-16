@@ -21,6 +21,8 @@ import {
   parseCsvList,
   statusesFromFilters,
 } from '../../../src/lib/validation'
+import { ApplicationSelection } from '../applications/ApplicationSelection'
+import { BatchAnalysisControls } from '../applications/BatchAnalysisControls'
 import { JobAnalysisDraft } from '../intake/JobAnalysisDraft'
 import { EmptyState } from '../ui/EmptyState'
 import { InputField, SelectField, TextareaField } from '../ui/FormField'
@@ -44,7 +46,7 @@ export function Filters({ filters }: { filters: Filters }) {
       hx-push-url="true"
       hx-sync="this:replace"
       hx-indicator="#loading"
-      hx-trigger="input changed delay:350ms from:input[name='q'], search from:input[name='q'], change from:select, change from:input[name='statuses'], change from:input[name='attributes'], change from:input[name='today']"
+      hx-trigger="input changed delay:350ms from:(#filters input[name='q']), search from:(#filters input[name='q']), change from:(#filters select), change from:(#filters input[name='statuses']), change from:(#filters input[name='attributes']), change from:(#filters input[name='today'])"
     >
       <div class="card-body gap-4 p-4 sm:p-5">
         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -314,6 +316,7 @@ export function Board({
               : 'List view'}
         </span>
       </div>
+      {!!jobs.length && <BatchAnalysisControls />}
       {filters.view === 'board' ? (
         <KanbanBoard jobs={jobs} filters={filters} />
       ) : (
@@ -376,6 +379,9 @@ function ListBoard({ jobs, filters }: { jobs: JobCardData[]; filters: Filters })
               <caption class="sr-only">Job applications</caption>
               <thead>
                 <tr>
+                  <th>
+                    <span class="sr-only">Select application</span>
+                  </th>
                   {attributes.map((attr) => (
                     <th class={attr === 'title' ? 'min-w-48' : undefined}>
                       {applicationAttributeLabels[attr]}
@@ -387,6 +393,9 @@ function ListBoard({ jobs, filters }: { jobs: JobCardData[]; filters: Filters })
               <tbody>
                 {jobs.map((job) => (
                   <tr class="border-base-200 hover:bg-base-200/50">
+                    <td>
+                      <ApplicationSelection job={job} />
+                    </td>
                     {attributes.map((attr) => (
                       <td>{renderCell(job, attr)}</td>
                     ))}
@@ -438,6 +447,7 @@ function MobileApplicationRow({
   return (
     <article class="p-4">
       <div class="flex items-start justify-between gap-3">
+        <ApplicationSelection job={job} />
         <div class="min-w-0">
           <p class="truncate text-sm text-base-content/60">{job.companyName}</p>
           <h3 class="mt-0.5 font-semibold">
@@ -557,6 +567,9 @@ function TodayTasksTable({ jobs, filters }: { jobs: JobCardData[]; filters: Filt
           <caption class="sr-only">Applications due today</caption>
           <thead>
             <tr>
+              <th>
+                <span class="sr-only">Select application</span>
+              </th>
               <th>Job title</th>
               <th>Company</th>
               <th>Location</th>
@@ -570,6 +583,9 @@ function TodayTasksTable({ jobs, filters }: { jobs: JobCardData[]; filters: Filt
               const overdue = !!job.applyTodayTargetDate && job.applyTodayTargetDate < todayISO()
               return (
                 <tr class="border-base-200 hover:bg-base-200/50">
+                  <td>
+                    <ApplicationSelection job={job} />
+                  </td>
                   <td class="font-medium">
                     {job.jobTitle}
                     {job.url && (
@@ -638,6 +654,7 @@ function JobCard({
     <article class="card border border-base-300/40 bg-base-100 p-4 shadow-sm">
       <div class={`card-body gap-2 p-0 ${compact ? 'flex-col md:flex-row md:items-center' : ''}`}>
         <div class="flex items-start justify-between gap-2">
+          <ApplicationSelection job={job} />
           <div>
             <div class="flex items-center gap-1">
               <h3 class="font-semibold leading-tight">{job.jobTitle}</h3>

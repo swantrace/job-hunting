@@ -4,6 +4,15 @@ import { assertDatabaseReady } from '../../src/db/health'
 import { migratedDatabase } from '../support/sqlite'
 
 describe('startup schema readiness', () => {
+  test('requires the durable batch analysis table', () => {
+    const sqlite = migratedDatabase()
+    try {
+      sqlite.exec('DROP TABLE batch_analysis_items')
+      expect(() => assertDatabaseReady(sqlite)).toThrow('batch_analysis_items')
+    } finally {
+      sqlite.close()
+    }
+  })
   test('passes on a fully migrated database', () => {
     const sqlite = migratedDatabase()
     try {

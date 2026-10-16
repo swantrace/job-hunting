@@ -11,6 +11,7 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
+import { batchAnalysisModes, batchAnalysisStatuses } from '../lib/analysis/batch-contract'
 import { priorities, statuses } from '../lib/applications/constants'
 import { generatedArtifactTypes, runStatuses } from '../lib/generation/constants'
 import { intakeItemKinds, jobIntakeItemStatuses } from '../lib/job-intake/batch'
@@ -638,6 +639,47 @@ export const jobIntakeItems = sqliteTable(
     check(
       'job_intake_items_status_check',
       sql`${table.status} in ('pending', 'needs-pasted-text', 'ready', 'failed')`,
+    ),
+  ],
+)
+
+export const batchAnalysisItems = sqliteTable(
+  'batch_analysis_items',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    batchId: text('batch_id').notNull(),
+    jobApplicationId: integer('job_application_id').references(() => jobApplications.id, {
+      onDelete: 'set null',
+    }),
+    jobPostingId: integer('job_posting_id').references(() => jobPostings.id, {
+      onDelete: 'set null',
+    }),
+    label: text('label').notNull(),
+    mode: text('mode', { enum: batchAnalysisModes }).notNull(),
+    status: text('status', { enum: batchAnalysisStatuses }).notNull().default('queued'),
+    jobAnalysisRunId: integer('job_analysis_run_id').references(() => jobPostingAnalyses.id, {
+      onDelete: 'set null',
+    }),
+    candidateAnalysisRunId: integer('candidate_analysis_run_id').references(
+      () => applicationAnalysisRuns.id,
+      { onDelete: 'set null' },
+    ),
+    errorMessage: text('error_message'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('batch_analysis_items_batch_idx').on(table.batchId),
+    uniqueIndex('batch_analysis_items_active_application_idx')
+      .on(table.jobApplicationId)
+      .where(sql`${table.status} in ('queued', 'job-analysis', 'candidate-analysis')`),
+    check(
+      'batch_analysis_items_mode_check',
+      sql`${table.mode} in ('job-and-candidate', 'candidate-only')`,
+    ),
+    check(
+      'batch_analysis_items_status_check',
+      sql`${table.status} in ('queued', 'job-analysis', 'candidate-analysis', 'completed', 'failed', 'skipped')`,
     ),
   ],
 )

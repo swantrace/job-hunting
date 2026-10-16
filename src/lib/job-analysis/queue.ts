@@ -15,7 +15,7 @@ import {
   markJobAnalysisRunProcessing,
   resetStaleProcessingJobAnalysisRuns,
 } from '../../db/job-analysis-runs'
-import { jobIntakeItems, jobPostings } from '../../db/schema'
+import { batchAnalysisItems, jobIntakeItems, jobPostings } from '../../db/schema'
 import { autoChainCandidateAnalysis } from '../analysis/chain'
 import { buildJobAnalysisInput, frozenSuppliedCatalog } from './input'
 
@@ -82,7 +82,12 @@ async function processJobAnalysis(
       .where(eq(jobIntakeItems.jobPostingId, posting.id))
       .all()
       .some((item) => item.pipelineStatus !== null)
-    if (!extensionItem) await autoChainCandidateAnalysis(posting.jobApplicationId)
+    const batchItem = db
+      .select({ id: batchAnalysisItems.id })
+      .from(batchAnalysisItems)
+      .where(eq(batchAnalysisItems.jobAnalysisRunId, run.id))
+      .get()
+    if (!extensionItem && !batchItem) await autoChainCandidateAnalysis(posting.jobApplicationId)
     await updateProgress(100, 'Complete')
     return { runId: run.id }
   } catch (error) {

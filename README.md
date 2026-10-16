@@ -44,7 +44,7 @@ postings, analyses, requirements and skill mentions, career facts, directions,
 the skill catalog, personal skills, and Base Resume versions. JSON is
 **import/export interchange only**; it is never read as live state.
 
-The schema is defined in `src/db/schema.ts`: **36 application tables plus one
+The schema is defined in `src/db/schema.ts`: **38 application tables plus one
 view**. `job_requirements_to_skills` is a read-only view derived from
 `job_requirement_skill_mentions`, so mapping writes only ever touch the mention
 that owns them. There is no `career_state` table: each career table carries its
@@ -85,6 +85,17 @@ Applications are edited through the workspace and its tabs (Job Post, Review,
 Documents, Contacts, Activities). Workspace tabs are gated: Review opens once a
 current structured Job Analysis exists, and Documents opens once the current
 Review is ready.
+
+Select applications in either List or Board view, choose **Candidate analysis
+only** or **Job Post + Candidate analysis**, then click **Analyze selected**.
+Select all applies to the currently filtered results (up to 200 applications).
+Changing filters clears selection. Each item shows its own progress or reason
+for being skipped; one failure does not stop the rest. Candidate-only requires
+a current completed Job Post analysis. Applications with active analysis or
+intake work are skipped to avoid duplicate requests. Batch progress is stored
+in SQLite and recovered on restart; the latest batch remains visible after a
+page reload. Analysis uses API credits and never generates Documents or makes
+Include/Skip decisions automatically.
 
 ### Job analysis and candidate analysis
 

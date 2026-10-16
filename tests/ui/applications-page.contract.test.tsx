@@ -19,6 +19,8 @@ const filters: ApplicationFilters = {
 describe('applications page UI contracts', () => {
   test('uses a checkbox column chooser instead of an overflowing multi-select', async () => {
     const html = await renderJsx(<Filters filters={filters} />)
+    expect(html).toContain('change from:(#filters select)')
+    expect(html).not.toContain('change from:select')
 
     expect(html).toContain('<details class="dropdown dropdown-end w-full">')
     expect(html).toContain('Choose columns')
