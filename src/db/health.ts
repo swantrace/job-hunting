@@ -3,6 +3,7 @@ import { sqlite } from './client'
 
 const requiredTables = [
   'companies',
+  'job_source_identities',
   'job_requirements_to_skills',
   'job_postings',
   'generation_runs',
@@ -31,6 +32,8 @@ const requiredTables = [
 // partially-applied or drift-out-of-sync migration fails fast at boot with a
 // readable message instead of surfacing mid-request (e.g. during generation).
 const requiredColumns: Record<string, string[]> = {
+  job_applications: ['field_provenance_json'],
+  job_intake_items: ['pipeline_status', 'candidate_analysis_run_id', 'claimed_at'],
   // 0029 moved the career_state archive onto the career tables themselves.
   career_profile: ['extension_json', 'documents_json'],
   generation_runs: [

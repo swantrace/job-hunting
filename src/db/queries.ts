@@ -19,6 +19,7 @@ import {
   skillKey,
   textValue,
 } from '../lib/job-intake/import'
+import { userProvenance } from '../lib/job-intake/provenance'
 import {
   persistedRequirementBases,
   requirementImportances,
@@ -117,6 +118,7 @@ export function createApplication(input: z.infer<typeof quickCollectSchema>) {
         location: input.location,
         url: input.url,
         postedDate: input.postedDate,
+        fieldProvenanceJson: userProvenance(input),
         priority: 'B',
         applicationSource: input.applicationSource,
         salary: input.salary,
@@ -177,6 +179,7 @@ export function updateApplication(id: number, input: z.infer<typeof applicationS
         salary: input.salary,
         notes: input.notes,
         status: existing.status,
+        fieldProvenanceJson: userProvenance(input, existing.fieldProvenanceJson),
         updatedAt: date,
       })
       .where(eq(jobApplications.id, id))
@@ -198,8 +201,8 @@ export function listApplications(filters: Filters): JobCardData[] {
   }
   const orderMap = {
     updated_desc: sql`${jobApplications.updatedAt} desc, ${jobApplications.id} desc`,
-    posted_desc: sql`${jobApplications.postedDate} desc, ${jobApplications.id} desc`,
-    posted_asc: sql`${jobApplications.postedDate} asc, ${jobApplications.id} desc`,
+    posted_desc: sql`${jobApplications.postedDate} is null, ${jobApplications.postedDate} desc, ${jobApplications.id} desc`,
+    posted_asc: sql`${jobApplications.postedDate} is null, ${jobApplications.postedDate} asc, ${jobApplications.id} desc`,
     company_asc: sql`${companies.name} collate nocase asc, ${jobApplications.id} desc`,
     company_desc: sql`${companies.name} collate nocase desc, ${jobApplications.id} desc`,
     priority_asc: sql`${jobApplications.priority} asc, ${jobApplications.id} desc`,
@@ -337,9 +340,9 @@ export function exportData() {
   const contactById = new Map(contactRows.map((contact) => [contact.id, contact]))
   const applicationRows = db.select().from(jobApplications).all()
   return {
-    // Portable core-data format (v4). Derived AI history, generated artifacts,
+    // Portable core-data format (v5: nullable postedDate). Derived AI history, generated artifacts,
     // baseline history, and OAuth connections are deliberately omitted.
-    schemaVersion: 4,
+    schemaVersion: 5,
     exportedAt: new Date().toISOString(),
     companies: companyRows,
     skills: db.select().from(skills).all(),
@@ -605,7 +608,7 @@ export function mergeImport(payload: ImportPayload) {
       const companyName = companyNameById.get(companyId ?? 0) ?? textValue(incoming.companyName)
       const title = textValue(incoming.jobTitle)
       const postedDate = textValue(incoming.postedDate)
-      if (!companyId || !title || !postedDate) continue
+      if (!companyId || !title) continue
       const existing = applicationRows.find(
         (item) => applicationKey(item, companyName) === applicationKey(incoming, companyName),
       )
@@ -615,7 +618,7 @@ export function mergeImport(payload: ImportPayload) {
         direction: textValue(incoming.direction) || 'fullstack',
         location: nullableText(incoming.location),
         url: nullableText(incoming.url),
-        postedDate,
+        postedDate: postedDate || null,
         priority: controlledValue(priorities, incoming.priority, 'B'),
         appliedDate: nullableText(incoming.appliedDate),
         applicationSource: nullableText(incoming.applicationSource),
@@ -627,11 +630,21 @@ export function mergeImport(payload: ImportPayload) {
         createdAt: textValue(incoming.createdAt) || todayISO(),
         updatedAt: textValue(incoming.updatedAt) || todayISO(),
       }
+      const importedValues = {
+        ...values,
+        fieldProvenanceJson: userProvenance(
+          { ...values, companyName },
+          existing?.fieldProvenanceJson,
+        ),
+      }
       if (existing) {
-        tx.update(jobApplications).set(values).where(eq(jobApplications.id, existing.id)).run()
+        tx.update(jobApplications)
+          .set(importedValues)
+          .where(eq(jobApplications.id, existing.id))
+          .run()
         applicationIds.set(Number(incoming.id), existing.id)
       } else {
-        const created = tx.insert(jobApplications).values(values).returning().get()
+        const created = tx.insert(jobApplications).values(importedValues).returning().get()
         applicationIds.set(Number(incoming.id), created.id)
       }
     }

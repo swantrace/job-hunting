@@ -561,7 +561,7 @@ describe('identity form fragments', () => {
 
 describe('stale revision fragment policy', () => {
   test('the renderer swaps a 409 fragment instead of falling back to an error', () => {
-    const renderer = readFileSync(resolve(process.cwd(), 'app/routes/_renderer.tsx'), 'utf8')
+    const renderer = readFileSync(resolve(process.cwd(), 'app/client.ts'), 'utf8')
     expect(renderer).toMatch(/code: '409', swap: true/)
     expect(renderer).toMatch(/code: '422', swap: true/)
   })

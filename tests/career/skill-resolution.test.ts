@@ -291,7 +291,7 @@ describe('deterministic requirement term resolution', () => {
     }
   })
 
-  test('leaves ambiguous, unknown and broad terms pending with no catalog growth', () => {
+  test('creates pending catalog entries for unknown and broad terms without personal evidence', () => {
     const target = resolveDatabase()
     try {
       const analysisId = seedPosting(target)
@@ -305,9 +305,9 @@ describe('deterministic requirement term resolution', () => {
         '2026-10-14',
         frozenContext(target).entries,
       )
-      expect(listRequirementSkillMappings(analysisId, target.executor)).toEqual([])
-      expect(countPendingMentions(target.executor, analysisId)).toBe(3)
-      expect(counts(target)).toEqual(before)
+      expect(listRequirementSkillMappings(analysisId, target.executor)).toHaveLength(3)
+      expect(countPendingMentions(target.executor, analysisId)).toBe(0)
+      expect(counts(target)).toEqual({ ...before, skills: before.skills + 3 })
     } finally {
       target.cleanup()
     }
@@ -436,7 +436,7 @@ describe('forged and unknown model keys', () => {
     }
   })
 
-  test('never creates a catalog record from a forged key during persistence', () => {
+  test('ignores forged keys and creates pending identities from actual raw terms', () => {
     const target = resolveDatabase()
     try {
       const analysisId = seedPosting(target)
@@ -465,12 +465,14 @@ describe('forged and unknown model keys', () => {
         '2026-10-14',
         supplied,
       )
-      expect(listRequirementSkillMappings(analysisId, target.executor)).toEqual([])
-      expect(countPendingMentions(target.executor, analysisId)).toBe(2)
-      expect(counts(target)).toEqual(before)
+      expect(
+        listRequirementSkillMappings(analysisId, target.executor).map((row) => row.skillKey),
+      ).toEqual(['kubernetes', 'sqlite-work'])
+      expect(countPendingMentions(target.executor, analysisId)).toBe(0)
+      expect(counts(target)).toEqual({ ...before, skills: before.skills + 2 })
       expect(
         target.sqlite.query("SELECT count(*) AS count FROM skills WHERE key = 'kubernetes'").get(),
-      ).toEqual({ count: 0 })
+      ).toEqual({ count: 1 })
     } finally {
       target.cleanup()
     }
@@ -496,7 +498,7 @@ describe('forged and unknown model keys', () => {
 })
 
 describe('empty and bounded catalogs', () => {
-  test('an empty catalog yields unresolved terms without failing or growing the catalog', () => {
+  test('an empty catalog creates pending standard skills but never personal skills', () => {
     const target = createCareerTestDatabase({ seed: false })
     try {
       const analysisId = seedPosting(target)
@@ -515,10 +517,10 @@ describe('empty and bounded catalogs', () => {
         frozenContext(target).entries,
       )
 
-      expect(listRequirementSkillMappings(analysisId, target.executor)).toEqual([])
-      expect(countPendingMentions(target.executor, analysisId)).toBeGreaterThan(0)
-      expect(counts(target)).toEqual(before)
-      expect(listCanonicalSkillGroups(target.executor, analysisId)).toEqual([])
+      expect(listRequirementSkillMappings(analysisId, target.executor)).toHaveLength(4)
+      expect(countPendingMentions(target.executor, analysisId)).toBe(0)
+      expect(counts(target)).toEqual({ ...before, skills: 4 })
+      expect(listCanonicalSkillGroups(target.executor, analysisId)).toHaveLength(4)
       expect(target.sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
     } finally {
       target.cleanup()
@@ -618,8 +620,11 @@ describe('empty and bounded catalogs', () => {
         '2026-10-14',
         frozenSuppliedCatalog(JSON.stringify(identity.snapshot)),
       )
-      expect(listRequirementSkillMappings(analysisId, target.executor)).toEqual([])
-      expect(countPendingMentions(target.executor, analysisId)).toBe(1)
+      expect(listRequirementSkillMappings(analysisId, target.executor)[0]).toMatchObject({
+        skillKey: 'openapi',
+        reviewStatus: 'approved',
+      })
+      expect(countPendingMentions(target.executor, analysisId)).toBe(0)
       expect(target.sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
     } finally {
       target.cleanup()
@@ -663,8 +668,8 @@ describe('empty and bounded catalogs', () => {
         listRequirementSkillMappings(analysisId, target.executor).map(
           (mapping) => mapping.skillKey,
         ),
-      ).toEqual(['openapi'])
-      expect(countPendingMentions(target.executor, analysisId)).toBe(1)
+      ).toEqual(['openapi', 'oauth'])
+      expect(countPendingMentions(target.executor, analysisId)).toBe(0)
     } finally {
       target.cleanup()
     }

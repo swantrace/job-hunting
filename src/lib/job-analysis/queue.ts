@@ -1,6 +1,7 @@
 import type { Queue, Worker } from 'bunqueue/client'
 import { eq } from 'drizzle-orm'
 import { parseJobDescription } from '../../ai/client'
+import { jobParserModelId } from '../../ai/models'
 import { jobParserPromptVersion } from '../../ai/prompts/job-parser'
 import { jobAnalysisSchemaVersion } from '../../ai/schemas/job-analysis'
 import { db } from '../../db/client'
@@ -14,8 +15,7 @@ import {
   markJobAnalysisRunProcessing,
   resetStaleProcessingJobAnalysisRuns,
 } from '../../db/job-analysis-runs'
-import { jobPostings } from '../../db/schema'
-import { countPendingMentions } from '../../db/skill-mentions'
+import { jobIntakeItems, jobPostings } from '../../db/schema'
 import { autoChainCandidateAnalysis } from '../analysis/chain'
 import { buildJobAnalysisInput, frozenSuppliedCatalog } from './input'
 
@@ -47,7 +47,7 @@ async function getQueue() {
   queue ??= new bunQueue.Queue<JobAnalysisQueueJob>(queueName, {
     embedded: true,
     dataPath: queueDataPath(),
-    defaultJobOptions: { attempts: 3, backoff: 10_000, timeout: 240_000, durable: true },
+    defaultJobOptions: { attempts: 1, backoff: 10_000, timeout: 900_000, durable: true },
   })
   return queue
 }
@@ -59,6 +59,7 @@ async function processJobAnalysis(
   const run = getJobAnalysisRun(db, runId)
   if (!run) return { runId }
   if (run.status === 'Completed') return { runId: run.id }
+  if (run.status === 'Processing') return { runId: run.id }
   markJobAnalysisRunProcessing(db, run.id)
   await updateProgress(10, 'Analyzing job post')
   try {
@@ -73,12 +74,15 @@ async function processJobAnalysis(
       frozenSuppliedCatalog(run.frozenInputJson),
     )
     completeJobAnalysisRun(db, run.id, parsed)
-    // Auto-chain the read-only Candidate Analysis only when no requirement term
-    // is still unresolved: a pending mention needs an explicit human mapping
-    // first, and mapping never requires another paid JD parse. Profile
-    // confirmation and Include/Skip decisions remain explicit user actions.
-    if (countPendingMentions(db, run.id) === 0)
-      await autoChainCandidateAnalysis(posting.jobApplicationId)
+    // The extension reconciler owns its child IDs; website intake uses the
+    // same automatic chain without waiting for catalog approval.
+    const extensionItem = db
+      .select()
+      .from(jobIntakeItems)
+      .where(eq(jobIntakeItems.jobPostingId, posting.id))
+      .all()
+      .some((item) => item.pipelineStatus !== null)
+    if (!extensionItem) await autoChainCandidateAnalysis(posting.jobApplicationId)
     await updateProgress(100, 'Complete')
     return { runId: run.id }
   } catch (error) {
@@ -100,7 +104,7 @@ export async function startJobAnalysisWorker() {
     {
       embedded: true,
       dataPath: queueDataPath(),
-      concurrency: 1,
+      concurrency: 3,
       heartbeatInterval: 10_000,
     },
   )
@@ -120,14 +124,16 @@ export type EnqueueJobAnalysisResult =
  * with the same input hash is reused; an explicit rerun after completion
  * creates a new append-only record.
  */
-export async function enqueueJobAnalysis(jobPostingId: number): Promise<EnqueueJobAnalysisResult> {
+export async function enqueueJobAnalysis(
+  jobPostingId: number,
+  persisted?: (run: { id: number }) => void,
+): Promise<EnqueueJobAnalysisResult> {
   const outcome = db.transaction(() => {
     const built = buildJobAnalysisInput(db, jobPostingId)
     if (!built) return { kind: 'missing' as const }
     const reusable = findReusableJobAnalysisRun(db, jobPostingId, built.inputHash)
     if (reusable) return { kind: 'reused' as const, run: reusable }
-    const model =
-      process.env.OPENAI_MODEL_JOB_PARSER ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
+    const model = jobParserModelId()
     const run = createJobAnalysisRun(db, {
       jobPostingId,
       inputHash: built.inputHash,
@@ -139,22 +145,28 @@ export async function enqueueJobAnalysis(jobPostingId: number): Promise<EnqueueJ
     return { kind: 'created' as const, run }
   })
   if (outcome.kind === 'missing') return { run: null, reused: false, reason: 'missing-posting' }
-  if (outcome.kind === 'reused') return { run: outcome.run, reused: true }
   const run = outcome.run
+  persisted?.(run)
+  await dispatchJobAnalysisRun(run.id)
+  return { run, reused: outcome.kind === 'reused' }
+}
 
+/** Redispatch the persisted snapshot, never rebuild it from changed live facts. */
+export async function dispatchJobAnalysisRun(runId: number) {
+  const run = getJobAnalysisRun(db, runId)
+  if (!run || run.status !== 'Queued') return
   const persistentQueue = await getQueue()
   if (!persistentQueue) {
     void processJobAnalysis(run.id, async () => undefined).catch((error) =>
       console.error('Development job analysis failed', error),
     )
-    return { run, reused: false }
+    return
   }
   await persistentQueue.add(
     'analyze-job',
     { runId: run.id },
     { jobId: run.queueJobId ?? undefined, durable: true },
   )
-  return { run, reused: false }
 }
 
 export async function recoverQueuedJobAnalysisRuns() {

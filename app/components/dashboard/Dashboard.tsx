@@ -236,8 +236,7 @@ export function QuickCollect({
             label="Posted date"
             name="postedDate"
             type="date"
-            required
-            value={values.postedDate ?? todayISO()}
+            value={values.postedDate ?? ''}
             error={error(errors, 'postedDate')}
           />
           <InputField label="Salary" name="salary" value={values.salary} />

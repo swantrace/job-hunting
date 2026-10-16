@@ -40,6 +40,14 @@ export function SkillMergeForm({
             </option>
           ))}
         </select>
+        <label class="label" for="merge-personal-resolution">
+          If personal proficiency or eligibility differs
+        </label>
+        <select id="merge-personal-resolution" name="personalResolution" class="select w-full">
+          <option value="">Ask before choosing personal settings</option>
+          <option value="target">Keep target skill settings; preserve all evidence</option>
+          <option value="source">Keep source skill settings; preserve all evidence</option>
+        </select>
         {error && (
           <p id="merge-skill-error" class="label text-error">
             {error}

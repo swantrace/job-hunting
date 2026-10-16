@@ -1,12 +1,14 @@
 import { asc, eq } from 'drizzle-orm'
 import { type JobAnalysisRequirement, type RequirementTerm } from '../ai/schemas/job-analysis'
+import { canonicalHash } from '../lib/canonical-hash'
 import type { CatalogContextEntry } from '../lib/skills/catalog-context'
+import { canonicalSkillKey, normalizeSkillAlias } from '../lib/skills/normalize'
 import { type ResolvedMention, resolveRequirementTerms } from '../lib/skills/resolver'
 import type { CareerDb } from './career-shared'
 import { db } from './client'
-import { type JobPostingAnalysis, type JobRequirement, jobRequirements } from './schema'
+import { type JobPostingAnalysis, type JobRequirement, jobRequirements, skills } from './schema'
 import { mapMention, upsertPendingMention } from './skill-mentions'
-import { resolveSkillByKey } from './skill-queries'
+import { resolveSkillByAlias, resolveSkillByKey } from './skill-queries'
 
 export type JobRequirementTermInput = RequirementTerm
 
@@ -44,10 +46,43 @@ export function persistRequirementMentions(
       occurrences: mention.occurrences,
       date,
     })
-    if (mention.state !== 'mapped' || !mention.skillKey) continue
-    const skill = resolveSkillByKey(tx, mention.skillKey)
-    if (!skill || skill.reviewStatus !== 'approved' || skill.mergedIntoSkillId !== null) continue
-    mapMention(tx, stored.id, skill.id, date)
+    const normalized = normalizeSkillAlias(mention.rawTerm)
+    const exactName = tx
+      .select()
+      .from(skills)
+      .all()
+      .find((row) => normalizeSkillAlias(row.name) === normalized)
+    let skill = mention.skillKey
+      ? resolveSkillByKey(tx, mention.skillKey)
+      : (resolveSkillByAlias(tx, normalized) ?? exactName ?? resolveSkillByKey(tx, normalized))
+    if (!skill) {
+      let key =
+        canonicalSkillKey(mention.rawTerm) || `term-${canonicalHash(normalized).slice(0, 16)}`
+      if (resolveSkillByKey(tx, key)) key += `-${canonicalHash(normalized).slice(0, 12)}`
+      // All analysis completion writes run in one SQLite transaction. A second
+      // concurrent completion resolves the already-created pending entry.
+      tx.insert(skills)
+        .values({
+          name: mention.rawTerm,
+          key,
+          origin: 'job-parser',
+          reviewStatus: 'pending',
+          createdAt: date,
+          updatedAt: date,
+        })
+        .onConflictDoNothing()
+        .run()
+      skill = resolveSkillByKey(tx, key)!
+    }
+    const seen = new Set<number>()
+    while (skill.mergedIntoSkillId !== null) {
+      if (seen.has(skill.id)) throw new Error('Invalid skill merge cycle.')
+      seen.add(skill.id)
+      const target = tx.select().from(skills).where(eq(skills.id, skill.mergedIntoSkillId)).get()
+      if (!target) throw new Error('Skill merge target not found.')
+      skill = target
+    }
+    mapMention(tx, stored.id, skill.id, date, true)
   }
 }
 

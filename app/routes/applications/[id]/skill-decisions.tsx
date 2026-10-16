@@ -25,7 +25,7 @@ import { SkillDecisionForm } from '../../../components/workspace/SkillDecisionFo
 import { SkillReviewPanel } from '../../../components/workspace/SkillReviewPanel'
 import { WorkspaceTabs } from '../../../components/workspace/WorkspaceTabs'
 
-function reviewPanel(job: JobCardData, filters: Filters, runId: number) {
+function reviewPanel(job: JobCardData, filters: Filters, runId: number, retainSkillId?: number) {
   const jobPostingAnalysisId = jobPostingAnalysisIdForCandidateRun(runId, db)
   return (
     <SkillReviewPanel
@@ -37,14 +37,20 @@ function reviewPanel(job: JobCardData, filters: Filters, runId: number) {
       categories={skillCategoryDefinitions()}
       searchCatalog={(term, limit) => searchApprovedCatalog(db, term, limit)}
       canMap={jobPostingAnalysisId !== null}
+      retainSkillId={retainSkillId}
     />
   )
 }
 
-function completedDecisionFragments(job: JobCardData, filters: Filters, runId: number) {
+function completedDecisionFragments(
+  job: JobCardData,
+  filters: Filters,
+  runId: number,
+  retainSkillId?: number,
+) {
   return (
     <>
-      {reviewPanel(job, filters, runId)}
+      {reviewPanel(job, filters, runId, retainSkillId)}
       <WorkspaceTabs
         activeTab="review"
         availability={tabAvailability(computeWorkspaceAvailability(job.id))}
@@ -88,6 +94,13 @@ export const POST = createRoute(async (c) => {
     return c.html(<div class="alert alert-error">Skill not found.</div>, 404)
 
   const parsed = skillDecisionSchema.safeParse(raw)
+  if (review.analysisResult === 'proven-match')
+    return c.html(
+      <div class="alert alert-info">
+        This skill already has supporting evidence and is used automatically.
+      </div>,
+      422,
+    )
   if (!parsed.success) {
     c.header('HX-Retarget', `#skill-decision-${skillId}`)
     return c.html(
@@ -104,5 +117,5 @@ export const POST = createRoute(async (c) => {
   const decision = parsed.data.action
   const reason = parsed.data.reason.trim() || null
   decideRunSkill({ runId, skillId, decision, reason })
-  return c.html(completedDecisionFragments(job, filters, runId))
+  return c.html(completedDecisionFragments(job, filters, runId, skillId))
 })

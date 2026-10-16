@@ -44,12 +44,14 @@ export function SkillGapPanel({
   requirements,
   careerEvidence,
   canDecide = true,
+  retainSkillId,
 }: {
   job: JobCardData
   filters: Filters
   requirements: RunSkillReview[]
   careerEvidence: Record<string, string[]>
   canDecide?: boolean
+  retainSkillId?: number
 }) {
   const scores = calculateSkillScores(
     requirements.map((item) => ({
@@ -68,6 +70,13 @@ export function SkillGapPanel({
       <h3 id="skill-gap-panel-heading" class="mb-2 font-semibold">
         Canonical skill review
       </h3>
+      <label class="label mb-3 gap-2">
+        <input type="checkbox" class="checkbox checkbox-sm" data-review-filter checked />
+        Only skills requiring a decision
+      </label>
+      <p class="mb-3 text-sm text-base-content/60" data-review-empty hidden>
+        No decisions are pending. Uncheck the filter to view all evidence.
+      </p>
       <section class="mb-4 grid gap-3 sm:grid-cols-3">
         <div id="skill-readiness" class="rounded-box border border-base-300 p-3">
           <p class="text-sm font-medium">Readiness</p>
@@ -124,14 +133,44 @@ export function SkillGapPanel({
           )}
           <div class="space-y-5">
             {groups.map((group) => (
-              <section>
+              <section data-review-group>
                 <h3 class="mb-2 font-semibold">{categoryLabel(group.category)}</h3>
                 <ul class="space-y-2">
                   {group.items.map((requirement) => (
-                    <li class="rounded-box border border-base-300 p-3">
+                    <li
+                      class="rounded-box border border-base-300 p-3"
+                      data-review-skill
+                      data-review-pending={
+                        requirement.analysisResult !== 'proven-match' &&
+                        (requirement.decision === 'pending' ||
+                          retainSkillId === requirement.skillId)
+                          ? 'true'
+                          : 'false'
+                      }
+                      hidden={
+                        requirement.analysisResult === 'proven-match' ||
+                        (requirement.decision !== 'pending' &&
+                          retainSkillId !== requirement.skillId)
+                      }
+                    >
                       <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-2">
                         <div class="col-start-1 row-start-1 min-w-0">
                           <p class="font-medium">{requirement.skillName}</p>
+                          <p class="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                            <span
+                              class={`badge badge-sm whitespace-nowrap ${requirement.reviewStatus === 'pending' ? 'badge-warning' : 'badge-ghost'}`}
+                            >
+                              {requirement.reviewStatus}
+                            </span>
+                            <a
+                              href={`/skills/${requirement.skillId}/edit`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="link"
+                            >
+                              Manage skill ↗
+                            </a>
+                          </p>
                           <p class="text-xs text-base-content/60">
                             Importance: {requirement.importance}
                             {requirement.rawLabel && requirement.rawLabel !== requirement.skillName

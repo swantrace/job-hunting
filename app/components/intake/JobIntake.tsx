@@ -21,7 +21,13 @@ const statusLabel: Record<JobIntakeItem['status'], string> = {
 }
 
 function anyPending(batches: JobIntakeBatchView[]) {
-  return batches.some((batch) => batch.items.some((item) => item.status === 'pending'))
+  return batches.some((batch) =>
+    batch.items.some((item) =>
+      item.pipelineStatus
+        ? ['accepted', 'queued', 'processing'].includes(item.pipelineStatus)
+        : item.status === 'pending',
+    ),
+  )
 }
 
 export function JobIntakePanel({
@@ -107,7 +113,10 @@ function BatchList({ batches }: { batches: JobIntakeBatchView[] }) {
     <div class="space-y-4">
       <h3 class="font-semibold">Import batches</h3>
       {batches.map((batch) => (
-        <section class="card border border-base-300 bg-base-100 shadow-sm">
+        <section
+          id={`intake-batch-${batch.id}`}
+          class="card border border-base-300 bg-base-100 shadow-sm"
+        >
           <div class="card-body">
             <div class="flex flex-wrap items-center gap-2 text-sm">
               <span class="font-mono">Batch #{batch.id}</span>
@@ -123,16 +132,29 @@ function BatchList({ batches }: { batches: JobIntakeBatchView[] }) {
                   class="flex flex-wrap items-start gap-2 rounded-box bg-base-200 p-3 text-sm"
                 >
                   <span class="font-mono text-xs text-base-content/60">#{item.sequence}</span>
-                  <span class={`badge badge-sm ${statusClass[item.status]}`}>
-                    {statusLabel[item.status]}
+                  <span
+                    class={`badge badge-sm whitespace-nowrap ${
+                      item.pipelineStatus === 'failed' || item.pipelineStatus === 'rejected'
+                        ? 'badge-error'
+                        : item.pipelineStatus === 'duplicate'
+                          ? 'badge-ghost'
+                          : statusClass[item.status]
+                    }`}
+                  >
+                    {item.pipelineStatus
+                      ? item.pipelineStatus === 'completed'
+                        ? 'Candidate analysis completed'
+                        : `${item.pipelineStatus} · ${item.stage}`
+                      : statusLabel[item.status]}
                   </span>
                   <span class="min-w-0 flex-1 break-all text-base-content/70">
                     {item.normalizedUrl ?? item.raw.slice(0, 120)}
                   </span>
-                  {item.status === 'ready' && item.jobApplicationId ? (
+                  {(item.status === 'ready' || item.pipelineStatus === 'failed') &&
+                  item.jobApplicationId ? (
                     <a
                       class="btn btn-outline btn-xs"
-                      href={`/applications/${item.jobApplicationId}/workspace`}
+                      href={`/applications/${item.jobApplicationId}/workspace?workspaceTab=review`}
                     >
                       Review
                     </a>

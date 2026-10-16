@@ -452,7 +452,7 @@ describe('schema simplification migration (0027)', () => {
 
       // 36 application tables plus the junction as a view: 0027 left 39, 0028
       // dropped the two portfolio tables, and 0029 dissolved career_state.
-      expect(tables).toHaveLength(36)
+      expect(tables).toHaveLength(37)
       expect(tables).not.toContain('career_state')
       expect(
         sqlite

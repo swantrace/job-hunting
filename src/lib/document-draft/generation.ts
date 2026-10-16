@@ -1,11 +1,18 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import {
+  coverLetterModelId,
+  type ReasoningEffort,
+  resumeModelId,
+  stageReasoningEffort,
+} from '../../ai/models'
+import {
   baselineDraftSystemPromptFor,
   coverLetterDraftSystemPromptFor,
   documentDraftPromptVersion,
   resumeDraftSystemPromptFor,
 } from '../../ai/prompts/document-draft'
+import { openAIRequest } from '../../ai/request'
 import {
   documentMarkdownResponseSchema,
   documentMarkdownSchema,
@@ -27,7 +34,7 @@ import { type DocumentIdentity } from '../docx/render-common'
 import { renderResumeDocx } from '../docx/resume-renderer'
 import { docxRendererVersion } from '../docx/styles'
 import type { GeneratedArtifactType } from '../generation/constants'
-import { coverLetterModelId, frozenDraftSnapshotFromRun, resumeModelId } from '../generation/input'
+import { frozenDraftSnapshotFromRun } from '../generation/input'
 import { type DocumentDraft, parseDocumentDraft } from './definition'
 import { stripMarkdownFence } from './experiment'
 import {
@@ -55,15 +62,17 @@ const filenamePart = (value: string) =>
 async function callMarkdown(args: {
   apiKey: string
   model: string
+  effort: ReasoningEffort
   system: string
   input: DocumentDraftSnapshot
 }): Promise<string> {
-  const response = await fetch('https://api.openai.com/v1/responses', {
+  const response = await openAIRequest('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { Authorization: `Bearer ${args.apiKey}`, 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(180_000),
+    timeoutMs: 180_000,
     body: JSON.stringify({
       model: args.model,
+      reasoning: { effort: args.effort },
       input: [
         {
           role: 'system',
@@ -230,12 +239,14 @@ export async function generateApplicationDrafts(runId: number): Promise<Artifact
   const resumeMarkdown = await callMarkdown({
     apiKey,
     model: resumeModelId(),
+    effort: stageReasoningEffort.resume,
     system: resumeDraftSystemPromptFor(snapshot.documentPolicy),
     input: snapshot,
   })
   const coverLetterMarkdown = await callMarkdown({
     apiKey,
     model: coverLetterModelId(),
+    effort: stageReasoningEffort.coverLetter,
     system: coverLetterDraftSystemPromptFor(snapshot.documentPolicy),
     input: snapshot,
   })
@@ -316,6 +327,7 @@ export async function generateBaselineDraft(runId: number) {
   const resumeMarkdown = await callMarkdown({
     apiKey,
     model: resumeModelId(),
+    effort: stageReasoningEffort.resume,
     system: baselineDraftSystemPromptFor(snapshot.documentPolicy),
     input: snapshot,
   })

@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto'
-import { desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { nowISO, todayISO } from '../lib/date'
 import type { IntakeItemKind } from '../lib/job-intake/batch'
+import { captureProvenance } from '../lib/job-intake/provenance'
 import { db } from './client'
 import * as schema from './schema'
 import type { DbExecutor } from './skill-queries'
@@ -93,7 +94,12 @@ export function listPendingJobIntakeItems() {
   return db
     .select()
     .from(schema.jobIntakeItems)
-    .where(eq(schema.jobIntakeItems.status, 'pending'))
+    .where(
+      and(
+        eq(schema.jobIntakeItems.status, 'pending'),
+        isNull(schema.jobIntakeItems.pipelineStatus),
+      ),
+    )
     .orderBy(schema.jobIntakeItems.id)
     .all()
 }
@@ -191,7 +197,12 @@ export function createIntakeApplication(input: {
         jobTitle: input.jobTitle,
         direction: input.direction,
         url: input.url,
-        postedDate: date,
+        postedDate: null,
+        fieldProvenanceJson: captureProvenance({
+          companyName: input.companyName,
+          url: input.url,
+          applicationSource: 'batch-import',
+        }),
         priority: 'B',
         applicationSource: 'batch-import',
         status: 'Saved',

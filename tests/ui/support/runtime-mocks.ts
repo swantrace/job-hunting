@@ -43,6 +43,7 @@ export const mockSkillDecisionSafeParse = (value: unknown) =>
 export const mockListRunSkillReviews = mock((): any => [])
 
 export const mockJob = {
+  fieldProvenanceJson: null,
   appliedDate: null,
   applicationSource: 'LinkedIn',
   applyTodayTargetDate: null,

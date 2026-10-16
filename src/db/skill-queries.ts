@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { parseStoredCandidateFit } from '../lib/candidate/fit-result'
 import { nowISO } from '../lib/date'
 import type {
   SkillDecision,
@@ -14,6 +15,7 @@ import { jobPostingAnalysisIdForCandidateRun } from './analysis-lineage'
 import { db } from './client'
 import {
   analysisRunDecisions,
+  applicationAnalysisRuns,
   jobPostingAnalyses,
   jobPostings,
   jobRequirements,
@@ -221,8 +223,8 @@ export type RunSkillReview = RequirementSkillMapping & {
 /**
  * Run-scoped skill review projection for the Review workspace. Combines the
  * exact Job Analysis run's requirement-skill mappings with that run's pending
- * Skip/Include decisions. "Proven" is derived from the canonical skill's
- * career-skill link; decisions belong only to the referenced run.
+ * Skip/Include decisions. Validated requirement evidence determines "proven";
+ * career-skill links are a fallback for legacy results without assessments.
  */
 export function listRunSkillReviews(runId: number, executor: DbExecutor = db): RunSkillReview[] {
   const jobPostingAnalysisId = jobPostingAnalysisIdForCandidateRun(runId, executor)
@@ -247,14 +249,35 @@ export function listRunSkillReviews(runId: number, executor: DbExecutor = db): R
     .where(eq(analysisRunDecisions.applicationAnalysisRunId, runId))
     .all()
   const decisionBySkill = new Map(decisions.map((decision) => [decision.skillId, decision]))
-  return mappings.map((mapping) => {
+  const run = executor
+    .select()
+    .from(applicationAnalysisRuns)
+    .where(eq(applicationAnalysisRuns.id, runId))
+    .get()
+  const fit = parseStoredCandidateFit(run?.resultJson ?? null)
+  const assessments = new Map(fit?.requirementAssessments.map((a) => [a.jobRequirementId, a]) ?? [])
+  const grouped = new Map<number, RunSkillReview>()
+  const rank = { required: 3, preferred: 2, mentioned: 1 }
+  for (const mapping of mappings) {
     const decision = decisionBySkill.get(mapping.skillId)
-    return {
+    const assessment = assessments.get(mapping.requirementId)
+    const proven = assessment
+      ? assessment.evidenceStatus !== 'unknown-evidence' && assessment.evidenceRefs.length > 0
+      : careerSkillMatchResult(mapping.skillKey, executor) === 'proven-match'
+    const current: RunSkillReview = {
       ...mapping,
-      analysisResult: careerSkillMatchResult(mapping.skillKey, executor),
+      analysisResult: proven ? 'proven-match' : 'not-in-career-data',
       decision: decision?.decision ?? 'pending',
       decisionReason: decision?.reason ?? null,
       aliases: aliasesBySkill.get(mapping.skillId) ?? [],
     }
-  })
+    const prior = grouped.get(mapping.skillId)
+    if (prior) {
+      if (!prior.requirementStatement.includes(mapping.requirementStatement))
+        prior.requirementStatement += `\n${mapping.requirementStatement}`
+      if (rank[current.importance] > rank[prior.importance]) prior.importance = current.importance
+      if (!proven) prior.analysisResult = 'not-in-career-data'
+    } else grouped.set(mapping.skillId, current)
+  }
+  return [...grouped.values()]
 }

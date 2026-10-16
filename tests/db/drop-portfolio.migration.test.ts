@@ -281,7 +281,7 @@ describe('portfolio removal migration (0028)', () => {
       const tables = tableNames(sqlite)
       expect(tables).not.toContain('career_portfolio_topics')
       expect(tables).not.toContain('career_portfolio_topic_projects')
-      expect(tables).toHaveLength(36)
+      expect(tables).toHaveLength(37)
       expect(tables).not.toContain('career_state')
 
       // 2. The rebuilt junction has no topic column and no topic unique index;

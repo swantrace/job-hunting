@@ -1,4 +1,5 @@
 import type { Queue, Worker } from 'bunqueue/client'
+import { documentReviewModelId } from '../../ai/models'
 import { documentReviewPromptVersion } from '../../ai/prompts/document-review'
 import { documentReviewSchemaVersion } from '../../ai/schemas/document-review'
 import {
@@ -40,7 +41,7 @@ async function getQueue() {
   queue ??= new bunQueue.Queue<DocumentReviewQueueJob>(queueName, {
     embedded: true,
     dataPath: queueDataPath(),
-    defaultJobOptions: { attempts: 3, backoff: 10_000, timeout: 240_000, durable: true },
+    defaultJobOptions: { attempts: 1, backoff: 10_000, timeout: 900_000, durable: true },
   })
   return queue
 }
@@ -90,10 +91,7 @@ export async function enqueueDocumentReview(
   const review = createDocumentReview({
     generationRunId,
     inputHash,
-    model:
-      process.env.OPENAI_MODEL_DOCUMENT_REVIEW ??
-      process.env.OPENAI_MODEL_DEFAULT ??
-      'gpt-5.6-terra',
+    model: documentReviewModelId(),
     promptVersion: documentReviewPromptVersion,
     schemaVersion: documentReviewSchemaVersion,
   })

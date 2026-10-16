@@ -316,6 +316,7 @@ export function mapMention(
   mentionId: number,
   skillId: number,
   date?: string,
+  allowUnapproved = false,
 ): MentionRecord {
   return executor.transaction((tx) => {
     const mention = requireMention(tx, mentionId)
@@ -324,7 +325,7 @@ export function mapMention(
     if (skill.reviewStatus === 'merged' || skill.mergedIntoSkillId !== null) {
       throw new CareerReferenceError(`Catalog skill "${skill.key}" is merged and cannot be mapped.`)
     }
-    if (skill.reviewStatus !== 'approved') {
+    if (!allowUnapproved && skill.reviewStatus !== 'approved') {
       throw new CareerReferenceError(
         `Catalog skill "${skill.key}" is ${skill.reviewStatus}; only approved catalog skills can be mapped.`,
       )

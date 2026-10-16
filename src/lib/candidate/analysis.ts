@@ -1,5 +1,7 @@
 import { z } from 'zod'
+import { candidateFitModelId, stageReasoningEffort } from '../../ai/models'
 import { candidateFitPromptVersion, candidateFitSystemPrompt } from '../../ai/prompts/candidate-fit'
+import { openAIRequest } from '../../ai/request'
 import {
   type CandidateFit,
   candidateFitResponseSchema,
@@ -20,6 +22,7 @@ import { currentJobAnalysisHash } from '../job-analysis/input'
 import { parseJobAnalysisResult } from '../job-analysis/result'
 import { careerSkillMatchResult } from '../skills/runtime-career-skills'
 import { assertEveryRequirementAssessed, validateCandidateFitEvidence } from './fit-analysis'
+import { candidateSnapshotIdentity } from './identity'
 
 export const candidateAnalysisInputVersion = 2
 
@@ -174,7 +177,7 @@ export function buildCandidateAnalysisInput(
     careerData,
     sourceVersions,
   }
-  const inputHash = canonicalHash(snapshot)
+  const inputHash = candidateSnapshotIdentity(snapshot) ?? canonicalHash(snapshot)
   return { snapshot: { ...snapshot, inputHash }, inputHash }
 }
 
@@ -235,7 +238,8 @@ export function getCandidateAnalysisState(jobApplicationId: number): CandidateAn
     runs.map((run) => ({
       id: run.id,
       status: run.status,
-      inputHash: run.inputHash,
+      inputHash:
+        candidateSnapshotIdentity(safeParseSnapshot(run.inputSnapshotJson)) ?? run.inputHash,
       schemaVersion: run.schemaVersion,
     })),
     currentInput?.inputHash ?? null,
@@ -266,8 +270,17 @@ export function validateCandidateAnalysisResult(
   result: CandidateFit,
   snapshot: CandidateAnalysisInput,
 ) {
-  const data = loadCareerData()
-  const evidence = careerEvidenceIds(data)
+  const frozen = snapshot.careerData as Record<string, unknown>
+  const ids = (key: string) =>
+    new Set((Array.isArray(frozen[key]) ? frozen[key] : []).map((item: { id: string }) => item.id))
+  const evidence = {
+    experience: ids('experiences'),
+    achievement: ids('achievements'),
+    project: ids('projects'),
+    publication: ids('publications'),
+    skill: ids('skills'),
+    story: ids('stories'),
+  }
   const requirementIds = snapshot.jobAnalysis.requirements.map((item) => item.id)
   validateCandidateFitEvidence(result, { evidence })
   assertEveryRequirementAssessed(requirementIds, result)
@@ -281,15 +294,16 @@ async function structuredCandidateFit(args: {
   model: string
   input: CandidateAnalysisInput
 }): Promise<CandidateFit> {
-  const response = await fetch('https://api.openai.com/v1/responses', {
+  const response = await openAIRequest('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${args.apiKey}`,
       'Content-Type': 'application/json',
     },
-    signal: AbortSignal.timeout(180_000),
+    timeoutMs: 180_000,
     body: JSON.stringify({
       model: args.model,
+      reasoning: { effort: stageReasoningEffort.candidateFit },
       input: [
         {
           role: 'system',
@@ -332,8 +346,7 @@ export async function runCandidateAnalysis(runId: number) {
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.')
   const result = await structuredCandidateFit({
     apiKey,
-    model:
-      process.env.OPENAI_MODEL_CANDIDATE_FIT ?? process.env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra',
+    model: candidateFitModelId(),
     input: snapshot,
   })
   return validateCandidateAnalysisResult(result, snapshot)

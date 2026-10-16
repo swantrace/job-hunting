@@ -14,6 +14,7 @@ import {
 import { priorities, statuses } from '../lib/applications/constants'
 import { generatedArtifactTypes, runStatuses } from '../lib/generation/constants'
 import { intakeItemKinds, jobIntakeItemStatuses } from '../lib/job-intake/batch'
+import { pipelineStatuses } from '../lib/job-intake/contracts'
 import { persistedRequirementBases, requirementTypes } from '../lib/job-requirements/constants'
 import {
   type SkillDecision,
@@ -146,7 +147,8 @@ export const jobApplications = sqliteTable(
     direction: text('direction').notNull().default('fullstack'),
     location: text('location'),
     url: text('url'),
-    postedDate: text('posted_date').notNull(),
+    postedDate: text('posted_date'),
+    fieldProvenanceJson: text('field_provenance_json'),
     priority: text('priority', { enum: priorities }).notNull().default('B'),
     appliedDate: text('applied_date'),
     applicationSource: text('application_source'),
@@ -566,10 +568,18 @@ export const jobIntakeBatches = sqliteTable(
   'job_intake_batches',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
+    clientBatchId: text('client_batch_id'),
+    idempotencyKey: text('idempotency_key'),
+    requestHash: text('request_hash'),
+    terminalRevision: text('terminal_revision'),
+    revision: integer('revision').notNull().default(1),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
-  (table) => [],
+  (table) => [
+    uniqueIndex('intake_batch_client_unique').on(table.clientBatchId),
+    uniqueIndex('intake_batch_idempotency_unique').on(table.idempotencyKey),
+  ],
 )
 
 export const jobIntakeItems = sqliteTable(
@@ -580,6 +590,21 @@ export const jobIntakeItems = sqliteTable(
       .notNull()
       .references(() => jobIntakeBatches.id, { onDelete: 'cascade' }),
     sequence: integer('sequence').notNull(),
+    clientItemId: text('client_item_id'),
+    payloadJson: text('payload_json'),
+    pipelineStatus: text('pipeline_status', { enum: pipelineStatuses }),
+    stage: text('stage').notNull().default('intake'),
+    errorCode: text('error_code'),
+    fieldErrorsJson: text('field_errors_json'),
+    jobAnalysisRunId: integer('job_analysis_run_id').references(() => jobPostingAnalyses.id, {
+      onDelete: 'set null',
+    }),
+    candidateAnalysisRunId: integer('candidate_analysis_run_id').references(
+      () => applicationAnalysisRuns.id,
+      { onDelete: 'set null' },
+    ),
+    claimedAt: integer('claimed_at'),
+    nextDispatchAt: integer('next_dispatch_at').notNull().default(0),
     kind: text('kind', { enum: intakeItemKinds }).notNull(),
     raw: text('raw').notNull(),
     normalizedUrl: text('normalized_url'),
@@ -600,12 +625,24 @@ export const jobIntakeItems = sqliteTable(
     uniqueIndex('job_intake_items_batch_sequence_unique_idx').on(table.batchId, table.sequence),
     index('job_intake_items_batch_idx').on(table.batchId),
     index('job_intake_items_status_idx').on(table.status),
+    index('intake_pipeline_dispatch_idx').on(table.pipelineStatus, table.nextDispatchAt),
     check('job_intake_items_kind_check', sql`${table.kind} in ('url', 'text')`),
     check(
       'job_intake_items_status_check',
       sql`${table.status} in ('pending', 'needs-pasted-text', 'ready', 'failed')`,
     ),
   ],
+)
+
+export const jobSourceIdentities = sqliteTable(
+  'job_source_identities',
+  {
+    identity: text('identity').primaryKey(),
+    jobApplicationId: integer('job_application_id')
+      .notNull()
+      .references(() => jobApplications.id, { onDelete: 'cascade' }),
+  },
+  (table) => [index('job_source_identity_application_idx').on(table.jobApplicationId)],
 )
 
 // ---------------------------------------------------------------------------

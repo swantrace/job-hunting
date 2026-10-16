@@ -64,8 +64,7 @@ export function ApplicationForm({
           label="Posted date"
           name="postedDate"
           type="date"
-          required
-          value={job.postedDate}
+          value={job.postedDate ?? ''}
           error={err(errors, 'postedDate')}
         />
         <InputField

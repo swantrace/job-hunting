@@ -1,4 +1,5 @@
 import { listDirections } from '../lib/career/directions'
+import { jobParserModelId, stageReasoningEffort } from './models'
 import {
   type CatalogPromptEntry,
   jobAnalysisCatalogBlock,
@@ -6,6 +7,7 @@ import {
   jobAnalysisSystemPrompt,
 } from './prompts/job-analysis'
 import { jobParserPromptVersion, jobParserSystemPrompt } from './prompts/job-parser'
+import { openAIRequest } from './request'
 import type { JobAnalysis } from './schemas/job-analysis'
 import {
   jobAnalysisCombinedResponseSchema,
@@ -88,7 +90,7 @@ export async function parseJobDescription(
 ): Promise<ParsedJobResult> {
   const apiKey = env.OPENAI_API_KEY
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured')
-  const model = env.OPENAI_MODEL_JOB_PARSER ?? env.OPENAI_MODEL_DEFAULT ?? 'gpt-5.6-terra'
+  const model = jobParserModelId(env)
   const timeoutMs = parserTimeoutMs(env)
   const directions = listDirections()
   const directionIds = directions.map((direction) => direction.id)
@@ -97,16 +99,17 @@ export async function parseJobDescription(
     .join(', ')
   let response: Response
   try {
-    response = await fetch('https://api.openai.com/v1/responses', {
+    response = await openAIRequest('https://api.openai.com/v1/responses', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'X-Client-Request-Id': crypto.randomUUID(),
       },
-      signal: AbortSignal.timeout(timeoutMs),
+      timeoutMs: timeoutMs,
       body: JSON.stringify({
         model,
+        reasoning: { effort: stageReasoningEffort.jobParser },
         input: [
           {
             role: 'system',
