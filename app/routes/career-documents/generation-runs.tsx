@@ -1,11 +1,11 @@
 import { createRoute } from 'honox/factory'
 import { listBaselineGenerationRuns } from '../../../src/db/generation'
-import { loadApprovedBaseResume } from '../../../src/lib/base-resumes'
-import { directionLabel, listDirections } from '../../../src/lib/directions'
-import { enqueueBaselineGeneration } from '../../../src/lib/generation-queue'
+import { loadApprovedBaseResume } from '../../../src/lib/career/base-resumes'
+import { directionLabel, listDirections } from '../../../src/lib/career/directions'
+import { enqueueBaselineGeneration } from '../../../src/lib/generation/queue'
 import { parseForm } from '../../../src/lib/request'
 import { baselineGenerationSchema } from '../../../src/lib/validation'
-import { BaselineGenerationPanel } from '../../components/BaselineGenerationPanel'
+import { BaselineGenerationPanel } from '../../components/career/BaselineGenerationPanel'
 
 export default createRoute((c) =>
   c.html(<BaselineGenerationPanel runs={listBaselineGenerationRuns()} />),

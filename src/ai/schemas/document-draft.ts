@@ -1,11 +1,11 @@
 import { z } from 'zod'
-import { draftSchemaVersion } from '../../lib/document-draft'
+import { draftSchemaVersion } from '../../lib/document-draft/definition'
 
 /**
  * The document drafting contract. Each request returns one Markdown document
  * inside a minimal Structured Outputs wrapper. The Markdown is then parsed and
- * validated by `src/lib/document-draft.ts` and
- * `src/lib/document-draft-validation.ts`.
+ * validated by `src/lib/document-draft/definition.ts` and
+ * `src/lib/document-draft/validation.ts`.
  */
 
 export const documentDraftSchemaVersion = draftSchemaVersion

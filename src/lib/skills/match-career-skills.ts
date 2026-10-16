@@ -1,4 +1,4 @@
-import type { CanonicalCareerData } from '../career-data'
+import type { CanonicalCareerData } from '../career/canonical-data'
 import type { SkillMatchResult } from './constants'
 
 /**

@@ -1,5 +1,5 @@
 import { AlignmentType, Document, Packer, Paragraph, TextRun } from 'docx'
-import type { DocumentDraft } from '../document-draft'
+import type { DocumentDraft } from '../document-draft/definition'
 import {
   contactLineParts,
   type DocumentIdentity,

@@ -32,6 +32,11 @@ const importanceWeight: Record<AtsImportance, number> = {
   mentioned: 0,
 }
 
+/** The transparent weight shared with requirement coverage: required 3, preferred 1, mentioned 0. */
+export function atsImportanceWeight(importance: AtsImportance): number {
+  return importanceWeight[importance]
+}
+
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 /**

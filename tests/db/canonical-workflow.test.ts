@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { completeJobAnalysisRun, createJobAnalysisRun } from '../../src/db/job-analysis-runs'
 import * as schema from '../../src/db/schema'
 import { listRequirementSkillMappings } from '../../src/db/skill-queries'
-import { jobAnalysisInputFromContent } from '../../src/lib/job-analysis-input'
+import { jobAnalysisInputFromContent } from '../../src/lib/job-analysis/input'
 import { migratedDatabase } from '../support/sqlite'
 
 /**

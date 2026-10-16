@@ -7,12 +7,12 @@ import { completeJobAnalysisRun, createJobAnalysisRun } from '../../src/db/job-a
 import * as schema from '../../src/db/schema'
 import { countPendingMentions, listRequirementMentions } from '../../src/db/skill-mentions'
 import { listRequirementSkillMappings } from '../../src/db/skill-queries'
-import { jobAnalysisInputFromContent } from '../../src/lib/job-analysis-input'
+import { jobAnalysisInputFromContent } from '../../src/lib/job-analysis/input'
 import type { CatalogContextEntry } from '../../src/lib/skills/catalog-context'
 import { migratedDatabase } from '../support/sqlite'
 
 /**
- * Canonical requirement-term persistence contract (Step 5): requirement-owned
+ * Canonical requirement-term persistence contract (): requirement-owned
  * raw terms are stored as mentions, a verified catalog match writes the
  * `job_requirements_to_skills` junction through `mapMention`, and persistence
  * never creates a catalog skill, alias or category.
@@ -33,14 +33,14 @@ function seedPosting(sqlite: Database): { postingId: number; applicationId: numb
   const application = sqlite
     .query(
       `INSERT INTO job_applications (
-        company_id, job_title, direction, posted_date, priority, status, created_at, updated_at
-      ) VALUES (?, ?, 'fullstack', '2026-08-28', 'B', 'Saved', '2026-08-28', '2026-08-28') RETURNING id`,
+    company_id, job_title, direction, posted_date, priority, status, created_at, updated_at
+   ) VALUES (?, ?, 'fullstack', '2026-08-28', 'B', 'Saved', '2026-08-28', '2026-08-28') RETURNING id`,
     )
     .get(company.id, 'Platform Engineer') as { id: number }
   const posting = sqlite
     .query(
       `INSERT INTO job_postings (job_application_id, raw_text, captured_at, content_hash)
-       VALUES (?, ?, '2026-08-28', ?) RETURNING id`,
+    VALUES (?, ?, '2026-08-28', ?) RETURNING id`,
     )
     .get(application.id, postingText, 'posting-hash') as { id: number }
   return { postingId: posting.id, applicationId: application.id }
@@ -60,8 +60,8 @@ function seedApprovedKafka(sqlite: Database): number {
     sqlite
       .query(
         `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
-         VALUES ('kafka', 'Kafka', 'messaging-async', 'approved', 'career-data', '2026-08-28', '2026-08-28')
-         RETURNING id`,
+     VALUES ('kafka', 'Kafka', 'messaging-async', 'approved', 'career-data', '2026-08-28', '2026-08-28')
+     RETURNING id`,
       )
       .get() as { id: number }
   ).id

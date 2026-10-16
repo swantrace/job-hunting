@@ -61,8 +61,8 @@ export type SkillTaxonomy = z.infer<typeof taxonomySchema>
 export type SkillCategory = string
 
 /**
- * Import-only file resolution for `skill-taxonomy.json`. The Step 3 importer and
- * the retired Step 12 taxonomy sync CLI read the file on purpose; the runtime
+ * Import-only file resolution for `skill-taxonomy.json`. The importer reads the
+ * file on purpose during an upload; the runtime
  * reads `skill_categories` from the database instead.
  */
 function taxonomyPath() {

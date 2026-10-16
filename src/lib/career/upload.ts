@@ -1,7 +1,7 @@
 import PizZip from 'pizzip'
-import { baseResumeDirectoryName, baseResumeManifestFileName } from '../base-resumes'
-import { careerImportDocumentFiles, careerImportTaxonomyFile } from '../career-import'
+import { baseResumeDirectoryName, baseResumeManifestFileName } from './base-resumes'
 import { careerDatasetFormat, careerDatasetSchemaVersion } from './dataset'
+import { careerImportDocumentFiles, careerImportTaxonomyFile } from './import'
 
 /**
  * Decodes an uploaded career source into an inert in-memory file map.

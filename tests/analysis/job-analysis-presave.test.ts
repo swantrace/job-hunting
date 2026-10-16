@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { jobAnalysisSchemaVersion } from '../../src/ai/schemas/job-analysis'
 import { persistCompletedJobAnalysis } from '../../src/db/job-analysis-runs'
 import * as schema from '../../src/db/schema'
-import { jobAnalysisInputFromContent } from '../../src/lib/job-analysis-input'
+import { jobAnalysisInputFromContent } from '../../src/lib/job-analysis/input'
 import { migrateCareerTestDatabase } from '../support/career-db'
 import { migratedDatabase } from '../support/sqlite'
 

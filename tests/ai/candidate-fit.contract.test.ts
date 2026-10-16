@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 
 const schemaPath = resolve(process.cwd(), 'src/ai/schemas/candidate-fit.ts')
 const promptPath = resolve(process.cwd(), 'src/ai/prompts/candidate-fit.ts')
-const validationPath = resolve(process.cwd(), 'src/lib/fit-analysis.ts')
+const validationPath = resolve(process.cwd(), 'src/lib/candidate/fit-analysis.ts')
 const contractTest =
   existsSync(schemaPath) && existsSync(promptPath) && existsSync(validationPath) ? test : test.todo
 
@@ -87,7 +87,7 @@ describe('candidate fit and evidence-matrix contract', () => {
 
   contractTest('normalizes legacy missing to unknown-evidence at the read boundary', async () => {
     const { parseStoredCandidateFit } = await import(
-      resolve(process.cwd(), 'src/lib/candidate-fit-result.ts')
+      resolve(process.cwd(), 'src/lib/candidate/fit-result.ts')
     )
     const legacy = JSON.parse(JSON.stringify(validFitAnalysis())) as {
       requirementAssessments: Array<{ evidenceStatus: string }>

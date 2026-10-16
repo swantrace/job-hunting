@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { parseJobDescription } from '../../src/ai/client'
 import { jobAnalysisSchema, jobAnalysisSchemaVersion } from '../../src/ai/schemas/job-analysis'
 import { persistJobRequirements } from '../../src/db/job-analysis'
 import {
@@ -7,13 +8,12 @@ import {
   listRequirementMentions,
 } from '../../src/db/skill-mentions'
 import { listRequirementSkillMappings } from '../../src/db/skill-queries'
-import { parseJobDescription } from '../../src/lib/ai'
 import {
   buildJobAnalysisInput,
   frozenSuppliedCatalog,
   jobAnalysisInputFromContent,
-} from '../../src/lib/job-analysis-input'
-import { parseJobAnalysisResult } from '../../src/lib/job-analysis-result'
+} from '../../src/lib/job-analysis/input'
+import { parseJobAnalysisResult } from '../../src/lib/job-analysis/result'
 import {
   buildCatalogContext,
   catalogContextCategoryCandidateLimit,
@@ -24,14 +24,14 @@ import { type CareerTestDatabase, createCareerTestDatabase } from '../support/ca
 import { syntheticRequirementTerms } from './fixtures'
 
 /**
- * Step 5 acceptance: catalog-grounded JD resolution.
+ * acceptance: catalog-grounded JD resolution.
  *
  * The JD parser only owns raw requirement terms. A deterministic, server-side
  * resolver maps a term to a catalog entry only through an exact key, a curated
  * alias or a verified catalog match; unknown, ambiguous and broad terms stay
  * pending, and resolution never creates a catalog record or personal evidence.
  *
- * Every case runs against a temporary database seeded from the Step 1
+ * Every case runs against a temporary database seeded from the
  * synthetic fixtures (never `jobs.db`).
  */
 
@@ -43,7 +43,7 @@ function addApprovedSkill(
   target.sqlite
     .query(
       `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
-       VALUES (?, ?, ?, 'approved', 'career-data', '2026-10-14', '2026-10-14')`,
+    VALUES (?, ?, ?, 'approved', 'career-data', '2026-10-14', '2026-10-14')`,
     )
     .run(entry.key, entry.name, entry.category)
   const skill = target.sqlite.query('SELECT id FROM skills WHERE key = ?').get(entry.key) as {
@@ -53,7 +53,7 @@ function addApprovedSkill(
     target.sqlite
       .query(
         `INSERT INTO skill_aliases (skill_id, alias, normalized_alias, origin, created_at)
-         VALUES (?, ?, ?, 'career-data', '2026-10-14')`,
+     VALUES (?, ?, ?, 'career-data', '2026-10-14')`,
       )
       .run(skill.id, alias, normalizeSkillAlias(alias))
   }
@@ -75,14 +75,14 @@ function seedPosting(target: CareerTestDatabase, rawText: string = syntheticPost
   const application = target.sqlite
     .query(
       `INSERT INTO job_applications (
-        company_id, job_title, direction, posted_date, priority, status, created_at, updated_at
-      ) VALUES (?, ?, 'fullstack', '2026-10-14', 'B', 'Saved', '2026-10-14', '2026-10-14') RETURNING id`,
+    company_id, job_title, direction, posted_date, priority, status, created_at, updated_at
+   ) VALUES (?, ?, 'fullstack', '2026-10-14', 'B', 'Saved', '2026-10-14', '2026-10-14') RETURNING id`,
     )
     .get(company.id, 'Platform Engineer') as { id: number }
   const posting = target.sqlite
     .query(
       `INSERT INTO job_postings (job_application_id, raw_text, captured_at, content_hash)
-       VALUES (?, ?, '2026-10-14', ?) RETURNING id`,
+    VALUES (?, ?, '2026-10-14', ?) RETURNING id`,
     )
     .get(application.id, rawText, 'posting-hash') as { id: number }
   const analysis = target.sqlite

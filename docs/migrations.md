@@ -15,16 +15,18 @@ operator runs it.
 - `drizzle/*.sql` contains ordered, immutable database migrations.
 - `drizzle/meta/_journal.json` records their execution order.
 - `src/db/migrate.ts` (`bun run db:migrate`) applies pending migrations.
-- `jobs.db` (or `DB_FILE_NAME`) owns career facts, directions, categories,
-  personal skills, Base Resume versions, and the operational skill catalog.
+- `jobs.db` (or `DB_FILE_NAME`) owns applications, postings, analyses,
+  requirements, mentions, career facts, directions, categories, personal skills,
+  Base Resume versions, and the operational skill catalog.
 - A legacy `career-data/` directory (`*.json`, `skill-taxonomy.json`,
   `base-resumes/`) is an **import-only** source. It is never read at runtime and
-  is never synchronized automatically.
-  `bun run career:import --source <dir> --database <path>` loads it.
+  is never synchronized automatically. Load it through the browser flow at
+  `/career-data/transfer`, which previews the change set (source fingerprint,
+  database fingerprint, per-kind counts, conflicts) and then applies it in one
+  transaction after confirmation.
 
-`bun run setup` and `bun run start` apply schema migrations only. They do not
-run `taxonomy:sync`, `skills:sync`, or any other file synchronizer, even if a
-career-data directory is mounted.
+`bun run start` applies schema migrations only. No boot path runs a file
+synchronizer, even when a career-data directory is mounted.
 
 ## Runtime behavior
 
@@ -34,33 +36,17 @@ The production start command performs these operations in order:
 db:migrate -> start server
 ```
 
-The legacy per-file sync commands (`taxonomy:sync`, `skills:sync`) and the Fly
-file upload (`fly:sync-career-data`) still exist as explicit, import-only tools,
-but no boot path invokes them. A migration failure prevents the server from
-starting and must never be handled by deleting the production database.
-
-### CLI database selection (required)
-
-Every CLI that opens or writes the database — `career:import`, `career:export`,
-`career:export-chatgpt-context`, `resume:import`, `resume:experiment`,
-`skills:audit`, `artifacts:audit`, `taxonomy:sync`, `skills:sync` and
-`fly:sync-career-data` — resolves its target from `--database <path>` or
-`DB_FILE_NAME` and fails loudly when neither is set:
-
-```text
-No database selected: pass --database <path> or set DB_FILE_NAME.
-Refusing to fall back to ./jobs.db because a CLI could then read or write production data.
-```
-
-The app server is unchanged and still defaults to `DB_FILE_NAME ?? 'jobs.db'`.
-The `db:migrate` script is part of that server path and keeps the same default.
+A migration failure prevents the server from starting and must never be handled
+by deleting the production database. Import and export are browser flows under
+`/career-data/transfer`, so there is no command-line path that could open
+production data by accident.
 
 `src/db/health.ts` runs at boot before the server accepts requests. If any
 canonical table or migration-added column is missing it fails fast with a
 readable message naming the missing object, for example:
 
 ```text
-Database schema is missing required table(s): career_candidate, career_state, ...
+Database schema is missing required table(s): career_profile, career_record_directions, ...
 Run the database migrations (bun run db:migrate) before starting the server.
 ```
 
@@ -80,12 +66,27 @@ A database backup covers only `jobs.db`. Back up generated artifacts, queued
 work and legacy career-data files separately when a complete environment
 snapshot is required.
 
+### Running commands on the machine
+
+`fly ssh console` **without** `-C` opens a real shell, so multi-line scripts,
+`cd`, pipes and globs all work there. `fly ssh console -C '<command>'` does **not**
+use a shell — it execs the words directly, so `cd /app && ...`, pipes, `;` and
+globs fail with `exec: "cd": executable file not found in $PATH`. Wrap those:
+
+```sh
+fly ssh console -a job-hunting -C 'sh -c "cd /data && ls -lh jobs.db*"'
+```
+
+For multi-line probes, prefer an interactive console and paste the script.
+
 ## Creating a migration
 
 1. Change `src/db/schema.ts`.
-2. Add the next ordered SQL file under `drizzle/` and its journal entry. Use
-   `bun run db:generate` when Drizzle can express the change safely; review all
-   generated SQL before accepting it.
+2. Add the next ordered SQL file under `drizzle/` and its journal entry by hand.
+   Migrations in this repository are written deliberately: there is no generator
+   script (`bun run db:generate` no longer exists), and DDL that SQLite cannot
+   express as a plain `ALTER` is rebuilt explicitly with a copy-and-verify step
+   (see step 5).
 3. Never edit or reorder a migration that may already have been applied.
 4. Keep migrations deterministic and local. They must not call an LLM, make a
    network request, or depend on private career data.
@@ -233,37 +234,28 @@ with local data, and do not import a local dataset into production.
    ```
 
    Confirm the health check passes and startup logs report the schema ready.
-4. **Dry-run the import (default).** Point `--source` at the existing volume
-   directory and `--database` at the production database. A dry run writes
-   nothing and prints the source hash, database revision, per-kind counts and
-   every conflict:
+4. **Bring the volume files to the browser.** Import is a browser flow: open
+   `/career-data/transfer`, choose Import, and upload **either** a career dataset
+   JSON **or** a zip of the legacy `career-data/` directory. The upload is decoded
+   in memory and read strictly as data. To package the volume copy, download it
+   first:
 
    ```sh
-   cd /app
-   bun run career:import --source /data/career-data --database /data/jobs.db
+   fly sftp get -R /data/career-data ./career-data-volume --app job-hunting
+   cd career-data-volume && zip -r ../career-data.zip . && cd ..
    ```
 
-   Importing from a dataset JSON file works the same way:
-
-   ```sh
-   bun run career:import --source /data/career-data/career-dataset.json --database /data/jobs.db
-   ```
-
-5. **Review conflicts and counts.** Any reported conflict blocks the whole
-   import. Resolve the source or the conflicting database record, then run a new
-   dry run — a stale preview is rejected, so always re-run before applying.
-   Verify the planned inserts/updates match the legacy files and that unrelated
-   operational tables are untouched.
-6. **Apply in one transaction.**
-
-   ```sh
-   cd /app
-   bun run career:import --source /data/career-data --database /data/jobs.db --apply
-   ```
-
-   The apply is transactional; on any validation error nothing is written.
+5. **Review the preview.** The preview writes nothing and shows the source
+   fingerprint, the database fingerprint, per-kind counts and every conflict. Any
+   conflict blocks the whole import; resolve the source or the conflicting record
+   and upload again — a stale preview is rejected, so always re-run before
+   confirming. Verify the planned inserts/updates match the legacy files and that
+   unrelated operational tables are untouched.
+6. **Confirm to apply in one transaction.** The confirm step re-reads the same
+   bytes and re-derives the fingerprints before writing, and the apply is
+   transactional: on any validation error nothing is written.
 7. **Verify readiness and counts.** Re-run the count query from step 2 and
-   confirm the career tables are populated; an empty `career_candidate` means
+   confirm the career tables are populated; an empty `career_profile` means
    onboarding still applies. Check foreign-key integrity:
 
    ```sh
@@ -271,34 +263,76 @@ with local data, and do not import a local dataset into production.
    bun -e '
      import { Database } from "bun:sqlite";
      const db = new Database("/data/jobs.db", { readonly: true });
+     console.log("integrity", db.query("PRAGMA integrity_check").get());
      console.log("fk violations", db.query("PRAGMA foreign_key_check").all());
-     for (const t of ["career_candidate", "career_experiences", "career_skills", "career_base_resumes"])
+     for (const t of ["career_profile", "career_experiences", "career_skills", "career_base_resumes", "career_record_directions"])
        console.log(t, db.query(`SELECT COUNT(*) AS n FROM ${t}`).get().n);
      db.close();
    '
    ```
 
+   The operational tables recorded in step 2 are expected to be empty by now; see
+   "Cutting over to the database-owned career schema" above.
+
    Then open the app and confirm: Career Data loads, an approved Base Resume is
    selected per direction, Review resolves requirements, and an existing
    application still shows its Job Post, Documents, Contacts and Activities.
    Drive connection status and confirmed pending uploads must still work.
-8. **Retire the file-based environment variables.** Once the database is
-   authoritative and verified, remove `CAREER_DATA_DIR` (and
-   `CAREER_BASE_RESUMES_DIR` if set) from the Fly app configuration and from any
-   local `.env`, so nothing suggests runtime file reads:
+8. **Retire the file-based environment variables.** No runtime request reads
+   `CAREER_DATA_DIR` or `CAREER_BASE_RESUMES_DIR`, so they must not remain in the
+   Fly app configuration. `fly.toml` no longer sets `CAREER_DATA_DIR`; if the
+   variable is still present as a secret, unset it:
 
    ```sh
    fly secrets unset CAREER_DATA_DIR --app job-hunting   # only if set as a secret
    ```
 
-   If the variable is set in `fly.toml` `[env]` instead, remove it there and
-   deploy the change through the normal manual flow. Keep the legacy
-   `/data/career-data/` files in place until you have confirmed the import and
-   kept the backup; they are harmless once unused.
+   Deploy the change through the normal manual flow. Keep the legacy
+   `/data/career-data/` files in place: they are harmless once unused, and they
+   are the source you would upload again at `/career-data/transfer`.
 9. **Keep the manual deploy policy.** Do not enable automatic deployment, and do
    not deploy again until the checks above pass. If something is wrong, fix
    forward with a new migration or restore the snapshot during a maintenance
    window (see Recovery).
+
+## Cutting over to the database-owned career schema (0026-0029)
+
+This migration set is more than an additive schema change: `0027` deliberately
+discards the job-search operational history, so it has to be backed up and
+accepted on purpose.
+
+| Migration | Effect |
+| --- | --- |
+| `0026_career_facts` | Adds the relational career, catalog and mention tables (initially empty). |
+| `0027_simplify_schema` | Clears the operational tables (applications, postings, analyses, requirements, mappings, mentions, runs, artifacts, reviews, intake, follow-ups, interviews), folds the baseline pipeline and the 1:1 result/snapshot tables into `generation_runs` (`kind`), merges the two career singletons into `career_profile`, merges five direction junctions into `career_record_directions`, replaces `job_requirements_to_skills` with a view, and drops 12 unusable indexes and two dead columns. |
+| `0028_drop_portfolio` | Drops `career_portfolio_topics` and `career_portfolio_topic_projects`. |
+| `0029_collapse_career_state` | Drops `career_state`: authored fields without a column move to each row's `extension_json`, document-level values to `career_profile.documents_json`, and the stored version counter becomes a value computed from the data. |
+| `0030_drop_orphan_resume_strategies` | Drops `analysis_run_resume_strategies`, an orphan whose creating migration (`0023_run_scoped_resume_strategies`) disappeared when the chain was renumbered. Databases migrated by the older chain still carry it; databases built from the current chain never did, hence `DROP TABLE IF EXISTS`. |
+
+Result: **36 application tables plus the `job_requirements_to_skills` view**.
+
+A database count above 36 means an orphan table survived a removed migration. Before
+`0030` the known one was `analysis_run_resume_strategies` (carried by databases
+migrated before the chain renumbering); applying `0030` brings such a database to 36.
+Consult that table's migration history rather than assuming a failed migration.
+
+Plan for these consequences:
+
+- **The operational history is gone after `0027`.** Record the pre-migration counts
+  first (step 2 below) so the backup is meaningful, then expect those tables to be
+  empty. Empty is the designed outcome, not a failed import.
+- **`start` migrates on boot**, so deploying the image applies the whole set. Code
+  and schema ship together: the previous image cannot run against the new schema,
+  and the new image cannot start against the old one. **A rollback therefore means
+  restoring the database snapshot *and* redeploying the previous image together**;
+  an image rollback on its own will not work.
+- **Career facts are not part of the migration.** Production career tables are
+  empty after `0026`; the owner's facts arrive through the import in the runbook
+  below.
+- **Never shorten this by uploading a local `jobs.db`.** Beyond being forbidden,
+  `google_drive_connections.refresh_token_encrypted` is sealed with a key derived
+  from `GOOGLE_OAUTH_STATE_SECRET`; a token encrypted with a different secret
+  cannot be decrypted, which silently breaks Drive uploads.
 
 ## Production deployment checklist
 
@@ -323,15 +357,20 @@ Verify more than whether the home page loads:
 1. Check Fly logs for migration, constraint, or missing-table errors.
 2. Open Applications, Skills, Companies, Contacts, Career Data and Career
    Documents.
-3. Open an existing application and confirm its Job Post, Review, Documents,
-   Contacts, and Activities data still resolve.
-4. Confirm expected counts for applications, companies, contacts, postings,
-   analysis runs, generation runs, artifacts, and the career tables.
-5. Run `PRAGMA foreign_key_check` against the production database or a new
-   post-deployment snapshot.
-6. Confirm Google Drive connection verification and user-confirmed pending
+3. After `0027` there is no existing application to open: the operational history
+   is discarded on purpose. Confirm instead that Applications, Skills, Companies,
+   Contacts, Career Data and Career Documents all load, that career facts render,
+   and that an empty workspace shows onboarding guidance rather than an error.
+4. Confirm the career tables carry the imported facts, and confirm that the
+   operational tables recorded before the cutover are empty by design (the
+   `0027` migration discards them).
+5. Confirm the schema shape: 36 application tables plus the
+   `job_requirements_to_skills` view, and no `career_state` table.
+6. Run `PRAGMA integrity_check` and `PRAGMA foreign_key_check` against the
+   production database or a new post-deployment snapshot.
+7. Confirm Google Drive connection verification and user-confirmed pending
    uploads still behave correctly.
-7. Restart once and confirm the migration step is idempotent and the boot health
+8. Restart once and confirm the migration step is idempotent and the boot health
    check passes without any career-data directory.
 
 ## Recovery
@@ -380,3 +419,5 @@ unless the backup predates the import. Never overwrite production with a local
 - Do not edit an already-applied migration; add a new corrective migration.
 - Do not deploy a destructive migration without testing it against a recent
   production snapshot, and keep deployment manual.
+- Do not roll back the image without restoring the matching database snapshot:
+  from `0027` onward the two are inseparable.

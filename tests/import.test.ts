@@ -5,7 +5,7 @@ import {
   contactKey,
   detectImportConflicts,
   importPayloadSchema,
-} from '../src/lib/import'
+} from '../src/lib/job-intake/import'
 
 describe('JSON import format', () => {
   test('uses stable case-insensitive matching keys', () => {

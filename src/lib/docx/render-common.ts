@@ -7,7 +7,7 @@ import {
   Paragraph,
   TextRun,
 } from 'docx'
-import type { DocumentSection } from '../document-draft'
+import type { DocumentSection } from '../document-draft/definition'
 import { docxBulletReference, docxColors, docxTypography } from './styles'
 
 export type DocumentIdentity = {

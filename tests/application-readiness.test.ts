@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { assessApplicationReadiness } from '../src/lib/application-readiness'
+import { assessApplicationReadiness } from '../src/lib/applications/readiness'
 
 describe('application generation readiness', () => {
   test('returns a structured reason list for each blocking condition', () => {

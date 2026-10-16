@@ -1,4 +1,4 @@
-import type { CareerImportPreview } from '../../../src/lib/career-import'
+import type { CareerImportPreview } from '../../../src/lib/career/import'
 
 export const careerImportPreviewId = 'career-import-preview'
 

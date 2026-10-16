@@ -1,7 +1,7 @@
 import { createRoute } from 'honox/factory'
 import { getApplication } from '../../../../src/db/queries'
 import { loadReviewData } from '../../../../src/db/review-data'
-import { enqueueJobAnalysis } from '../../../../src/lib/job-analysis-queue'
+import { enqueueJobAnalysis } from '../../../../src/lib/job-analysis/queue'
 import { parseFilters, parseId } from '../../../../src/lib/request'
 import { computeWorkspaceAvailability } from '../../../../src/lib/workspace/availability'
 import { resolveWorkspaceTab, tabAvailability } from '../../../../src/lib/workspace/state'

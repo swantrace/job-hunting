@@ -6,7 +6,7 @@ import {
   isSafeLinkUrl,
   parseDocumentDraft,
   parseStoredDocumentDraft,
-} from '../src/lib/document-draft'
+} from '../src/lib/document-draft/definition'
 
 const resume = `## Summary
 

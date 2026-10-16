@@ -8,7 +8,7 @@ import {
 } from '../../../../src/db/queries'
 import { parseFilters, parseForm, parseId } from '../../../../src/lib/request'
 import { followUpSchema } from '../../../../src/lib/validation'
-import { Board, Metrics } from '../../../components/Dashboard'
+import { Board, Metrics } from '../../../components/dashboard/Dashboard'
 import { ActivityPanel } from '../../../components/workspace/ActivityPanel'
 import { WorkspaceHeader } from '../../../components/workspace/WorkspaceHeader'
 

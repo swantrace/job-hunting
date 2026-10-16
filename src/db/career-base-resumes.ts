@@ -1,5 +1,5 @@
 import { and, asc, eq, ne } from 'drizzle-orm'
-import { baseResumeTextHash, isEmptyBaseResume } from '../lib/base-resumes'
+import { baseResumeTextHash, isEmptyBaseResume } from '../lib/career/base-resumes'
 import { nowISO, todayISO } from '../lib/date'
 import { type CareerDb, CareerReferenceError, type CareerWriteResult } from './career-shared'
 import { db } from './client'

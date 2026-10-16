@@ -2,9 +2,9 @@ import { createRoute } from 'honox/factory'
 import { createApplication, listApplications, metrics } from '../../../src/db/queries'
 import { parseFilters, parseForm } from '../../../src/lib/request'
 import { parseJobAnalysisValue, quickCollectSchema } from '../../../src/lib/validation'
-import { ApplicationsPage } from '../../components/ApplicationsPage'
-import { Board, QuickCollect } from '../../components/Dashboard'
-import { MutationResponse } from '../../components/Responses'
+import { ApplicationsPage } from '../../components/applications/ApplicationsPage'
+import { MutationResponse } from '../../components/applications/Responses'
+import { Board, QuickCollect } from '../../components/dashboard/Dashboard'
 
 export const GET = createRoute((c) => {
   const filters = parseFilters(c)
@@ -35,7 +35,7 @@ export const POST = createRoute(async (c) => {
   // end-to-end without a separate Review click. Profile confirmation and
   // Include/Skip decisions remain explicit.
   if (parsed.data.jobAnalysis) {
-    const { autoChainCandidateAnalysis } = await import('../../../src/lib/analysis-chain')
+    const { autoChainCandidateAnalysis } = await import('../../../src/lib/analysis/chain')
     void autoChainCandidateAnalysis(applicationId)
   }
   return c.html(

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import PizZip from 'pizzip'
-import { parseDocumentDraft } from '../../src/lib/document-draft'
+import { parseDocumentDraft } from '../../src/lib/document-draft/definition'
 import { renderCoverLetterDocx } from '../../src/lib/docx/cover-letter-renderer'
 import { renderResumeDocx } from '../../src/lib/docx/resume-renderer'
 

@@ -3,14 +3,14 @@ import { migratedDatabase } from '../support/sqlite'
 import { seedPopulatedLegacyCatalog } from './fixtures'
 
 /**
- * Step 1 catalog and mapping contracts. They freeze the rules that already hold
+ * catalog and mapping contracts. They freeze the rules that already hold
  * in the current schema and that the database-owned catalog must keep:
  *
  * - a requirement/skill mapping is a statement about the job post, never a claim
- *   that the candidate possesses the skill;
+ *  that the candidate possesses the skill;
  * - an Include evidence decision requires an explicit reason, while Skip does not;
  * - existing catalog provenance (approved, pending, merged, aliases) and the
- *   requirement mappings that reference it survive every migration.
+ *  requirement mappings that reference it survive every migration.
  */
 
 function columnNames(sqlite: ReturnType<typeof migratedDatabase>, table: string) {
@@ -41,7 +41,7 @@ describe('requirement to catalog mapping', () => {
       const mapping = sqlite
         .query(
           `SELECT skill_id, raw_label, confidence FROM job_requirements_to_skills
-           WHERE job_requirement_id = ?`,
+      WHERE job_requirement_id = ?`,
         )
         .all(seeded.requirementId) as Array<{
         skill_id: number
@@ -71,7 +71,7 @@ describe('catalog provenance', () => {
       const rows = sqlite
         .query(
           `SELECT key, name, review_status, origin, merged_into_skill_id
-           FROM skills ORDER BY id`,
+      FROM skills ORDER BY id`,
         )
         .all() as Array<{
         key: string
@@ -102,7 +102,7 @@ describe('catalog provenance', () => {
       const unapprovedMappings = sqlite
         .query(
           `SELECT count(*) AS count FROM job_requirements_to_skills
-           WHERE skill_id IN (SELECT id FROM skills WHERE review_status != 'approved')`,
+      WHERE skill_id IN (SELECT id FROM skills WHERE review_status != 'approved')`,
         )
         .get() as { count: number }
       expect(unapprovedMappings.count).toBe(0)
@@ -130,8 +130,8 @@ describe('evidence decisions', () => {
       const seeded = seedPopulatedLegacyCatalog(sqlite)
       const insert = sqlite.query(
         `INSERT INTO analysis_run_decisions (
-          application_analysis_run_id, skill_id, decision, reason, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?)`,
+     application_analysis_run_id, skill_id, decision, reason, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?)`,
       )
       const timestamp = '2026-10-14T00:00:00.000Z'
 
@@ -140,7 +140,7 @@ describe('evidence decisions', () => {
           seeded.applicationAnalysisRunId,
           seeded.pendingSkillId,
           'include',
-          '   ',
+          '  ',
           timestamp,
           timestamp,
         ),
@@ -166,7 +166,7 @@ describe('evidence decisions', () => {
       const decisions = sqlite
         .query(
           `SELECT skill_id, decision, reason FROM analysis_run_decisions
-           ORDER BY skill_id`,
+      ORDER BY skill_id`,
         )
         .all() as Array<{ skill_id: number; decision: string; reason: string | null }>
       expect(decisions).toEqual([
@@ -188,8 +188,8 @@ describe('evidence decisions', () => {
       const seeded = seedPopulatedLegacyCatalog(sqlite)
       const insert = sqlite.query(
         `INSERT INTO analysis_run_decisions (
-          application_analysis_run_id, skill_id, decision, reason, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?)`,
+     application_analysis_run_id, skill_id, decision, reason, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?)`,
       )
       const timestamp = '2026-10-14T00:00:00.000Z'
       insert.run(

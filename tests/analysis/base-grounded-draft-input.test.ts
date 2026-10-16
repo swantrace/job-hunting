@@ -1,11 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
-import { baseResumeTextHash } from '../../src/lib/base-resumes'
+import { auditResumeKeywords } from '../../src/lib/ats-audit'
+import { baseResumeTextHash } from '../../src/lib/career/base-resumes'
 import {
   baseResumeIdentity,
   baseResumeSourceFor,
   buildBaselineDocumentDraftSnapshot,
   buildDocumentDraftSnapshot,
-} from '../../src/lib/document-draft-input'
+  documentDraftAuditTerms,
+} from '../../src/lib/document-draft/input'
 import { approvedBaseResumeMarkdown } from '../career/fixtures'
 import { type CareerTestDatabase, careerTestDatabase } from '../support/career-db'
 
@@ -84,6 +86,41 @@ describe('base-grounded document draft input', () => {
     expect(snapshot.documentPolicy.coverLetter.maxWords).toBe(400)
     expect(snapshot.careerData.experiences.length).toBeGreaterThan(0)
     expect(snapshot.careerData.skills.length).toBeGreaterThan(0)
+  })
+
+  test('audit terms keep eligible requirements and mark excluded skills unclaimable', () => {
+    const terms = documentDraftAuditTerms(buildDocumentDraftSnapshot(applicationSource))
+
+    expect(terms.find((term) => term.canonical === 'TypeScript')).toMatchObject({
+      evidenceEligible: true,
+      importance: 'required',
+    })
+    // Kafka was skipped, so no evidence supports it and it must never be added.
+    expect(terms.find((term) => term.canonical === 'Kafka')).toMatchObject({
+      evidenceEligible: false,
+      importance: 'required',
+    })
+    expect(new Set(terms.map((term) => term.canonical.toLowerCase())).size).toBe(terms.length)
+  })
+
+  test('the keyword audit separates matched, safely additive and unclaimable terms', () => {
+    const requiredTerms = documentDraftAuditTerms(buildDocumentDraftSnapshot(applicationSource))
+
+    const matched = auditResumeKeywords({
+      requiredTerms,
+      resumeText: 'Built TypeScript services.',
+    })
+    expect(matched.exactMatches.map((match) => match.canonical)).toEqual(['TypeScript'])
+    expect(matched.unsupportedTerms.map((match) => match.canonical)).toEqual(['Kafka'])
+    expect(matched.safeAdditions).toEqual([])
+    // The unclaimable term still counts in the denominator (required weight 3).
+    expect(matched.coverage).toEqual({ matchedWeight: 3, totalWeight: 6, percentage: 50 })
+
+    const absent = auditResumeKeywords({ requiredTerms, resumeText: 'Nothing relevant.' })
+    expect(absent.missingButSupported.map((match) => match.canonical)).toEqual(['TypeScript'])
+    expect(absent.safeAdditions.map((match) => match.canonical)).toEqual(['TypeScript'])
+    expect(absent.unsupportedTerms.map((match) => match.canonical)).toEqual(['Kafka'])
+    expect(absent.coverage).toEqual({ matchedWeight: 0, totalWeight: 6, percentage: 0 })
   })
 
   test('baseline snapshot never invents an employer or a job description', () => {

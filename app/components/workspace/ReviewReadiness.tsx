@@ -1,5 +1,5 @@
 import type { Filters } from '../../../src/db/queries'
-import type { ApplicationReadiness } from '../../../src/lib/application-readiness'
+import type { ApplicationReadiness } from '../../../src/lib/applications/readiness'
 import { query } from './helpers'
 
 export function ReviewReadiness({

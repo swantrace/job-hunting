@@ -1,10 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import { saveCareerPreferences } from '../../src/db/career-facts'
 import { careerContentProbe } from '../../src/db/career-shared'
-import { candidateStalenessReasons } from '../../src/lib/candidate-analysis'
+import { candidateStalenessReasons } from '../../src/lib/candidate/analysis'
 import { canonicalHash } from '../../src/lib/canonical-hash'
-import { type CanonicalCareerData, loadCareerDataFromDatabase } from '../../src/lib/career-data'
-import { safeCareerData } from '../../src/lib/document-draft-input'
+import {
+  type CanonicalCareerData,
+  loadCareerDataFromDatabase,
+} from '../../src/lib/career/canonical-data'
+import { safeCareerData } from '../../src/lib/document-draft/input'
 import { loadExampleCareerData } from '../support/career-data'
 import { type CareerTestDatabase, careerTestDatabase } from '../support/career-db'
 

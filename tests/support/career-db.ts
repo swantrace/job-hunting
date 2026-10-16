@@ -5,7 +5,7 @@ import { isAbsolute, relative, resolve } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import * as schema from '../../src/db/schema'
-import { applyCareerImport, prepareCareerImport } from '../../src/lib/career-import'
+import { applyCareerImport, prepareCareerImport } from '../../src/lib/career/import'
 import {
   approvedBaseResumeManifest,
   approvedBaseResumeMarkdown,
@@ -18,7 +18,7 @@ import {
  * The runtime authority for career facts is SQLite, so tests must seed a
  * database rather than point `CAREER_DATA_DIR` at a directory. This module
  * builds temporary migrated databases outside the repository and seeds them from
- * the Step 1 synthetic fixtures through the Step 3 importer. It never opens the
+ * the synthetic fixtures through the importer. It never opens the
  * developer's `jobs.db` or private `career-data/`.
  */
 

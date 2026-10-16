@@ -1,12 +1,12 @@
 import { createRoute } from 'honox/factory'
 import { getActivity, getApplication } from '../../../../src/db/queries'
-import { careerSkillEvidenceMap } from '../../../../src/lib/career-data'
-import { getGoogleDriveConnectionStatus } from '../../../../src/lib/google-drive'
+import { careerSkillEvidenceMap } from '../../../../src/lib/career/canonical-data'
+import { getGoogleDriveConnectionStatus } from '../../../../src/lib/google/drive'
 import { parseFilters, parseId, parseWorkspaceTab } from '../../../../src/lib/request'
 import { computeWorkspaceAvailability } from '../../../../src/lib/workspace/availability'
 import { resolveWorkspaceTab, tabAvailability } from '../../../../src/lib/workspace/state'
 import { AppShell } from '../../../components/layout/AppShell'
-import { Workspace } from '../../../components/Workspace'
+import { WorkspaceShell as Workspace } from '../../../components/workspace/WorkspaceShell'
 
 export default createRoute(async (c) => {
   const id = parseId(c.req.param('id'))

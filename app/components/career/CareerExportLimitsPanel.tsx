@@ -1,12 +1,12 @@
 import { careerDatasetExcluded } from '../../../src/lib/career/dataset'
-import { careerImportDocumentFiles, careerImportTaxonomyFile } from '../../../src/lib/career-import'
+import { careerImportDocumentFiles, careerImportTaxonomyFile } from '../../../src/lib/career/import'
 
 /**
  * The logical limits of an export, stated where the operator exports. A career
  * dataset (and the ChatGPT JSON context) is editorial data, not an operational
  * backup: it cannot restore OAuth credentials, application or analysis history,
  * generation runs, document reviews or artifact binaries. Full recovery needs a
- * consistent SQLite backup *and* an artifact backup, which Step 12 documents.
+ * consistent SQLite backup *and* an artifact backup, which the migration runbook documents.
  */
 export function CareerExportLimitsPanel({ contentFingerprint }: { contentFingerprint: string }) {
   return (

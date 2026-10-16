@@ -20,11 +20,11 @@ import {
   resetMention,
   skipMention,
 } from '../../src/db/skill-mentions'
-import { assessApplicationReadiness } from '../../src/lib/application-readiness'
+import { assessApplicationReadiness } from '../../src/lib/applications/readiness'
 import { type CareerTestDatabase, createCareerTestDatabase } from '../support/career-db'
 
 /**
- * Step 6 service acceptance, on temporary databases seeded from the Step 1
+ * service acceptance, on temporary databases seeded from the
  * synthetic fixtures (never `jobs.db`):
  *
  * mapping and catalog creation never fabricate candidate facts; blank input is
@@ -33,7 +33,7 @@ import { type CareerTestDatabase, createCareerTestDatabase } from '../support/ca
  * Skip never hides the catalog skill globally.
  *
  * The two catalog entries the synthetic candidate does not possess mirror the
- * Step 1 `catalogOnlySkills` fixture.
+ * `catalogOnlySkills` fixture.
  */
 
 const postingText = 'Platform engineer role using Kubernetes and Playwright.'
@@ -54,7 +54,7 @@ function addCatalogOnly(
   target.sqlite
     .query(
       `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
-       VALUES (?, ?, ?, 'approved', 'career-data', '2026-10-14', '2026-10-14')`,
+    VALUES (?, ?, ?, 'approved', 'career-data', '2026-10-14', '2026-10-14')`,
     )
     .run(entry.key, entry.name, entry.category)
   const skill = target.sqlite.query('SELECT id FROM skills WHERE key = ?').get(entry.key) as {
@@ -64,7 +64,7 @@ function addCatalogOnly(
     target.sqlite
       .query(
         `INSERT INTO skill_aliases (skill_id, alias, normalized_alias, origin, created_at)
-         VALUES (?, ?, ?, 'career-data', '2026-10-14')`,
+     VALUES (?, ?, ?, 'career-data', '2026-10-14')`,
       )
       .run(skill.id, alias, alias.trim().toLowerCase())
   }
@@ -91,14 +91,14 @@ function seedApplication(
   const application = target.sqlite
     .query(
       `INSERT INTO job_applications (
-        company_id, job_title, direction, posted_date, priority, status, created_at, updated_at
-      ) VALUES (?, ?, 'fullstack', '2026-10-14', 'B', 'Saved', '2026-10-14', '2026-10-14') RETURNING id`,
+    company_id, job_title, direction, posted_date, priority, status, created_at, updated_at
+   ) VALUES (?, ?, 'fullstack', '2026-10-14', 'B', 'Saved', '2026-10-14', '2026-10-14') RETURNING id`,
     )
     .get(companyId, 'Platform Engineer') as { id: number }
   const posting = target.sqlite
     .query(
       `INSERT INTO job_postings (job_application_id, raw_text, captured_at, content_hash)
-       VALUES (?, ?, '2026-10-14', ?) RETURNING id`,
+    VALUES (?, ?, '2026-10-14', ?) RETURNING id`,
     )
     .get(application.id, rawText, `posting-hash-${application.id}`) as { id: number }
   const analysis = target.sqlite
@@ -111,7 +111,7 @@ function seedApplication(
 
 /**
  * Persists requirements with an empty supplied catalog, so every term stays
- * pending exactly as Step 5 requires for an unknown or ambiguous term.
+ * pending exactly as requires for an unknown or ambiguous term.
  */
 function persistPending(
   target: CareerTestDatabase,
@@ -283,7 +283,7 @@ describe('mapping a pending term to a catalog skill', () => {
       seeded.target.sqlite
         .query(
           `INSERT INTO skills (key, name, category, review_status, origin, merged_into_skill_id, created_at, updated_at)
-           VALUES ('k8s-legacy', 'K8s', 'cloud-devops', 'merged', 'job-parser', ?, '2026-10-14', '2026-10-14')`,
+      VALUES ('k8s-legacy', 'K8s', 'cloud-devops', 'merged', 'job-parser', ?, '2026-10-14', '2026-10-14')`,
         )
         .run(seeded.kubernetesId)
       const merged = seeded.target.sqlite
@@ -292,8 +292,8 @@ describe('mapping a pending term to a catalog skill', () => {
       const pendingTarget = seeded.target.sqlite
         .query(
           `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
-           VALUES ('terraform', 'Terraform', 'cloud-devops', 'pending', 'job-parser', '2026-10-14', '2026-10-14')
-           RETURNING id`,
+      VALUES ('terraform', 'Terraform', 'cloud-devops', 'pending', 'job-parser', '2026-10-14', '2026-10-14')
+      RETURNING id`,
         )
         .get() as { id: number }
 
@@ -430,12 +430,12 @@ describe('explicit catalog creation', () => {
         { input: { name: 'Kubernetes', category: 'cloud-devops' }, field: 'key' },
         { input: { name: 'K8s', category: 'cloud-devops' }, field: 'alias' },
         { input: { name: 'Not A Real Category', category: 'nope' }, field: 'category' },
-        { input: { name: '   ', category: null }, field: 'name' },
+        { input: { name: '  ', category: null }, field: 'name' },
       ] as const
       seeded.target.sqlite
         .query(
           `INSERT INTO skill_aliases (skill_id, alias, normalized_alias, origin, created_at)
-           VALUES (?, 'K8s', 'k8s', 'manual', '2026-10-14')`,
+      VALUES (?, 'K8s', 'k8s', 'manual', '2026-10-14')`,
         )
         .run(seeded.kubernetesId)
 
@@ -455,7 +455,7 @@ describe('explicit catalog creation', () => {
       seeded.target.sqlite
         .query(
           `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
-           VALUES ('legacy-key', 'Legacy Name', 'cloud-devops', 'approved', 'import', '2026-10-14', '2026-10-14')`,
+      VALUES ('legacy-key', 'Legacy Name', 'cloud-devops', 'approved', 'import', '2026-10-14', '2026-10-14')`,
         )
         .run()
       expect(() =>
@@ -512,7 +512,7 @@ describe('Remember as alias is an explicit single-alias opt-in', () => {
       seeded.target.sqlite
         .query(
           `INSERT INTO skill_aliases (skill_id, alias, normalized_alias, origin, created_at)
-           VALUES (?, 'Playwright Test', 'playwright test', 'manual', '2026-10-14')`,
+      VALUES (?, 'Playwright Test', 'playwright test', 'manual', '2026-10-14')`,
         )
         .run(seeded.playwrightId)
       expect(() =>
@@ -589,14 +589,14 @@ describe('bounded catalog search for the selector', () => {
         seeded.target.sqlite
           .query(
             `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
-             VALUES (?, ?, 'testing-quality', 'approved', 'manual', '2026-10-14', '2026-10-14')`,
+       VALUES (?, ?, 'testing-quality', 'approved', 'manual', '2026-10-14', '2026-10-14')`,
           )
           .run(`probe-${index}`, `Probe ${index}`)
       }
       seeded.target.sqlite
         .query(
           `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
-           VALUES ('probe-pending', 'Probe Pending', 'testing-quality', 'pending', 'job-parser', '2026-10-14', '2026-10-14')`,
+      VALUES ('probe-pending', 'Probe Pending', 'testing-quality', 'pending', 'job-parser', '2026-10-14', '2026-10-14')`,
         )
         .run()
 
@@ -619,7 +619,7 @@ describe('bounded catalog search for the selector', () => {
       seeded.target.sqlite
         .query(
           `INSERT INTO skill_aliases (skill_id, alias, normalized_alias, origin, created_at)
-           VALUES (?, 'Container Orchestration', 'container orchestration', 'manual', '2026-10-14')`,
+      VALUES (?, 'Container Orchestration', 'container orchestration', 'manual', '2026-10-14')`,
         )
         .run(seeded.kubernetesId)
       expect(
@@ -632,7 +632,7 @@ describe('bounded catalog search for the selector', () => {
       seeded.target.sqlite
         .query(
           `INSERT INTO skills (key, name, category, review_status, origin, merged_into_skill_id, created_at, updated_at)
-           VALUES ('k8s-old', 'K8s Old', 'cloud-devops', 'merged', 'job-parser', ?, '2026-10-14', '2026-10-14')`,
+      VALUES ('k8s-old', 'K8s Old', 'cloud-devops', 'merged', 'job-parser', ?, '2026-10-14', '2026-10-14')`,
         )
         .run(seeded.kubernetesId)
       expect(

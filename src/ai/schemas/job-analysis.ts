@@ -182,7 +182,7 @@ export const jobAnalysisSchema = z
   .superRefine(refineAnalysis)
 
 /**
- * The stored v4 contract. A run saved before Step 5 still parses so historical
+ * The stored v4 contract. A run saved before still parses so historical
  * results stay readable and never crash a downstream projection.
  */
 export const legacyJobAnalysisSchema = z

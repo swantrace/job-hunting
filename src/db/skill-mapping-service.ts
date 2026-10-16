@@ -25,19 +25,19 @@ import {
 import { addAliasIfAbsent, type DbExecutor, resolveSkillByAlias } from './skill-queries'
 
 /**
- * Review mapping service. Wraps the Step 2 requirement-mention repository for
+ * Review mapping service. Wraps the requirement-mention repository for
  * the mapping routes: bounded catalog search for the selector, explicit catalog
  * creation, and map/skip/remember-alias/reset mutations.
  *
  * Hard product rules enforced here rather than in the UI:
  * - mapping a term to a catalog skill never writes a `career_skills` row and
- *   never infers category-wide competence;
+ *  never infers category-wide competence;
  * - creating a catalog skill creates no personal skill and no alias — exactly
- *   one global alias is written only by the explicit Remember-as-alias action;
+ *  one global alias is written only by the explicit Remember-as-alias action;
  * - there is no fuzzy matching: only exact key / normalized display name /
- *   curated alias wording can find or collide with a catalog entry;
+ *  curated alias wording can find or collide with a catalog entry;
  * - every id arriving from a request is re-validated against the database, so a
- *   forged or foreign id fails closed instead of writing.
+ *  forged or foreign id fails closed instead of writing.
  */
 
 /** Documented bound on selector results; a run never ships the whole catalog. */

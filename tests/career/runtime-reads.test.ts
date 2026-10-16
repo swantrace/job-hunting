@@ -4,18 +4,18 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
 /**
- * Step 4 runtime-read acceptance runs in an isolated child process.
+ * runtime-read acceptance runs in an isolated child process.
  *
  * Several UI suites register process-global `mock.module` replacements for the
  * very modules this acceptance exercises (`src/db/queries`, `src/lib/directions`,
- * `src/lib/candidate-analysis`, `src/lib/generation-queue`). Those mocks leak
+ * `src/lib/candidate/analysis`, `src/lib/generation/queue`). Those mocks leak
  * across test files, so running these cases in the same process as the UI suite
  * would assert against stubs rather than the database-backed runtime. The child
  * gets its own temporary `DB_FILE_NAME`, so it is fully isolated in both
  * directions.
  */
 describe('database-owned runtime career reads (isolated process)', () => {
-  test('passes every Step 4 acceptance case', () => {
+  test('passes every acceptance case', () => {
     const root = mkdtempSync(resolve(tmpdir(), 'job-tracker-runtime-reads-'))
     try {
       const result = Bun.spawnSync({

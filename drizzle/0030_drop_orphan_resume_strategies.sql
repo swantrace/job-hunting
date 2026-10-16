@@ -1,0 +1,15 @@
+-- Drop `analysis_run_resume_strategies`, an orphan left behind by a migration that
+-- no longer exists in this chain.
+--
+-- It was created by `0023_run_scoped_resume_strategies.sql` together with
+-- `src/db/resume-strategy.ts` ("persist run-scoped resume strategy"). That
+-- feature and its migration were both removed when the chain was renumbered
+-- (`0023` is now `0023_base_grounded_drafts`), so no migration in the current
+-- chain knows about the table and nothing drops it.
+--
+-- Consequences: a database built from the current chain (fresh installs, test
+-- databases, developer databases recreated after the renumbering) never had the
+-- table, while a database migrated by the older chain (production) still carries
+-- it. Nothing reads or writes it any more. `IF EXISTS` is therefore required so
+-- this migration converges both cases to the same 36 tables.
+DROP TABLE IF EXISTS `analysis_run_resume_strategies`;

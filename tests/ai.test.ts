@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
+import { parsedJobSchema } from '../src/ai/client'
 import { jobParserPromptVersion, jobParserSystemPrompt } from '../src/ai/prompts/job-parser'
 import { requirementTermSchema } from '../src/ai/schemas/job-analysis'
 import { jobParserResponseSchema } from '../src/ai/schemas/job-parser'
-import { parsedJobSchema } from '../src/lib/ai'
 
 describe('AI job parser output', () => {
   test('accepts a complete structured result with requirement-owned skills', () => {
@@ -31,7 +31,7 @@ describe('AI job parser output', () => {
   })
 
   test('accepts a raw requirement term and rejects a malformed one', () => {
-    // Step 5: the parser emits raw terms with source context, never a canonical
+    // : the parser emits raw terms with source context, never a canonical
     // label or a category. A proposed catalog key stays an optional hint.
     const valid = requirementTermSchema.safeParse({
       term: 'Kafka',
@@ -42,7 +42,7 @@ describe('AI job parser output', () => {
     expect(valid.success).toBe(true)
 
     expect(requirementTermSchema.safeParse({ term: 'Kafka', confidence: 1.2 }).success).toBe(false)
-    expect(requirementTermSchema.safeParse({ term: '   ' }).success).toBe(false)
+    expect(requirementTermSchema.safeParse({ term: '  ' }).success).toBe(false)
     // Unknown keys are still rejected: the model cannot smuggle a canonical label.
     expect(
       requirementTermSchema.safeParse({ term: 'Kafka', canonicalLabel: 'Kafka' }).success,

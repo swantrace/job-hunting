@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { type CanonicalCareerData, validateCareerData } from '../../src/lib/career-data'
+import { type CanonicalCareerData, validateCareerData } from '../../src/lib/career/canonical-data'
 import { parseSkillTaxonomy } from '../../src/lib/skills/taxonomy'
 import { loadExampleCareerData } from '../support/career-data'
 

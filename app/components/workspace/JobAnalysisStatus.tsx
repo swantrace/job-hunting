@@ -5,8 +5,8 @@ import {
   listJobAnalysisRuns,
 } from '../../../src/db/job-analysis-runs'
 import type { Filters, JobCardData } from '../../../src/db/queries'
-import type { AnalysisRunState } from '../../../src/lib/analysis-run-state'
-import { currentJobAnalysisHash } from '../../../src/lib/job-analysis-input'
+import type { AnalysisRunState } from '../../../src/lib/analysis/run-state'
+import { currentJobAnalysisHash } from '../../../src/lib/job-analysis/input'
 import { query } from './helpers'
 
 function actionLabel(state: AnalysisRunState): string {

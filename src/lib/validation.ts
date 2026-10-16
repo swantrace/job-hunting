@@ -8,8 +8,8 @@ import {
   type JobStatus,
   priorities,
 } from './applications/constants'
+import { hasDirection } from './career/directions'
 import { isISODate, isISOTimestamp } from './date'
-import { hasDirection } from './directions'
 import { skillReviewStatuses } from './skills/constants'
 import { hasSkillCategory } from './skills/taxonomy'
 import { workspaceTabs } from './workspace/constants'

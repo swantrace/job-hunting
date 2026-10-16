@@ -10,10 +10,10 @@ import {
 import { createCareerTestDatabase } from '../support/career-db'
 
 /**
- * Step 11 acceptance for the database-owned JSON ChatGPT context.
+ * acceptance for the database-owned JSON ChatGPT context.
  *
  * Each test builds a temporary migrated database outside the repository and
- * seeds the synthetic fixtures through the Step 3 importer, so the developer's
+ * seeds the synthetic fixtures through the importer, so the developer's
  * `jobs.db` and private `career-data/` are never touched.
  */
 

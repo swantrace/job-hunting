@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { candidateStalenessReasons } from '../../src/lib/candidate-analysis'
+import { candidateStalenessReasons } from '../../src/lib/candidate/analysis'
 
 function snapshot(overrides: Record<string, unknown> = {}) {
   return {

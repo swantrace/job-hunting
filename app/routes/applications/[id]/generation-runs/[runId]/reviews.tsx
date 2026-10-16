@@ -1,7 +1,7 @@
 import { createRoute } from 'honox/factory'
 import { listDocumentReviews } from '../../../../../../src/db/document-review'
 import { getGenerationRunResults } from '../../../../../../src/db/generation'
-import { enqueueDocumentReview } from '../../../../../../src/lib/document-review-queue'
+import { enqueueDocumentReview } from '../../../../../../src/lib/document-review/queue'
 import { parseFilters, parseId } from '../../../../../../src/lib/request'
 import { DocumentReviewPanel } from '../../../../../components/workspace/DocumentReview'
 

@@ -1,7 +1,7 @@
 import { createRoute } from 'honox/factory'
 import { listManagementData } from '../../../../src/db/queries'
-import type { ManagementKind } from '../../../components/Management'
-import { ManagementForm } from '../../../components/ManagementForm'
+import type { ManagementKind } from '../../../components/manage/Management'
+import { ManagementForm } from '../../../components/manage/ManagementForm'
 
 export default createRoute((c) => {
   const kind = c.req.param('kind')

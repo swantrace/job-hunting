@@ -2,7 +2,7 @@ import type { Database } from 'bun:sqlite'
 import { createHash } from 'node:crypto'
 import { mkdirSync, utimesSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { baseResumeTextHash } from '../../src/lib/base-resumes'
+import { baseResumeTextHash } from '../../src/lib/career/base-resumes'
 
 /**
  * Synthetic career fixtures for the database-owned career and curated skill
@@ -350,7 +350,7 @@ export const catalogOnlySkills = [
 
 /**
  * Job terms that exercise catalog resolution. `expectation` is consumed by the
- * Step 5 resolver contract; Step 1 only proves every case is represented and that
+ * resolver contract; only proves every case is represented and that
  * both acceptance orderings exist.
  */
 export const syntheticRequirementTerms = [
@@ -538,14 +538,14 @@ const legacyTimestamp = '2026-08-01T00:00:00.000Z'
  * approved imported skill with an alias, a legacy pending parser skill, a merged
  * skill with a redirect, and a job requirement mapped to the approved skill.
  *
- * Step 2 must preserve every one of these rows and their provenance.
+ * must preserve every one of these rows and their provenance.
  */
 export function seedPopulatedLegacyCatalog(sqlite: Database) {
   // `skill_categories` is already seeded by migration 0012/0021; the seeder only
   // adds the catalog entries that reference it.
   const insertSkill = sqlite.query(
     `INSERT INTO skills (key, name, category, review_status, origin, merged_into_skill_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
   )
   const typescript = insertSkill.get(
     'typescript',
@@ -581,7 +581,7 @@ export function seedPopulatedLegacyCatalog(sqlite: Database) {
   sqlite
     .query(
       `INSERT INTO skill_aliases (skill_id, alias, normalized_alias, origin, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+    VALUES (?, ?, ?, ?, ?)`,
     )
     .run(typescript.id, 'TS', 'ts', 'career-data', legacyTimestamp)
 
@@ -591,7 +591,7 @@ export function seedPopulatedLegacyCatalog(sqlite: Database) {
   const application = sqlite
     .query(
       `INSERT INTO job_applications (company_id, job_title, direction, posted_date, priority, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     )
     .get(
       company.id,
@@ -608,7 +608,7 @@ export function seedPopulatedLegacyCatalog(sqlite: Database) {
   const posting = sqlite
     .query(
       `INSERT INTO job_postings (job_application_id, version, raw_text, captured_at, content_hash)
-       VALUES (?, ?, ?, ?, ?) RETURNING id`,
+    VALUES (?, ?, ?, ?, ?) RETURNING id`,
     )
     .get(application.id, 1, 'Legacy synthetic posting text.', legacyTimestamp, 'legacy-hash') as {
     id: number
@@ -616,7 +616,7 @@ export function seedPopulatedLegacyCatalog(sqlite: Database) {
   const postingAnalysis = sqlite
     .query(
       `INSERT INTO job_posting_analyses (job_posting_id, status, created_at, updated_at, completed_at)
-       VALUES (?, ?, ?, ?, ?) RETURNING id`,
+    VALUES (?, ?, ?, ?, ?) RETURNING id`,
     )
     .get(posting.id, 'Completed', legacyTimestamp, legacyTimestamp, legacyTimestamp) as {
     id: number
@@ -624,9 +624,9 @@ export function seedPopulatedLegacyCatalog(sqlite: Database) {
   const requirement = sqlite
     .query(
       `INSERT INTO job_requirements (
-        job_posting_analysis_id, sequence, requirement_type, importance, basis, statement,
-        source_text, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+    job_posting_analysis_id, sequence, requirement_type, importance, basis, statement,
+    source_text, created_at, updated_at
+   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
     )
     .get(
       postingAnalysis.id,
@@ -643,7 +643,7 @@ export function seedPopulatedLegacyCatalog(sqlite: Database) {
   const run = sqlite
     .query(
       `INSERT INTO application_analysis_runs (job_posting_analysis_id, status, queue_job_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?) RETURNING id`,
+    VALUES (?, ?, ?, ?, ?) RETURNING id`,
     )
     .get(postingAnalysis.id, 'Completed', 'legacy-queue-job', legacyTimestamp, legacyTimestamp) as {
     id: number
@@ -661,9 +661,9 @@ export function seedPopulatedLegacyCatalog(sqlite: Database) {
     sqlite
       .query(
         `INSERT INTO job_requirement_skill_mentions (
-          job_requirement_id, raw_term, normalized_term, mapping_state, resolved_skill_id,
-          occurrences_json, created_at, updated_at
-        ) VALUES (?, ?, 'typescript', 'mapped', ?, ?, ?, ?)`,
+     job_requirement_id, raw_term, normalized_term, mapping_state, resolved_skill_id,
+     occurrences_json, created_at, updated_at
+    ) VALUES (?, ?, 'typescript', 'mapped', ?, ?, ?, ?)`,
       )
       .run(
         requirement.id,
@@ -677,7 +677,7 @@ export function seedPopulatedLegacyCatalog(sqlite: Database) {
     sqlite
       .query(
         `INSERT INTO job_requirements_to_skills (job_requirement_id, skill_id, raw_label, confidence)
-         VALUES (?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?)`,
       )
       .run(requirement.id, typescript.id, 'TypeScript', 1)
   }

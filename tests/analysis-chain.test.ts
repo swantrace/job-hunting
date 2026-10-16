@@ -1,5 +1,5 @@
 import { describe, expect, mock, test } from 'bun:test'
-import { autoChainCandidateAnalysis } from '../src/lib/analysis-chain'
+import { autoChainCandidateAnalysis } from '../src/lib/analysis/chain'
 
 describe('auto-chained candidate analysis', () => {
   test('enqueues candidate analysis for the completed job analysis application', async () => {

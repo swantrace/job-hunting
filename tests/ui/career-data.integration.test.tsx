@@ -12,7 +12,7 @@ import {
   listCareerExperiences,
 } from '../../src/db/career-records'
 import { db, sqlite } from '../../src/db/client'
-import { careerOnboardingGuidance } from '../../src/lib/application-readiness'
+import { careerOnboardingGuidance } from '../../src/lib/applications/readiness'
 import {
   saveRecordExtensions,
   storedRecordExtensions,
@@ -22,12 +22,12 @@ import { createCareerTestDatabase } from '../support/career-db'
 import { recordsFor, renderJsx } from './support/html-contract'
 
 /**
- * Step 7 route acceptance for `/career-data`.
+ * route acceptance for `/career-data`.
  *
  * Everything here runs against the suite's isolated database (`DB_FILE_NAME`,
  * created outside the repository by the preload): the routes resolve the real
  * `db` singleton, so the acceptance criteria are proved end to end through the
- * Step 2 repositories. Fixture rows use an explicit `__career-ui` marker and are
+ * repositories. Fixture rows use an explicit `__career-ui` marker and are
  * removed before and after every test; the developer's `jobs.db` is never
  * opened, and no identity row is ever written.
  */

@@ -5,13 +5,13 @@ import {
   markArtifactUploadFailed,
 } from '../../../../../src/db/generation'
 import { getApplication } from '../../../../../src/db/queries'
-import { getApplicationReadiness } from '../../../../../src/lib/application-readiness'
+import { getApplicationReadiness } from '../../../../../src/lib/applications/readiness'
 import {
   getGoogleDriveConnectionStatus,
   uploadArtifactToGoogleDrive,
-} from '../../../../../src/lib/google-drive'
+} from '../../../../../src/lib/google/drive'
 import { parseFilters, parseId } from '../../../../../src/lib/request'
-import { GenerationPanel } from '../../../../components/Workspace'
+import { GenerationPanel } from '../../../../components/workspace/GenerationPanel'
 
 function panelFor(
   id: number,

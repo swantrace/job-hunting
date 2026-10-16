@@ -48,10 +48,9 @@ const analysis: JobAnalysis = {
 }
 
 async function renderDraft() {
-  const { JobAnalysisDraft } = (await import('../../app/components/JobAnalysisDraft')) as Record<
-    string,
-    unknown
-  >
+  const { JobAnalysisDraft } = (await import(
+    '../../app/components/intake/JobAnalysisDraft'
+  )) as Record<string, unknown>
   return renderJsx(
     (JobAnalysisDraft as (props: { analysis: JobAnalysis }) => unknown)({ analysis }),
   )
@@ -64,7 +63,7 @@ describe('requirement-owned raw skill terms draft', () => {
     expect(html).toContain('data-ja-requirement')
     expect(html).toContain('data-ja-terms')
     expect(html).toContain('data-ja-term')
-    // Step 5 removes the model-owned canonical/category editor; Step 6 adds the
+    // removes the model-owned canonical/category editor; adds the
     // reviewed mapping UI, so no parser-side mapping control may reappear here.
     expect(html).not.toContain('data-ja-skill-canonical')
     expect(html).not.toContain('data-ja-skill-category')

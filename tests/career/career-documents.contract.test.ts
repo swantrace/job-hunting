@@ -1,60 +1,67 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { resolve } from 'node:path'
 import {
-  approveBaseResume,
+  type ApprovedBaseResume,
   baseResumeTextHash,
   frozenBaseResumeSource,
   loadApprovedBaseResume,
   normalizeBaseResumeText,
-} from '../../src/lib/base-resumes'
+} from '../../src/lib/career/base-resumes'
 import { createCareerTestDatabase } from '../support/career-db'
 import { migratedDatabase } from '../support/sqlite'
 import { approvedBaseResumeMarkdown, draftBaseResumeMarkdown } from './fixtures'
 
 /**
- * Step 1 document-history contracts. Approved Base Resume content and queued run
+ * document-history contracts. Approved Base Resume content and queued run
  * inputs must be frozen by value so that later edits cannot rewrite history and
  * a queued worker never reads facts that changed after enqueue.
  */
 
-function withTempDirectory<T>(run: (directory: string) => T): T {
-  const directory = mkdtempSync(resolve(tmpdir(), 'job-tracker-base-resumes-'))
-  try {
-    return run(directory)
-  } finally {
-    rmSync(directory, { force: true, recursive: true })
+/** An approved version as the database projects it, built without touching disk. */
+function approvedResume(
+  markdown: string,
+  overrides: Partial<ApprovedBaseResume> = {},
+): ApprovedBaseResume {
+  const sha256 = baseResumeTextHash(markdown)
+  return {
+    direction: 'fullstack',
+    fileName: 'fullstack.md',
+    version: 'v1',
+    approvedAt: '2026-10-01',
+    approvedSha256: sha256,
+    text: normalizeBaseResumeText(markdown),
+    sha256,
+    empty: false,
+    stale: false,
+    ...overrides,
   }
 }
 
 describe('approved base resume history', () => {
   test('freezes content by value so a later approval cannot rewrite history', () => {
-    withTempDirectory((directory) => {
-      const knownDirectionIds = new Set(['fullstack'])
-      const approvedV1 = approveBaseResume(directory, 'fullstack', approvedBaseResumeMarkdown, {
-        version: 'v1',
-        approvedAt: '2026-10-01',
-        knownDirectionIds,
-      })
-      const frozen = frozenBaseResumeSource(approvedV1)
+    const frozen = frozenBaseResumeSource(approvedResume(approvedBaseResumeMarkdown))
+    const beforeLaterApproval = structuredClone(frozen)
 
-      const approvedV2 = approveBaseResume(directory, 'fullstack', draftBaseResumeMarkdown, {
-        version: 'v2',
-        approvedAt: '2026-10-14',
-        knownDirectionIds,
-      })
-
-      expect(frozen.version).toBe('v1')
-      expect(frozen.text).toBe(normalizeBaseResumeText(approvedBaseResumeMarkdown))
-      expect(frozen.sha256).toBe(baseResumeTextHash(approvedBaseResumeMarkdown))
-      expect(frozen).not.toHaveProperty('stale')
-      expect(JSON.stringify(frozen)).not.toContain(directory)
-
-      expect(approvedV2.version).toBe('v2')
-      expect(approvedV2.text).toBe(normalizeBaseResumeText(draftBaseResumeMarkdown))
-      expect(approvedV2.sha256).not.toBe(frozen.sha256)
+    const approvedV2 = approvedResume(draftBaseResumeMarkdown, {
+      version: 'v2',
+      approvedAt: '2026-10-14',
     })
+
+    expect(frozen.version).toBe('v1')
+    expect(frozen.text).toBe(normalizeBaseResumeText(approvedBaseResumeMarkdown))
+    expect(frozen.sha256).toBe(baseResumeTextHash(approvedBaseResumeMarkdown))
+    // Exactly the frozen shape: no path, no digest bookkeeping, no staleness flag.
+    expect(Object.keys(frozen).sort()).toEqual([
+      'approvedAt',
+      'direction',
+      'sha256',
+      'text',
+      'version',
+    ])
+
+    expect(approvedV2.version).toBe('v2')
+    expect(approvedV2.text).toBe(normalizeBaseResumeText(draftBaseResumeMarkdown))
+    expect(approvedV2.sha256).not.toBe(frozen.sha256)
+    expect(frozen).toEqual(beforeLaterApproval)
   })
 
   test('reads the approved version from the database and reports a drifted digest as stale', () => {

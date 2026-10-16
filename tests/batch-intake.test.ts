@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { classifyIntakeField, parseBatchIntake, validateIntakeUrl } from '../src/lib/batch-intake'
+import {
+  classifyIntakeField,
+  parseBatchIntake,
+  validateIntakeUrl,
+} from '../src/lib/job-intake/batch'
 
 describe('batch job post intake', () => {
   test('preserves input order and classifies URLs vs pasted text', () => {

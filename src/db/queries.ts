@@ -4,8 +4,10 @@ import type { z } from 'zod'
 import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
 import { followUpActionTypes, interviewRoundTypes } from '../lib/activities/constants'
 import { type ApplicationSort, priorities, statuses } from '../lib/applications/constants'
+import { advanceStatus } from '../lib/applications/transitions'
 import { nowISO, todayISO } from '../lib/date'
 import { runStatuses } from '../lib/generation/constants'
+import { jobAnalysisInputFromContent } from '../lib/job-analysis/input'
 import {
   applicationKey,
   companyKey,
@@ -16,8 +18,7 @@ import {
   nullableText,
   skillKey,
   textValue,
-} from '../lib/import'
-import { jobAnalysisInputFromContent } from '../lib/job-analysis-input'
+} from '../lib/job-intake/import'
 import {
   persistedRequirementBases,
   requirementImportances,
@@ -32,7 +33,6 @@ import {
 } from '../lib/skills/constants'
 import { canonicalSkillKey, normalizeSkillAlias } from '../lib/skills/normalize'
 import { hasSkillCategory, type SkillCategory } from '../lib/skills/taxonomy'
-import { advanceStatus } from '../lib/transitions'
 import {
   type applicationSchema,
   type filterSchema,

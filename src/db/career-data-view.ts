@@ -1,5 +1,5 @@
 import { asc, eq } from 'drizzle-orm'
-import { careerOnboardingRequired } from '../lib/application-readiness'
+import { careerOnboardingRequired } from '../lib/applications/readiness'
 import { extensionObjectOrNull, extensionSchema, parseJsonColumn } from '../lib/career/json-schemas'
 import { listAllBaseResumeVersions } from './career-base-resumes'
 import { type CareerDirectionRecord, listCareerDirections } from './career-directions'

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { Hono } from 'hono'
-import { CareerGrowthList } from '../../app/components/CareerGrowth'
-import type { CareerGrowthOpportunity } from '../../src/lib/career-growth'
+import { CareerGrowthList } from '../../app/components/career/CareerGrowth'
+import type { CareerGrowthOpportunity } from '../../src/lib/career/growth'
 
 function harness(opportunities: CareerGrowthOpportunity[]) {
   const app = new Hono()

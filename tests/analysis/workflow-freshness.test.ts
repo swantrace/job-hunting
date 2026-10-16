@@ -12,15 +12,15 @@ import { createCareerTestDatabase } from '../support/career-db'
  * contracts that become executable automatically when their boundary exists.
  *
  * Activation boundaries:
- * - `job analysis input hash`  -> `src/lib/job-analysis-input.ts` exists
- * - `candidate analysis input hash` -> `src/lib/candidate-analysis.ts` exports
- *   `getCandidateAnalysisState` (the Step 2.1 freshness correction)
- * - `documents input hash`     -> `src/lib/generation-input.ts` exists
+ * - `job analysis input hash` -> `src/lib/job-analysis/input.ts` exists
+ * - `candidate analysis input hash` -> `src/lib/candidate/analysis.ts` exports
+ *  `getCandidateAnalysisState` (the freshness correction)
+ * - `documents input hash`   -> `src/lib/generation/input.ts` exists
  */
 const root = process.cwd()
-const jobAnalysisInputPath = resolve(root, 'src/lib/job-analysis-input.ts')
-const generationInputPath = resolve(root, 'src/lib/generation-input.ts')
-const candidateAnalysisPath = resolve(root, 'src/lib/candidate-analysis.ts')
+const jobAnalysisInputPath = resolve(root, 'src/lib/job-analysis/input.ts')
+const generationInputPath = resolve(root, 'src/lib/generation/input.ts')
+const candidateAnalysisPath = resolve(root, 'src/lib/candidate/analysis.ts')
 
 function sourceHasExport(relativePath: string, exportName: string): boolean {
   try {
@@ -32,7 +32,7 @@ function sourceHasExport(relativePath: string, exportName: string): boolean {
 
 const jobAnalysisHashTest = existsSync(jobAnalysisInputPath) ? test : test.todo
 const candidateHashTest = sourceHasExport(
-  'src/lib/candidate-analysis.ts',
+  'src/lib/candidate/analysis.ts',
   'getCandidateAnalysisState',
 )
   ? test
@@ -68,7 +68,7 @@ describe('canonical hashing', () => {
 })
 
 describe('job analysis input hash', () => {
-  // Step 5: the catalog is not an extraction input. Resolution runs over the
+  // : the catalog is not an extraction input. Resolution runs over the
   // stored raw terms against the separately frozen resolution fingerprint, so a
   // catalog edit can be remapped without another paid JD parse.
   const fixture = {
@@ -112,7 +112,7 @@ describe('job analysis input hash', () => {
         target.sqlite
           .query(
             `INSERT INTO skills (key, name, category, review_status, origin, created_at, updated_at)
-             VALUES ('typescript', 'TypeScript', NULL, 'approved', 'career-data', '2026-10-14', '2026-10-14')`,
+       VALUES ('typescript', 'TypeScript', NULL, 'approved', 'career-data', '2026-10-14', '2026-10-14')`,
           )
           .run()
         const after = jobAnalysisInputFromContent('content-hash-a', rawText, target.executor)

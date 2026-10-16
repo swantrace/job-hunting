@@ -23,8 +23,8 @@ import {
 } from './support/runtime-mocks'
 
 /**
- * Step 6 route acceptance: the mapping HTMX contract, driven through the real
- * service and the Step 2 mention repository against the suite's isolated
+ * route acceptance: the mapping HTMX contract, driven through the real
+ * service and the mention repository against the suite's isolated
  * database.
  *
  * Blank selection is rejected on the row's own form and is never a Skip; a

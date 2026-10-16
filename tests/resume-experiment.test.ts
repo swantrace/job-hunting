@@ -1,11 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { parseOptions } from '../src/cli/run-resume-experiment'
 import {
   basicResumeMetrics,
   buildResumeExperimentRequest,
   responseText,
   stripMarkdownFence,
-} from '../src/lib/resume-experiment'
+} from '../src/lib/document-draft/experiment'
 
 const input = {
   jd: 'Build TypeScript products.',
@@ -15,29 +14,6 @@ const input = {
 }
 
 describe('resume generation experiments', () => {
-  test('defaults to the baseline method when no job description is supplied', () => {
-    const options = parseOptions(['--base-resume', 'package.json'])
-    expect(options.jdPath).toBeUndefined()
-    expect(options.methods).toEqual([
-      'baseline-minimal',
-      'baseline-grounded',
-      'baseline-career-only',
-    ])
-    expect(options.originalPrompt).toContain('FHIR baseline resume')
-  })
-
-  test('keeps job-specific methods as the default when a job description is supplied', () => {
-    const options = parseOptions(['--jd', 'package.json', '--base-resume', 'package.json'])
-    expect(options.methods).not.toContain('baseline-grounded')
-    expect(options.methods).toContain('base-grounded')
-  })
-
-  test('rejects a job-specific method when no job description is supplied', () => {
-    expect(() =>
-      parseOptions(['--base-resume', 'package.json', '--methods', 'base-grounded']),
-    ).toThrow('A job description is required')
-  })
-
   test('isolates the intended input variable for every method', () => {
     const minimal = buildResumeExperimentRequest('base-minimal', input)
     const grounded = buildResumeExperimentRequest('base-grounded', input)

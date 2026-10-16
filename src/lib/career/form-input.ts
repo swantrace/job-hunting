@@ -12,7 +12,7 @@ import type {
   CareerStoryInput,
 } from '../../db/career-records'
 import type { CareerSkillInput, CareerSkillUpdateInput } from '../../db/career-skills'
-import { documentDraftPolicy } from '../document-draft-policy'
+import { documentDraftPolicy } from '../document-draft/policy'
 import type { FieldErrors } from '../validation'
 import {
   type Compensation,

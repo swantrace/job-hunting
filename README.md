@@ -1,280 +1,361 @@
 # Job Application Tracker
 
-A local-first, server-rendered job pipeline built with Bun, HonoX, htmx, Drizzle ORM, SQLite, Tailwind CSS, and daisyUI. It has no client-side React or Preact hydration runtime.
+A single-user, local-first job pipeline. Bun serves a HonoX application that
+renders HTML with `hono/jsx`; htmx performs fragment swaps. There is no SPA, no
+client hydration framework, and no ORM other than Drizzle.
 
-## Data flow
+## What it does
 
-```mermaid
-flowchart LR
-  Browser[Browser] <-->|Server-rendered HTML + htmx| App[HonoX application]
-  App <--> DB[(SQLite<br/>jobs.db)]
-  Import[Import-only career-data/<br/>JSON + Base Resume files] -->|career:import| DB
+- **Applications** — track each role through `Saved`, `Apply Today`, `Applied`,
+  `Follow Up`, `Interviewing`, `Rejected`, and `Archived`, with `A`/`B`/`C`
+  priority, list and board views, activities (follow-ups and interviews), and
+  versioned Job Post raw text.
+- **Job post intake** — import one `https` URL or one pasted job description per
+  box at `/applications/import`, preserving input order. URLs are validated
+  before any fetch (`https` only, no credentials, no localhost/private/reserved
+  addresses, bounded redirects/bytes/time, scripts and styles stripped). A
+  blocked or failed link becomes **Needs pasted text**; blank or error HTML is
+  never sent to the model.
+- **Review and decisions** — parse a posting into structured requirements, see
+  each requirement's importance, source excerpt, evidence status, and
+  Include/Skip controls, and read dual coverage scores.
+- **Documents** — generate a targeted resume and cover letter from an approved
+  Base Resume plus canonical Career Data (and the reviewed JD), or a
+  direction-only baseline with no JD. Warnings, an optional semantic review,
+  DOCX artifacts, and optional Google Drive upload.
+- **Career Data** — author identity, experience, education, achievements,
+  projects, skills, stories, publications, preferences, directions, and Base
+  Resume versions, then import/export them.
+- **Career growth** — a derived read model over active applications, grouped by
+  canonical skill.
+- **Backup and restore** — a portable JSON export/import of core operational
+  data, separate from a full SQLite backup.
 
-  App --> Intake[Batch job post intake<br/>https URLs or pasted text]
-  Intake --> Queue[Durable async queues<br/>bunqueue.db]
+## Architecture
 
-  Queue --> JA[Job analysis]
-  Queue --> CA[Candidate analysis]
-  Queue --> DG[Markdown drafting]
-  Queue --> DR[Document review]
+### SQLite owns all runtime data
 
-  JA -->|structured job requirements| LLM[OpenAI API]
-  CA -->|fit recommendation + evidence matrix| LLM
-  DG -->|resume + cover letter Markdown| LLM
-  DR -->|read-only quality findings| LLM
+`jobs.db` (or `DB_FILE_NAME`) is the runtime authority for applications, job
+postings, analyses, requirements and skill mentions, career facts, directions,
+the skill catalog, personal skills, and Base Resume versions. JSON is
+**import/export interchange only**; it is never read as live state.
 
-  DG --> DOCX[Code-rendered DOCX<br/>validated draft model]
-  JA --> DB
-  CA --> DB
-  DG --> DB
-  DR --> DB
-  DOCX --> Files[Generated DOCX files<br/>and snapshots]
-  Files --> Drive[Optional Google Drive]
-  DB --> Growth[Career growth<br/>derived read model]
-  DB --> Gap[Per-application gap report]
-```
+The schema is defined in `src/db/schema.ts`: **36 application tables plus one
+view**. `job_requirements_to_skills` is a read-only view derived from
+`job_requirement_skill_mentions`, so mapping writes only ever touch the mention
+that owns them. There is no `career_state` table: each career table carries its
+own `extension_json` for authored fields the schema does not model,
+`career_profile.documents_json` carries unmodelled per-source-document values,
+and career change detection is a value computed from the data rather than a
+stored revision counter.
 
-The application persists each requested operation as an append-only run in SQLite before queuing it. In production, the named queues use embedded Bunqueue and durable state in `QUEUE_FILE_NAME` (normally `/data/bunqueue.db`); at startup the application recovers queued runs. In development, the same jobs run in-process without Bunqueue persistence. The browser never waits for a model response: it polls the persisted run state through htmx. Document generation drafts Markdown from an approved Base Resume plus complete canonical Career Data (and a reviewed JD when present), validates it deterministically, and renders DOCX in code; a generated document is a draft, not an approved application artifact.
+### Legacy career files are import-only
 
+A legacy `career-data/` directory (`*.json`, `skill-taxonomy.json`,
+`base-resumes/`) and the `CAREER_DATA_DIR` / `CAREER_BASE_RESUMES_DIR`
+environment variables are **import-only** inputs. The running application never
+reads them: it reads career facts, directions, categories, personal skills, and
+Base Resume versions from SQLite and needs neither variable to boot. There are
+no import, export, or sync command-line tools; every import/export is a browser
+flow.
 
-## Career data setup
+### Requests and async work
 
-SQLite is the runtime authority for career facts, directions, categories, personal skills and Base Resume versions. Manage them in the app under **Career Data**; a fresh database shows an onboarding notice and asks for your identity first, and no page requires a `career-data/` directory.
+The application persists each requested operation as an append-only run in
+SQLite before queueing it. In production the named queues use embedded Bunqueue
+with durable state in `QUEUE_FILE_NAME` (normally `/data/bunqueue.db`); at
+startup the application recovers queued runs. Development runs the same jobs
+in-process without Bunqueue persistence. The browser never waits for a model
+response: it polls the persisted run state through htmx.
 
-The repository still ships `career-data.example/`: a small, valid, import-only dataset that lets a fresh clone seed a database and run tests. Import it (or your own private directory) explicitly — dry-run first, then `--apply`:
+At boot, before the server accepts requests, the health check verifies that the
+canonical tables and migration-added columns exist and fails fast with a readable
+message naming the missing object. An empty but fully migrated database is
+healthy and renders the Career Data onboarding state.
 
-```sh
-cp -R career-data.example career-data          # your private copy, ignored by Git
-bun run career:import --source career-data --database ./jobs.db                 # dry run (default)
-bun run career:import --source career-data --database ./jobs.db --apply         # write in one transaction
-```
+## Feature map
 
-Every CLI that reads or writes the database requires an explicit target: pass `--database <path>` or set `DB_FILE_NAME`. Without one it fails before opening anything, because importing the database client would otherwise open the default `./jobs.db`.
+### Applications pipeline
 
-`career:import` accepts a legacy `career-data/` directory (the JSON files plus `skill-taxonomy.json` and optional `base-resumes/`) or an exported `career-dataset` JSON file. It merges by stable key, never deletes records missing from the source, reports conflicts instead of guessing, and binds the source hash and database revision so a stale preview is rejected. Keep stable IDs when editing imported files; directions and target titles come from `preferences.json` `directionDefinitions` on import and are then edited in the UI.
+Applications are edited through the workspace and its tabs (Job Post, Review,
+Documents, Contacts, Activities). Workspace tabs are gated: Review opens once a
+current structured Job Analysis exists, and Documents opens once the current
+Review is ready.
 
-Career Data can also live in a separate private repository. `CAREER_DATA_DIR` is an **import-only** input read by the import/legacy-sync CLIs; the running app never reads it. Set it in the ignored local `.env` (leave `.env.example` portable):
+### Job analysis and candidate analysis
 
-```ini
-CAREER_DATA_DIR=../career-profile-private
-```
+- **Job Analysis** extracts structured requirements (type, importance, source
+  excerpt) and a direction proposal from the raw posting plus a bounded snapshot
+  of the approved catalog. Exact catalog keys and curated aliases resolve
+  deterministically; unknown or ambiguous terms stay pending as
+  requirement-owned mentions and never auto-create catalog records.
+- **Candidate Analysis** compares the reviewed requirements against frozen
+  canonical Career Data and returns a labelled
+  `apply`/`apply-selectively`/`skip` recommendation plus a requirement-to-evidence
+  matrix. After a completed Job Analysis with no unresolved terms it is queued
+  automatically; it can also be re-run explicitly.
+- **Review** shows each requirement's importance, source excerpt, evidence
+  status (`direct`, `transferable`, or `unknown-evidence`), and Include/Skip
+  controls. Decisions are scoped to a Candidate Analysis run: a new run starts
+  every missing skill as `pending`, and an Include requires a truthful
+  reason. A blank or whitespace input is never treated as a Skip; Skip is an
+  explicit decision.
+- Dual scores are shown for coverage: **canonical match** (proven matches only)
+  and **application coverage** (proven matches plus user-confirmed Includes).
+  Skipped and pending requirements count as uncovered. Weights are `required` =
+  3, `preferred` = 1, `mentioned` = 0. These are transparent heuristics, not
+  vendor ATS scores, and there is no universal numeric fit score.
 
-The private repository root should contain the same JSON files and `base-resumes/` directory that would otherwise live under `career-data/`. Keeping source code and personal career facts separate lets this application remain reusable without duplicating private data.
+Reruns never overwrite history. Each run stores its frozen input hash and is
+labelled `Outdated` when the current inputs differ; staleness is always derived,
+never persisted. Job Analysis staleness is driven by the posting content hash and
+the parser/job-analysis prompt and schema versions — model-only changes never
+make a completed analysis stale, and the catalog is resolved separately so a
+catalog edit enables remapping without another paid extraction. Candidate
+Analysis staleness is driven by the completed Job Analysis and canonical career
+data; changing a Skip/Include decision does not invalidate it. Documents
+additionally depend on the direction, run-scoped decisions, canonical evidence,
+generation contract versions, and the configured models.
 
-### Approved Base Resumes
+### Documents and generated artifacts
 
-An approved Base Resume is private Markdown that serves as an editorial starting point for drafting, while the database career facts remain the factual authority. Versions live in the `career_base_resumes` table with their direction, version label, approval date and normalized-text SHA-256 hash. Create, preview and approve them under **Career Data → Base Resumes**; superseded and draft versions are kept so historical documents stay reproducible. Missing an approved Base Resume disables document generation only for that direction — the app never falls back to a blank resume.
+Documents are drafted from an **approved Base Resume** (editorial prior) plus
+**complete canonical Career Data** (factual authority), with the reviewed JD when
+generating for a specific application. The model writes Markdown against a
+controlled section vocabulary; a safe parser produces a typed document model,
+deterministic checks report omissions, dates, and unsupported claims, and code
+renders the DOCX. The renderer owns the title, contact line, and layout.
 
-The `resume:import` CLI is an import-only helper for a PDF, Markdown or text file. It stages normalized Markdown plus a `manifest.json` under `career-data/base-resumes/` (PDF extraction uses Ghostscript locally; production never extracts PDFs), then `career:import` loads it into SQLite:
+- With a JD: a targeted resume and cover letter grounded in the reviewed JD and
+  the resolved Include/Skip decisions. Direction selects the Base Resume and
+  target titles only.
+- Without a JD (baseline, under **Career documents**): a reusable direction
+  baseline from the Base Resume and Career Data only. It never invents an
+  employer or claims JD alignment.
 
-```sh
-bun run resume:import -- --direction fhir --input ~/resumes/fhir.pdf --version v1 --database ./jobs.db
-bun run career:import --source career-data --database ./jobs.db --apply
-```
+Every generation run records an immutable evidence-selection snapshot in SQLite
+and writes its files under `ARTIFACTS_DIR/run-<id>/` (baseline runs use
+`baseline-run-<id>/`). The workspace's generation record exposes the selected
+IDs, schema/prompt versions, and the snapshot download so a document stays
+reviewable after career data changes. A
+generated document is a draft, not an approved application artifact. A missing
+approved Base Resume disables generation for that direction only; the app never
+falls back to a blank resume.
 
-### ChatGPT career context
+Optional semantic document review observes and reports findings
+(`blocking`/`important`/`optional`); it never rewrites documents and its findings
+never become career facts. When Google Drive is connected, a generated artifact
+can be uploaded; the OAuth refresh token is stored encrypted in SQLite with a key
+derived from `GOOGLE_OAUTH_STATE_SECRET`.
 
-Export one versioned JSON ChatGPT context per direction from the database (no ChatGPT network call is made):
+### Career Data
 
-```sh
-# Export every direction with an approved Base Resume to ./chatgpt-context
-bun run career:export-chatgpt-context -- --database ./jobs.db
+Manage career data under **Career Data**, whose tabs are Identity, Experience,
+Education, Achievements, Projects, Skills, Stories, Publications, Preferences,
+Directions, Base resumes, and Import & export. A fresh database shows onboarding
+guidance and asks for identity first.
 
-# Export only selected directions
-bun run career:export-chatgpt-context -- --database ./jobs.db --direction fullstack
-bun run career:export-chatgpt-context -- --database ./jobs.db --direction frontend --direction fhir
-```
+- An **approved Base Resume** is private Markdown that seeds drafting while
+  database career facts remain the factual authority. Versions live in
+  `career_base_resumes` with their direction, version label, approval date, and
+  normalized-text SHA-256 hash. Superseded and draft versions are kept so
+  historical documents stay reproducible. A draft never replaces an approved
+  version without an explicit approval action.
+- **Directions** carry their label and target titles; bounded generation rules are
+  edited per direction.
+- Every original field from an imported source, including authored extension
+  fields, is preserved in the database and remains editable in the UI. Imports
+  merge by stable key, never delete records missing from the source, and report
+  conflicts instead of guessing.
 
-Each file combines the direction's approved Base Resume with safe database career facts, the effective generation rules and an evidence index. Publication source URLs and project URLs are excluded by default; pass `--include-source-urls` only when you deliberately want them. Regenerate after changing career facts or approving a new Base Resume. When asking ChatGPT to tailor a resume, attach or reference the direction file from `chatgpt-context/` together with the job description.
+### Transfer (import and export)
 
-## Run locally
+All career import/export lives under `/career-data/transfer` and makes no network
+call:
+
+- **Import** accepts a `career-dataset` JSON export or a zip archive of a legacy
+  `career-data/` directory. The archive is read in memory only (bounded size and
+  entry count, unsafe paths rejected). Preview reports counts and conflicts and
+  binds both a source fingerprint and the database fingerprint; confirming
+  re-derives both and writes nothing when the source changed, the database
+  changed, or a conflict remains. A conflict-free import is applied in one
+  transaction. `career-data.example/` is a small valid legacy dataset you can
+  zip and import to seed a fresh database.
+- **Career dataset export** (`career-dataset-<scope>-<date>.json`) downloads the
+  full dataset or one direction and the records linked to it, marked with its own
+  `format` so it can never be confused with the application backup.
+- **ChatGPT context export** produces one versioned JSON context per direction
+  (or full scope) combining the approved Base Resume with safe career facts and
+  an evidence index. Publication source URLs and contact details are excluded
+  unless explicitly opted in. Regenerate it after changing career facts or
+  approving a Base Resume.
+
+### Career growth
+
+`/career-growth` is a derived read model over active applications (Archived and
+Rejected are excluded), grouped by canonical skill and ranked by application
+frequency, requirement importance, direction relevance, and retention. It uses
+neutral labels — *Verify existing evidence*, *Consider learning/project
+evidence*, and *Low priority* — and never writes a mutable table or modifies
+Career Data. Include reasons are context only, never proof.
+
+### Skills, companies, and contacts
+
+The catalog and reusable network records have their own bookmarkable pages:
+
+- `/skills` — review, approve, reject, recategorize, alias, and merge canonical
+  skills. The category vocabulary itself comes from the imported taxonomy and is
+  stored in `skill_categories`.
+- `/companies` — search companies, open websites, and merge duplicates.
+- `/contacts` — manage contacts independently while they stay available in
+  application workspaces.
+
+### Backup and restore
+
+`/export` downloads a **portable core-data export** (schema version 4):
+companies, contacts, applications, the reviewed skill catalog and aliases,
+activities, application-contact links, and Job Post raw-text versions. It
+deliberately omits derived AI history, generated artifacts, baseline history, and
+OAuth connections. `/import` previews and merges that JSON. The career dataset
+and ChatGPT context cover career facts, directions, catalogs, and approved Base
+Resumes.
+
+None of these is a full backup. **Full operational recovery requires a
+consistent SQLite backup AND an artifact backup.**
+
+## Data model and migrations
+
+Migrations are handwritten, forward-only, immutable SQL files in `drizzle/` with
+their execution order recorded in `drizzle/meta/_journal.json`. `bun run
+db:migrate` (`src/db/migrate.ts`) applies pending migrations in order and sets
+foreign keys and WAL mode. Never generate migrations and never edit or reorder an
+applied one; add a new corrective migration instead. Schema and code ship
+together, so a rollback means restoring the matching database snapshot *and*
+redeploying the previous image together. See [`docs/migrations.md`](docs/migrations.md)
+for the full migration, backup, restore, and production runbook.
+
+## Environment variables
+
+Copy `.env.example` to `.env` for local development. `.env` is ignored by Git.
+
+| Variable | Purpose |
+| --- | --- |
+| `DB_FILE_NAME` | SQLite file for all runtime data. Defaults to `jobs.db` (Fly: `/data/jobs.db`). |
+| `QUEUE_FILE_NAME` | Durable Bunqueue file. Defaults to `bunqueue.db` (Fly: `/data/bunqueue.db`). |
+| `ARTIFACTS_DIR` | Generated artifacts root. Defaults to `artifacts` (Fly: `/data/artifacts`). |
+| `OPENAI_API_KEY` | Needed only for AI parsing, analysis, generation, and semantic review. |
+| `OPENAI_MODEL_DEFAULT` | Fallback for every specialized model below. |
+| `OPENAI_MODEL_JOB_PARSER` | Job parsing and Job Analysis. |
+| `OPENAI_MODEL_CANDIDATE_FIT` | Candidate Analysis. |
+| `OPENAI_MODEL_RESUME` | Resume drafting. |
+| `OPENAI_MODEL_COVER_LETTER` | Cover-letter drafting. |
+| `OPENAI_MODEL_DOCUMENT_REVIEW` | Optional semantic document review. |
+| `OPENAI_JOB_PARSER_TIMEOUT_MS` | Job-parser request timeout (bounded 10s–300s, default 90s). |
+| `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_STATE_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` | Optional Google Drive upload. The state secret also derives the refresh-token encryption key. |
+| `APP_AUTH_REQUIRED`, `APP_AUTH_USERNAME`, `APP_AUTH_PASSWORD` | Optional Basic Auth. On a deployment with `APP_AUTH_REQUIRED=true`, missing credentials fail closed with `503`. |
+| `CAREER_DATA_DIR`, `CAREER_BASE_RESUMES_DIR` | **Optional import-only** inputs. `CAREER_DATA_DIR` points at a legacy `career-data/` directory; `CAREER_BASE_RESUMES_DIR` at staged Base Resume Markdown (default `<CAREER_DATA_DIR>/base-resumes`). The running app reads neither — all runtime career data comes from SQLite. |
+
+Every application route also applies same-origin CSRF validation, security
+headers, and `Cache-Control: no-store`.
+
+## Local development
 
 ```sh
 bun install
-bun run setup     # applies the schema migrations
-bun run dev
+bun run db:migrate   # apply pending migrations (safe to re-run)
+bun run dev          # HonoX dev server on 0.0.0.0:5173
 ```
 
-`bun run setup` is `bun run db:migrate` and nothing else: boot never synchronizes private career data. `bun run db:migrate` is also safe to run on its own.
+The Vite dev server uses polling file watching and a fixed HMR client port so it
+stays reliable under WSL, Docker, or a mounted filesystem. If the port is not
+reachable from your browser, forward `5173` (VS Code **Ports** panel) or use the
+printed Network URL.
 
-The SQLite database is created as `jobs.db`. Set `DB_FILE_NAME` to use a different file.
+`package.json` defines exactly these scripts:
 
-## Career skill taxonomy and sync (import-only, retired at boot)
+| Script | Command |
+| --- | --- |
+| `dev` | `bunx --bun vite` |
+| `build` | `vite build --mode client && vite build` |
+| `start` | `bun run db:migrate && cd dist && bun index.js` |
+| `db:migrate` | `bun run src/db/migrate.ts` |
+| `db:studio` | `drizzle-kit studio` |
+| `format` | `biome check --write .` |
+| `format:check` | `biome check .` |
+| `typecheck` | `tsc --noEmit` |
+| `test` | `bun test` |
 
-`skill_categories` and `skills` in SQLite are the runtime authority. Manage categories as **Skills settings** and personal skills under **Career Data**, or import them transactionally with `career:import`.
-
-The legacy per-file sync CLIs below are kept for explicit one-off imports from a JSON `career-data/` directory. `setup` and `start` never run them, and they are not the supported path for a full migration:
-
-```sh
-bun run skills:audit --database ./jobs.db        # read-only review of duplicates, aliases, and non-skills
-bun run taxonomy:sync --database ./jobs.db       # dry-run; import-only legacy taxonomy sync
-bun run taxonomy:sync --database ./jobs.db --apply # upsert JSON-owned key, label, and sort order
-bun run skills:sync --database ./jobs.db         # dry-run preview (default)
-bun run skills:sync --database ./jobs.db --apply # write inside a transaction
-bun run skills:sync --database ./jobs.db --check # non-zero exit when conflicts require manual review
-```
-
-- Every command above also accepts `DB_FILE_NAME` instead of `--database`, and fails without an explicit database.
-
-- Each imported career skill uses a stable lowercase kebab-case `id`, declares a `category` from the adjacent `skill-taxonomy.json`, and may list aliases. That ID becomes the immutable `skills.key`; labels and aliases are never used to guess identity.
-- Taxonomy import is idempotent. It upserts configured keys, labels, and sort order; categories no longer present in JSON are retained as orphaned database rows so historical skill records are not invalidated.
-- Sync matches only the immutable key to `skills.key`. It updates an exact-key row or creates a new approved skill; labels and aliases never cause an automatic merge.
-- Evidence, levels, last-used dates, review notes, and directions are never copied into the taxonomy tables.
-- `bun run skills:sync --database ./jobs.db --if-present` exits cleanly when no `career-data/` is mounted; nothing calls it on boot any more.
-
-## Career data and document generation
-
-Database career records are the canonical, factual source used to generate documents. Stable keys survive rename: a direction references the underlying experience, achievement, project, or skill records by key, and editing them in the UI bumps the career revision so dependent documents become visibly stale.
-
-- Identity, education, experiences, achievements, projects, publications, stories, personal skills, directions and preferences are edited under **Career Data**. Publications keep a display-ready citation and structured authors, including an `isCandidate` marker.
-- Directions carry their `label` and `targetTitles`; bounded generation rules are edited per direction.
-- Legacy `career-data/` JSON is an import source only. Every original field, including authored extension fields, is preserved in the database and remains editable in the UI.
-
-Every generation run records an immutable evidence-selection snapshot in the database and writes a matching JSON file beneath `ARTIFACTS_DIR/run-<id>/`. The workspace’s **Evidence selection & generation record** section shows the exact selected IDs and schema/prompt versions, and lets you download that snapshot. This makes a generated resume or letter reviewable even after career data changes.
-
-Do not use the removed `CANDIDATE_PROFILE_FILE` or `CANDIDATE_PROFILE_JSON` configuration; candidate facts come only from the database.
-
-For Fly.io deployment, `fly.toml` mounts a persistent volume at `/data` and sets `DB_FILE_NAME=/data/jobs.db`. The machine is configured to stay running (`auto_stop_machines = 'off'`, `min_machines_running = 1`). Create the volume once before deploying:
+## Tests and quality gates
 
 ```sh
-fly volumes create data --region yyz --size 1
-fly deploy
-```
-
-Set `ARTIFACTS_DIR=/data/artifacts` and `QUEUE_FILE_NAME=/data/bunqueue.db` in Fly as well, so snapshots, generated documents, and queued work survive machine restarts.
-
-The production start command runs Drizzle migrations before starting the server and does not touch career-data files. Keep one Fly machine for this SQLite deployment because Fly volumes are attached to a single machine. To move existing volume career files into SQLite, follow the **Fly career-data migration runbook** in `docs/migrations.md`; the legacy `bun run fly:sync-career-data` file upload is retired in favour of a consistent database backup plus `career:import`.
-
-The `bun run fly:sync-career-data` file upload is a retired import-only helper. It uploads legacy `career-data/` JSON and Markdown to the mounted volume so they can be imported; it is no longer part of the runtime or the migration path. Runtime facts are not re-read from the volume. Use the runbook in `docs/migrations.md` for any real migration, and never overwrite a production `jobs.db` with local data.
-
-## Base-grounded document generation
-
-Documents are drafted from an **approved Base Resume** (editorial prior) plus **complete safe canonical Career Data** (factual authority), and a reviewed Job Description when generating for a specific application. The model writes Markdown using a controlled section vocabulary; a safe parser produces a typed document model, deterministic checks report omissions, dates, and unsupported claims, and code renders the DOCX. The renderer owns the title, contact line, and layout — the model never overwrites user-confirmed metadata.
-
-- With a JD: a targeted resume and cover letter grounded in the reviewed JD, resolved Include/Skip decisions. The full safe career data is always supplied; direction selects the Base Resume and target titles only.
-- Without a JD (baseline): a reusable direction baseline from the Base Resume and Career Data only. It never invents an employer or claims JD alignment.
-
-Generation freshness covers the Base Resume, Career Data, JD, decisions, direction, prompt, model, and draft/render contract, so prior documents become visibly stale when their true inputs change.
-
-## Batch job post intake
-
-**Import jobs** (`/applications/import`) accepts one `https` URL or one pasted job description per box (multi-line is fine), preserving input order. URLs are validated before any fetch: `https` only, no credentials, no localhost/private/reserved addresses, bounded redirects/bytes/time, and scripts/styles are stripped. A blocked or failed link keeps its URL and becomes **Needs pasted text** — blank or error HTML is never sent to the model. Successful text is analyzed through the existing Job Analysis, and the created application appears in Review with placeholder metadata for you to confirm. First drafts are generated only for explicitly selected, Documents-ready applications.
-
-## Gap report and Career growth
-
-- **Gap report** (per application): the Review workspace shows each requirement's importance, source excerpt, evidence references, status (`direct`, `transferable`, or `unknown-evidence`), and Include/Skip controls. `unknown-evidence` means Career Data does not verify the requirement; it never claims you lack a skill.
-- **Career growth** (`/career-growth`): a derived read model over active applications, grouped by canonical skill and ranked by application frequency, requirement importance, direction relevance, and retention. It uses neutral labels — *Verify existing evidence*, *Consider learning/project evidence*, and *Low priority* — and never writes a mutable table or modifies private Career Data.
-
-## How to use the tracker
-
-1. In **Applications**, paste a posting and use **Parse with AI**, or enter the known facts directly in Quick collect.
-2. Review the draft. Add the job URL, source, company, and direction yourself, then save it as **Saved**.
-3. Move a role to **Apply Today** when it becomes a task. Complete the application workspace and select **Sent application** after applying.
-4. Record follow-ups and interviews in the workspace. These activities advance the visible pipeline without overwriting a more advanced status.
-5. In **Review**, resolve every missing skill: **Skip**, or **Include** with a truthful, application-specific reason. This creates the evidence selection used for generation.
-6. In **Documents**, explicitly generate the resume and cover letter. Review the reviewed Markdown draft, deterministic warnings, and DOCX files; optionally request a semantic document review. A generated file is a draft until you decide it is suitable to use.
-7. Download approved documents or upload them to Google Drive when it is connected. Existing artifacts and Drive links remain available if a newer run later becomes outdated.
-8. Manage reusable companies, contacts, and skills from their dedicated pages under Career and Network. Export JSON periodically as a backup.
-
-### Configuration
-
-Copy `.env.example` to `.env` for local development. `OPENAI_API_KEY` is needed only for AI parsing, analysis, and document generation. Google OAuth variables are needed only for optional Drive uploads. `CAREER_DATA_DIR` and `CAREER_BASE_RESUMES_DIR` are **optional import-only** inputs read by `career:import` and the retired per-file sync CLIs; the running app reads career facts, directions, categories, personal skills and Base Resume versions from SQLite and needs neither variable. Each specialized model variable (`OPENAI_MODEL_JOB_PARSER`, `OPENAI_MODEL_CANDIDATE_FIT`, `OPENAI_MODEL_RESUME`, `OPENAI_MODEL_COVER_LETTER`, `OPENAI_MODEL_DOCUMENT_REVIEW`) falls back to `OPENAI_MODEL_DEFAULT`.
-
-### Private deployment authentication
-
-Fly deployment is fail-closed because `fly.toml` sets `APP_AUTH_REQUIRED=true`. Before deploying, generate a password, display it once, save it in a password manager, and set both credentials as Fly secrets:
-
-```sh
-APP_AUTH_PASSWORD="$(openssl rand -base64 32)"
-printf 'Job Tracker password: %s\n' "$APP_AUTH_PASSWORD"
-fly secrets set --app job-hunting \
-  APP_AUTH_USERNAME='fred' \
-  APP_AUTH_PASSWORD="$APP_AUTH_PASSWORD"
-unset APP_AUTH_PASSWORD
-```
-
-The browser presents its native Basic Auth prompt. Without both secrets, production returns `503` instead of exposing the application. Local development remains open while `APP_AUTH_REQUIRED=false`; set the username and password in the ignored `.env` file when local authentication testing is needed. Every application route also uses same-origin CSRF validation, security headers, and `Cache-Control: no-store`.
-
-### GitHub Actions deployment
-
-The workflow in `.github/workflows/ci-cd.yml` runs formatting, typechecking, tests, and a production build for pull requests and pushes to `main`. It does not deploy automatically. To deploy, open **Actions**, select **CI and Fly Deploy**, choose **Run workflow** from `main`, and run it after CI passes. Add a repository secret named `FLY_API_TOKEN` before the first manual deployment.
-
-### VS Code Remote / WSL
-
-The dev server listens on all interfaces at port `5173`. If `http://localhost:5173` is not reachable from your browser, open the VS Code **Ports** panel and forward port `5173`; VS Code will provide the correct localhost URL. You can also use the Network URL printed by Vite (for example, `http://172.17.x.x:5173/`).
-
-## Skill review, scores, and generation readiness
-
-- A parsed job post produces structured skill requirements, each with a canonical name, category, importance, source excerpt, and confidence.
-- Requirements resolve against the SQLite catalog: exact keys and curated aliases resolve deterministically; unknown or ambiguous terms stay pending as requirement-owned mentions and never auto-create catalog records.
-- The application workspace has a **Review** tab. Every `not-in-career-data` skill must be skipped or included with a reason before document generation is enabled.
-- Dual scores are shown: **canonical match** (proven matches only) and **application coverage** (proven matches plus user-confirmed includes). Skipped and pending requirements count as uncovered.
-- An include is application-only: it never changes career data or the canonical score, and its mandatory reason is the only allowed claim in generated documents.
-
-## LLM workflow and boundaries
-
-The pipeline makes five distinct model calls, each with a separate trust boundary. Every prompt, response schema, and frozen input records a version, and every run records the selected model in SQLite.
-
-1. **Job-only analysis** (`OPENAI_MODEL_JOB_PARSER`) — receives only the raw job posting and a bounded approved catalog snapshot. It never sees a resume, career data, or candidate identity, and it never produces a fit score. It proposes a direction from the supplied direction definitions.
-2. **Candidate fit / evidence matrix** (`OPENAI_MODEL_CANDIDATE_FIT`) — an explicit, queued paid action. It receives a frozen canonical input snapshot (career data and the reviewed job requirements) and returns a labelled `apply`/`apply-selectively`/`skip` recommendation and a requirement-to-evidence matrix. Every evidence reference must resolve to a supplied canonical ID.
-3. **Resume and cover-letter generation** (`OPENAI_MODEL_RESUME`, `OPENAI_MODEL_COVER_LETTER`) — runs only from a frozen, validated evidence snapshot v2 and stores claim-level provenance so every material claim traces to a canonical or application-only source.
-4. **Optional semantic document review** (`OPENAI_MODEL_DOCUMENT_REVIEW`) — an explicit paid action that observes and reports findings (`blocking`/`important`/`optional`). It never rewrites documents and its findings never become career facts.
-
-Actions that incur a model call: parsing a job post, running candidate analysis, generating application documents, and requesting a semantic review. Saving an opportunity, resolving a skill decision, and the deterministic keyword audit do **not** call a model.
-
-### Versioned analysis, reruns, and freshness
-
-Job Analysis, Candidate Analysis, and Documents are each append-only run histories in SQLite. Reruns never overwrite history; every run records its frozen input hash and, on completion, its result. "Stale" is always derived by comparing the current inputs against a run's frozen input — it is never a persisted status.
-
-- **Job Analysis** staleness is driven by the raw posting content hash, the skill-taxonomy hash, the parser/job-analysis prompt versions, and the job-analysis schema version. Model-only changes never make a completed analysis stale.
-- **Candidate Analysis** staleness is driven by the current completed Job Analysis, canonical career data, evidence, and candidate-fit contract versions. Skip/Include decisions and reasons are deliberately excluded, so changing a decision never invalidates the candidate analysis itself.
-- **Documents** staleness additionally includes the direction, run-scoped decisions and reasons, canonical evidence, generation contract versions, and the configured resume/cover-letter models.
-
-Freshness is compared lazily on workspace/readiness load, so editing career data in the UI is detected on the next page view without any background token spend. Nothing reruns automatically: stale stages show `Outdated` with the exact changed reason and an explicit rerun action. Old results, artifacts, Drive links, snapshots, audits, and semantic reviews remain accessible after they become stale, and a failed rerun never hides an older usable result.
-
-Skill decisions are scoped to a Candidate Analysis run. A new run starts every missing skill as `pending`; the previous run's decision is only a suggestion and must be reconfirmed.
-
-### Canonical facts vs application-only decisions
-
-- **Canonical facts** come only from the career database. No LLM output or user decision ever writes into the database's career records implicitly; changes happen only through explicit career-data edits or an explicit import.
-- **Application-only decisions** (`skip`/`include` with a reason) affect only the current application. An included skill may appear in generated documents only through the user-authored reason — never as fabricated professional experience.
-
-### Metrics are transparent heuristics
-
-Fit, requirement coverage, and keyword coverage are deterministic calculations over labelled data (`required` = 3, `preferred` = 1, `mentioned` = 0). They are **not** vendor ATS scores and there is no universal numeric fit score. The keyword audit separates exact matches, alias matches, evidenced-missing terms, and unsupported terms; it never recommends inserting a term without generation-eligible evidence.
-
-### Stale analysis and regeneration
-
-A completed analysis becomes stale when its frozen input hash no longer matches the current inputs. Stale results are never deleted — they remain auditable history, labelled `Outdated` with the exact changed reason. A stale review blocks new application-specific generation, but existing artifacts remain downloadable, and direction-only baseline generation is independent of application analysis. The JSON export is schema version 4 and carries Job Analysis run metadata, run-scoped decisions, and generation input identity; older exports import through explicit adapters.
-
-## Resource pages
-
-Skills, Companies, and Contacts are separate bookmarkable pages under the Career and Network navigation sections. The old `/manage` URL redirects to `/skills`.
-
-- `/skills` — review, approve, reject, recategorize, alias, and merge skills.
-- `/companies` — search companies, open websites, and merge duplicates.
-- `/contacts` — manage contacts independently while they remain available in application workspaces.
-
-## Backup and migration
-
-The JSON export (`/export`) is a **portable core-data export** — companies, contacts, applications, reviewed skill taxonomy/aliases, activities, application-contact links, and immutable Job Post raw-text versions. It deliberately omits derived AI history, generated artifacts, baseline history, and OAuth connections, and is not a full backup of `jobs.db` or the physical `artifacts/` directory. The career-data export and the ChatGPT context cover career facts, directions, catalogs and approved Base Resumes; they likewise exclude OAuth credentials, application/analysis histories and artifact binaries. **Full operational recovery requires a consistent SQLite backup AND an artifact backup.**
-
-Back up `jobs.db` consistently (never copy only a live `.db`/WAL file) and the `artifacts/` directory before applying migrations or importing in production. See `docs/migrations.md` for the migration, backup, restore and Fly career-data migration checklist. `bun run artifacts:audit --database ./jobs.db` lists physical artifact files no longer referenced by the database (preview only); it never deletes them unless you explicitly pass `--apply`.
-
-Migrations are hand-written SQLite files in `drizzle/` with journal entries in `drizzle/meta/_journal.json`; `bun run db:migrate` applies them in order, and `setup`/`start` run only this step — they never synchronize career files. Migrations are tested against empty and populated temporary databases and must never invoke an LLM. To apply locally: `bun run db:migrate`. To apply on Fly without a local production copy, test the migration against a disposable copy of a consistent backup first, then deploy the artifact and run `bun run db:migrate` in the app context (for example `fly ssh console`). Never run migration or import commands directly against a live production SQLite file without a backup, and **never overwrite a production `jobs.db` with local data**.
-
-The canonical contract migration (`0021`) preserves companies, contacts, applications and their URLs, application-contact links, follow-ups, interviews, Job Post raw text/hash, canonical skills/categories/aliases, and the encrypted Drive connection. It intentionally resets derived AI history (Job Analysis, requirements, Candidate Analysis, decisions, generation and document-review history, and baseline history). After migrating, re-run Job Analysis for each application (the saved Job Post text is preserved), then Candidate Analysis and document generation as needed.
-
-The key-only identity migration (`0022`) removes the redundant `career_skill_id` column and intentionally clears the legacy skill rows plus application AI derivations. It preserves applications and immutable Job Post text/links. The later database-owned-career migrations (`0026`+) create the relational career tables; `bun run setup` applies them and an explicit `bun run career:import --source career-data --database ./jobs.db --apply` loads legacy files, after which newly discovered JD skills continue accumulating in SQLite.
-
-## Useful commands
-
-```sh
+bun run format:check
 bun run typecheck
 bun test
 bun run build
-bun run db:generate
-bun run db:studio
 ```
 
-All UI components are rendered on the server with `hono/jsx`. htmx performs fragment swaps; no React or Preact hydration runtime is used.
+`bun test` is a single suite. Tests run against temporary migrated databases and
+must never read or write the owner's `jobs.db`, private `career-data/`,
+`artifacts/`, or secrets. The Bun test preload points `DB_FILE_NAME` at a fresh
+temporary database and refuses to migrate or seed a path inside the repository.
+Migrations are exercised against both empty and populated temporary databases
+and never call an LLM.
+
+## Deployment
+
+The app deploys to Fly.io as `job-hunting` (region `yyz`) with a persistent volume
+mounted at `/data`:
+
+```text
+/data/jobs.db         # all runtime data
+/data/bunqueue.db     # durable queue state
+/data/artifacts/      # generated documents and snapshots
+/data/career-data/    # import-only legacy files, when present
+```
+
+`bun run start` runs `bun run db:migrate` before booting the server, so a deploy
+migrates the schema on startup. Keep a single Fly machine: the SQLite volume
+attaches to one machine, and `fly.toml` keeps it running
+(`auto_stop_machines = 'off'`, `min_machines_running = 1`).
+
+```sh
+fly volumes create data --region yyz --size 1
+fly secrets set --app job-hunting \
+  APP_AUTH_USERNAME='...' \
+  APP_AUTH_PASSWORD='...'
+fly deploy
+```
+
+GitHub Actions (`.github/workflows/ci-cd.yml`) runs formatting, typechecking,
+tests, and a production build on push and pull request to `main`. Deployment is
+manual and deliberate: the Fly deploy job runs only for a `workflow_dispatch` on
+`main`, so add a `FLY_API_TOKEN` repository secret, then open **Actions → CI and
+Fly Deploy → Run workflow** from `main` after CI passes. Pushing to `main` never
+deploys.
+
+Before any deploy that carries migrations, take a consistent SQLite snapshot (not
+a bare copy of a live `.db`/WAL file) and back up `artifacts/`; the runbook in
+[`docs/migrations.md`](docs/migrations.md) covers the commands and the recovery
+procedure.
+
+## Safety invariants
+
+- **Catalog records are never created by model output.** LLM-returned strings
+  cannot create a `skills` record; they resolve against the frozen approved
+  catalog or stay pending as requirement-owned mentions for explicit mapping.
+- **Catalog mapping never proves personal skill possession.** Matching a
+  requirement to a catalog skill says nothing about whether the author has it;
+  evidence status comes only from canonical Career Data.
+- **A blank answer is not a Skip.** Skip is an explicit decision, and an Include
+  requires a truthful, application-specific reason — the only claim an Include
+  authorizes in generated documents.
+- **Decisions are application-only.** They never write to career records, never
+  change the canonical score, and never fabricate professional experience.
+- **Drafts never replace an approved Base Resume** without an explicit approval
+  action; drafts and superseded versions are retained.
+- **Every authored fact and extension field is preserved.** Imported fields the
+  schema does not model are kept in the owning row's `extension_json` (or
+  `career_profile.documents_json`) and stay editable, so nothing is silently
+  dropped.
+- **Stale results are never deleted.** Outdated runs, artifacts, Drive links,
+  snapshots, audits, and reviews stay accessible; nothing reruns automatically.

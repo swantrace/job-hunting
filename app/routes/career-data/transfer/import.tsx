@@ -1,7 +1,7 @@
 import { createRoute } from 'honox/factory'
 import { db } from '../../../../src/db/client'
+import { prepareCareerImport } from '../../../../src/lib/career/import'
 import { CareerUploadError, decodeCareerUpload } from '../../../../src/lib/career/upload'
-import { prepareCareerImport } from '../../../../src/lib/career-import'
 import { retargetFragment } from '../../../../src/lib/request'
 import { CareerImportForm, careerImportFormId } from '../../../components/career/CareerImportForm'
 import { CareerImportPreviewPanel } from '../../../components/career/CareerImportPreview'

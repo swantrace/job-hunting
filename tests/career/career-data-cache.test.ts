@@ -4,7 +4,7 @@ import { listCareerDirections } from '../../src/db/career-directions'
 import { listCareerAchievements, updateCareerAchievement } from '../../src/db/career-records'
 import { skills } from '../../src/db/schema'
 import { renameSkill } from '../../src/db/skill-service'
-import { loadCareerData } from '../../src/lib/career-data'
+import { loadCareerData } from '../../src/lib/career/canonical-data'
 import { createCareerTestDatabase } from '../support/career-db'
 
 /**
