@@ -199,18 +199,12 @@ export function completeAnalysisRun(runId: number, resultJson: string) {
           prior.basisHash !== review.decisionBasisHash
         )
           continue
-        if (
-          prior.decision === 'include' &&
-          !prior.reason?.trim() &&
-          review.evidenceKind !== 'transferable'
-        )
-          continue
+        if (prior.decision === 'include' && !prior.reason?.trim()) continue
         upsertRunDecision(tx, {
           runId,
           skillId: review.skillId,
           decision: prior.decision,
           reason: prior.reason,
-          includeBasis: prior.includeBasis,
           basisHash: review.decisionBasisHash,
           previousDecisionId: prior.id,
         })

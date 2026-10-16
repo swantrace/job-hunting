@@ -1,6 +1,4 @@
 import { inArray } from 'drizzle-orm'
-import type { RequirementAssessment } from '../ai/schemas/candidate-fit'
-import { parseStoredCandidateFit } from '../lib/candidate/fit-result'
 import { type CareerGrowthInputRow, isActiveApplicationStatus } from '../lib/career/growth'
 import { readReviewSnapshot, reviewSkillEvidence } from '../lib/skills/review-evidence'
 import { db } from './client'
@@ -97,14 +95,8 @@ export function listCareerGrowthRows(
     ]),
   )
 
-  const evidenceByRun = new Map<number, Map<number, RequirementAssessment>>()
   const snapshots = new Map<number, ReturnType<typeof readReviewSnapshot>>()
   for (const run of runs) {
-    const fit = parseStoredCandidateFit(run.resultJson)
-    evidenceByRun.set(
-      run.id,
-      new Map(fit?.requirementAssessments.map((a) => [a.jobRequirementId, a]) ?? []),
-    )
     snapshots.set(run.id, readReviewSnapshot(run.inputSnapshotJson))
   }
 
@@ -156,16 +148,10 @@ export function listCareerGrowthRows(
     else if (requirement.importance === 'preferred') existing.preferredCount += 1
     else existing.mentionedCount += 1
 
-    if (
-      reviewSkillEvidence(
-        skill.key,
-        snapshots.get(runId) ?? null,
-        evidenceByRun.get(runId)?.get(requirement.id),
-      ) === 'direct'
-    )
+    if (reviewSkillEvidence(skill.key, snapshots.get(runId) ?? null) === 'direct')
       existing.verifiedEvidenceCount += 1
-    if (decisionByRunSkill.get(`${runId}:${skill.id}`)?.decision === 'include')
-      existing.retainedCount += 1
+    const decision = decisionByRunSkill.get(`${runId}:${skill.id}`)
+    if (decision?.decision === 'include' && decision.reason?.trim()) existing.retainedCount += 1
     if (app.updatedAt > existing.latestActivityAt) existing.latestActivityAt = app.updatedAt
     aggregate.set(skill.key, existing)
   }

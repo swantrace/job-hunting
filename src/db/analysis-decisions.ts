@@ -16,14 +16,9 @@ export const runDecisionSchema = z
   .object({
     decision: z.enum(['pending', 'skip', 'include']),
     reason: z.string().trim().max(2000).nullable(),
-    includeBasis: z.enum(['user-reason', 'transferable']).default('user-reason'),
   })
   .superRefine((value, ctx) => {
-    if (
-      value.decision === 'include' &&
-      value.includeBasis !== 'transferable' &&
-      (!value.reason || value.reason.trim() === '')
-    )
+    if (value.decision === 'include' && (!value.reason || value.reason.trim() === ''))
       ctx.addIssue({
         code: 'custom',
         message: 'A reason is required to include this skill.',
@@ -142,7 +137,6 @@ export function upsertRunDecision(
     decision: 'pending' | 'skip' | 'include'
     reason: string | null
     previousDecisionId?: number | null
-    includeBasis?: 'user-reason' | 'transferable'
     basisHash?: string | null
   },
 ) {
@@ -152,8 +146,9 @@ export function upsertRunDecision(
       ? (findPriorDecision(db, input.runId, input.skillId)?.id ?? null)
       : input.previousDecisionId
   const reason = input.decision === 'include' ? (input.reason ?? null) : null
-  const includeBasis = input.includeBasis ?? 'user-reason'
-  runDecisionSchema.parse({ decision: input.decision, reason, includeBasis })
+  // Keep the legacy database column for immutable history, not an optional-reason path.
+  const includeBasis = 'user-reason'
+  runDecisionSchema.parse({ decision: input.decision, reason })
   db.insert(analysisRunDecisions)
     .values({
       applicationAnalysisRunId: input.runId,

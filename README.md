@@ -109,12 +109,14 @@ Include/Skip decisions automatically.
   `apply`/`apply-selectively`/`skip` recommendation plus a requirement-to-evidence
   matrix. After a completed Job Analysis with no unresolved terms it is queued
   automatically; it can also be re-run explicitly.
-- **Review** shows each requirement's importance, source excerpt, evidence
-  status (`direct`, `transferable`, or `unknown-evidence`), and Include/Skip
-  controls. Decisions are scoped to a Candidate Analysis run: a new run starts
-  every missing skill as `pending`, and an Include requires a truthful
-  reason. A blank or whitespace input is never treated as a Skip; Skip is an
-  explicit decision.
+- **Skill Review** has two states: Proven match (an exact personal skill in the
+  frozen Career Data with usable linked evidence) or Needs confirmation.
+  Composite requirement assessments never downgrade an individual skill.
+  Unverified skills require an explicit Include with a truthful reason or Skip;
+  a blank reason is never treated as Skip. Decisions are scoped to a Candidate
+  Analysis run and reused only when their skill, requirements and evidence
+  remain unchanged. The separate Requirement Evidence Matrix retains the AI's
+  `direct`, `transferable`, and `unknown-evidence` assessments as context.
 - Dual scores are shown for coverage: **canonical match** (proven matches only)
   and **application coverage** (proven matches plus user-confirmed Includes).
   Skipped and pending requirements count as uncovered. Weights are `required` =

@@ -25,13 +25,11 @@ export function decideRunSkill(input: {
   const review = listRunSkillReviews(input.runId).find((row) => row.skillId === input.skillId)
   if (!review || review.analysisResult === 'proven-match')
     throw new Error('This skill does not require a decision.')
-  const includeBasis = review.evidenceKind === 'transferable' ? 'transferable' : 'user-reason'
   upsertRunDecision(db, {
     runId: input.runId,
     skillId: input.skillId,
     decision: input.decision,
     reason: input.reason,
-    includeBasis,
     basisHash: review.decisionBasisHash,
   })
 }

@@ -16,7 +16,6 @@ export function SkillDecisionForm({
   canDecide?: boolean
 }) {
   const decided = requirement.decision === 'skip' || requirement.decision === 'include'
-  const transferable = requirement.evidenceKind === 'transferable'
   const modalId = `include-skill-modal-${requirement.skillId}`
   if (decided && !error) {
     return (
@@ -67,9 +66,8 @@ export function SkillDecisionForm({
           <div class="modal-box">
             <h3 class="text-lg font-bold">Include {requirement.skillName}</h3>
             <p class="mt-1 text-sm text-base-content/60">
-              {transferable
-                ? 'Recorded career evidence supports a limited, transferable claim. Include allows a qualified Skills entry only, not experience bullets or detailed cover-letter claims. Additional context is optional.'
-                : 'Explain why this skill can be claimed for this application. This reason will be available to resume and cover-letter generation.'}
+              Explain why this skill can be claimed for this application. This reason will be
+              available to resume and cover-letter generation.
             </p>
             <form
               class="mt-4"
@@ -83,7 +81,7 @@ export function SkillDecisionForm({
               <input type="hidden" name="action" value="include" />
               <fieldset class="fieldset">
                 <legend class="fieldset-legend">
-                  Reason {transferable ? '(optional)' : <span class="text-error">*</span>}
+                  Reason <span class="text-error">*</span>
                 </legend>
                 <textarea
                   id={`include-reason-${requirement.skillId}`}
@@ -91,7 +89,7 @@ export function SkillDecisionForm({
                   rows={4}
                   class={`textarea w-full ${error ? 'textarea-error' : ''}`}
                   placeholder="e.g. Used this in a personal prototype with retry handling."
-                  required={!transferable}
+                  required
                   aria-describedby={
                     error ? `include-reason-error-${requirement.skillId}` : undefined
                   }

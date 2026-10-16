@@ -1,5 +1,4 @@
 import { and, asc, desc, eq, inArray } from 'drizzle-orm'
-import { parseStoredCandidateFit } from '../lib/candidate/fit-result'
 import { nowISO } from '../lib/date'
 import type {
   SkillDecision,
@@ -270,9 +269,7 @@ export type RunSkillReview = RequirementSkillMapping & {
   decisionReason: string | null
   aliases: string[]
   evidenceKind?: SkillEvidenceKind
-  evidenceExplanation?: string
   decisionBasisHash?: string | null
-  decisionIncludeBasis?: 'user-reason' | 'transferable'
   previousDecisionId?: number | null
 }
 
@@ -280,8 +277,8 @@ export type RunSkillReview = RequirementSkillMapping & {
  * Run-scoped skill review projection for the Review workspace. Combines the
  * exact Job Analysis run's requirement-skill mappings with that run's pending
  * Skip/Include decisions. Only a personal skill in the frozen career snapshot
- * plus directly related requirement evidence determines "proven". Transferable
- * and unknown claims always require explicit confirmation.
+ * with usable linked evidence determines "proven". Whole-requirement AI
+ * assessments never downgrade personal possession of an individual skill.
  */
 export function listRunSkillReviews(
   runId: number,
@@ -314,15 +311,12 @@ export function listRunSkillReviews(
     .from(applicationAnalysisRuns)
     .where(eq(applicationAnalysisRuns.id, runId))
     .get()
-  const fit = parseStoredCandidateFit(run?.resultJson ?? null)
   const snapshot = readReviewSnapshot(run?.inputSnapshotJson ?? null)
-  const assessments = new Map(fit?.requirementAssessments.map((a) => [a.jobRequirementId, a]) ?? [])
   const grouped = new Map<number, RunSkillReview>()
   const rank = { required: 3, preferred: 2, mentioned: 1 }
   for (const mapping of mappings) {
     const decision = decisionBySkill.get(mapping.skillId)
-    const assessment = assessments.get(mapping.requirementId)
-    const evidenceKind = reviewSkillEvidence(mapping.skillKey, snapshot, assessment)
+    const evidenceKind = reviewSkillEvidence(mapping.skillKey, snapshot)
     const proven = evidenceKind === 'direct'
     const current: RunSkillReview = {
       ...mapping,
@@ -331,14 +325,7 @@ export function listRunSkillReviews(
       decisionReason: decision?.reason ?? null,
       aliases: aliasesBySkill.get(mapping.skillId) ?? [],
       evidenceKind,
-      evidenceExplanation: assessment?.explanation,
-      decisionBasisHash: skillDecisionBasis(
-        mapping.skillId,
-        mapping.skillKey,
-        snapshot,
-        fit?.requirementAssessments ?? [],
-      ),
-      decisionIncludeBasis: decision?.includeBasis ?? 'user-reason',
+      decisionBasisHash: skillDecisionBasis(mapping.skillId, mapping.skillKey, snapshot),
       previousDecisionId: decision?.previousDecisionId ?? null,
     }
     const prior = grouped.get(mapping.skillId)
@@ -346,24 +333,11 @@ export function listRunSkillReviews(
       if (!prior.requirementStatement.includes(mapping.requirementStatement))
         prior.requirementStatement += `\n${mapping.requirementStatement}`
       if (rank[current.importance] > rank[prior.importance]) prior.importance = current.importance
-      if (!proven) prior.analysisResult = 'not-in-career-data'
-      if (evidenceKind === 'unknown-evidence' || prior.evidenceKind === 'unknown-evidence') {
-        prior.evidenceKind = 'unknown-evidence'
-        if (evidenceKind === 'unknown-evidence') prior.evidenceExplanation = assessment?.explanation
-      } else if (evidenceKind === 'transferable') {
-        prior.evidenceKind = 'transferable'
-        prior.evidenceExplanation = assessment?.explanation
-      }
     } else grouped.set(mapping.skillId, current)
   }
   // Evaluate the final skill-wide kind, not each requirement independently.
   for (const row of grouped.values()) {
-    if (
-      row.decision === 'include' &&
-      !row.decisionReason?.trim() &&
-      (row.decisionIncludeBasis !== 'transferable' || row.evidenceKind !== 'transferable')
-    )
-      row.decision = 'pending'
+    if (row.decision === 'include' && !row.decisionReason?.trim()) row.decision = 'pending'
   }
   return [...grouped.values()]
 }

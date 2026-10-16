@@ -1,10 +1,9 @@
-import type { RequirementAssessment } from '../../ai/schemas/candidate-fit'
 import { canonicalHash } from '../canonical-hash'
 import type { documentSafeCareerData } from '../career/canonical-data'
 import { hasUsableEvidence } from './match-career-skills'
 
-export type SkillEvidenceKind = 'direct' | 'transferable' | 'unknown-evidence'
-export const skillReviewPolicyVersion = 1
+export type SkillEvidenceKind = 'direct' | 'unknown-evidence'
+export const skillReviewPolicyVersion = 2
 
 type ReviewSnapshot = {
   sourceVersions?: Record<string, number>
@@ -65,28 +64,17 @@ function evidenceKey(ref: string, records: ReadonlyMap<string, unknown>): string
 export function reviewSkillEvidence(
   skillKey: string,
   snapshot: ReturnType<typeof readReviewSnapshot>,
-  assessment?: RequirementAssessment,
 ): SkillEvidenceKind {
-  if (snapshot?.sourceVersions?.skillReviewPolicy !== skillReviewPolicyVersion)
-    return 'unknown-evidence'
   const records = frozenRecords(snapshot)
   const skill = records.get(`skill:${skillKey}`)
-  if (!skill || !hasUsableEvidence(skill as Record<string, unknown>) || !assessment)
-    return 'unknown-evidence'
-  const related = new Set(
-    (Array.isArray(skill.evidence) ? skill.evidence : []).flatMap((ref) =>
-      typeof ref === 'string' ? (evidenceKey(ref, records) ?? []) : [],
-    ),
-  )
-  if (!related.size) return 'unknown-evidence'
-  related.add(`skill:${skillKey}`)
-  const references = assessment.evidenceRefs.filter((ref) =>
-    related.has(`${ref.sourceType}:${ref.sourceId}`),
-  )
-  if (!references.length) return 'unknown-evidence'
-  if (assessment.evidenceStatus === 'direct' && references.some((r) => r.relevance === 'direct'))
-    return 'direct'
-  return assessment.evidenceStatus === 'transferable' ? 'transferable' : 'unknown-evidence'
+  if (!skill || !hasUsableEvidence(skill)) return 'unknown-evidence'
+  // Possession is a career fact, independent of the model's assessment of a
+  // composite JD requirement. A dangling evidence reference cannot prove it.
+  const supported = (skill.evidence as unknown[]).some((ref) => {
+    const key = typeof ref === 'string' ? evidenceKey(ref, records) : null
+    return key !== null && key !== `skill:${skillKey}`
+  })
+  return supported ? 'direct' : 'unknown-evidence'
 }
 
 /** Stable facts, not the model's wording/confidence or changing database run IDs. */
@@ -94,7 +82,6 @@ export function skillDecisionBasis(
   skillId: number,
   skillKey: string,
   snapshot: ReturnType<typeof readReviewSnapshot>,
-  assessments: RequirementAssessment[],
 ): string | null {
   if (snapshot?.sourceVersions?.skillReviewPolicy !== skillReviewPolicyVersion) return null
   const mappings = snapshot.skillRequirements?.filter(
@@ -122,19 +109,13 @@ export function skillDecisionBasis(
       const requirement = snapshot.jobAnalysis!.requirements.find(
         (r: { id: number }) => r.id === mapping.requirementId,
       )
-      const assessment = assessments.find((a) => a.jobRequirementId === mapping.requirementId)
-      for (const ref of assessment?.evidenceRefs ?? []) visit(`${ref.sourceType}:${ref.sourceId}`)
       return {
         statement: requirement?.statement,
         sourceText: requirement?.sourceText,
         importance: requirement?.importance,
         type: requirement?.type,
         basis: requirement?.basis,
-        evidenceKind: reviewSkillEvidence(skillKey, snapshot, assessment),
-        evidenceRefs:
-          assessment?.evidenceRefs
-            .map((r) => ({ ...r }))
-            .sort((a, b) => canonicalHash(a).localeCompare(canonicalHash(b))) ?? [],
+        evidenceKind: reviewSkillEvidence(skillKey, snapshot),
       }
     })
     .sort((a: unknown, b: unknown) => canonicalHash(a).localeCompare(canonicalHash(b)))

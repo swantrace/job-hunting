@@ -14,12 +14,13 @@ import {
 } from '../../src/db/extension-intake'
 import { listJobRequirements, persistJobRequirements } from '../../src/db/job-analysis'
 import { createJobAnalysisRun } from '../../src/db/job-analysis-runs'
-import { applicationAnalysisRuns } from '../../src/db/schema'
+import { analysisRunDecisions, applicationAnalysisRuns } from '../../src/db/schema'
 import { listRequirementSkillMappings, listRunSkillReviews } from '../../src/db/skill-queries'
 import { documentSafeCareerData, loadCareerData } from '../../src/lib/career/canonical-data'
+import { skillReviewPolicyVersion } from '../../src/lib/skills/review-evidence'
 import { careerTestDatabase } from '../support/career-db'
 
-test('personal evidence governs decisions, reasonless transfers and safe Include/Skip reuse', () => {
+test('personal evidence governs individual skills independently of composite requirement assessments', () => {
   // UI route tests install process-wide module mocks. Exercise real repositories
   // in a child process, with a separate disposable database, regardless of order.
   if (process.env.PERSONAL_SKILL_REVIEW_ISOLATED !== '1') {
@@ -87,7 +88,7 @@ test('personal evidence governs decisions, reasonless transfers and safe Include
     const ts = mappings.find((row) => row.skillKey === 'typescript')!
     const vue = mappings.find((row) => row.skillId !== ts.skillId)!
     const snapshot = {
-      sourceVersions: { skillReviewPolicy: 1 },
+      sourceVersions: { skillReviewPolicy: skillReviewPolicyVersion },
       application: { direction: 'fullstack' },
       careerData: documentSafeCareerData(loadCareerData()),
       jobAnalysis: {
@@ -154,37 +155,64 @@ test('personal evidence governs decisions, reasonless transfers and safe Include
 
     const transfer = finish('transferable')
     expect(listRunSkillReviews(transfer).find((r) => r.skillId === ts.skillId)?.evidenceKind).toBe(
-      'transferable',
+      'direct',
     )
-    decideRunSkill({ runId: transfer, skillId: ts.skillId, decision: 'include', reason: null })
-    const saved = listRunDecisions(db, transfer).find((r) => r.skillId === ts.skillId)!
-    expect(saved.includeBasis).toBe('transferable')
-    expect(saved.reason).toBeNull()
+    expect(
+      listRunSkillReviews(transfer).find((r) => r.skillId === ts.skillId)?.analysisResult,
+    ).toBe('proven-match')
+    expect(listRunDecisions(db, transfer).some((r) => r.skillId === ts.skillId)).toBe(false)
+    expect(() =>
+      decideRunSkill({ runId: transfer, skillId: ts.skillId, decision: 'skip', reason: null }),
+    ).toThrow('does not require a decision')
+    decideRunSkill({
+      runId: transfer,
+      skillId: vue.skillId,
+      decision: 'include',
+      reason: 'Built a Vue prototype',
+    })
+    const saved = listRunDecisions(db, transfer).find((r) => r.skillId === vue.skillId)!
+    expect(saved.includeBasis).toBe('user-reason')
+    expect(saved.reason).toBe('Built a Vue prototype')
     expect(saved.basisHash).toBeTruthy()
-    const repeated = finish('transferable')
-    const reused = listRunDecisions(db, repeated).find((r) => r.skillId === ts.skillId)!
+    // Model assessment changes do not change skill possession or discard user choices.
+    const repeated = finish('unknown-evidence')
+    expect(
+      listRunSkillReviews(repeated).find((r) => r.skillId === ts.skillId)?.analysisResult,
+    ).toBe('proven-match')
+    const reused = listRunDecisions(db, repeated).find((r) => r.skillId === vue.skillId)!
     expect(reused.decision).toBe('include')
     expect(reused.previousDecisionId).toBe(saved.id)
 
     const changed = structuredClone(snapshot)
-    changed.jobAnalysis.requirements[0]!.statement += ' at enterprise scale'
+    changed.jobAnalysis.requirements.find((r) => r.id === vue.requirementId)!.statement +=
+      ' at enterprise scale'
     const changedRun = finish('transferable', changed)
-    expect(listRunDecisions(db, changedRun).find((r) => r.skillId === ts.skillId)?.decision).toBe(
+    expect(listRunDecisions(db, changedRun).find((r) => r.skillId === vue.skillId)?.decision).toBe(
       'pending',
     )
-    decideRunSkill({ runId: changedRun, skillId: ts.skillId, decision: 'skip', reason: null })
+    decideRunSkill({ runId: changedRun, skillId: vue.skillId, decision: 'skip', reason: null })
     const skippedRun = finish('transferable', changed)
-    expect(listRunDecisions(db, skippedRun).find((r) => r.skillId === ts.skillId)?.decision).toBe(
+    expect(listRunDecisions(db, skippedRun).find((r) => r.skillId === vue.skillId)?.decision).toBe(
       'skip',
     )
 
     const unknown = finish('unknown-evidence', changed)
-    expect(listRunDecisions(db, unknown).find((r) => r.skillId === ts.skillId)?.decision).toBe(
-      'pending',
+    expect(listRunDecisions(db, unknown).find((r) => r.skillId === vue.skillId)?.decision).toBe(
+      'skip',
     )
     expect(() =>
-      decideRunSkill({ runId: unknown, skillId: ts.skillId, decision: 'include', reason: null }),
+      decideRunSkill({ runId: unknown, skillId: vue.skillId, decision: 'include', reason: null }),
     ).toThrow()
+    const legacy = listRunDecisions(db, unknown).find((r) => r.skillId === vue.skillId)!
+    // Old records remain readable, but cannot authorize a new reasonless claim.
+    db.update(analysisRunDecisions)
+      .set({ decision: 'include', reason: null, includeBasis: 'transferable' })
+      .where(eq(analysisRunDecisions.id, legacy.id))
+      .run()
+    expect(listRunSkillReviews(unknown).find((r) => r.skillId === vue.skillId)?.decision).toBe(
+      'pending',
+    )
+    expect(listRunDecisions(db, unknown).find((r) => r.id === legacy.id)?.decision).toBe('include')
     // Historical input snapshots remain immutable after subsequent analysis runs.
     expect(
       db.select().from(applicationAnalysisRuns).where(eq(applicationAnalysisRuns.id, direct)).get()

@@ -17,7 +17,7 @@ import { getCandidateAnalysisState } from '../../../../src/lib/candidate/analysi
 import { careerSkillEvidenceMap } from '../../../../src/lib/career/canonical-data'
 import { parseFilters, parseForm, parseId } from '../../../../src/lib/request'
 import { skillCategoryDefinitions } from '../../../../src/lib/skills/taxonomy'
-import { skillDecisionSchemaFor } from '../../../../src/lib/validation'
+import { skillDecisionSchema } from '../../../../src/lib/validation'
 import { computeWorkspaceAvailability } from '../../../../src/lib/workspace/availability'
 import { tabAvailability } from '../../../../src/lib/workspace/state'
 import { ReviewReadiness } from '../../../components/workspace/ReviewReadiness'
@@ -93,7 +93,7 @@ export const POST = createRoute(async (c) => {
   if (!Number.isSafeInteger(skillId) || skillId < 1 || !review)
     return c.html(<div class="alert alert-error">Skill not found.</div>, 404)
 
-  const parsed = skillDecisionSchemaFor(review.evidenceKind === 'transferable').safeParse(raw)
+  const parsed = skillDecisionSchema.safeParse(raw)
   if (review.analysisResult === 'proven-match')
     return c.html(
       <div class="alert alert-info">

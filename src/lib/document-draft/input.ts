@@ -37,6 +37,8 @@ export type DocumentDraftRequirement = {
   rawLabel: string | null
   sourceText: string | null
   evidenceKind?: string
+  // Historical frozen runs may still contain skills-only-qualified. New runs
+  // use personal evidence or an explicit Include reason, never a transferable tier.
   usage?: 'skills-only-qualified' | 'supported-claim'
   evidenceExplanation?: string | null
 }
@@ -248,7 +250,7 @@ export function buildDocumentDraftSnapshot(
       rawLabel: item.rawLabel ?? null,
       sourceText: item.requirementStatement ?? null,
       evidenceKind: item.evidenceKind ?? 'unknown-evidence',
-      usage: item.evidenceKind === 'transferable' ? 'skills-only-qualified' : 'supported-claim',
+      usage: 'supported-claim',
       evidenceExplanation: item.evidenceExplanation ?? null,
     })),
     excludedSkills: [...new Set(excludedSkills)],

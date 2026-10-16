@@ -183,15 +183,8 @@ export function SkillGapPanel({
                           {requirement.analysisResult !== 'proven-match' ? (
                             <div class="mt-2 space-y-1 text-xs">
                               <span class="badge badge-warning badge-sm whitespace-nowrap">
-                                {requirement.evidenceKind === 'transferable'
-                                  ? 'Transferable · confirmation required'
-                                  : 'Unverified · Include needs a reason'}
+                                Needs confirmation · Include needs a reason
                               </span>
-                              {requirement.evidenceExplanation ? (
-                                <p class="text-base-content/70">
-                                  AI assessment: {requirement.evidenceExplanation}
-                                </p>
-                              ) : null}
                               {careerEvidence[requirement.skillKey]?.length ? (
                                 <p>
                                   Personal skill evidence:{' '}

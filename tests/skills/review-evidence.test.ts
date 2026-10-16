@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import type { RequirementAssessment } from '../../src/ai/schemas/candidate-fit'
+import { candidateFitSystemPrompt } from '../../src/ai/prompts/candidate-fit'
+import { runDecisionSchema } from '../../src/db/analysis-decisions'
 import { documentSafeCareerData, loadCareerData } from '../../src/lib/career/canonical-data'
 import { parseDocumentDraft } from '../../src/lib/document-draft/definition'
 import { validateTransferableSkillUsage } from '../../src/lib/document-draft/validation'
@@ -7,14 +8,15 @@ import {
   readReviewSnapshot,
   reviewSkillEvidence,
   skillDecisionBasis,
+  skillReviewPolicyVersion,
 } from '../../src/lib/skills/review-evidence'
-import { skillDecisionSchemaFor } from '../../src/lib/validation'
+import { skillDecisionSchema } from '../../src/lib/validation'
 import { careerTestDatabase } from '../support/career-db'
 
 function snapshot() {
   return readReviewSnapshot(
     JSON.stringify({
-      sourceVersions: { skillReviewPolicy: 1 },
+      sourceVersions: { skillReviewPolicy: skillReviewPolicyVersion },
       application: { direction: 'fullstack' },
       jobAnalysis: {
         requirements: [
@@ -36,108 +38,96 @@ function snapshot() {
     }),
   )!
 }
-const assessment = (
-  status: RequirementAssessment['evidenceStatus'] = 'direct',
-): RequirementAssessment => ({
-  jobRequirementId: 1,
-  evidenceStatus: status,
-  evidenceRefs: [
-    {
-      sourceType: 'achievement',
-      sourceId: 'react-ui',
-      relevance: status === 'transferable' ? 'transferable' : 'direct',
-    },
-  ],
-  explanation: 'React evidence supports this requirement.',
-  confidence: 0.9,
-})
-
 describe('personal-skill review authority', () => {
+  test('JavaScript stays proven when a composite requirement has additional unverified capabilities', () => {
+    expect(candidateFitSystemPrompt).toContain('These labels assess the whole requirement')
+    expect(candidateFitSystemPrompt).toContain('Do not instruct the user to Include or Skip')
+    const input = snapshot()
+    input.careerData!.skills[0]!.id = 'javascript'
+    input.careerData!.achievements[0]!.claim = 'Built JavaScript applications'
+    input.jobAnalysis!.requirements[0]!.statement =
+      'Build responsive web applications using HTML, CSS, JavaScript, and Node.js, Python, or PHP'
+    expect(reviewSkillEvidence('javascript', input)).toBe('direct')
+    input.jobAnalysis!.requirements[0]!.statement =
+      'Have experience with TypeScript/JavaScript, NodeJS, and React'
+    expect(reviewSkillEvidence('javascript', input)).toBe('direct')
+  })
   test('catalog existence and unrelated framework evidence never prove possession', () => {
-    expect(reviewSkillEvidence('vuejs', snapshot(), assessment())).toBe('unknown-evidence')
-    expect(reviewSkillEvidence('access-management', snapshot(), assessment())).toBe(
-      'unknown-evidence',
-    )
-    expect(reviewSkillEvidence('vuejs', snapshot(), assessment('transferable'))).toBe(
-      'unknown-evidence',
-    )
+    expect(reviewSkillEvidence('vuejs', snapshot())).toBe('unknown-evidence')
+    expect(reviewSkillEvidence('access-management', snapshot())).toBe('unknown-evidence')
   })
   test('requires an eligible personal skill AND evidence tied to that skill', () => {
-    expect(reviewSkillEvidence('react', snapshot(), assessment())).toBe('direct')
-    const other = assessment()
-    other.evidenceRefs[0]!.sourceId = 'unrelated-project'
-    expect(reviewSkillEvidence('react', snapshot(), other)).toBe('unknown-evidence')
+    expect(reviewSkillEvidence('react', snapshot())).toBe('direct')
     const input = snapshot()
     input.careerData!.skills[0]!.resumeEligible = false
-    expect(reviewSkillEvidence('react', input, assessment())).toBe('unknown-evidence')
+    expect(reviewSkillEvidence('react', input)).toBe('unknown-evidence')
+    const dangling = snapshot()
+    dangling.careerData!.skills[0]!.evidence = ['achievement:missing']
+    expect(reviewSkillEvidence('react', dangling)).toBe('unknown-evidence')
+    dangling.careerData!.skills[0]!.evidence = ['skill:react']
+    expect(reviewSkillEvidence('react', dangling)).toBe('unknown-evidence')
   })
   test('uses the real frozen flat career-data shape and resolves legacy bare evidence IDs', () => {
     const fixture = careerTestDatabase()
     try {
       const input = snapshot()
       input.careerData = documentSafeCareerData(loadCareerData())
-      const result = assessment()
-      result.evidenceRefs = [
-        { sourceType: 'achievement', sourceId: 'reporting-api-delivery', relevance: 'direct' },
-      ]
-      expect(reviewSkillEvidence('typescript', input, result)).toBe('direct')
-      expect(reviewSkillEvidence('react', input, result)).toBe('unknown-evidence') // personal row has no evidence
-      result.evidenceStatus = 'transferable'
-      result.evidenceRefs[0]!.relevance = 'transferable'
-      expect(reviewSkillEvidence('typescript', input, result)).toBe('transferable')
+      expect(reviewSkillEvidence('typescript', input)).toBe('direct')
+      expect(reviewSkillEvidence('react', input)).toBe('unknown-evidence') // personal row has no evidence
     } finally {
       fixture.cleanup()
     }
   })
-  test('transferable evidence still requires a decision; missing/legacy snapshots fail closed', () => {
-    expect(reviewSkillEvidence('react', snapshot(), assessment('transferable'))).toBe(
-      'transferable',
-    )
-    expect(reviewSkillEvidence('react', null, assessment())).toBe('unknown-evidence')
+  test('personal evidence is readable in historical snapshots; absent facts fail closed', () => {
+    expect(reviewSkillEvidence('react', null)).toBe('unknown-evidence')
     const old = snapshot()
     delete old.sourceVersions
-    expect(reviewSkillEvidence('react', old, assessment())).toBe('unknown-evidence')
+    expect(reviewSkillEvidence('react', old)).toBe('direct')
+    expect(skillDecisionBasis(10, 'react', old)).toBeNull()
   })
-  test('only server-confirmed transferable includes permit an empty reason', () => {
-    expect(skillDecisionSchemaFor(true).safeParse({ action: 'include', reason: '' }).success).toBe(
-      true,
-    )
+  test('all unverified Includes require a reason, even with a forged legacy basis', () => {
     expect(
-      skillDecisionSchemaFor().safeParse({
+      skillDecisionSchema.safeParse({
         action: 'include',
         reason: '',
         includeBasis: 'transferable',
       }).success,
     ).toBe(false)
+    expect(
+      runDecisionSchema.safeParse({
+        decision: 'include',
+        reason: null,
+        includeBasis: 'transferable',
+      }).success,
+    ).toBe(false)
+    expect(skillDecisionSchema.safeParse({ action: 'include', reason: '  ' }).success).toBe(false)
+    expect(
+      skillDecisionSchema.safeParse({ action: 'include', reason: 'Used in a prototype' }).success,
+    ).toBe(true)
+    expect(skillDecisionSchema.safeParse({ action: 'skip' }).success).toBe(true)
   })
 })
 
 describe('safe decision reuse fingerprint', () => {
   test('ignores model prose, confidence, run IDs and unrelated career edits', () => {
-    const original = skillDecisionBasis(10, 'react', snapshot(), [assessment()])
+    const original = skillDecisionBasis(10, 'react', snapshot())
     expect(original).toBeTruthy()
-    const changed = assessment()
-    changed.explanation = 'Different model wording'
-    changed.confidence = 0.7
     const input = snapshot()
     input.careerData!.achievements.push({
       id: 'unrelated',
       claim: 'Other work',
     } as never)
-    expect(skillDecisionBasis(10, 'react', input, [changed])).toBe(original)
+    expect(skillDecisionBasis(10, 'react', input)).toBe(original)
   })
-  test('invalidates reuse for changed requirements, evidence, or assessment kind', () => {
-    const original = skillDecisionBasis(10, 'react', snapshot(), [assessment()])
+  test('invalidates reuse for changed requirements or personal evidence', () => {
+    const original = skillDecisionBasis(10, 'react', snapshot())
     const input = snapshot()
     input.jobAnalysis!.requirements[0]!.statement = 'Lead React architecture across teams'
-    expect(skillDecisionBasis(10, 'react', input, [assessment()])).not.toBe(original)
+    expect(skillDecisionBasis(10, 'react', input)).not.toBe(original)
     const edited = snapshot()
     edited.careerData!.achievements[0]!.claim = 'Built a small React prototype'
-    expect(skillDecisionBasis(10, 'react', edited, [assessment()])).not.toBe(original)
-    expect(skillDecisionBasis(10, 'react', snapshot(), [assessment('transferable')])).not.toBe(
-      original,
-    )
-    expect(skillDecisionBasis(10, 'react', null, [assessment()])).toBeNull()
+    expect(skillDecisionBasis(10, 'react', edited)).not.toBe(original)
+    expect(skillDecisionBasis(10, 'react', null)).toBeNull()
   })
 })
 

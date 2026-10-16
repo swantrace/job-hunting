@@ -46,7 +46,7 @@ function submit(action: string, extra: Record<string, string> = {}) {
 }
 
 describe('skill decision HTMX response boundaries', () => {
-  test('only an authoritative transferable assessment makes Include reason optional', async () => {
+  test('a legacy transferable assessment cannot bypass the required Include reason', async () => {
     mockListRunSkillReviews.mockReturnValue([{ ...requirement, evidenceKind: 'transferable' }])
     mockGetCandidateAnalysisState.mockReturnValue({
       state: 'current',
@@ -56,7 +56,11 @@ describe('skill decision HTMX response boundaries', () => {
       staleCompleted: null,
       reasons: [],
     })
-    expect((await submit('include', { reason: '' })).status).toBe(200)
+    const response = await submit('include', { reason: '' })
+    expect(response.status).toBe(422)
+    const html = await response.text()
+    expect(html).not.toContain('Reason (optional)')
+    expect(html).not.toContain('Additional context is optional')
     mockListRunSkillReviews.mockReturnValue([{ ...requirement, evidenceKind: 'unknown-evidence' }])
     expect((await submit('include', { reason: '', includeBasis: 'transferable' })).status).toBe(422)
   })
