@@ -222,7 +222,7 @@ describe('application save response envelope', () => {
 
 describe('global HTMX validation response policy', () => {
   test('explicitly opts 422 responses into swapping without treating every 4xx as swappable', () => {
-    const renderer = readFileSync(resolve(process.cwd(), 'app/routes/_renderer.tsx'), 'utf8')
+    const renderer = readFileSync(resolve(process.cwd(), 'app/client.ts'), 'utf8')
 
     expect(renderer).toMatch(/responseHandling|htmx:beforeSwap/)
     expect(renderer).toMatch(/422/)
