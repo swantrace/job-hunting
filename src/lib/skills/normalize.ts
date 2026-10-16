@@ -11,6 +11,11 @@ export function normalizeSkillAlias(value: string) {
   return value.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
+/** Keep technical punctuation and non-Latin names, but reject punctuation-only fragments. */
+export function isMeaningfulSkillTerm(value: string) {
+  return /[\p{L}\p{N}]/u.test(value.normalize('NFKC'))
+}
+
 /**
  * Splits a conjunctive composite term ("JavaScript and TypeScript",
  * "HTML/CSS", "Go, Rust") into its parts. Only the conjunctive separators that

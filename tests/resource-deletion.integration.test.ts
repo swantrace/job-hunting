@@ -212,6 +212,128 @@ test('resource deletion protects references and preserves HTMX list/filter bound
       })
       .run()
     expect((await remove('skills', mergedTarget.id)).status).toBe(409)
+    const { candidateSnapshotIdentity } = await import('../src/lib/candidate/identity')
+    const { candidateStalenessReasons } = await import('../src/lib/candidate/analysis')
+    const jobOnly = skill('job-only')
+    const posting = db
+      .insert(schema.jobPostings)
+      .values({
+        jobApplicationId: application.id,
+        rawText: 'Original JD with parser noise',
+        contentHash: 'job-only-source',
+        capturedAt: date,
+      })
+      .returning()
+      .get()
+    const jobRun = db
+      .insert(schema.jobPostingAnalyses)
+      .values({ jobPostingId: posting.id, createdAt: date, updatedAt: date })
+      .returning()
+      .get()
+    const requirement = db
+      .insert(schema.jobRequirements)
+      .values({
+        jobPostingAnalysisId: jobRun.id,
+        sequence: 1,
+        requirementType: 'skill',
+        importance: 'required',
+        basis: 'explicit',
+        statement: 'Original source requirement',
+        sourceText: posting.rawText,
+        createdAt: date,
+        updatedAt: date,
+      })
+      .returning()
+      .get()
+    const mention = db
+      .insert(schema.jobRequirementSkillMentions)
+      .values({
+        jobRequirementId: requirement.id,
+        rawTerm: jobOnly.name,
+        normalizedTerm: jobOnly.name.toLowerCase(),
+        mappingState: 'mapped',
+        resolvedSkillId: jobOnly.id,
+        createdAt: date,
+        updatedAt: date,
+      })
+      .returning()
+      .get()
+    const snapshot = {
+      version: 2,
+      application: { id: application.id },
+      jobPosting: { rawText: posting.rawText },
+      jobAnalysis: { runId: jobRun.id },
+      careerData: { skills: [] },
+      skillRequirements: [{ requirementId: requirement.id, skillId: jobOnly.id }],
+    }
+    const originalIdentity = candidateSnapshotIdentity(snapshot)
+    const candidate = db
+      .insert(schema.applicationAnalysisRuns)
+      .values({
+        jobPostingAnalysisId: jobRun.id,
+        queueJobId: crypto.randomUUID(),
+        inputSnapshotJson: JSON.stringify(snapshot),
+        createdAt: date,
+        updatedAt: date,
+      })
+      .returning()
+      .get()
+    db.insert(schema.analysisRunDecisions)
+      .values({
+        applicationAnalysisRunId: candidate.id,
+        skillId: jobOnly.id,
+        decision: 'skip',
+        createdAt: date,
+        updatedAt: date,
+      })
+      .run()
+    response = await remove('skills', jobOnly.id)
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain('Original job terms were kept as skipped')
+    expect(
+      db
+        .select()
+        .from(schema.jobRequirementSkillMentions)
+        .where(eq(schema.jobRequirementSkillMentions.id, mention.id))
+        .get(),
+    ).toMatchObject({ rawTerm: jobOnly.name, mappingState: 'skipped', resolvedSkillId: null })
+    expect(
+      db
+        .select()
+        .from(schema.analysisRunDecisions)
+        .where(eq(schema.analysisRunDecisions.skillId, jobOnly.id))
+        .all(),
+    ).toEqual([])
+    expect(
+      db
+        .select()
+        .from(schema.applicationAnalysisRuns)
+        .where(eq(schema.applicationAnalysisRuns.id, candidate.id))
+        .get()?.inputSnapshotJson,
+    ).toBe(JSON.stringify(snapshot))
+    const currentSnapshot = { ...snapshot, skillRequirements: [] }
+    expect(candidateSnapshotIdentity(currentSnapshot)).not.toBe(originalIdentity)
+    expect(candidateStalenessReasons(currentSnapshot, snapshot)).toContain('job-analysis-changed')
+
+    const source = db
+      .select()
+      .from(schema.skills)
+      .all()
+      .find((row) => row.mergedIntoSkillId === mergedTarget.id)!
+    const beforeMergeProjection = {
+      ...snapshot,
+      skillRequirements: [
+        { requirementId: requirement.id, skillId: source.id },
+        { requirementId: requirement.id, skillId: mergedTarget.id },
+      ],
+    }
+    const afterMergeProjection = {
+      ...snapshot,
+      skillRequirements: [{ requirementId: requirement.id, skillId: mergedTarget.id }],
+    }
+    expect(candidateSnapshotIdentity(beforeMergeProjection)).toBe(
+      candidateSnapshotIdentity(afterMergeProjection),
+    )
     for (const kind of ['contacts', 'companies', 'skills']) {
       for (const invalid of ['invalid', '0', '-1', '1.5', '999999999'])
         expect((await remove(kind, invalid)).status).toBe(404)

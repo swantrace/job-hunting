@@ -1,6 +1,11 @@
 import type { SourceOccurrence } from '../career/json-schemas'
 import type { CatalogContextEntry } from './catalog-context'
-import { canonicalSkillKey, normalizeSkillAlias, splitCompositeSkillTerm } from './normalize'
+import {
+  canonicalSkillKey,
+  isMeaningfulSkillTerm,
+  normalizeSkillAlias,
+  splitCompositeSkillTerm,
+} from './normalize'
 
 /**
  * Deterministic, server-verified resolution of JD requirement terms against a
@@ -116,7 +121,7 @@ function mentionsForTerm(
   catalogKeys: ReadonlySet<string>,
 ): ResolvedMention[] {
   const rawTerm = term.term.trim()
-  if (rawTerm === '') return []
+  if (!isMeaningfulSkillTerm(rawTerm)) return []
   const occurrence = occurrenceFor(term)
   const proposedKey = term.key?.trim() ? term.key.trim() : null
   const direct = resolveTerm(rawTerm, ownersByTerm, catalogKeys, proposedKey)
@@ -130,7 +135,7 @@ function mentionsForTerm(
 
   const parts = splitCompositeSkillTerm(rawTerm)
   if (parts.length > 1) {
-    const resolvedParts = parts.map((part) => ({
+    const resolvedParts = parts.filter(isMeaningfulSkillTerm).map((part) => ({
       part,
       skillKey: resolveTerm(part, ownersByTerm, catalogKeys, null),
     }))

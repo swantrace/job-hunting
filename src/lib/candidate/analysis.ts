@@ -23,7 +23,7 @@ import { parseJobAnalysisResult } from '../job-analysis/result'
 import { skillReviewPolicyVersion } from '../skills/review-evidence'
 import { careerSkillMatchResult } from '../skills/runtime-career-skills'
 import { assertEveryRequirementAssessed, validateCandidateFitEvidence } from './fit-analysis'
-import { candidateSnapshotIdentity } from './identity'
+import { candidateSnapshotIdentity, skillMappingIdentity } from './identity'
 
 export const candidateAnalysisInputVersion = 2
 
@@ -203,7 +203,10 @@ export type CandidateAnalysisState = {
 function snapshotSubHashes(snapshot: unknown) {
   const record = (snapshot ?? {}) as Record<string, unknown>
   return {
-    jobAnalysis: canonicalHash(record.jobAnalysis ?? null),
+    jobAnalysis: canonicalHash({
+      analysis: record.jobAnalysis ?? null,
+      skillMappings: skillMappingIdentity(record.skillRequirements),
+    }),
     careerData: canonicalHash(record.careerData ?? null),
     version: record.version,
   }

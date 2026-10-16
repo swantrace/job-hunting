@@ -14,6 +14,27 @@ function currentSkillKey(key: string) {
   }
   return skill?.key ?? key
 }
+
+/** Identity-only projection: edits/aliases/synonym merges are not evidence changes. */
+export function skillMappingIdentity(value: unknown) {
+  if (!Array.isArray(value)) return null
+  const identities = new Set<string>()
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue
+    const { requirementId, skillId } = entry as Record<string, unknown>
+    if (typeof requirementId !== 'number' || typeof skillId !== 'number') continue
+    let id = skillId
+    const seen = new Set<number>()
+    while (!seen.has(id)) {
+      seen.add(id)
+      const skill = db.select().from(skills).where(eq(skills.id, id)).get()
+      if (skill?.mergedIntoSkillId == null) break
+      id = skill.mergedIntoSkillId
+    }
+    identities.add(`${requirementId}:${id}`)
+  }
+  return [...identities].sort()
+}
 function facts(value: unknown, personalSkill = false): unknown {
   if (Array.isArray(value)) return value.map((v) => facts(v, personalSkill))
   if (!value || typeof value !== 'object') return value
@@ -48,6 +69,7 @@ export function candidateSnapshotIdentity(snapshot: unknown): string | null {
     application: data.application,
     jobPosting: data.jobPosting,
     jobAnalysis: data.jobAnalysis,
+    skillMappings: skillMappingIdentity(data.skillRequirements),
     careerData: facts(data.careerData),
     sourceVersions: data.sourceVersions,
   })

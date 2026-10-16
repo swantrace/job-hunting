@@ -61,6 +61,7 @@ import {
   skillAliases,
   skills,
 } from './schema'
+import { deleteCatalogSkill } from './skill-deletion'
 import { type DbExecutor, getOrCreateSkill, insertSkill } from './skill-queries'
 
 export type Filters = z.infer<typeof filterSchema>
@@ -824,7 +825,7 @@ export function updateSkillDetails(
 
 export function deleteManagedItem(kind: 'skills' | 'companies' | 'contacts', id: number) {
   try {
-    if (kind === 'skills') db.delete(skills).where(eq(skills.id, id)).run()
+    if (kind === 'skills') deleteCatalogSkill(id)
     if (kind === 'companies') db.delete(companies).where(eq(companies.id, id)).run()
     if (kind === 'contacts') db.delete(contacts).where(eq(contacts.id, id)).run()
     return true

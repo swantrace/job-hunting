@@ -2,7 +2,11 @@ import { asc, eq } from 'drizzle-orm'
 import { type JobAnalysisRequirement, type RequirementTerm } from '../ai/schemas/job-analysis'
 import { canonicalHash } from '../lib/canonical-hash'
 import type { CatalogContextEntry } from '../lib/skills/catalog-context'
-import { canonicalSkillKey, normalizeSkillAlias } from '../lib/skills/normalize'
+import {
+  canonicalSkillKey,
+  isMeaningfulSkillTerm,
+  normalizeSkillAlias,
+} from '../lib/skills/normalize'
 import { type ResolvedMention, resolveRequirementTerms } from '../lib/skills/resolver'
 import type { CareerDb } from './career-shared'
 import { db } from './client'
@@ -39,6 +43,7 @@ export function persistRequirementMentions(
   date: string,
 ) {
   for (const mention of mentions) {
+    if (!isMeaningfulSkillTerm(mention.rawTerm)) continue
     const stored = upsertPendingMention(tx, {
       jobRequirementId,
       rawTerm: mention.rawTerm,
@@ -46,6 +51,7 @@ export function persistRequirementMentions(
       occurrences: mention.occurrences,
       date,
     })
+    if (stored.mappingState === 'skipped') continue
     const normalized = normalizeSkillAlias(mention.rawTerm)
     const exactName = tx
       .select()

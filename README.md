@@ -216,9 +216,15 @@ The catalog and reusable network records have their own bookmarkable pages:
 
 Each page provides **Delete** beside **Edit**, with a confirmation before removal.
 Deleting a contact also removes its application links, but keeps the applications.
-Companies linked to applications or contacts cannot be deleted. Skills referenced
-by career facts, analyses, decisions, or merge redirects cannot be deleted; merge
-duplicates instead. Deleting an unused skill removes its aliases too. The current
+Companies linked to applications or contacts cannot be deleted. A skill used only
+in job analysis can be deleted: its original terms and sources remain as skipped
+mentions, while related Include/Skip decisions and aliases are removed. Career
+facts and incoming merge redirects still prevent deletion; merge duplicates or
+remove personal references first. Cleanup is transactional, so a blocked deletion
+does not change mappings or decisions. Historical AI snapshots and documents are
+not rewritten; changed skill mappings make downstream analysis stale. Pure
+punctuation terms are ignored during parsing and never become new catalog skills.
+The current
 search and filters are preserved after deletion, including blocked requests.
 
 ### Backup and restore

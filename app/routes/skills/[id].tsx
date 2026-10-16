@@ -55,8 +55,8 @@ export const DELETE = createRoute((c) => {
       <SkillsTable skills={results(currentFilters)} filters={currentFilters} />
       <FlashMessage tone={deleted ? 'success' : 'warning'} autoDismiss={deleted}>
         {deleted
-          ? 'Skill and its aliases deleted.'
-          : 'This skill is referenced by career data, job analyses, decisions, or merged skills. Use merge for duplicates, or remove its references first.'}
+          ? 'Skill deleted. Original job terms were kept as skipped; related review decisions and aliases were removed.'
+          : 'This skill is referenced by personal career data or incoming merge redirects. Use merge for duplicates, or remove its personal references first.'}
       </FlashMessage>
     </>,
     deleted ? 200 : 409,
