@@ -214,6 +214,13 @@ The catalog and reusable network records have their own bookmarkable pages:
 - `/contacts` — manage contacts independently while they stay available in
   application workspaces.
 
+Each page provides **Delete** beside **Edit**, with a confirmation before removal.
+Deleting a contact also removes its application links, but keeps the applications.
+Companies linked to applications or contacts cannot be deleted. Skills referenced
+by career facts, analyses, decisions, or merge redirects cannot be deleted; merge
+duplicates instead. Deleting an unused skill removes its aliases too. The current
+search and filters are preserved after deletion, including blocked requests.
+
 ### Backup and restore
 
 `/export` downloads a **portable core-data export** (schema version 5):
