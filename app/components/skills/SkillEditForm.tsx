@@ -1,8 +1,9 @@
 import type { SkillOverview } from '../../../src/db/resource-queries'
+import { listSkillAliases } from '../../../src/db/skill-service'
 import { skillReviewStatuses } from '../../../src/lib/skills/constants'
 import { skillCategoryDefinitions } from '../../../src/lib/skills/taxonomy'
 import type { FieldErrors } from '../../../src/lib/validation'
-import { InputField, SelectField } from '../ui/FormField'
+import { InputField, SelectField, TextareaField } from '../ui/FormField'
 import { SkillMergeForm } from './SkillMergeForm'
 import type { SkillFilters } from './SkillsPage'
 
@@ -12,12 +13,14 @@ export function SkillEditForm({
   errors,
   mergeTargets,
   mergeError,
+  aliases,
 }: {
   skill: SkillOverview
   filters: SkillFilters
   errors?: FieldErrors
   mergeTargets: SkillOverview[]
   mergeError?: string
+  aliases?: string
 }) {
   const query = new URLSearchParams(filters).toString()
   return (
@@ -70,6 +73,14 @@ export function SkillEditForm({
               </option>
             ))}
         </SelectField>
+        <TextareaField
+          name="aliases"
+          label="Aliases"
+          help="One alias per line. Remove all lines to clear aliases. Names and keys belonging to another skill cannot be used."
+          value={aliases ?? listSkillAliases(skill.id).join('\n')}
+          rows={5}
+          error={errors?.aliases?.[0]}
+        />
         <div class="flex justify-end gap-2 pt-2">
           <label for="skill-workspace-toggle" class="btn btn-ghost">
             Cancel

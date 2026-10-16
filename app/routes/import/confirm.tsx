@@ -13,7 +13,12 @@ export const POST = createRoute(async (c) => {
       return c.html(<div class="alert alert-error">Invalid import payload.</div>, 422)
     mergeImport(parsed.data)
     return c.html(<div class="alert alert-success">Import completed successfully.</div>)
-  } catch {
-    return c.html(<div class="alert alert-error">Import failed and was rolled back.</div>, 422)
+  } catch (error) {
+    return c.html(
+      <div role="alert" class="alert alert-error">
+        Import failed and was rolled back. {error instanceof Error ? error.message : ''}
+      </div>,
+      422,
+    )
   }
 })

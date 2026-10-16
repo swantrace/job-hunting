@@ -21,13 +21,19 @@ export function skillMappingIdentity(value: unknown) {
   const identities = new Set<string>()
   for (const entry of value) {
     if (!entry || typeof entry !== 'object') continue
-    const { requirementId, skillId } = entry as Record<string, unknown>
+    const { requirementId, skillId, skillName } = entry as Record<string, unknown>
     if (typeof requirementId !== 'number' || typeof skillId !== 'number') continue
     let id = skillId
     const seen = new Set<number>()
     while (!seen.has(id)) {
       seen.add(id)
       const skill = db.select().from(skills).where(eq(skills.id, id)).get()
+      // Hard merges retain the source name/key as target aliases, not rows.
+      // Resolve old frozen display identities without rewriting the snapshot.
+      if (!skill && typeof skillName === 'string') {
+        id = resolveSkill(db, skillName)?.id ?? id
+        break
+      }
       if (skill?.mergedIntoSkillId == null) break
       id = skill.mergedIntoSkillId
     }

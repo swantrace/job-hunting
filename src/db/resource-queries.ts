@@ -54,11 +54,13 @@ export function listSkillsOverview(): SkillOverview[] {
     set.add(relation.applicationId)
     applicationIdsBySkill.set(relation.skillId, set)
   }
-  return skillRows.map((skill) => ({
-    ...skill,
-    aliasCount: aliasCount.get(skill.id) ?? 0,
-    applicationCount: applicationIdsBySkill.get(skill.id)?.size ?? 0,
-  }))
+  return skillRows
+    .filter((skill) => skill.reviewStatus !== 'merged')
+    .map((skill) => ({
+      ...skill,
+      aliasCount: aliasCount.get(skill.id) ?? 0,
+      applicationCount: applicationIdsBySkill.get(skill.id)?.size ?? 0,
+    }))
 }
 
 export function listCompaniesOverview(): CompanyOverview[] {

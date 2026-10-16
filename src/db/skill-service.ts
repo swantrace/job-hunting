@@ -15,7 +15,14 @@ import {
   skillAliases,
   skills,
 } from './schema'
-import { type DbExecutor, resolveSkillByAlias, resolveSkillByKey } from './skill-queries'
+import {
+  assertSkillLabelAvailable,
+  type DbExecutor,
+  resolveSkillByAlias,
+  resolveSkillByKey,
+} from './skill-queries'
+
+export { assertSkillLabelAvailable } from './skill-queries'
 
 export type SkillDb = Pick<typeof db, 'select' | 'insert' | 'delete' | 'update' | 'transaction'>
 
@@ -33,13 +40,21 @@ function resolverFor(tx: DbExecutor): SkillResolver {
 }
 
 export function resolveSkillByName(tx: DbExecutor, input: string): Skill | undefined {
-  return resolveSkillInput(resolverFor(tx), input)
+  return (
+    resolveSkillInput(resolverFor(tx), input) ??
+    tx
+      .select()
+      .from(skills)
+      .all()
+      .find((row) => normalizeSkillAlias(row.name) === normalizeSkillAlias(input))
+  )
 }
 
-function requireActiveSkill(tx: DbExecutor, id: number): Skill {
+function requireActiveSkill(tx: DbExecutor, id: number, allowLegacyMerged = false): Skill {
   const skill = tx.select().from(skills).where(eq(skills.id, id)).get()
   if (!skill) throw new Error('Skill not found.')
-  if (skill.reviewStatus === 'merged') throw new Error('A merged skill cannot be changed.')
+  if (skill.reviewStatus === 'merged' && !allowLegacyMerged)
+    throw new Error('A merged skill cannot be changed.')
   return skill
 }
 
@@ -66,9 +81,28 @@ export function recategorizeSkill(id: number, category: SkillCategory, executor:
 export function renameSkill(id: number, name: string, executor: SkillDb = db) {
   const date = nowISO()
   executor.transaction((tx) => {
-    const skill = requireActiveSkill(tx, id)
+    requireActiveSkill(tx, id)
+    assertSkillLabelAvailable(tx, name, [id])
     tx.update(skills).set({ name, updatedAt: date }).where(eq(skills.id, id)).run()
   })
+}
+
+export function replaceSkillAliases(skillId: number, aliases: string[], executor: SkillDb = db) {
+  executor.transaction((tx) => {
+    requireActiveSkill(tx, skillId)
+    for (const alias of aliases) assertSkillLabelAvailable(tx, alias, [skillId])
+    tx.delete(skillAliases).where(eq(skillAliases.skillId, skillId)).run()
+    for (const alias of aliases) addSkillAlias(skillId, alias.trim(), 'manual', tx)
+  })
+}
+
+export function listSkillAliases(skillId: number, executor: DbExecutor = db) {
+  return executor
+    .select()
+    .from(skillAliases)
+    .where(eq(skillAliases.skillId, skillId))
+    .all()
+    .map((row) => row.alias)
 }
 
 export function addSkillAlias(
@@ -77,6 +111,7 @@ export function addSkillAlias(
   origin = 'manual' as const,
   executor: SkillDb = db,
 ) {
+  assertSkillLabelAvailable(executor, alias, [skillId])
   const normalized = normalizeSkillAlias(alias)
   const existing = executor
     .select()
@@ -156,7 +191,7 @@ export function mergeSkills(
 
   const date = nowISO()
   return executor.transaction((tx) => {
-    const source = requireActiveSkill(tx, sourceId)
+    const source = requireActiveSkill(tx, sourceId, true)
     const target = requireActiveSkill(tx, targetId)
     for (const label of [source.name, source.key]) {
       const normalized = normalizeSkillAlias(label)
@@ -171,7 +206,18 @@ export function mergeSkills(
         (keyOwner && keyOwner.id !== sourceId && keyOwner.id !== targetId)
       )
         throw new Error(`Alias "${label}" is owned by another skill.`)
-      if (!owner) addSkillAlias(targetId, label, 'manual', tx)
+      // The source still exists until all references have moved.
+      assertSkillLabelAvailable(tx, label, [sourceId, targetId])
+      if (!owner)
+        tx.insert(skillAliases)
+          .values({
+            skillId: targetId,
+            alias: label,
+            normalizedAlias: normalized,
+            origin: 'manual',
+            createdAt: date,
+          })
+          .run()
     }
 
     // Transfer concrete career FKs as well as requirement mappings.
@@ -299,29 +345,11 @@ export function mergeSkills(
         )
         .get()
       if (targetDecision) {
-        const conflict =
-          isDecided(decision.decision) &&
-          isDecided(targetDecision.decision) &&
-          decision.decision !== targetDecision.decision
         const selected = targetDecision.decision === 'pending' ? decision : targetDecision
-        // Keep the originating catalog/decision identities with every reason,
-        // even when the user supplied identical prose for both skills.
-        const reasons = [
-          { row: targetDecision, skill: target },
-          { row: decision, skill: source },
-        ]
-          .filter(({ row }) => !!row.reason)
-          .map(
-            ({ row, skill }) =>
-              `${skill.name} [${skill.key}; skill ${skill.id}; decision ${row.id}; ${row.decision}]:\n${row.reason}`,
-          )
-        const reason = conflict
-          ? `Merge conflict: ${source.name} was ${decision.decision}; ${target.name} was ${targetDecision.decision}.\n${reasons.join('\n\n')}`
-          : reasons.join('\n\n') || null
         tx.update(analysisRunDecisions)
           .set({
-            decision: conflict ? 'pending' : selected.decision,
-            reason,
+            decision: selected.decision,
+            reason: selected.reason,
             includeBasis: selected.includeBasis,
             basisHash: null,
             updatedAt: date,
@@ -346,10 +374,37 @@ export function mergeSkills(
         .run()
     }
 
+    // Legacy redirect rows may still point at the source. Keep them valid;
+    // new merges never create redirect rows.
     tx.update(skills)
-      .set({ reviewStatus: 'merged', mergedIntoSkillId: targetId, updatedAt: date })
-      .where(eq(skills.id, sourceId))
+      .set({ mergedIntoSkillId: targetId })
+      .where(eq(skills.mergedIntoSkillId, sourceId))
       .run()
+    tx.delete(skills).where(eq(skills.id, sourceId)).run()
     return { sourceId: source.id, targetId: target.id }
+  })
+}
+
+/** Explicit one-time cleanup for redirects created by older versions. */
+export function consolidateLegacyMergedSkills(executor: SkillDb = db) {
+  return executor.transaction((tx) => {
+    const legacy = tx
+      .select()
+      .from(skills)
+      .all()
+      .filter((row) => row.reviewStatus === 'merged')
+    for (const source of legacy) {
+      const current = requireActiveSkill(tx, source.id, true)
+      let target = requireActiveSkill(tx, current.mergedIntoSkillId!, true)
+      const seen = new Set([source.id])
+      while (target.reviewStatus === 'merged') {
+        if (seen.has(target.id))
+          throw new Error('Circular legacy skill merge. No changes were saved.')
+        seen.add(target.id)
+        target = requireActiveSkill(tx, target.mergedIntoSkillId!, true)
+      }
+      mergeSkills(source.id, target.id, tx, 'target')
+    }
+    return legacy.length
   })
 }

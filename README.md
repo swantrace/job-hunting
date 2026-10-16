@@ -227,15 +227,90 @@ punctuation terms are ignored during parsing and never become new catalog skills
 The current
 search and filters are preserved after deletion, including blocked requests.
 
+Skill names can be edited without changing their stable keys. The editor's
+Aliases field accepts one alias per line; removing every line clears the alias
+set. Aliases are normalized and deduplicated, and cannot claim another skill's
+name, key, or alias. Catalog edits do not add personal career skills.
+
+Merging moves live personal/evidence links, job mentions, aliases, and run-scoped
+decisions to the target, then physically deletes the source in one transaction.
+For each analysis run, the target's Include/Skip and exact reason win; a missing
+or Pending target decision inherits the source decision. Personal proficiency
+conflicts still require a separate explicit choice, and evidence is preserved.
+Historical snapshots and generated documents are never rewritten. Old names and
+keys remain aliases; ordinary same-skill catalog merges do not trigger paid AI
+analysis. Actual evidence changes can still make an analysis stale.
+
+Older database versions may contain soft-merged redirect rows. These remain
+supported internally but are hidden from the catalog. After taking a consistent
+SQLite backup, explicitly consolidate them with:
+
+```sh
+bun run skills:consolidate-merges
+```
+
+The command handles redirect chains transactionally, uses target personal
+settings while preserving evidence, and can safely be repeated. It is not run
+automatically at startup. Legacy database columns remain for compatibility; new
+merges never create soft-merged records.
+
 ### Backup and restore
 
-`/export` downloads a **portable core-data export** (schema version 5):
+`/export` downloads a **portable core-data export** (schema version 6):
 companies, contacts, applications, the reviewed skill catalog and aliases,
 activities, application-contact links, and Job Post raw-text versions. It
 deliberately omits derived AI history, generated artifacts, baseline history, and
 OAuth connections. `/import` previews and merges that JSON. The career dataset
 and ChatGPT context cover career facts, directions, catalogs, and approved Base
 Resumes.
+
+Version 6 embeds each skill's aliases as a string array. Older separate
+`skillAliases` collections are still accepted. Legacy soft-merged rows in versions
+1–5 are resolved to their targets and aliases, not recreated as redirect rows.
+Version 6 export also folds existing legacy redirects into target aliases using
+a read-only projection, so no merged records are exported or written back.
+
+For catalog-only maintenance, import a partial payload rather than an old full
+application backup, which can also update application/contact/company data:
+
+```json
+{
+  "schemaVersion": 6,
+  "skills": [
+    {
+      "key": "react",
+      "name": "React",
+      "category": "frontend",
+      "reviewStatus": "approved",
+      "aliases": ["React.js", "ReactJS"]
+    }
+  ],
+  "mergeSkills": [{ "sourceKey": "react-js", "targetKey": "react" }],
+  "deleteSkills": ["obsolete-skill"]
+}
+```
+
+- Skills match by stable `key`, never display name or export-local numeric ID.
+  Missing records are not deleted. Remove a source/deleted record from `skills`
+  before listing it in `mergeSkills` or `deleteSkills`; contradictory operations
+  are rejected.
+- Omit `aliases` to keep the set, supply an array to replace it, or use `[]` to
+  clear it. Legacy root aliases are additive and ignored for a record that also
+  supplies its own embedded array.
+- Existing `career-data` catalog rows retain their protected name, category,
+  review status, and origin on application import. The preview explains this;
+  aliases remain editable. Use the editor or career-data workflow for facts.
+- `mergeSkills` uses the same merge service as the UI. It optionally accepts
+  `personalResolution: "source"` or `"target"` for conflicting personal settings.
+  Deletion uses the same personal-reference protections as the UI.
+- Preview runs the real skill operations in a transaction that is always rolled
+  back and lists changes, alias additions/removals, merges, deletes, and conflicts.
+  Confirm revalidates current database state; any failure rolls back the entire
+  import. No models are called by catalog maintenance.
+
+Career-data caching fingerprints complete career/catalog rows and junctions,
+not just counts or maximum timestamps. Same-size alias/link edits invalidate the
+cached assembler, and caches are isolated by database executor.
 
 None of these is a full backup. **Full operational recovery requires a
 consistent SQLite backup AND an artifact backup.**

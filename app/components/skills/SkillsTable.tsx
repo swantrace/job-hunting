@@ -43,11 +43,13 @@ export function SkillsTable({
             </select>
             <select name="status" class="select w-full">
               <option value="">All statuses</option>
-              {skillReviewStatuses.map((status) => (
-                <option value={status} selected={filters.status === status}>
-                  {status}
-                </option>
-              ))}
+              {skillReviewStatuses
+                .filter((status) => status !== 'merged')
+                .map((status) => (
+                  <option value={status} selected={filters.status === status}>
+                    {status}
+                  </option>
+                ))}
             </select>
           </div>
         </div>

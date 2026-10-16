@@ -8,6 +8,7 @@
     "start": "bun run db:migrate && cd dist && bun index.js",
     "db:migrate": "bun run src/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
+    "skills:consolidate-merges": "bun run src/cli/consolidate-skill-merges.ts",
     "format": "biome check --write .",
     "format:check": "biome check .",
     "typecheck": "tsc --noEmit",

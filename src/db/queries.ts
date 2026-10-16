@@ -12,7 +12,6 @@ import {
   applicationKey,
   companyKey,
   contactKey,
-  detectImportConflicts,
   type ImportPayload,
   key,
   nullableText,
@@ -26,14 +25,11 @@ import {
   requirementTypes,
 } from '../lib/job-requirements/constants'
 import {
-  type SkillOrigin,
   type SkillReviewStatus,
   skillDecisions,
   skillImportances,
   skillMatchResults,
 } from '../lib/skills/constants'
-import { canonicalSkillKey, normalizeSkillAlias } from '../lib/skills/normalize'
-import { hasSkillCategory, type SkillCategory } from '../lib/skills/taxonomy'
 import {
   type applicationSchema,
   type filterSchema,
@@ -58,11 +54,12 @@ import {
   jobPostings,
   jobRequirements,
   jobRequirementsToSkills,
-  skillAliases,
   skills,
 } from './schema'
 import { deleteCatalogSkill } from './skill-deletion'
-import { type DbExecutor, getOrCreateSkill, insertSkill } from './skill-queries'
+import { applySkillImport, exportSkillCatalog, skillImportState } from './skill-import'
+import { type DbExecutor, getOrCreateSkill } from './skill-queries'
+import { assertSkillLabelAvailable, renameSkill, replaceSkillAliases } from './skill-service'
 
 export type Filters = z.infer<typeof filterSchema>
 export type JobCardData = JobApplication & {
@@ -341,13 +338,12 @@ export function exportData() {
   const contactById = new Map(contactRows.map((contact) => [contact.id, contact]))
   const applicationRows = db.select().from(jobApplications).all()
   return {
-    // Portable core-data format (v5: nullable postedDate). Derived AI history, generated artifacts,
+    // Portable core-data format (v6: embedded aliases). Derived AI history, generated artifacts,
     // baseline history, and OAuth connections are deliberately omitted.
-    schemaVersion: 5,
+    schemaVersion: 6,
     exportedAt: new Date().toISOString(),
     companies: companyRows,
-    skills: db.select().from(skills).all(),
-    skillAliases: db.select().from(skillAliases).all(),
+    skills: exportSkillCatalog(db),
     contacts: contactRows.map((contact) => ({
       ...contact,
       companyName: companyById.get(contact.companyId),
@@ -377,15 +373,15 @@ export type ImportPreview = {
     { created: number; updated: number; unchanged: number; conflicts: number }
   >
   conflicts: string[]
+  skillChanges: { key: string; action: string; addedAliases: string[]; removedAliases: string[] }[]
+  notices: string[]
 }
 
 export function previewImport(payload: ImportPayload): ImportPreview {
   const localCompanies = db.select().from(companies).all()
-  const localSkills = db.select().from(skills).all()
   const localContacts = db.select().from(contacts).all()
   const localApplications = db.select().from(jobApplications).all()
   const companyMap = new Map(localCompanies.map((item) => [key(item.name), item]))
-  const skillMap = new Map(localSkills.map((item) => [key(item.name), item]))
   const companyNames = new Map(localCompanies.map((item) => [item.id, item.name]))
   const contactMap = new Map(
     localContacts.map((item) => [contactKey(item, companyNames.get(item.companyId) ?? ''), item]),
@@ -424,7 +420,56 @@ export function previewImport(payload: ImportPayload): ImportPreview {
     return { created, updated, unchanged, conflicts: conflicts.length }
   }
   const companiesSummary = count(payload.companies, companyMap, companyKey, 'Company')
-  const skillsSummary = count(payload.skills, skillMap, skillKey, 'Skill')
+  const skillsSummary = { created: 0, updated: 0, unchanged: 0, conflicts: 0 }
+  const skillChanges: ImportPreview['skillChanges'] = []
+  let notices: string[] = []
+  // Exercise the real write path under a transaction, then always roll it back.
+  // No IDs, aliases, decisions or career links survive a preview.
+  const rollbackPreview = new Error('Rollback skill preview')
+  try {
+    db.transaction((tx) => {
+      const before = skillImportState(tx)
+      notices = applySkillImport(payload, tx).notices
+      const after = skillImportState(tx)
+      for (const row of after) {
+        if (
+          !payload.skills.some((item) => skillKey(item) === row.key) &&
+          !payload.mergeSkills.some((item) => item.targetKey === row.key)
+        )
+          continue
+        const prior = before.find((item) => item.key === row.key)
+        const { updatedAt: _afterDate, ...next } = row
+        const { updatedAt: _beforeDate, ...previous } = prior ?? {}
+        const action = !prior
+          ? 'created'
+          : JSON.stringify(next) === JSON.stringify(previous)
+            ? 'unchanged'
+            : 'updated'
+        skillsSummary[action]++
+        if (action !== 'unchanged')
+          skillChanges.push({
+            key: row.key,
+            action,
+            addedAliases: row.aliases.filter((alias) => !prior?.aliases.includes(alias)),
+            removedAliases: prior?.aliases.filter((alias) => !row.aliases.includes(alias)) ?? [],
+          })
+      }
+      for (const row of before)
+        if (!after.some((item) => item.key === row.key))
+          skillChanges.push({
+            key: row.key,
+            action: payload.deleteSkills.includes(row.key) ? 'deleted' : 'merged',
+            addedAliases: [],
+            removedAliases: row.aliases,
+          })
+      throw rollbackPreview
+    })
+  } catch (error) {
+    if (error !== rollbackPreview) {
+      skillsSummary.conflicts++
+      conflicts.push(error instanceof Error ? error.message : 'Invalid skill operations.')
+    }
+  }
   const contactsSummary = count(
     payload.contacts,
     contactMap,
@@ -438,6 +483,8 @@ export function previewImport(payload: ImportPayload): ImportPreview {
     'Application',
   )
   return {
+    skillChanges,
+    notices,
     schemaVersion: payload.schemaVersion,
     summary: {
       companies: companiesSummary,
@@ -447,20 +494,13 @@ export function previewImport(payload: ImportPayload): ImportPreview {
       followUps: { created: payload.followUps.length, updated: 0, unchanged: 0, conflicts: 0 },
       interviews: { created: payload.interviews.length, updated: 0, unchanged: 0, conflicts: 0 },
     },
-    conflicts: [
-      ...conflicts,
-      ...detectImportConflicts(payload),
-      payload.schemaVersion < 4
-        ? 'Legacy AI history and application-skill rows are ignored; derived history is reset.'
-        : 'Derived AI history is not part of portable exports and is reset after import.',
-    ],
+    conflicts,
   }
 }
 
 export function mergeImport(payload: ImportPayload) {
   return db.transaction((tx) => {
     const companyIds = new Map<number, number>()
-    const skillIds = new Map<number, number>()
     const contactIds = new Map<number, number>()
     const applicationIds = new Map<number, number>()
     const companiesByKey = new Map(
@@ -496,75 +536,7 @@ export function mergeImport(payload: ImportPayload) {
         companyIds.set(Number(incoming.id), created.id)
       }
     }
-    const skillRows = tx.select().from(skills).all()
-    const skillsByKey = new Map(skillRows.map((item) => [item.key, item]))
-    const reviewValues = new Set<string>(['pending', 'approved', 'rejected', 'merged'])
-    const originValues = new Set<string>(['career-data', 'job-parser', 'manual', 'import'])
-    const category = (value: unknown) =>
-      typeof value === 'string' && hasSkillCategory(value) ? (value as SkillCategory) : null
-    const reviewStatus = (value: unknown) =>
-      typeof value === 'string' && reviewValues.has(value)
-        ? (value as SkillReviewStatus)
-        : 'pending'
-    const origin = (value: unknown) =>
-      typeof value === 'string' && originValues.has(value) ? (value as SkillOrigin) : 'import'
-
-    for (const incoming of payload.skills) {
-      const name = textValue(incoming.name)
-      if (!name) continue
-      const incomingKey = textValue(incoming.key) || canonicalSkillKey(name)
-      const existing = skillsByKey.get(incomingKey)
-      if (existing) {
-        tx.update(skills)
-          .set({
-            name: existing.origin === 'career-data' ? existing.name : name,
-            category:
-              existing.origin === 'career-data'
-                ? existing.category
-                : (category(incoming.category) ?? existing.category),
-            reviewStatus:
-              existing.origin === 'career-data'
-                ? existing.reviewStatus
-                : reviewStatus(incoming.reviewStatus),
-            origin: existing.origin === 'career-data' ? existing.origin : origin(incoming.origin),
-            updatedAt: todayISO(),
-          })
-          .where(eq(skills.id, existing.id))
-          .run()
-        skillIds.set(Number(incoming.id), existing.id)
-      } else {
-        const created = insertSkill(tx, {
-          name,
-          key: incomingKey,
-          category: category(incoming.category),
-          reviewStatus: reviewStatus(incoming.reviewStatus),
-          origin: origin(incoming.origin),
-        })
-        skillsByKey.set(created.key, created)
-        skillIds.set(Number(incoming.id), created.id)
-      }
-    }
-    for (const incoming of payload.skillAliases) {
-      const skillId = skillIds.get(Number(incoming.skillId))
-      const alias = textValue(incoming.alias)
-      if (!skillId || !alias) continue
-      const normalized = normalizeSkillAlias(alias)
-      const existing = tx
-        .select()
-        .from(skillAliases)
-        .where(eq(skillAliases.normalizedAlias, normalized))
-        .get()
-      if (!existing)
-        tx.insert(skillAliases)
-          .values({
-            skillId,
-            alias,
-            normalizedAlias: normalized,
-            origin: 'import',
-            createdAt: todayISO(),
-          })
-          .run()
-    }
+    applySkillImport(payload, tx)
     const companyNameById = new Map(
       tx
         .select()
@@ -772,14 +744,7 @@ export function updateManagedItem(
     | { companyId: number; name: string; email?: string | null; linkedinUrl?: string | null },
 ) {
   if (kind === 'skills') {
-    db.update(skills)
-      .set({
-        name: input.name,
-        key: normalizeSkillAlias(input.name),
-        updatedAt: todayISO(),
-      })
-      .where(eq(skills.id, id))
-      .run()
+    renameSkill(id, input.name)
     return
   }
   if (kind === 'companies') {
@@ -809,18 +774,28 @@ export function updateManagedItem(
 
 export function updateSkillDetails(
   id: number,
-  input: { name: string; category?: string | null; reviewStatus: SkillReviewStatus },
+  input: {
+    name: string
+    category?: string | null
+    reviewStatus: SkillReviewStatus
+    aliases?: string
+  },
 ) {
-  db.update(skills)
-    .set({
-      name: input.name,
-      key: normalizeSkillAlias(input.name),
-      category: input.category ?? null,
-      reviewStatus: input.reviewStatus,
-      updatedAt: todayISO(),
-    })
-    .where(eq(skills.id, id))
-    .run()
+  return db.transaction((tx) => {
+    assertSkillLabelAvailable(tx, input.name, [id])
+    if (input.reviewStatus === 'merged') throw new Error('Use Merge to combine duplicate skills.')
+    tx.update(skills)
+      .set({
+        name: input.name,
+        category: input.category ?? null,
+        reviewStatus: input.reviewStatus,
+        updatedAt: todayISO(),
+      })
+      .where(eq(skills.id, id))
+      .run()
+    if (input.aliases !== undefined)
+      replaceSkillAliases(id, input.aliases.trim() ? input.aliases.split(/\r?\n/) : [], tx)
+  })
 }
 
 export function deleteManagedItem(kind: 'skills' | 'companies' | 'contacts', id: number) {

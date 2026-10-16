@@ -102,8 +102,9 @@ export const contactSchema = z.object({
   ),
   linkedinUrl: z.preprocess(emptyToNull, z.string().trim().url().max(2048).nullable().optional()),
 })
-export const skillSchema = z.object({ name: z.string().trim().min(1).max(80) })
+export const skillSchema = z.object({ name: z.string().trim().min(1).max(120) })
 export const managedSkillSchema = skillSchema.extend({
+  aliases: z.string().max(20000).optional(),
   category: z.preprocess(
     emptyToNull,
     z.string().trim().min(1).refine(hasSkillCategory).nullable().optional(),

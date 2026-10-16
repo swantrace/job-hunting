@@ -634,10 +634,7 @@ function isDefined<T>(value: T | undefined): value is T {
   return value !== undefined
 }
 
-let careerDataCache: {
-  probe: string
-  data: CanonicalCareerData
-} | null = null
+const careerDataCache = new WeakMap<DbExecutor, { probe: string; data: CanonicalCareerData }>()
 
 /**
  * Database-owned canonical career data. The relational tables are the sole
@@ -649,11 +646,12 @@ let careerDataCache: {
  */
 export function loadCareerData(executor: DbExecutor = db): CanonicalCareerData {
   const probe = careerContentProbe(executor)
-  if (careerDataCache && careerDataCache.probe === probe) {
-    return careerDataCache.data
+  const cached = careerDataCache.get(executor)
+  if (cached?.probe === probe) {
+    return cached.data
   }
   const data = loadCareerDataFromDatabase(executor)
-  careerDataCache = { probe, data }
+  careerDataCache.set(executor, { probe, data })
   return data
 }
 

@@ -114,6 +114,69 @@ function seedDecision(
 }
 
 describe('transactional skill review and merge services', () => {
+  test('a Pending target inherits the source choice and reason, without rewriting snapshots', () => {
+    const { sqlite, db } = database()
+    try {
+      const source = seedSkill(sqlite, 'pending-source', 'Pending Source')
+      const target = seedSkill(sqlite, 'pending-target', 'Pending Target')
+      const run = seedDecision(sqlite, source.id, 'include')
+      const snapshot = JSON.stringify({ skillId: source.id, skillName: 'Pending Source' })
+      sqlite
+        .query('UPDATE application_analysis_runs SET input_snapshot_json=? WHERE id=?')
+        .run(snapshot, run)
+      sqlite
+        .query(
+          `INSERT INTO analysis_run_decisions(application_analysis_run_id,skill_id,decision,created_at,updated_at) VALUES(?,?,'pending','2026-10-16','2026-10-16')`,
+        )
+        .run(run, target.id)
+      mergeSkills(source.id, target.id, db)
+      expect(
+        sqlite
+          .query(
+            'SELECT skill_id,decision,reason FROM analysis_run_decisions WHERE application_analysis_run_id=?',
+          )
+          .all(run),
+      ).toEqual([
+        { skill_id: target.id, decision: 'include', reason: 'Synthetic supporting evidence' },
+      ])
+      expect(
+        sqlite
+          .query('SELECT input_snapshot_json FROM application_analysis_runs WHERE id=?')
+          .get(run),
+      ).toEqual({ input_snapshot_json: snapshot })
+      expect(sqlite.query('SELECT id FROM skills WHERE id=?').get(source.id)).toBeNull()
+    } finally {
+      sqlite.close()
+    }
+  })
+
+  test('a failure at source deletion rolls back aliases, mappings and decisions', () => {
+    const { sqlite, db } = database()
+    try {
+      const source = seedSkill(sqlite, 'rollback-source', 'Rollback Source')
+      const target = seedSkill(sqlite, 'rollback-target', 'Rollback Target')
+      addSkillAlias(source.id, 'Rollback alias', 'manual', db)
+      seedRequirementLink(sqlite, source.id)
+      seedDecision(sqlite, source.id, 'include')
+      sqlite.exec(
+        `CREATE TRIGGER prevent_skill_delete BEFORE DELETE ON skills BEGIN SELECT RAISE(ABORT, 'Synthetic deletion failure'); END`,
+      )
+      expect(() => mergeSkills(source.id, target.id, db)).toThrow('Synthetic deletion failure')
+      expect(sqlite.query('SELECT skill_id FROM skill_aliases').all()).toEqual([
+        { skill_id: source.id },
+      ])
+      expect(sqlite.query('SELECT skill_id FROM job_requirements_to_skills').all()).toEqual([
+        { skill_id: source.id },
+      ])
+      expect(sqlite.query('SELECT skill_id FROM analysis_run_decisions').all()).toEqual([
+        { skill_id: source.id },
+      ])
+      expect(sqlite.query('SELECT id FROM skills').all()).toHaveLength(2)
+    } finally {
+      sqlite.close()
+    }
+  })
+
   test('requires an explicit personal-level choice and preserves both evidence sets', () => {
     const { sqlite, db } = database()
     try {
@@ -153,7 +216,7 @@ describe('transactional skill review and merge services', () => {
     }
   })
 
-  test('merges two Include decisions without dropping either reason', () => {
+  test('keeps the target Include decision and its exact reason', () => {
     const { sqlite, db } = database()
     try {
       const source = seedSkill(sqlite, 'include-source', 'Include Source')
@@ -176,8 +239,7 @@ describe('transactional skill review and merge services', () => {
       expect(decisions).toHaveLength(1)
       expect(decisions[0].skill_id).toBe(target.id)
       expect(decisions[0].decision).toBe('include')
-      expect(decisions[0].reason).toContain('Source experience')
-      expect(decisions[0].reason).toContain('Target experience')
+      expect(decisions[0].reason).toBe('Target experience')
       expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
     } finally {
       sqlite.close()
@@ -194,11 +256,7 @@ describe('transactional skill review and merge services', () => {
 
       mergeSkills(source.id, target.id, db)
 
-      const merged = sqlite
-        .query('SELECT review_status, merged_into_skill_id FROM skills WHERE id = ?')
-        .get(source.id) as { review_status: string; merged_into_skill_id: number }
-      expect(merged.review_status).toBe('merged')
-      expect(merged.merged_into_skill_id).toBe(target.id)
+      expect(sqlite.query('SELECT id FROM skills WHERE id = ?').get(source.id)).toBeNull()
 
       const alias = sqlite
         .query('SELECT skill_id FROM skill_aliases WHERE normalized_alias = ?')
@@ -243,7 +301,7 @@ describe('transactional skill review and merge services', () => {
     }
   })
 
-  test('merges conflicting decisions into an explicit pending choice without AI analysis', () => {
+  test('resolves conflicting decisions using the target without AI analysis', () => {
     const { sqlite, db } = database()
     try {
       const source = seedSkill(sqlite, 'kafka', 'Kafka')
@@ -267,14 +325,10 @@ describe('transactional skill review and merge services', () => {
         )
         .all(runId) as { decision: string; reason: string | null }[]
       expect(decisions).toHaveLength(1)
-      expect(decisions[0].decision).toBe('pending')
-      expect(decisions[0].reason).toContain('Used in a prototype')
+      expect(decisions[0].decision).toBe('include')
+      expect(decisions[0].reason).toBe('Used in a prototype')
 
-      const sourceRow = sqlite
-        .query('SELECT review_status, merged_into_skill_id FROM skills WHERE id = ?')
-        .get(source.id) as { review_status: string; merged_into_skill_id: number | null }
-      expect(sourceRow.review_status).toBe('merged')
-      expect(sourceRow.merged_into_skill_id).toBe(target.id)
+      expect(sqlite.query('SELECT id FROM skills WHERE id = ?').get(source.id)).toBeNull()
     } finally {
       sqlite.close()
     }

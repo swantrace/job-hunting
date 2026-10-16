@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { eq } from 'drizzle-orm'
 import { listCareerDirections } from '../../src/db/career-directions'
 import { listCareerAchievements, updateCareerAchievement } from '../../src/db/career-records'
-import { skills } from '../../src/db/schema'
+import { careerRecordDirections, skills } from '../../src/db/schema'
 import { renameSkill } from '../../src/db/skill-service'
 import { loadCareerData } from '../../src/lib/career/canonical-data'
 import { createCareerTestDatabase } from '../support/career-db'
@@ -24,6 +24,33 @@ function firstFreeDirection(
 }
 
 describe('loadCareerData cache refresh', () => {
+  test('refreshes after a same-count junction replacement without touching parent timestamps', () => {
+    const database = createCareerTestDatabase()
+    const { executor } = database
+    try {
+      const achievement = listCareerAchievements(executor).find(
+        (row) => row.directions.length > 0 && firstFreeDirection(executor, row),
+      )!
+      const next = firstFreeDirection(executor, achievement)!
+      const before = loadCareerData(executor)
+      const links = executor.select().from(careerRecordDirections).all()
+      const link = links.find((row) => row.achievementId === achievement.id)!
+      executor
+        .update(careerRecordDirections)
+        .set({ directionKey: next })
+        .where(eq(careerRecordDirections.id, link.id))
+        .run()
+      expect(executor.select().from(careerRecordDirections).all()).toHaveLength(links.length)
+      const after = loadCareerData(executor)
+      expect(after).not.toBe(before)
+      expect(
+        after.achievements.achievements.find((row) => row.id === achievement.stableKey)?.directions,
+      ).toContain(next)
+    } finally {
+      database.cleanup()
+    }
+  })
+
   test('refreshes after a catalog rename', async () => {
     const database = createCareerTestDatabase()
     const { executor } = database

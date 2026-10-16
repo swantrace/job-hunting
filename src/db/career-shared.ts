@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import { sql } from 'drizzle-orm'
 import type { AnySQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core'
 import { nowISO } from '../lib/date'
 import { db } from './client'
@@ -99,12 +98,8 @@ export function assertExpectedRevision(
 type ProbeTable = { name: string; table: SQLiteTable; updatedAt: AnySQLiteColumn | null }
 
 /**
- * Every table that feeds the canonical career shape. Tables with an
- * `updated_at` column contribute their row count and their newest timestamp;
- * junction tables (which have no timestamp) contribute their row count. So the
- * probe changes for any career fact, catalog row, category or link write —
- * including catalog renames and merges, which previously left the assembler
- * cache stale because they had no counter of their own.
+ * Every table that feeds the canonical career shape. Hash actual contents,
+ * including junctions: counts and maximum timestamps miss same-size edits.
  */
 const probeTables: ProbeTable[] = [
   { name: 'career_profile', table: careerProfile, updatedAt: careerProfile.updatedAt },
@@ -140,34 +135,33 @@ const probeTables: ProbeTable[] = [
 ]
 
 function probeEntry(executor: DbExecutor, table: SQLiteTable, updatedAt: AnySQLiteColumn | null) {
-  if (updatedAt) {
-    const row = executor
-      .select({ count: sql<number>`count(*)`, newest: sql<string | null>`max(${updatedAt})` })
-      .from(table)
-      .get()
-    return { count: row?.count ?? 0, newest: row?.newest ?? null }
-  }
-  const row = executor.select({ count: sql<number>`count(*)` }).from(table).get()
-  return { count: row?.count ?? 0, newest: null }
+  const rows = executor.select().from(table).all()
+  const newest = updatedAt
+    ? (rows
+        .map((row) => row.updatedAt)
+        .filter((value): value is string => typeof value === 'string')
+        .sort()
+        .at(-1) ?? null)
+    : null
+  return { content: rows.map(stableFingerprint).sort(), newest }
 }
 
 export type CareerContentProbeState = {
-  /** Stable fingerprint of every career row count and newest timestamp. */
+  /** Stable fingerprint of complete career and catalog contents. */
   fingerprint: string
   /** Newest career timestamp, or `nowISO()` when no career row exists yet. */
   updatedAt: string
 }
 
 /**
- * Reads the change probe: a fingerprint over every career-feeding table's row
- * count (and newest `updated_at` where the table has one). It is cheap — one
- * tiny aggregate query per table — and is the single freshness identity that
- * replaced `career_state.revision` + `career_state.content_hash`.
+ * Content-based correctness deliberately takes priority over an aggregate
+ * shortcut. The assembler remains memoized; same-size link and alias edits
+ * invalidate it even when updated_at has not changed.
  */
 export function readCareerContentProbe(executor: DbExecutor = db): CareerContentProbeState {
   const entries = probeTables.map(({ name, table, updatedAt }) => {
-    const { count, newest } = probeEntry(executor, table, updatedAt)
-    return { table: name, count, newest }
+    const { content, newest } = probeEntry(executor, table, updatedAt)
+    return { table: name, content, newest }
   })
   const timestamps = entries
     .map((entry) => entry.newest)

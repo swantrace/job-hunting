@@ -38,6 +38,7 @@ function results(value: SkillFilters) {
 
 export const GET = createRoute((c) => {
   const skill = selected(Number(c.req.param('id')))
+  if (skill?.mergedIntoSkillId) return c.redirect(`/skills/${skill.mergedIntoSkillId}`)
   return skill
     ? c.html(
         <SkillEditForm skill={skill} filters={filters(c)} mergeTargets={mergeTargets(skill.id)} />,
@@ -68,11 +69,22 @@ export const PUT = createRoute(async (c) => {
   const skill = selected(id)
   if (!skill) return c.text('Not found.', 404)
   const currentFilters = filters(c)
-  const parsed = managedSkillSchema.safeParse(await parseForm(c))
+  const form = await parseForm(c)
+  const submitted = {
+    ...skill,
+    name: String(form.name ?? ''),
+    category: String(form.category ?? '') || null,
+    reviewStatus:
+      skillReviewStatuses.find((status) => status !== 'merged' && status === form.reviewStatus) ??
+      skill.reviewStatus,
+  }
+  const aliases = typeof form.aliases === 'string' ? form.aliases : undefined
+  const parsed = managedSkillSchema.safeParse(form)
   if (!parsed.success)
     return c.html(
       <SkillEditForm
-        skill={skill}
+        skill={submitted}
+        aliases={aliases}
         filters={currentFilters}
         errors={parsed.error.flatten().fieldErrors}
         mergeTargets={mergeTargets(id)}
@@ -81,15 +93,18 @@ export const PUT = createRoute(async (c) => {
     )
   try {
     updateSkillDetails(id, parsed.data)
-  } catch {
+  } catch (error) {
     return c.html(
       <SkillEditForm
-        skill={skill}
+        skill={{ ...submitted, reviewStatus: parsed.data.reviewStatus }}
+        aliases={aliases}
         filters={currentFilters}
-        errors={{ name: ['Unable to save this skill.'] }}
+        errors={{
+          aliases: [error instanceof Error ? error.message : 'Unable to save this skill.'],
+        }}
         mergeTargets={mergeTargets(id)}
       />,
-      409,
+      422,
     )
   }
   const updated = selected(id)

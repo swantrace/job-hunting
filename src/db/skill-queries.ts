@@ -8,7 +8,11 @@ import type {
   SkillOrigin,
   SkillReviewStatus,
 } from '../lib/skills/constants'
-import { canonicalSkillKey, normalizeSkillAlias } from '../lib/skills/normalize'
+import {
+  canonicalSkillKey,
+  isMeaningfulSkillTerm,
+  normalizeSkillAlias,
+} from '../lib/skills/normalize'
 import {
   readReviewSnapshot,
   reviewSkillEvidence,
@@ -31,6 +35,31 @@ import {
 } from './schema'
 
 export type DbExecutor = Pick<typeof db, 'select' | 'insert' | 'delete' | 'update'>
+
+/** Names, stable keys and aliases share one normalized namespace. */
+export function assertSkillLabelAvailable(tx: DbExecutor, label: string, ownerIds: number[]) {
+  if (!isMeaningfulSkillTerm(label) || label.trim().length > 120)
+    throw new Error(
+      'Skill names and aliases must contain a letter or number and be at most 120 characters.',
+    )
+  const normalized = normalizeSkillAlias(label)
+  const collision = tx
+    .select()
+    .from(skills)
+    .all()
+    .find(
+      (row) =>
+        !ownerIds.includes(row.id) &&
+        [row.name, row.key].some((value) => normalizeSkillAlias(value) === normalized),
+    )
+  const alias = tx
+    .select()
+    .from(skillAliases)
+    .where(eq(skillAliases.normalizedAlias, normalized))
+    .get()
+  if (collision || (alias && !ownerIds.includes(alias.skillId)))
+    throw new Error(`"${label}" belongs to another skill. Merge the skills instead.`)
+}
 
 export function resolveSkillByKey(tx: DbExecutor, key: string): Skill | undefined {
   return tx.select().from(skills).where(eq(skills.key, key)).get()
@@ -55,7 +84,15 @@ export function resolveSkillByAlias(tx: DbExecutor, normalizedAlias: string): Sk
 export function resolveSkill(tx: DbExecutor, name: string): Skill | undefined {
   const normalized = normalizeSkillAlias(name)
   const byKey = resolveSkillByKey(tx, canonicalSkillKey(name)) ?? resolveSkillByKey(tx, normalized)
-  return byKey ?? resolveSkillByAlias(tx, normalized)
+  return (
+    byKey ??
+    resolveSkillByAlias(tx, normalized) ??
+    tx
+      .select()
+      .from(skills)
+      .all()
+      .find((row) => normalizeSkillAlias(row.name) === normalized)
+  )
 }
 
 export function insertSkill(
@@ -68,6 +105,8 @@ export function insertSkill(
     origin?: SkillOrigin
   },
 ): Skill {
+  assertSkillLabelAvailable(tx, input.name, [])
+  assertSkillLabelAvailable(tx, input.key ?? canonicalSkillKey(input.name), [])
   const date = nowISO()
   const origin = input.origin ?? 'manual'
   const skill = tx

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { normalizeSkillAlias } from '../skills/normalize'
+import { canonicalSkillKey, normalizeSkillAlias } from '../skills/normalize'
 
 const record = z.record(z.string(), z.unknown())
 
@@ -14,6 +14,16 @@ export const importPayloadSchema = z
     companies: z.array(record).default([]),
     skills: z.array(record).default([]),
     skillAliases: z.array(record).default([]),
+    deleteSkills: z.array(z.string().trim().min(1).max(120)).default([]),
+    mergeSkills: z
+      .array(
+        z.object({
+          sourceKey: z.string().trim().min(1).max(120),
+          targetKey: z.string().trim().min(1).max(120),
+          personalResolution: z.enum(['source', 'target']).optional(),
+        }),
+      )
+      .default([]),
     // Legacy exports used tags. Keep accepting them while normalizing the payload.
     tags: z.array(record).default([]),
     contacts: z.array(record).default([]),
@@ -60,7 +70,7 @@ export function companyKey(company: Record<string, unknown>) {
 }
 
 export function skillKey(skill: Record<string, unknown>) {
-  return key(skill.name)
+  return textValue(skill.key) || canonicalSkillKey(textValue(skill.name))
 }
 
 export function contactKey(contact: Record<string, unknown>, companyName: string) {
@@ -85,6 +95,7 @@ export function detectImportConflicts(
 ): string[] {
   const conflicts: string[] = []
   const owners = new Map<string, string>()
+  const keys = new Set<string>()
   const claim = (owner: string, normalized: string) => {
     if (!normalized) return
     const existing = owners.get(normalized)
@@ -93,7 +104,9 @@ export function detectImportConflicts(
     else if (!existing) owners.set(normalized, owner)
   }
   for (const skill of payload.skills ?? []) {
-    const owner = textValue(skill.name) || textValue(skill.key) || String(skill.id)
+    const owner = skillKey(skill)
+    if (keys.has(owner)) conflicts.push(`Duplicate skill key "${owner}".`)
+    keys.add(owner)
     claim(owner, normalizeSkillAlias(textValue(skill.name)))
     claim(owner, normalizeSkillAlias(textValue(skill.key)))
     const aliases = skill.aliases
@@ -103,7 +116,8 @@ export function detectImportConflicts(
   }
   for (const alias of payload.skillAliases ?? [])
     claim(
-      String(alias.skillId),
+      skillKey(payload.skills?.find((skill) => skill.id === alias.skillId) ?? {}) ||
+        String(alias.skillId),
       normalizeSkillAlias(textValue(alias.alias) || textValue(alias.normalizedAlias)),
     )
   return conflicts

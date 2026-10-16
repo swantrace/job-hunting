@@ -20,12 +20,13 @@ export function SkillMergeForm({
       hx-target="#skill-workspace-panel"
       hx-swap="innerHTML"
       hx-disabled-elt="find button"
-      hx-confirm="Merge this skill into the selected canonical skill? This cannot be undone."
+      hx-confirm="Move all live references and aliases to the target, then delete this skill? Conflicting decisions use the target's choice and reason. This cannot be undone."
     >
       <fieldset class="fieldset">
         <legend class="fieldset-legend">Merge duplicate skill</legend>
         <p class="label">
-          Move aliases, requirement links, and compatible decisions to another skill.
+          Move live references and aliases, then delete the source. Existing target decisions take
+          priority. Historical snapshots remain unchanged.
         </p>
         <select
           name="targetSkillId"
