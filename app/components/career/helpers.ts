@@ -1,5 +1,5 @@
 import type { GenerationRules } from '../../../src/lib/career/json-schemas'
-import { documentDraftPolicy } from '../../../src/lib/document-draft-policy'
+import { documentDraftPolicy } from '../../../src/lib/document-draft/policy'
 
 /**
  * Only an http(s) value is rendered as a link: a stored `javascript:` or other

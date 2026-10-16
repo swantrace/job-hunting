@@ -1,5 +1,5 @@
 import { canonicalHash } from '../canonical-hash'
-import { safeCareerData } from '../document-draft-input'
+import { safeCareerData } from '../document-draft/input'
 import type { FrozenBaseResumeSource } from './base-resumes'
 import { type CanonicalCareerData, documentEligibleProjects } from './canonical-data'
 

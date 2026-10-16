@@ -1,6 +1,6 @@
 import type { Queue, Worker } from 'bunqueue/client'
-import { documentReviewPromptVersion } from '../ai/prompts/document-review'
-import { documentReviewSchemaVersion } from '../ai/schemas/document-review'
+import { documentReviewPromptVersion } from '../../ai/prompts/document-review'
+import { documentReviewSchemaVersion } from '../../ai/schemas/document-review'
 import {
   completeDocumentReview,
   createDocumentReview,
@@ -9,8 +9,8 @@ import {
   listQueuedDocumentReviews,
   markDocumentReviewProcessing,
   resetStaleProcessingDocumentReviews,
-} from '../db/document-review'
-import { documentReviewInputHash } from './document-review'
+} from '../../db/document-review'
+import { documentReviewInputHash } from './run'
 
 type DocumentReviewQueueJob = { reviewId: number }
 
@@ -50,7 +50,7 @@ async function processDocumentReview(reviewId: number) {
   if (!review || review.status === 'Completed') return { reviewId }
   markDocumentReviewProcessing(reviewId)
   try {
-    const { runDocumentReview } = await import('./document-review')
+    const { runDocumentReview } = await import('./run')
     const result = await runDocumentReview(reviewId)
     completeDocumentReview(reviewId, JSON.stringify(result))
     return { reviewId }

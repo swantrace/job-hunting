@@ -20,7 +20,7 @@ import {
   resetMention,
   skipMention,
 } from '../../src/db/skill-mentions'
-import { assessApplicationReadiness } from '../../src/lib/application-readiness'
+import { assessApplicationReadiness } from '../../src/lib/applications/readiness'
 import { type CareerTestDatabase, createCareerTestDatabase } from '../support/career-db'
 
 /**

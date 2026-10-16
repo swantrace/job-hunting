@@ -2,18 +2,18 @@ import { createHash } from 'node:crypto'
 import {
   documentReviewPromptVersion,
   documentReviewSystemPrompt,
-} from '../ai/prompts/document-review'
+} from '../../ai/prompts/document-review'
 import {
   type DocumentReview as DocumentReviewResult,
   documentReviewResponseSchema,
   documentReviewSchema,
-} from '../ai/schemas/document-review'
-import { getDocumentReview } from '../db/document-review'
+} from '../../ai/schemas/document-review'
+import { getDocumentReview } from '../../db/document-review'
 import {
   getGenerationEvidenceSnapshot,
   getGenerationRun,
   getGenerationRunResults,
-} from '../db/generation'
+} from '../../db/generation'
 
 type JsonSchema = Record<string, unknown>
 

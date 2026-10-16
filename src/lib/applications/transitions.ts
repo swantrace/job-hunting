@@ -1,4 +1,4 @@
-import type { JobStatus } from './applications/constants'
+import type { JobStatus } from './constants'
 
 const rank: Partial<Record<JobStatus, number>> = {
   Saved: 0,

@@ -1,6 +1,6 @@
 import type { Queue, Worker } from 'bunqueue/client'
-import { candidateFitPromptVersion } from '../ai/prompts/candidate-fit'
-import { candidateFitSchemaVersion } from '../ai/schemas/candidate-fit'
+import { candidateFitPromptVersion } from '../../ai/prompts/candidate-fit'
+import { candidateFitSchemaVersion } from '../../ai/schemas/candidate-fit'
 import {
   completeAnalysisRun,
   createAnalysisRun,
@@ -10,8 +10,8 @@ import {
   listQueuedAnalysisRuns,
   markAnalysisRunProcessing,
   resetStaleProcessingAnalysisRuns,
-} from '../db/analysis'
-import { db } from '../db/client'
+} from '../../db/analysis'
+import { db } from '../../db/client'
 
 type AnalysisQueueJob = { runId: number }
 
@@ -56,7 +56,7 @@ async function processAnalysis(
   markAnalysisRunProcessing(run.id)
   await updateProgress(10, 'Running candidate analysis')
   try {
-    const { runCandidateAnalysis } = await import('./candidate-analysis')
+    const { runCandidateAnalysis } = await import('../candidate/analysis')
     const result = await runCandidateAnalysis(run.id)
     completeAnalysisRun(run.id, JSON.stringify(result))
     await updateProgress(100, 'Complete')
@@ -98,7 +98,7 @@ export type EnqueueAnalysisResult =
 export async function enqueueCandidateAnalysis(
   jobApplicationId: number,
 ): Promise<EnqueueAnalysisResult> {
-  const { buildCandidateAnalysisInput } = await import('./candidate-analysis')
+  const { buildCandidateAnalysisInput } = await import('../candidate/analysis')
   // Build and persist the frozen snapshot in one read transaction: the worker
   // consumes this snapshot, never the career facts as they are when it runs.
   const outcome = db.transaction(() => {

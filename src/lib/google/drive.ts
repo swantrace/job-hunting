@@ -5,8 +5,8 @@ import {
   getGoogleDriveConnection,
   markArtifactUploaded,
   saveGoogleDriveConnection,
-} from '../db/generation'
-import { getArtifactsRoot } from './artifact-storage'
+} from '../../db/generation'
+import { getArtifactsRoot } from '../artifacts/storage'
 
 const scope = 'https://www.googleapis.com/auth/drive.file'
 const tokenUrl = 'https://oauth2.googleapis.com/token'

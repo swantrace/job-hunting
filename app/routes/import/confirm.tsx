@@ -1,6 +1,6 @@
 import { createRoute } from 'honox/factory'
 import { mergeImport } from '../../../src/db/queries'
-import { importPayloadSchema } from '../../../src/lib/import'
+import { importPayloadSchema } from '../../../src/lib/job-intake/import'
 
 export const POST = createRoute(async (c) => {
   const form = await c.req.formData()

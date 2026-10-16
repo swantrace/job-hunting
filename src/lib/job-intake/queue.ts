@@ -7,10 +7,10 @@ import {
   markJobIntakeItemNeedsPastedText,
   markJobIntakeItemProcessing,
   markJobIntakeItemReady,
-} from '../db/job-intake'
-import { validateIntakeUrl } from './batch-intake'
-import { listDirections } from './career/directions'
-import { fetchJobPostingText } from './job-intake-fetch'
+} from '../../db/job-intake'
+import { listDirections } from '../career/directions'
+import { validateIntakeUrl } from './batch'
+import { fetchJobPostingText } from './fetch'
 
 function companyNameFor(item: { kind: string; normalizedUrl: string | null }): string {
   if (item.kind === 'url' && item.normalizedUrl) {
@@ -64,7 +64,7 @@ export async function processJobIntakeItem(itemId: number) {
       url: item.normalizedUrl,
       rawText: text,
     })
-    const { enqueueJobAnalysis } = await import('./job-analysis-queue')
+    const { enqueueJobAnalysis } = await import('../job-analysis/queue')
     await enqueueJobAnalysis(postingId)
     markJobIntakeItemReady(itemId, {
       jobApplicationId: applicationId,

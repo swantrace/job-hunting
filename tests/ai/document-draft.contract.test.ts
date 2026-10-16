@@ -9,7 +9,7 @@ import {
   documentDraftSchemaVersion,
   documentMarkdownResponseSchema,
 } from '../../src/ai/schemas/document-draft'
-import { draftSchemaVersion } from '../../src/lib/document-draft'
+import { draftSchemaVersion } from '../../src/lib/document-draft/definition'
 
 describe('base-grounded document draft contract', () => {
   test('prompt and parser contracts share one schema version', () => {

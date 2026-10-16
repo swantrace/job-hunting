@@ -4,7 +4,7 @@ import {
   buildResumeExperimentRequest,
   responseText,
   stripMarkdownFence,
-} from '../src/lib/resume-experiment'
+} from '../src/lib/document-draft/experiment'
 
 const input = {
   jd: 'Build TypeScript products.',

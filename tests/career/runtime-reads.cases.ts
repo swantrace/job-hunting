@@ -13,12 +13,12 @@ import {
   assessApplicationReadiness,
   careerOnboardingGuidance,
   careerOnboardingRequired,
-} from '../../src/lib/application-readiness'
+} from '../../src/lib/applications/readiness'
 import {
   buildCandidateAnalysisInput,
   candidateStalenessReasons,
   currentCandidateAnalysisHash,
-} from '../../src/lib/candidate-analysis'
+} from '../../src/lib/candidate/analysis'
 import {
   careerEvidenceIds,
   loadCareerData,
@@ -26,14 +26,14 @@ import {
 } from '../../src/lib/career/canonical-data'
 import { listDirections } from '../../src/lib/career/directions'
 import { nowISO, todayISO } from '../../src/lib/date'
-import { generateApplicationDrafts } from '../../src/lib/document-draft-generation'
+import { generateApplicationDrafts } from '../../src/lib/document-draft/generation'
 import {
   buildGenerationInput,
   frozenDraftSnapshotFromRun,
   generationStalenessReasons,
-} from '../../src/lib/generation-input'
-import { enqueueGeneration } from '../../src/lib/generation-queue'
-import { currentJobAnalysisHash } from '../../src/lib/job-analysis-input'
+} from '../../src/lib/generation/input'
+import { enqueueGeneration } from '../../src/lib/generation/queue'
+import { currentJobAnalysisHash } from '../../src/lib/job-analysis/input'
 import { writeSyntheticCareerData } from '../career/fixtures'
 import {
   type CareerTestDatabase,

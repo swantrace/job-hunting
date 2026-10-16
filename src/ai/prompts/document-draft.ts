@@ -9,7 +9,7 @@
  * documented default policy used by any direction without stored rules.
  */
 
-import { type DocumentDraftPolicy, documentDraftPolicy } from '../../lib/document-draft-policy'
+import { type DocumentDraftPolicy, documentDraftPolicy } from '../../lib/document-draft/policy'
 
 export const documentDraftPromptVersion = '2.1.0'
 

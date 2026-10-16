@@ -12,7 +12,7 @@ import {
   listCareerExperiences,
 } from '../../src/db/career-records'
 import { db, sqlite } from '../../src/db/client'
-import { careerOnboardingGuidance } from '../../src/lib/application-readiness'
+import { careerOnboardingGuidance } from '../../src/lib/applications/readiness'
 import {
   saveRecordExtensions,
   storedRecordExtensions,

@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { jobAnalysisSchemaVersion } from '../../src/ai/schemas/job-analysis'
 import * as schema from '../../src/db/schema'
-import { type AnalysisRunSummary, classifyAnalysisRunState } from '../../src/lib/analysis-run-state'
+import { type AnalysisRunSummary, classifyAnalysisRunState } from '../../src/lib/analysis/run-state'
 import { migratedDatabase } from '../support/sqlite'
 
 /**

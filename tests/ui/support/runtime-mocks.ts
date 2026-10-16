@@ -2,7 +2,7 @@ import { mock } from 'bun:test'
 import { z } from 'zod'
 import type { JobCardData } from '../../../src/db/queries'
 import * as realSkillQueries from '../../../src/db/skill-queries'
-import * as realApplicationReadiness from '../../../src/lib/application-readiness'
+import * as realApplicationReadiness from '../../../src/lib/applications/readiness'
 import * as realCareerData from '../../../src/lib/career/canonical-data'
 import * as realRequest from '../../../src/lib/request'
 import * as realValidation from '../../../src/lib/validation'
@@ -121,7 +121,7 @@ export const mockGetGoogleDriveConnectionStatus = mock(
 )
 export const mockUploadArtifactToGoogleDrive = mock(async (_artifact: any) => undefined)
 
-mock.module('../../../src/lib/google-drive', () => ({
+mock.module('../../../src/lib/google/drive', () => ({
   getGoogleDriveConnectionStatus: mockGetGoogleDriveConnectionStatus,
   uploadArtifactToGoogleDrive: mockUploadArtifactToGoogleDrive,
 }))
@@ -129,7 +129,7 @@ mock.module('../../../src/lib/google-drive', () => ({
 export const mockEnqueueGeneration = mock(async () => ({ id: 1 }))
 export const mockEnqueueBaselineGeneration = mock(async () => ({ id: 1 }))
 
-mock.module('../../../src/lib/generation-queue', () => ({
+mock.module('../../../src/lib/generation/queue', () => ({
   enqueueBaselineGeneration: mockEnqueueBaselineGeneration,
   enqueueGeneration: mockEnqueueGeneration,
 }))
@@ -145,7 +145,7 @@ export const mockListAnalysisRuns = mock((): any => [])
 export const mockGetAnalysisRun = mock((): any => null)
 export const mockCurrentCandidateAnalysisHash = mock(() => 'current-hash')
 
-mock.module('../../../src/lib/analysis-queue', () => ({
+mock.module('../../../src/lib/analysis/queue', () => ({
   enqueueCandidateAnalysis: mockEnqueueCandidateAnalysis,
 }))
 
@@ -223,7 +223,7 @@ mock.module('../../../src/db/review-data', () => ({
 
 export const mockGetApplicationReadiness = mock((): any => ({ ready: true, reasons: [] }))
 
-mock.module('../../../src/lib/application-readiness', () => ({
+mock.module('../../../src/lib/applications/readiness', () => ({
   ...realApplicationReadiness,
   getApplicationReadiness: mockGetApplicationReadiness,
 }))
@@ -249,7 +249,7 @@ mock.module('../../../src/db/document-review', () => ({
   listDocumentReviews: mockListDocumentReviews,
 }))
 
-mock.module('../../../src/lib/document-review-queue', () => ({
+mock.module('../../../src/lib/document-review/queue', () => ({
   enqueueDocumentReview: mockEnqueueDocumentReview,
 }))
 
@@ -262,7 +262,7 @@ export const mockGetCandidateAnalysisState = mock((): any => ({
   reasons: [],
 }))
 
-mock.module('../../../src/lib/candidate-analysis', () => ({
+mock.module('../../../src/lib/candidate/analysis', () => ({
   currentCandidateAnalysisHash: mockCurrentCandidateAnalysisHash,
   getCandidateAnalysisState: mockGetCandidateAnalysisState,
 }))

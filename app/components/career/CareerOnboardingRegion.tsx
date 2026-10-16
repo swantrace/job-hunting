@@ -1,4 +1,4 @@
-import { careerOnboardingGuidance } from '../../../src/lib/application-readiness'
+import { careerOnboardingGuidance } from '../../../src/lib/applications/readiness'
 
 /**
  * Visible onboarding empty state. It appears the moment the career database has

@@ -1,6 +1,6 @@
 import { deleteCookie, getCookie } from 'hono/cookie'
 import { createRoute } from 'honox/factory'
-import { connectGoogleDrive } from '../../../../src/lib/google-drive'
+import { connectGoogleDrive } from '../../../../src/lib/google/drive'
 
 export default createRoute(async (c) => {
   const state = c.req.query('state')

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { classifyAnalysisRunState } from '../../src/lib/analysis-run-state'
+import { classifyAnalysisRunState } from '../../src/lib/analysis/run-state'
 import { canonicalHash } from '../../src/lib/canonical-hash'
 import { resolveWorkspaceTab, reviewGateCopy } from '../../src/lib/workspace/state'
 import { migratedDatabase } from '../support/sqlite'

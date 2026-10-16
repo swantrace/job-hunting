@@ -1,24 +1,24 @@
-import { listCareerDirections, readCareerDirection } from '../db/career-directions'
-import { db } from '../db/client'
-import type { DbExecutor } from '../db/skill-queries'
-import { canonicalHash } from './canonical-hash'
+import { listCareerDirections, readCareerDirection } from '../../db/career-directions'
+import { db } from '../../db/client'
+import type { DbExecutor } from '../../db/skill-queries'
+import { canonicalHash } from '../canonical-hash'
 import {
   type FrozenBaseResumeSource,
   frozenBaseResumeSource,
   loadApprovedBaseResume,
-} from './career/base-resumes'
+} from '../career/base-resumes'
 import {
   type CanonicalCareerData,
   documentSafeCareerData,
   loadCareerData,
-} from './career/canonical-data'
-import { directionTargetTitles } from './career/directions'
-import { todayISO } from './date'
-import { type DocumentDraftPolicy, effectiveDocumentDraftPolicy } from './document-draft-policy'
+} from '../career/canonical-data'
+import { directionTargetTitles } from '../career/directions'
+import { todayISO } from '../date'
 import {
   generationEligibleRequirements,
   isGenerationEligible,
-} from './skills/generation-eligibility'
+} from '../skills/generation-eligibility'
+import { type DocumentDraftPolicy, effectiveDocumentDraftPolicy } from './policy'
 
 /**
  * Builds the frozen drafting input: approved Base Resume (editorial prior),

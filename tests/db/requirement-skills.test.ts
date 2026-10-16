@@ -7,7 +7,7 @@ import { completeJobAnalysisRun, createJobAnalysisRun } from '../../src/db/job-a
 import * as schema from '../../src/db/schema'
 import { countPendingMentions, listRequirementMentions } from '../../src/db/skill-mentions'
 import { listRequirementSkillMappings } from '../../src/db/skill-queries'
-import { jobAnalysisInputFromContent } from '../../src/lib/job-analysis-input'
+import { jobAnalysisInputFromContent } from '../../src/lib/job-analysis/input'
 import type { CatalogContextEntry } from '../../src/lib/skills/catalog-context'
 import { migratedDatabase } from '../support/sqlite'
 

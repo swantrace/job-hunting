@@ -12,8 +12,8 @@ import {
   buildJobAnalysisInput,
   frozenSuppliedCatalog,
   jobAnalysisInputFromContent,
-} from '../../src/lib/job-analysis-input'
-import { parseJobAnalysisResult } from '../../src/lib/job-analysis-result'
+} from '../../src/lib/job-analysis/input'
+import { parseJobAnalysisResult } from '../../src/lib/job-analysis/result'
 import {
   buildCatalogContext,
   catalogContextCategoryCandidateLimit,

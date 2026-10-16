@@ -1,5 +1,5 @@
-import { getCandidateAnalysisState } from '../lib/candidate-analysis'
-import { currentJobAnalysisHash } from '../lib/job-analysis-input'
+import { getCandidateAnalysisState } from '../lib/candidate/analysis'
+import { currentJobAnalysisHash } from '../lib/job-analysis/input'
 import { db } from './client'
 import { listJobRequirements } from './job-analysis'
 import { getJobAnalysisState } from './job-analysis-runs'

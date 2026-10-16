@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { generationStalenessReasons } from '../../src/lib/generation-input'
+import { generationStalenessReasons } from '../../src/lib/generation/input'
 import { migratedDatabase } from '../support/sqlite'
 
 function snapshot(overrides: Record<string, unknown> = {}) {

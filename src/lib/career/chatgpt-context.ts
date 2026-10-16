@@ -3,8 +3,8 @@ import { listCareerDirections } from '../../db/career-directions'
 import { readCareerContentProbe } from '../../db/career-shared'
 import type { DbExecutor } from '../../db/skill-queries'
 import { canonicalHash } from '../canonical-hash'
-import { safeCareerData } from '../document-draft-input'
-import { effectiveDocumentDraftPolicy } from '../document-draft-policy'
+import { safeCareerData } from '../document-draft/input'
+import { effectiveDocumentDraftPolicy } from '../document-draft/policy'
 import {
   type ApprovedBaseResume,
   type FrozenBaseResumeSource,

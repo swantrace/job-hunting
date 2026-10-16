@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { normalizeSkillAlias } from './skills/normalize'
+import { normalizeSkillAlias } from '../skills/normalize'
 
 const record = z.record(z.string(), z.unknown())
 

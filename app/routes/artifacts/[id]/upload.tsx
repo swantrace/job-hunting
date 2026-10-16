@@ -1,6 +1,6 @@
 import { createRoute } from 'honox/factory'
 import { getArtifact, markArtifactUploadFailed } from '../../../../src/db/generation'
-import { uploadArtifactToGoogleDrive } from '../../../../src/lib/google-drive'
+import { uploadArtifactToGoogleDrive } from '../../../../src/lib/google/drive'
 import { parseId } from '../../../../src/lib/request'
 import { ArtifactActions } from '../../../components/workspace/ArtifactActions'
 

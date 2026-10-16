@@ -1,25 +1,25 @@
 import { z } from 'zod'
-import { candidateFitPromptVersion, candidateFitSystemPrompt } from '../ai/prompts/candidate-fit'
+import { candidateFitPromptVersion, candidateFitSystemPrompt } from '../../ai/prompts/candidate-fit'
 import {
   type CandidateFit,
   candidateFitResponseSchema,
   candidateFitSchema,
   candidateFitSchemaVersion,
-} from '../ai/schemas/candidate-fit'
-import { type ApplicationAnalysisRun, listAnalysisRuns } from '../db/analysis'
-import { db } from '../db/client'
-import { listJobRequirements } from '../db/job-analysis'
-import { getJobAnalysisState } from '../db/job-analysis-runs'
-import { getApplication } from '../db/queries'
-import { listRequirementSkillMappings } from '../db/skill-queries'
-import { type AnalysisRunState, classifyAnalysisRunState } from './analysis-run-state'
-import { canonicalHash } from './canonical-hash'
-import { careerEvidenceIds, documentSafeCareerData, loadCareerData } from './career/canonical-data'
-import { todayISO } from './date'
+} from '../../ai/schemas/candidate-fit'
+import { type ApplicationAnalysisRun, listAnalysisRuns } from '../../db/analysis'
+import { db } from '../../db/client'
+import { listJobRequirements } from '../../db/job-analysis'
+import { getJobAnalysisState } from '../../db/job-analysis-runs'
+import { getApplication } from '../../db/queries'
+import { listRequirementSkillMappings } from '../../db/skill-queries'
+import { type AnalysisRunState, classifyAnalysisRunState } from '../analysis/run-state'
+import { canonicalHash } from '../canonical-hash'
+import { careerEvidenceIds, documentSafeCareerData, loadCareerData } from '../career/canonical-data'
+import { todayISO } from '../date'
+import { currentJobAnalysisHash } from '../job-analysis/input'
+import { parseJobAnalysisResult } from '../job-analysis/result'
+import { careerSkillMatchResult } from '../skills/runtime-career-skills'
 import { assertEveryRequirementAssessed, validateCandidateFitEvidence } from './fit-analysis'
-import { currentJobAnalysisHash } from './job-analysis-input'
-import { parseJobAnalysisResult } from './job-analysis-result'
-import { careerSkillMatchResult } from './skills/runtime-career-skills'
 
 export const candidateAnalysisInputVersion = 2
 
@@ -323,7 +323,7 @@ async function structuredCandidateFit(args: {
 }
 
 export async function runCandidateAnalysis(runId: number) {
-  const { getAnalysisRun } = await import('../db/analysis')
+  const { getAnalysisRun } = await import('../../db/analysis')
   const run = getAnalysisRun(runId)
   if (!run) throw new Error('Analysis run no longer exists.')
   if (!run.inputSnapshotJson) throw new Error('Analysis run has no frozen input snapshot.')

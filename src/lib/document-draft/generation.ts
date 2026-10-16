@@ -5,11 +5,11 @@ import {
   coverLetterDraftSystemPromptFor,
   documentDraftPromptVersion,
   resumeDraftSystemPromptFor,
-} from '../ai/prompts/document-draft'
+} from '../../ai/prompts/document-draft'
 import {
   documentMarkdownResponseSchema,
   documentMarkdownSchema,
-} from '../ai/schemas/document-draft'
+} from '../../ai/schemas/document-draft'
 import {
   getBaselineGenerationRun,
   getGenerationRun,
@@ -18,23 +18,23 @@ import {
   saveBaselineGenerationResults,
   saveGenerationEvidenceSnapshot,
   saveGenerationRunResults,
-} from '../db/generation'
-import { getArtifactsRoot } from './artifact-storage'
-import { todayISO } from './date'
-import { type DocumentDraft, parseDocumentDraft } from './document-draft'
+} from '../../db/generation'
+import { getArtifactsRoot } from '../artifacts/storage'
+import { todayISO } from '../date'
+import { renderCoverLetterDocx } from '../docx/cover-letter-renderer'
+import { type DocumentIdentity } from '../docx/render-common'
+import { renderResumeDocx } from '../docx/resume-renderer'
+import { docxRendererVersion } from '../docx/styles'
+import type { GeneratedArtifactType } from '../generation/constants'
+import { coverLetterModelId, frozenDraftSnapshotFromRun, resumeModelId } from '../generation/input'
+import { type DocumentDraft, parseDocumentDraft } from './definition'
+import { stripMarkdownFence } from './experiment'
 import {
   buildBaselineDocumentDraftSnapshot,
   buildDocumentDraftSnapshot,
   type DocumentDraftSnapshot,
-} from './document-draft-input'
-import { extractMetricClaims, validateDocumentDraft } from './document-draft-validation'
-import { renderCoverLetterDocx } from './docx/cover-letter-renderer'
-import { type DocumentIdentity } from './docx/render-common'
-import { renderResumeDocx } from './docx/resume-renderer'
-import { docxRendererVersion } from './docx/styles'
-import type { GeneratedArtifactType } from './generation/constants'
-import { coverLetterModelId, frozenDraftSnapshotFromRun, resumeModelId } from './generation-input'
-import { stripMarkdownFence } from './resume-experiment'
+} from './input'
+import { extractMetricClaims, validateDocumentDraft } from './validation'
 
 type ArtifactOutput = {
   type: GeneratedArtifactType

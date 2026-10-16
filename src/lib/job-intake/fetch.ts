@@ -1,4 +1,4 @@
-import { validateIntakeUrl } from './batch-intake'
+import { validateIntakeUrl } from './batch'
 
 /**
  * Safe URL ingestion for batch Job Post intake. Accepts https only, follows a

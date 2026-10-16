@@ -4,8 +4,8 @@ import {
   getGenerationRunResults,
 } from '../../../src/db/generation'
 import type { Filters } from '../../../src/db/queries'
-import type { ApplicationReadiness } from '../../../src/lib/application-readiness'
-import type { GoogleDriveConnectionStatus } from '../../../src/lib/google-drive'
+import type { ApplicationReadiness } from '../../../src/lib/applications/readiness'
+import type { GoogleDriveConnectionStatus } from '../../../src/lib/google/drive'
 import { ArtifactActions } from './ArtifactActions'
 import { DraftReview } from './DraftReview'
 import { query } from './helpers'

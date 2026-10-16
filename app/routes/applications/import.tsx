@@ -4,8 +4,8 @@ import {
   createJobIntakeItems,
   listJobIntakeBatches,
 } from '../../../src/db/job-intake'
-import { classifyIntakeField, validateIntakeUrl } from '../../../src/lib/batch-intake'
-import { enqueueJobIntakeBatch } from '../../../src/lib/job-intake-queue'
+import { classifyIntakeField, validateIntakeUrl } from '../../../src/lib/job-intake/batch'
+import { enqueueJobIntakeBatch } from '../../../src/lib/job-intake/queue'
 import { JobIntakePanel } from '../../components/intake/JobIntake'
 import { AppShell } from '../../components/layout/AppShell'
 

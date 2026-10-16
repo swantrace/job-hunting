@@ -1,5 +1,5 @@
-import { type CandidateFit, candidateFitSchema } from '../ai/schemas/candidate-fit'
-import { normalizeEvidenceStatus } from './evidence/status'
+import { type CandidateFit, candidateFitSchema } from '../../ai/schemas/candidate-fit'
+import { normalizeEvidenceStatus } from '../evidence/status'
 
 /**
  * Parses a stored candidate-fit result, normalizing the legacy `missing`

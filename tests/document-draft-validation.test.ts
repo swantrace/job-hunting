@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { parseDocumentDraft } from '../src/lib/document-draft'
+import { parseDocumentDraft } from '../src/lib/document-draft/definition'
 import {
   validateDateBounds,
   validateDocumentDraft,
@@ -9,7 +9,7 @@ import {
   validateSectionBlockCount,
   validateSectionContract,
   validateSectionWordBudget,
-} from '../src/lib/document-draft-validation'
+} from '../src/lib/document-draft/validation'
 
 describe('deterministic document draft validation', () => {
   test('flags omitted education entries', () => {

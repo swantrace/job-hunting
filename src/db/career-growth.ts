@@ -1,5 +1,5 @@
 import { inArray } from 'drizzle-orm'
-import { parseStoredCandidateFit } from '../lib/candidate-fit-result'
+import { parseStoredCandidateFit } from '../lib/candidate/fit-result'
 import { type CareerGrowthInputRow, isActiveApplicationStatus } from '../lib/career/growth'
 import { db } from './client'
 import * as schema from './schema'

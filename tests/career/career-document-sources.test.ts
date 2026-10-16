@@ -29,7 +29,7 @@ import {
   documentSafeCareerData,
   loadCareerDataFromDatabase,
 } from '../../src/lib/career/canonical-data'
-import { safeCareerData } from '../../src/lib/document-draft-input'
+import { safeCareerData } from '../../src/lib/document-draft/input'
 import { migratedDatabase } from '../support/sqlite'
 
 /**

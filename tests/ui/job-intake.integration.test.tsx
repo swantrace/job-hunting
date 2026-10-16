@@ -8,7 +8,7 @@ mock.module('../../src/db/job-intake', () => ({
   createJobIntakeItems: createItems,
   listJobIntakeBatches: () => [{ id: 1, createdAt: '2026-08-31', items: [] }],
 }))
-mock.module('../../src/lib/job-intake-queue', () => ({
+mock.module('../../src/lib/job-intake/queue', () => ({
   enqueueJobIntakeBatch: () => {},
 }))
 mock.module('honox/factory', () => ({ createRoute: (handler: unknown) => handler }))

@@ -1,5 +1,5 @@
 import type { Queue, Worker } from 'bunqueue/client'
-import { db } from '../db/client'
+import { db } from '../../db/client'
 import {
   completeBaselineGenerationRun,
   completeGenerationRun,
@@ -18,8 +18,8 @@ import {
   markGenerationRunProcessing,
   resetStaleProcessingBaselineGenerationRuns,
   resetStaleProcessingGenerationRuns,
-} from '../db/generation'
-import { buildGenerationInput } from './generation-input'
+} from '../../db/generation'
+import { buildGenerationInput } from './input'
 
 type GenerationQueueJob = { runId: number }
 
@@ -66,11 +66,11 @@ async function processGeneration(
   try {
     const source = getGenerationSource(run.id)
     if (!source) throw new Error('Generation source no longer exists.')
-    const { generateApplicationDrafts } = await import('./document-draft-generation')
+    const { generateApplicationDrafts } = await import('../document-draft/generation')
     const artifacts = await generateApplicationDrafts(run.id)
     await updateProgress(95, 'Saving generated drafts')
     completeGenerationRun(run.id, artifacts)
-    const { uploadArtifactToGoogleDrive } = await import('./google-drive')
+    const { uploadArtifactToGoogleDrive } = await import('../google/drive')
     const savedArtifacts =
       listGenerationRuns(source.application.id).find((item) => item.id === run.id)?.artifacts ?? []
     for (const artifact of savedArtifacts) {
@@ -95,7 +95,7 @@ async function processBaselineGeneration(runId: number) {
   if (!run || run.status === 'Completed') return
   markBaselineGenerationRunProcessing(runId)
   try {
-    const { generateBaselineDraft } = await import('./document-draft-generation')
+    const { generateBaselineDraft } = await import('../document-draft/generation')
     completeBaselineGenerationRun(runId, await generateBaselineDraft(runId))
   } catch (error) {
     failBaselineGenerationRun(runId, error)

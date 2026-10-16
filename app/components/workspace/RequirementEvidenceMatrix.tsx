@@ -1,6 +1,6 @@
 import type { ApplicationAnalysisRun } from '../../../src/db/analysis'
 import type { JobRequirement } from '../../../src/db/job-analysis'
-import { parseStoredCandidateFit } from '../../../src/lib/candidate-fit-result'
+import { parseStoredCandidateFit } from '../../../src/lib/candidate/fit-result'
 
 function parseResult(run: ApplicationAnalysisRun | null) {
   return parseStoredCandidateFit(run?.resultJson ?? null)

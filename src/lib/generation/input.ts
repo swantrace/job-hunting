@@ -1,20 +1,20 @@
-import { documentDraftPromptVersion } from '../ai/prompts/document-draft'
-import { documentDraftSchemaVersion } from '../ai/schemas/document-draft'
-import { listRunDecisions } from '../db/analysis-decisions'
-import { db } from '../db/client'
-import { getGenerationSourceLineage } from '../db/generation'
-import { getApplication } from '../db/queries'
-import { getCandidateAnalysisState } from './candidate-analysis'
-import { canonicalHash } from './canonical-hash'
-import { loadCareerData } from './career/canonical-data'
+import { documentDraftPromptVersion } from '../../ai/prompts/document-draft'
+import { documentDraftSchemaVersion } from '../../ai/schemas/document-draft'
+import { listRunDecisions } from '../../db/analysis-decisions'
+import { db } from '../../db/client'
+import { getGenerationSourceLineage } from '../../db/generation'
+import { getApplication } from '../../db/queries'
+import { getCandidateAnalysisState } from '../candidate/analysis'
+import { canonicalHash } from '../canonical-hash'
+import { loadCareerData } from '../career/canonical-data'
 import {
   baseResumeIdentity,
   buildDocumentDraftSnapshot,
   type DocumentDraftSnapshot,
   directionDocumentPolicy,
   safeCareerData,
-} from './document-draft-input'
-import { docxRendererVersion } from './docx/styles'
+} from '../document-draft/input'
+import { docxRendererVersion } from '../docx/styles'
 
 export const generationInputVersion = 4
 

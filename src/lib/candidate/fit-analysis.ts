@@ -1,5 +1,5 @@
-import type { CandidateFit, EvidenceRef } from '../ai/schemas/candidate-fit'
-import type { EvidenceSourceType } from './evidence/constants'
+import type { CandidateFit, EvidenceRef } from '../../ai/schemas/candidate-fit'
+import type { EvidenceSourceType } from '../evidence/constants'
 
 /**
  * The allowlist of canonical source IDs that may legally appear in an

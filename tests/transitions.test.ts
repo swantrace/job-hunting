@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { advanceStatus } from '../src/lib/transitions'
+import { advanceStatus } from '../src/lib/applications/transitions'
 
 describe('pipeline transitions', () => {
   test('activity advances the pipeline', () => {

@@ -12,15 +12,15 @@ import { createCareerTestDatabase } from '../support/career-db'
  * contracts that become executable automatically when their boundary exists.
  *
  * Activation boundaries:
- * - `job analysis input hash` -> `src/lib/job-analysis-input.ts` exists
- * - `candidate analysis input hash` -> `src/lib/candidate-analysis.ts` exports
+ * - `job analysis input hash` -> `src/lib/job-analysis/input.ts` exists
+ * - `candidate analysis input hash` -> `src/lib/candidate/analysis.ts` exports
  *  `getCandidateAnalysisState` (the freshness correction)
- * - `documents input hash`   -> `src/lib/generation-input.ts` exists
+ * - `documents input hash`   -> `src/lib/generation/input.ts` exists
  */
 const root = process.cwd()
-const jobAnalysisInputPath = resolve(root, 'src/lib/job-analysis-input.ts')
-const generationInputPath = resolve(root, 'src/lib/generation-input.ts')
-const candidateAnalysisPath = resolve(root, 'src/lib/candidate-analysis.ts')
+const jobAnalysisInputPath = resolve(root, 'src/lib/job-analysis/input.ts')
+const generationInputPath = resolve(root, 'src/lib/generation/input.ts')
+const candidateAnalysisPath = resolve(root, 'src/lib/candidate/analysis.ts')
 
 function sourceHasExport(relativePath: string, exportName: string): boolean {
   try {
@@ -32,7 +32,7 @@ function sourceHasExport(relativePath: string, exportName: string): boolean {
 
 const jobAnalysisHashTest = existsSync(jobAnalysisInputPath) ? test : test.todo
 const candidateHashTest = sourceHasExport(
-  'src/lib/candidate-analysis.ts',
+  'src/lib/candidate/analysis.ts',
   'getCandidateAnalysisState',
 )
   ? test

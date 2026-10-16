@@ -1,9 +1,9 @@
 import type { Queue, Worker } from 'bunqueue/client'
 import { eq } from 'drizzle-orm'
-import { parseJobDescription } from '../ai/client'
-import { jobParserPromptVersion } from '../ai/prompts/job-parser'
-import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
-import { db } from '../db/client'
+import { parseJobDescription } from '../../ai/client'
+import { jobParserPromptVersion } from '../../ai/prompts/job-parser'
+import { jobAnalysisSchemaVersion } from '../../ai/schemas/job-analysis'
+import { db } from '../../db/client'
 import {
   completeJobAnalysisRun,
   createJobAnalysisRun,
@@ -13,11 +13,11 @@ import {
   listQueuedJobAnalysisRuns,
   markJobAnalysisRunProcessing,
   resetStaleProcessingJobAnalysisRuns,
-} from '../db/job-analysis-runs'
-import { jobPostings } from '../db/schema'
-import { countPendingMentions } from '../db/skill-mentions'
-import { autoChainCandidateAnalysis } from './analysis-chain'
-import { buildJobAnalysisInput, frozenSuppliedCatalog } from './job-analysis-input'
+} from '../../db/job-analysis-runs'
+import { jobPostings } from '../../db/schema'
+import { countPendingMentions } from '../../db/skill-mentions'
+import { autoChainCandidateAnalysis } from '../analysis/chain'
+import { buildJobAnalysisInput, frozenSuppliedCatalog } from './input'
 
 type JobAnalysisQueueJob = { runId: number }
 

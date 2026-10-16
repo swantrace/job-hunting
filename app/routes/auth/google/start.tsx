@@ -1,6 +1,6 @@
 import { setCookie } from 'hono/cookie'
 import { createRoute } from 'honox/factory'
-import { googleAuthorizationUrl } from '../../../../src/lib/google-drive'
+import { googleAuthorizationUrl } from '../../../../src/lib/google/drive'
 
 export default createRoute((c) => {
   try {

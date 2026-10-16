@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'bun:test'
-import { stripScriptsAndStyles } from '../src/lib/job-intake-fetch'
-import { processJobIntakeItem } from '../src/lib/job-intake-queue'
+import { stripScriptsAndStyles } from '../src/lib/job-intake/fetch'
+import { processJobIntakeItem } from '../src/lib/job-intake/queue'
 
 describe('job posting extraction', () => {
   test('strips scripts, styles, and markup while decoding entities', () => {
@@ -42,10 +42,10 @@ describe('job intake item processing', () => {
       markJobIntakeItemFailed: () => {},
       createIntakeApplication: () => ({ applicationId: 1, postingId: 1 }),
     }))
-    mock.module('../src/lib/job-intake-fetch', () => ({
+    mock.module('../src/lib/job-intake/fetch', () => ({
       fetchJobPostingText: mock(async () => ({ ok: false, reason: 'The site returned HTTP 403.' })),
     }))
-    mock.module('../src/lib/job-analysis-queue', () => ({
+    mock.module('../src/lib/job-analysis/queue', () => ({
       enqueueJobAnalysis: enqueueAnalysis,
     }))
 
@@ -75,10 +75,10 @@ describe('job intake item processing', () => {
       markJobIntakeItemFailed: () => {},
       createIntakeApplication: createApplication,
     }))
-    mock.module('../src/lib/job-intake-fetch', () => ({
+    mock.module('../src/lib/job-intake/fetch', () => ({
       fetchJobPostingText: mock(async () => ({ ok: true, text: 'text' })),
     }))
-    mock.module('../src/lib/job-analysis-queue', () => ({
+    mock.module('../src/lib/job-analysis/queue', () => ({
       enqueueJobAnalysis: enqueueAnalysis,
     }))
 

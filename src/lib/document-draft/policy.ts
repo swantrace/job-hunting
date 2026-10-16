@@ -1,4 +1,4 @@
-import type { GenerationRules } from './career/json-schemas'
+import type { GenerationRules } from '../career/json-schemas'
 
 /**
  * Shared editorial budgets for LLM drafting and deterministic validation.

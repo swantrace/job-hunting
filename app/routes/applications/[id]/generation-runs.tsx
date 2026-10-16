@@ -1,8 +1,8 @@
 import { createRoute } from 'honox/factory'
 import { getGenerationState, listGenerationRuns } from '../../../../src/db/generation'
-import { getApplicationReadiness } from '../../../../src/lib/application-readiness'
-import { enqueueGeneration } from '../../../../src/lib/generation-queue'
-import { getGoogleDriveConnectionStatus } from '../../../../src/lib/google-drive'
+import { getApplicationReadiness } from '../../../../src/lib/applications/readiness'
+import { enqueueGeneration } from '../../../../src/lib/generation/queue'
+import { getGoogleDriveConnectionStatus } from '../../../../src/lib/google/drive'
 import { parseFilters, parseId } from '../../../../src/lib/request'
 import { GenerationPanel } from '../../../components/workspace/GenerationPanel'
 

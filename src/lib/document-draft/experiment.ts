@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { type CanonicalCareerData, documentEligibleProjects } from './career/canonical-data'
+import { type CanonicalCareerData, documentEligibleProjects } from '../career/canonical-data'
 
 export const resumeExperimentMethods = [
   'base-minimal',

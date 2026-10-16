@@ -1,13 +1,13 @@
 import { createApp } from 'honox/server'
 import { assertDatabaseReady } from '../src/db/health'
-import { recoverQueuedAnalysisRuns, startAnalysisWorker } from '../src/lib/analysis-queue'
+import { recoverQueuedAnalysisRuns, startAnalysisWorker } from '../src/lib/analysis/queue'
 import {
   recoverQueuedDocumentReviews,
   startDocumentReviewWorker,
-} from '../src/lib/document-review-queue'
-import { recoverQueuedGenerationRuns, startGenerationWorker } from '../src/lib/generation-queue'
-import { recoverQueuedJobAnalysisRuns, startJobAnalysisWorker } from '../src/lib/job-analysis-queue'
-import { recoverPendingJobIntakeItems } from '../src/lib/job-intake-queue'
+} from '../src/lib/document-review/queue'
+import { recoverQueuedGenerationRuns, startGenerationWorker } from '../src/lib/generation/queue'
+import { recoverQueuedJobAnalysisRuns, startJobAnalysisWorker } from '../src/lib/job-analysis/queue'
+import { recoverPendingJobIntakeItems } from '../src/lib/job-intake/queue'
 
 console.log('run createApp')
 assertDatabaseReady()

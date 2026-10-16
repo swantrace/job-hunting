@@ -1,5 +1,5 @@
 import type { JobAnalysisRun } from '../../../src/db/job-analysis-runs'
-import { parseJobAnalysisResult } from '../../../src/lib/job-analysis-result'
+import { parseJobAnalysisResult } from '../../../src/lib/job-analysis/result'
 
 export function JobAnalysisSummary({
   analysis,

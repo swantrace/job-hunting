@@ -12,8 +12,8 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
 import { priorities, statuses } from '../lib/applications/constants'
-import { intakeItemKinds, jobIntakeItemStatuses } from '../lib/batch-intake'
 import { generatedArtifactTypes, runStatuses } from '../lib/generation/constants'
+import { intakeItemKinds, jobIntakeItemStatuses } from '../lib/job-intake/batch'
 import { persistedRequirementBases, requirementTypes } from '../lib/job-requirements/constants'
 import {
   type SkillDecision,

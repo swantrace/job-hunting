@@ -5,7 +5,7 @@ import {
   baseResumeSourceFor,
   buildBaselineDocumentDraftSnapshot,
   buildDocumentDraftSnapshot,
-} from '../../src/lib/document-draft-input'
+} from '../../src/lib/document-draft/input'
 import { approvedBaseResumeMarkdown } from '../career/fixtures'
 import { type CareerTestDatabase, careerTestDatabase } from '../support/career-db'
 

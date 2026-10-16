@@ -1,11 +1,11 @@
-import { isISODate, todayISO } from './date'
+import { isISODate, todayISO } from '../date'
 import {
   collectDraftText,
   countDraftBullets,
   countDraftWords,
   type DocumentDraft,
   type DocumentSectionId,
-} from './document-draft'
+} from './definition'
 
 /**
  * Deterministic completeness checks for validated document drafts. These are

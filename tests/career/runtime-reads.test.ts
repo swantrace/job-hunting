@@ -8,7 +8,7 @@ import { resolve } from 'node:path'
  *
  * Several UI suites register process-global `mock.module` replacements for the
  * very modules this acceptance exercises (`src/db/queries`, `src/lib/directions`,
- * `src/lib/candidate-analysis`, `src/lib/generation-queue`). Those mocks leak
+ * `src/lib/candidate/analysis`, `src/lib/generation/queue`). Those mocks leak
  * across test files, so running these cases in the same process as the UI suite
  * would assert against stubs rather than the database-backed runtime. The child
  * gets its own temporary `DB_FILE_NAME`, so it is fully isolated in both

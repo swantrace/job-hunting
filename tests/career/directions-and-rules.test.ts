@@ -18,19 +18,19 @@ import {
   directionFormValues,
   directionRulesFromForm,
 } from '../../src/lib/career/form-input'
-import type { DocumentDraft } from '../../src/lib/document-draft'
+import type { DocumentDraft } from '../../src/lib/document-draft/definition'
 import {
   baseResumeIdentity,
   baseResumeSourceFor,
   buildDocumentDraftSnapshot,
   directionDocumentPolicy,
-} from '../../src/lib/document-draft-input'
+} from '../../src/lib/document-draft/input'
 import {
   documentDraftPolicy,
   effectiveDocumentDraftPolicy,
-} from '../../src/lib/document-draft-policy'
-import { validateDocumentDraft } from '../../src/lib/document-draft-validation'
-import { generationStalenessReasons } from '../../src/lib/generation-input'
+} from '../../src/lib/document-draft/policy'
+import { validateDocumentDraft } from '../../src/lib/document-draft/validation'
+import { generationStalenessReasons } from '../../src/lib/generation/input'
 import { type CareerTestDatabase, createCareerTestDatabase } from '../support/career-db'
 
 /**

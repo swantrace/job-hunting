@@ -12,8 +12,8 @@ import {
   searchApprovedCatalog,
 } from '../../../../src/db/skill-mapping-service'
 import { listRunSkillReviews } from '../../../../src/db/skill-queries'
-import { getApplicationReadiness } from '../../../../src/lib/application-readiness'
-import { getCandidateAnalysisState } from '../../../../src/lib/candidate-analysis'
+import { getApplicationReadiness } from '../../../../src/lib/applications/readiness'
+import { getCandidateAnalysisState } from '../../../../src/lib/candidate/analysis'
 import { careerSkillEvidenceMap } from '../../../../src/lib/career/canonical-data'
 import { parseFilters, parseForm, parseId } from '../../../../src/lib/request'
 import { skillCategoryDefinitions } from '../../../../src/lib/skills/taxonomy'

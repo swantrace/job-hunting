@@ -35,7 +35,7 @@ export const POST = createRoute(async (c) => {
   // end-to-end without a separate Review click. Profile confirmation and
   // Include/Skip decisions remain explicit.
   if (parsed.data.jobAnalysis) {
-    const { autoChainCandidateAnalysis } = await import('../../../src/lib/analysis-chain')
+    const { autoChainCandidateAnalysis } = await import('../../../src/lib/analysis/chain')
     void autoChainCandidateAnalysis(applicationId)
   }
   return c.html(

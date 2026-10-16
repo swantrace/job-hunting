@@ -3,9 +3,9 @@ import { db } from '../../db/client'
 import { getGenerationState } from '../../db/generation'
 import { getJobAnalysisState } from '../../db/job-analysis-runs'
 import { getApplication } from '../../db/queries'
-import { careerOnboardingRequired } from '../application-readiness'
-import { getCandidateAnalysisState } from '../candidate-analysis'
-import { currentJobAnalysisHash } from '../job-analysis-input'
+import { careerOnboardingRequired } from '../applications/readiness'
+import { getCandidateAnalysisState } from '../candidate/analysis'
+import { currentJobAnalysisHash } from '../job-analysis/input'
 import type { WorkspaceAvailability } from './state'
 
 /**

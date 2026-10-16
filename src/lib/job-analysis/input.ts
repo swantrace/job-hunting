@@ -1,18 +1,18 @@
 import { asc, eq } from 'drizzle-orm'
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
-import { jobAnalysisPromptVersion } from '../ai/prompts/job-analysis'
-import { jobParserPromptVersion } from '../ai/prompts/job-parser'
-import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
-import { db } from '../db/client'
-import * as schema from '../db/schema'
-import { skillAliases, skillCategories, skills } from '../db/schema'
-import type { DbExecutor } from '../db/skill-queries'
-import { canonicalHash } from './canonical-hash'
+import { jobAnalysisPromptVersion } from '../../ai/prompts/job-analysis'
+import { jobParserPromptVersion } from '../../ai/prompts/job-parser'
+import { jobAnalysisSchemaVersion } from '../../ai/schemas/job-analysis'
+import { db } from '../../db/client'
+import * as schema from '../../db/schema'
+import { skillAliases, skillCategories, skills } from '../../db/schema'
+import type { DbExecutor } from '../../db/skill-queries'
+import { canonicalHash } from '../canonical-hash'
 import {
   buildCatalogContext,
   type CatalogContext,
   type CatalogContextEntry,
-} from './skills/catalog-context'
+} from '../skills/catalog-context'
 
 export const jobAnalysisInputVersion = 3
 

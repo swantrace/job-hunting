@@ -1,6 +1,6 @@
 import { createRoute } from 'honox/factory'
 import { previewImport } from '../../src/db/queries'
-import { importPayloadSchema } from '../../src/lib/import'
+import { importPayloadSchema } from '../../src/lib/job-intake/import'
 import { ImportPage } from '../components/intake/Import'
 import { ImportPreview } from '../components/intake/ImportPreview'
 

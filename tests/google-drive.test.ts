@@ -27,7 +27,7 @@ afterAll(() => {
 })
 
 async function connectedFixture() {
-  const { encryptGoogleRefreshToken } = await import('../src/lib/google-drive')
+  const { encryptGoogleRefreshToken } = await import('../src/lib/google/drive')
   return {
     id: 1,
     refreshTokenEncrypted: encryptGoogleRefreshToken('refresh-token'),
@@ -42,7 +42,7 @@ describe('Google Drive connection verification', () => {
     const fetcher = mock(async () =>
       Response.json({ access_token: 'access-token', expires_in: 3600 }),
     )
-    const { verifyGoogleDriveConnection } = await import('../src/lib/google-drive')
+    const { verifyGoogleDriveConnection } = await import('../src/lib/google/drive')
 
     expect(await verifyGoogleDriveConnection(await connectedFixture(), fetcher)).toEqual({
       state: 'connected',
@@ -56,7 +56,7 @@ describe('Google Drive connection verification', () => {
         { status: 400 },
       ),
     )
-    const { verifyGoogleDriveConnection } = await import('../src/lib/google-drive')
+    const { verifyGoogleDriveConnection } = await import('../src/lib/google/drive')
 
     expect(await verifyGoogleDriveConnection(await connectedFixture(), fetcher)).toEqual({
       state: 'reconnect-required',
@@ -68,7 +68,7 @@ describe('Google Drive connection verification', () => {
     const fetcher = mock(async () => {
       throw new Error('network unavailable')
     })
-    const { verifyGoogleDriveConnection } = await import('../src/lib/google-drive')
+    const { verifyGoogleDriveConnection } = await import('../src/lib/google/drive')
 
     expect(await verifyGoogleDriveConnection(await connectedFixture(), fetcher)).toEqual({
       state: 'unavailable',

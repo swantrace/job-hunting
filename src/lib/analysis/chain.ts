@@ -7,7 +7,7 @@
 export async function autoChainCandidateAnalysis(
   jobApplicationId: number,
   enqueue: (id: number) => Promise<unknown> = async (id) => {
-    const { enqueueCandidateAnalysis } = await import('./analysis-queue')
+    const { enqueueCandidateAnalysis } = await import('./queue')
     await enqueueCandidateAnalysis(id)
   },
 ): Promise<void> {

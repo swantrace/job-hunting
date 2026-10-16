@@ -2,7 +2,7 @@ import {
   type JobAnalysis,
   jobAnalysisSchema,
   legacyJobAnalysisSchema,
-} from '../ai/schemas/job-analysis'
+} from '../../ai/schemas/job-analysis'
 
 /**
  * Parses a stored `result_json` value back into a validated structured Job
