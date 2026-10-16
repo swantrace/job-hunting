@@ -1,5 +1,9 @@
 # Job Application Tracker
 
+Chrome extension integration: [authenticated batch intake API](docs/job-intake-api.md)
+automatically runs job and candidate analysis, then leaves Include/Skip review
+and document generation under your control.
+
 A single-user, local-first job pipeline. Bun serves a HonoX application that
 renders HTML with `hono/jsx`; htmx performs fragment swaps. There is no SPA, no
 client hydration framework, and no ORM other than Drizzle.
@@ -212,7 +216,7 @@ The catalog and reusable network records have their own bookmarkable pages:
 
 ### Backup and restore
 
-`/export` downloads a **portable core-data export** (schema version 4):
+`/export` downloads a **portable core-data export** (schema version 5):
 companies, contacts, applications, the reviewed skill catalog and aliases,
 activities, application-contact links, and Job Post raw-text versions. It
 deliberately omits derived AI history, generated artifacts, baseline history, and
