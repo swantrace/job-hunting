@@ -80,7 +80,15 @@ export function ApplicationForm({
           ))}
         </SelectField>
         <InputField label="Source" name="applicationSource" value={job.applicationSource} />
-        <InputField label="Salary" name="salary" value={job.salary} />
+        <TextareaField
+          label="Salary"
+          name="salary"
+          value={job.salary}
+          rows={2}
+          maxLength={500}
+          help="Free-form compensation details (up to 500 characters)."
+          error={err(errors, 'salary')}
+        />
         <div class="sm:col-span-2">
           <TextareaField label="Notes" name="notes" value={job.notes ?? ''} rows={5} />
         </div>

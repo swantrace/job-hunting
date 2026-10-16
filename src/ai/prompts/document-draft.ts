@@ -11,9 +11,10 @@
 
 import { type DocumentDraftPolicy, documentDraftPolicy } from '../../lib/document-draft/policy'
 
-export const documentDraftPromptVersion = '2.1.0'
+export const documentDraftPromptVersion = '2.2.0'
 
 const sourceRules = `# Source authority
+0. Requirements with usage=skills-only-qualified were explicitly Included as transferable, not proven. Mention them only as qualified transferable skills in the resume Skills section. Never add them to summary, experience, projects, publications, or cover-letter prose; never claim proficiency or invent supporting achievements. A missing user reason does not relax this boundary. Related frameworks are not interchangeable skills.
 1. Canonical Career Data is the factual authority.
 2. When present, a user-authored reason for an Include decision permits only that narrow application-specific claim.
 3. When present, the reviewed Job Description controls targeting and supported terminology, not candidate facts.

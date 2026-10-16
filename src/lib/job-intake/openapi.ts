@@ -25,6 +25,7 @@ export const intakeOpenAPI = {
               authenticated: { const: true },
               limits: { type: 'object' },
               pollingIntervalSeconds: { type: 'integer' },
+              repeatImportBehavior: { const: 'refresh-analysis' },
             },
           }),
           '401': response('Invalid token.', reference('Error')),

@@ -36,6 +36,9 @@ export type DocumentDraftRequirement = {
   decisionReason: string | null
   rawLabel: string | null
   sourceText: string | null
+  evidenceKind?: string
+  usage?: 'skills-only-qualified' | 'supported-claim'
+  evidenceExplanation?: string | null
 }
 
 export type DocumentDraftSnapshot = {
@@ -192,6 +195,8 @@ type GenerationSourceLike = {
     decisionReason: string | null
     rawLabel: string | null
     requirementStatement: string
+    evidenceKind?: string
+    evidenceExplanation?: string
   }>
 }
 
@@ -242,6 +247,9 @@ export function buildDocumentDraftSnapshot(
       decisionReason: item.decisionReason ?? null,
       rawLabel: item.rawLabel ?? null,
       sourceText: item.requirementStatement ?? null,
+      evidenceKind: item.evidenceKind ?? 'unknown-evidence',
+      usage: item.evidenceKind === 'transferable' ? 'skills-only-qualified' : 'supported-claim',
+      evidenceExplanation: item.evidenceExplanation ?? null,
     })),
     excludedSkills: [...new Set(excludedSkills)],
     documentPolicy: directionDocumentPolicy(source.application.direction, executor),

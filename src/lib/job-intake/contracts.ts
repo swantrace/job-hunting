@@ -70,7 +70,7 @@ export const captureItemSchema = z.strictObject({
         (v) => (v === '' ? null : v),
         z.string().refine(isISODate, 'Use a real YYYY-MM-DD date.').nullable().optional(),
       ),
-      salary: optionalText(150),
+      salary: optionalText(500),
     })
     .optional(),
   capture: z

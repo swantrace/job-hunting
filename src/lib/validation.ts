@@ -56,7 +56,7 @@ export const quickCollectSchema = z.object({
   location: optionalText(200),
   url: optionalUrl,
   postedDate: z.preprocess(emptyToNull, isoDate.nullable()),
-  salary: optionalText(150),
+  salary: optionalText(500),
   applicationSource: optionalText(150),
   jobPostText: optionalText(100000),
   parserModel: optionalText(100),
@@ -76,7 +76,7 @@ export const applicationSchema = z.object({
   priority: z.enum(priorities),
   appliedDate: z.preprocess(emptyToNull, isoDate.nullable()),
   applicationSource: optionalText(150),
-  salary: optionalText(150),
+  salary: optionalText(500),
   notes: optionalText(5000),
 })
 
@@ -110,19 +110,21 @@ export const managedSkillSchema = skillSchema.extend({
   ),
   reviewStatus: z.enum(skillReviewStatuses),
 })
-export const skillDecisionSchema = z
-  .object({
-    action: z.enum(['skip', 'include']),
-    reason: z.string().trim().max(2000).default(''),
-  })
-  .superRefine((value, ctx) => {
-    if (value.action === 'include' && value.reason.trim() === '')
-      ctx.addIssue({
-        code: 'custom',
-        message: 'A reason is required to include this skill.',
-        path: ['reason'],
-      })
-  })
+export const skillDecisionSchemaFor = (transferable = false) =>
+  z
+    .object({
+      action: z.enum(['skip', 'include']),
+      reason: z.string().trim().max(2000).default(''),
+    })
+    .superRefine((value, ctx) => {
+      if (value.action === 'include' && !transferable && value.reason.trim() === '')
+        ctx.addIssue({
+          code: 'custom',
+          message: 'A reason is required to include this skill.',
+          path: ['reason'],
+        })
+    })
+export const skillDecisionSchema = skillDecisionSchemaFor()
 export const companySchema = z.object({
   name: z.string().trim().min(1).max(200),
   website: optionalUrl,

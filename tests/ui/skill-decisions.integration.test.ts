@@ -46,6 +46,20 @@ function submit(action: string, extra: Record<string, string> = {}) {
 }
 
 describe('skill decision HTMX response boundaries', () => {
+  test('only an authoritative transferable assessment makes Include reason optional', async () => {
+    mockListRunSkillReviews.mockReturnValue([{ ...requirement, evidenceKind: 'transferable' }])
+    mockGetCandidateAnalysisState.mockReturnValue({
+      state: 'current',
+      currentCompleted: { id: 1, status: 'Completed' },
+      latest: { id: 1, status: 'Completed' },
+      latestCompleted: { id: 1, status: 'Completed' },
+      staleCompleted: null,
+      reasons: [],
+    })
+    expect((await submit('include', { reason: '' })).status).toBe(200)
+    mockListRunSkillReviews.mockReturnValue([{ ...requirement, evidenceKind: 'unknown-evidence' }])
+    expect((await submit('include', { reason: '', includeBasis: 'transferable' })).status).toBe(422)
+  })
   test('returns the review panel and score fragments on a valid decision', async () => {
     mockListRunSkillReviews.mockReturnValue([requirement])
     mockGetCandidateAnalysisState.mockReturnValue({

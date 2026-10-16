@@ -1,4 +1,3 @@
-import { hasPendingRunDecisions } from '../../db/analysis-decisions'
 import { listCareerDirections } from '../../db/career-directions'
 import { readCareerCandidate } from '../../db/career-facts'
 import { db } from '../../db/client'
@@ -92,8 +91,7 @@ export function getApplicationReadiness(jobId: number): ApplicationReadiness {
     hasReviewedAnalysis,
     analysisStatus,
     hasPendingSkillDecisions: current
-      ? hasPendingRunDecisions(db, current.id) ||
-        listRunSkillReviews(current.id).some(
+      ? listRunSkillReviews(current.id).some(
           (r) => r.analysisResult !== 'proven-match' && r.decision === 'pending',
         )
       : true,

@@ -5,6 +5,19 @@ import { requirementTermSchema } from '../src/ai/schemas/job-analysis'
 import { jobParserResponseSchema } from '../src/ai/schemas/job-parser'
 
 describe('AI job parser output', () => {
+  test('uses the same 500-character salary limit for AI output and provider schema', () => {
+    const payload = {
+      jobTitle: 'Engineer',
+      location: null,
+      postedDate: null,
+      direction: 'fullstack',
+    }
+    expect(parsedJobSchema.parse({ ...payload, salary: 'x'.repeat(500) }).salary).toBe(
+      'x'.repeat(500),
+    )
+    expect(parsedJobSchema.safeParse({ ...payload, salary: 'x'.repeat(501) }).success).toBe(false)
+    expect(jobParserResponseSchema(['fullstack']).properties.salary.maxLength).toBe(500)
+  })
   test('accepts a complete structured result with requirement-owned skills', () => {
     const result = parsedJobSchema.parse({
       jobTitle: 'Backend Engineer',

@@ -33,6 +33,5 @@ primary_region = 'yyz'
   processes = ['app']
 
 [[vm]]
-  memory = '256mb'
+  memory = '1gb'
   cpus = 1
-  memory_mb = 256

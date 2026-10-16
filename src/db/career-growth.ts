@@ -1,6 +1,8 @@
 import { inArray } from 'drizzle-orm'
+import type { RequirementAssessment } from '../ai/schemas/candidate-fit'
 import { parseStoredCandidateFit } from '../lib/candidate/fit-result'
 import { type CareerGrowthInputRow, isActiveApplicationStatus } from '../lib/career/growth'
+import { readReviewSnapshot, reviewSkillEvidence } from '../lib/skills/review-evidence'
 import { db } from './client'
 import * as schema from './schema'
 
@@ -95,13 +97,15 @@ export function listCareerGrowthRows(
     ]),
   )
 
-  const assessmentByRun = new Map<number, Map<number, string>>()
+  const evidenceByRun = new Map<number, Map<number, RequirementAssessment>>()
+  const snapshots = new Map<number, ReturnType<typeof readReviewSnapshot>>()
   for (const run of runs) {
-    const parsed = parseStoredCandidateFit(run.resultJson)
-    const byRequirement = new Map<number, string>()
-    for (const assessment of parsed?.requirementAssessments ?? [])
-      byRequirement.set(assessment.jobRequirementId, assessment.evidenceStatus)
-    assessmentByRun.set(run.id, byRequirement)
+    const fit = parseStoredCandidateFit(run.resultJson)
+    evidenceByRun.set(
+      run.id,
+      new Map(fit?.requirementAssessments.map((a) => [a.jobRequirementId, a]) ?? []),
+    )
+    snapshots.set(run.id, readReviewSnapshot(run.inputSnapshotJson))
   }
 
   type Aggregate = {
@@ -152,8 +156,14 @@ export function listCareerGrowthRows(
     else if (requirement.importance === 'preferred') existing.preferredCount += 1
     else existing.mentionedCount += 1
 
-    const status = assessmentByRun.get(runId)?.get(requirement.id)
-    if (status === 'direct' || status === 'transferable') existing.verifiedEvidenceCount += 1
+    if (
+      reviewSkillEvidence(
+        skill.key,
+        snapshots.get(runId) ?? null,
+        evidenceByRun.get(runId)?.get(requirement.id),
+      ) === 'direct'
+    )
+      existing.verifiedEvidenceCount += 1
     if (decisionByRunSkill.get(`${runId}:${skill.id}`)?.decision === 'include')
       existing.retainedCount += 1
     if (app.updatedAt > existing.latestActivityAt) existing.latestActivityAt = app.updatedAt

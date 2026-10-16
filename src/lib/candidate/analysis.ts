@@ -20,6 +20,7 @@ import { careerEvidenceIds, documentSafeCareerData, loadCareerData } from '../ca
 import { todayISO } from '../date'
 import { currentJobAnalysisHash } from '../job-analysis/input'
 import { parseJobAnalysisResult } from '../job-analysis/result'
+import { skillReviewPolicyVersion } from '../skills/review-evidence'
 import { careerSkillMatchResult } from '../skills/runtime-career-skills'
 import { assertEveryRequirementAssessed, validateCandidateFitEvidence } from './fit-analysis'
 import { candidateSnapshotIdentity } from './identity'
@@ -131,6 +132,7 @@ export function buildCandidateAnalysisInput(
     projects: data.projects.schemaVersion,
     skills: data.skills.schemaVersion,
     stories: data.stories.schemaVersion,
+    skillReviewPolicy: skillReviewPolicyVersion,
   }
   const careerData = documentSafeCareerData(data)
 

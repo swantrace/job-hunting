@@ -360,6 +360,10 @@ export const analysisRunDecisions = sqliteTable(
       (): AnySQLiteColumn => analysisRunDecisions.id,
       { onDelete: 'set null' },
     ),
+    includeBasis: text('include_basis', { enum: ['user-reason', 'transferable'] })
+      .notNull()
+      .default('user-reason'),
+    basisHash: text('basis_hash'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
@@ -374,7 +378,11 @@ export const analysisRunDecisions = sqliteTable(
     ),
     check(
       'analysis_run_decisions_include_reason_check',
-      sql`${table.decision} != 'include' or (${table.reason} is not null and trim(${table.reason}) != '')`,
+      sql`${table.decision} != 'include' or ${table.includeBasis} = 'transferable' or (${table.reason} is not null and trim(${table.reason}) != '')`,
+    ),
+    check(
+      'analysis_run_decisions_basis_check',
+      sql`${table.includeBasis} in ('user-reason', 'transferable')`,
     ),
   ],
 )

@@ -19,6 +19,49 @@ export type DraftValidationWarning = {
   message: string
 }
 
+/** Enforce application-only transferable claims outside the allowed Skills section. */
+export function validateTransferableSkillUsage(
+  draft: DocumentDraft,
+  skills: string[],
+): DraftValidationWarning[] {
+  const disallowed = draft.sections.filter(
+    (section) => draft.kind !== 'resume' || section.id !== 'skills',
+  )
+  const text = normalizeForComparison(
+    disallowed.flatMap((section) => section.blocks.map((block) => block.text)).join(' '),
+  )
+  const skillBlocks = draft.sections.find((section) => section.id === 'skills')?.blocks ?? []
+  return skills.flatMap((skill) => {
+    const term = normalizeForComparison(skill)
+    const pattern = new RegExp(
+      `(?<![\\p{L}\\p{N}_])${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}_])`,
+      'iu',
+    )
+    if (term && pattern.test(text))
+      return [
+        {
+          code: 'transferable-skill-outside-skills',
+          message: `Transferable skill "${skill}" cannot be claimed outside the resume Skills section.`,
+        },
+      ]
+    if (
+      term &&
+      skillBlocks.some(
+        (block) =>
+          pattern.test(normalizeForComparison(block.text)) &&
+          !/\b(?:transferable|familiarity|exposure|learning)\b/i.test(block.text),
+      )
+    )
+      return [
+        {
+          code: 'unqualified-transferable-skill',
+          message: `Transferable skill "${skill}" needs a limited qualification.`,
+        },
+      ]
+    return []
+  })
+}
+
 export type SectionContract = {
   required: DocumentSectionId[]
   order: DocumentSectionId[]

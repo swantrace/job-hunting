@@ -23,7 +23,7 @@ import {
 } from '../../../src/lib/validation'
 import { JobAnalysisDraft } from '../intake/JobAnalysisDraft'
 import { EmptyState } from '../ui/EmptyState'
-import { InputField, SelectField } from '../ui/FormField'
+import { InputField, SelectField, TextareaField } from '../ui/FormField'
 import { Icon } from '../ui/Icon'
 import { StatusBadge } from '../ui/StatusBadge'
 
@@ -239,7 +239,15 @@ export function QuickCollect({
             value={values.postedDate ?? ''}
             error={error(errors, 'postedDate')}
           />
-          <InputField label="Salary" name="salary" value={values.salary} />
+          <TextareaField
+            label="Salary"
+            name="salary"
+            value={values.salary}
+            rows={2}
+            maxLength={500}
+            help="Free-form compensation details (up to 500 characters)."
+            error={error(errors, 'salary')}
+          />
           <InputField
             label="Application source"
             name="applicationSource"

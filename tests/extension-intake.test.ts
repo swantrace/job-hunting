@@ -4,6 +4,8 @@ import { Hono } from 'hono'
 import { candidateFitSchemaVersion } from '../src/ai/schemas/candidate-fit'
 import { jobAnalysisSchemaVersion } from '../src/ai/schemas/job-analysis'
 import { completeAnalysisRun, createAnalysisRun } from '../src/db/analysis'
+import { decideRunSkill } from '../src/db/analysis-decision-service'
+import { listRunDecisions } from '../src/db/analysis-decisions'
 import { db } from '../src/db/client'
 import {
   acceptExtensionBatch,
@@ -84,6 +86,25 @@ describe('extension intake contract and identity', () => {
 })
 
 describe('extension API persistence', () => {
+  test('preserves 500-character compensation text from capture through application storage', () => {
+    const salary = `${'Compensation includes salary, bonus, and benefits. '.repeat(11).slice(0, 499)}.`
+    const payload = { ...item(), suggestedMetadata: { salary } }
+    expect(captureItemSchema.parse(payload).suggestedMetadata?.salary).toBe(salary)
+    expect(
+      captureItemSchema.safeParse({ ...payload, suggestedMetadata: { salary: 'x'.repeat(501) } })
+        .success,
+    ).toBe(false)
+    const accepted = acceptExtensionBatch(envelope([payload]), crypto.randomUUID())
+    const captured = extensionBatchStatus(accepted.batchId)!.items[0]
+    const prepared = prepareExtensionItem(captured.itemId)
+    expect(
+      db
+        .select()
+        .from(jobApplications)
+        .where(eq(jobApplications.id, prepared.jobApplicationId!))
+        .get()?.salary,
+    ).toBe(salary)
+  })
   test('replays identical submissions, isolates rejected items and rejects conflicting retries', () => {
     const data = envelope([item(), { ...item(), rawText: '' }])
     const key = crypto.randomUUID()
@@ -93,7 +114,7 @@ describe('extension API persistence', () => {
     expect(extensionBatchStatus(accepted.batchId)?.counts.rejected).toBe(1)
     expect(() => acceptExtensionBatch({ ...data, items: [item()] }, key)).toThrow('already used')
   })
-  test('same job is ignored even when text or canonicalization policy changes', () => {
+  test('reimport updates the posting version without duplicating or changing application facts', () => {
     const fixture = careerTestDatabase()
     try {
       const first = item()
@@ -127,10 +148,12 @@ describe('extension API persistence', () => {
         crypto.randomUUID(),
       )
       const duplicate = prepareExtensionItem(extensionBatchStatus(b.batchId)!.items[0].itemId)
-      expect(duplicate.pipelineStatus).toBe('duplicate')
+      expect(duplicate.pipelineStatus).toBe('processing')
       expect(duplicate.jobApplicationId).toBe(prepared.jobApplicationId)
+      expect(duplicate.jobPostingId).not.toBe(prepared.jobPostingId)
+      expect(duplicate.jobAnalysisRunId).toBeNull()
       const status = extensionBatchStatus(b.batchId)!
-      expect(status.isTerminal).toBe(true)
+      expect(status.isTerminal).toBe(false)
       expect(extensionBatchStatus(b.batchId)?.terminalRevision).toBe(status.terminalRevision)
     } finally {
       fixture.cleanup()
@@ -164,7 +187,8 @@ test('intake auth fails closed, returns JSON and does not authorize unrelated ro
 test('intake reaches candidate completion with pending catalog skills and survives same-skill merge without AI rerun', async () => {
   const fixture = careerTestDatabase()
   try {
-    const accepted = acceptExtensionBatch(envelope([item()]), crypto.randomUUID())
+    const captured = item()
+    const accepted = acceptExtensionBatch(envelope([captured]), crypto.randomUUID())
     const id = extensionBatchStatus(accepted.batchId)!.items[0].itemId
     let calls = 0
     const dispatch: IntakeDispatchers = {
@@ -276,13 +300,53 @@ test('intake reaches candidate completion with pending catalog skills and surviv
     expect(application.jobTitle).toBe('Engineer')
     const reviews = listRunSkillReviews(row.candidateAnalysisRunId!)
     expect(reviews[0].reviewStatus).toBe('pending')
+    decideRunSkill({
+      runId: row.candidateAnalysisRunId!,
+      skillId: reviews[0].skillId,
+      decision: 'include',
+      reason: 'Used this broker in a personal prototype.',
+    })
+    const prior = listRunDecisions(db, row.candidateAnalysisRunId!)[0]!
+    expect(prior.basisHash).toBeTruthy()
+    db.update(jobApplications)
+      .set({ jobTitle: 'Human title', location: 'Human location', status: 'Applied' })
+      .where(eq(jobApplications.id, application.id))
+      .run()
+    const refreshed = acceptExtensionBatch(
+      envelope([{ ...captured, clientItemId: crypto.randomUUID() }]),
+      crypto.randomUUID(),
+    )
+    const refreshId = extensionBatchStatus(refreshed.batchId)!.items[0].itemId
+    // Keep title stable in the frozen reuse comparison: metadata edits are not skill evidence.
+    await advanceExtensionItem(refreshId, dispatch)
+    await advanceExtensionItem(refreshId, dispatch)
+    const refreshedStatus = extensionBatchStatus(refreshed.batchId)!
+    expect(refreshedStatus.isTerminal).toBe(true)
+    expect(calls).toBe(3) // candidate only; no second paid Job Analysis
+    const refreshedRow = db
+      .select()
+      .from(jobIntakeItems)
+      .where(eq(jobIntakeItems.id, refreshId))
+      .get()!
+    expect(refreshedRow.jobApplicationId).toBe(application.id)
+    expect(refreshedRow.jobPostingId).toBe(row.jobPostingId)
+    expect(refreshedRow.jobAnalysisRunId).toBe(row.jobAnalysisRunId)
+    expect(refreshedRow.candidateAnalysisRunId).not.toBe(row.candidateAnalysisRunId)
+    const inherited = listRunDecisions(db, refreshedRow.candidateAnalysisRunId!)[0]!
+    expect(inherited.decision).toBe('include')
+    expect(inherited.reason).toBe(prior.reason)
+    expect(inherited.previousDecisionId).toBe(prior.id)
+    expect(refreshedStatus.decisionCount).toBe(0)
+    expect(
+      db.select().from(jobApplications).where(eq(jobApplications.id, application.id)).get(),
+    ).toMatchObject({ jobTitle: 'Human title', location: 'Human location', status: 'Applied' })
     const target = insertSkill(db, { name: `Canonical Broker ${id}`, reviewStatus: 'approved' })
     mergeSkills(reviews[0].skillId, target.id)
     expect(getCandidateAnalysisState(application.id).currentCompleted?.id).toBe(
-      row.candidateAnalysisRunId ?? undefined,
+      refreshedRow.candidateAnalysisRunId ?? undefined,
     )
     expect(listRunSkillReviews(row.candidateAnalysisRunId!)[0].skillId).toBe(target.id)
-    expect(calls).toBe(2)
+    expect(calls).toBe(3)
   } finally {
     fixture.cleanup()
   }

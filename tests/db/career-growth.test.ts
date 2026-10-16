@@ -120,7 +120,7 @@ function seedRun(db: Db, analysisId: number, resultJson: string): number {
         `INSERT INTO application_analysis_runs (
           job_posting_analysis_id, status, queue_job_id, input_hash, input_snapshot_json,
           result_json, created_at, updated_at, completed_at
-        ) VALUES (?, 'Completed', ?, 'hash', '{}', ?, '2026-08-28', '2026-08-28', '2026-08-28') RETURNING id`,
+        ) VALUES (?, 'Completed', ?, 'hash', '{"sourceVersions":{"skillReviewPolicy":1},"careerData":{"skills":[{"id":"typescript","resumeEligible":true,"evidence":["project:synthetic"]}],"projects":[{"id":"synthetic"}]}}', ?, '2026-08-28', '2026-08-28', '2026-08-28') RETURNING id`,
       )
       .get(analysisId, `q-${analysisId}`, resultJson) as { id: number }
   ).id

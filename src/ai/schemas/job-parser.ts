@@ -17,7 +17,7 @@ export const parsedJobSchema = z.object({
     .trim()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable(),
-  salary: z.string().trim().max(150).nullable(),
+  salary: z.string().trim().max(500).nullable(),
   direction: z.string().trim().min(1).max(80),
 })
 
@@ -53,6 +53,7 @@ export function jobParserResponseSchema(directionIds: string[]) {
       },
       salary: {
         type: ['string', 'null'],
+        maxLength: 500,
         description: 'Salary or compensation text exactly as stated, or null.',
       },
       direction: {

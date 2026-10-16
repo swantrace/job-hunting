@@ -1,5 +1,6 @@
-import { listRunDecisions, upsertRunDecision } from './analysis-decisions'
+import { upsertRunDecision } from './analysis-decisions'
 import { db } from './client'
+import { listRunSkillReviews } from './skill-queries'
 
 /**
  * Singleton-backed run-scoped decision operations for the Review routes.
@@ -7,9 +8,10 @@ import { db } from './client'
  * route code never opens the database directly and can be mocked in UI tests.
  */
 export function skipRemainingRunDecisions(runId: number) {
-  for (const decision of listRunDecisions(db, runId)) {
+  for (const decision of listRunSkillReviews(runId)) {
+    if (decision.analysisResult === 'proven-match') continue
     if (decision.decision === 'pending') {
-      upsertRunDecision(db, { runId, skillId: decision.skillId, decision: 'skip', reason: null })
+      decideRunSkill({ runId, skillId: decision.skillId, decision: 'skip', reason: null })
     }
   }
 }
@@ -20,10 +22,16 @@ export function decideRunSkill(input: {
   decision: 'skip' | 'include'
   reason: string | null
 }) {
+  const review = listRunSkillReviews(input.runId).find((row) => row.skillId === input.skillId)
+  if (!review || review.analysisResult === 'proven-match')
+    throw new Error('This skill does not require a decision.')
+  const includeBasis = review.evidenceKind === 'transferable' ? 'transferable' : 'user-reason'
   upsertRunDecision(db, {
     runId: input.runId,
     skillId: input.skillId,
     decision: input.decision,
     reason: input.reason,
+    includeBasis,
+    basisHash: review.decisionBasisHash,
   })
 }

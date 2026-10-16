@@ -16,9 +16,14 @@ export const runDecisionSchema = z
   .object({
     decision: z.enum(['pending', 'skip', 'include']),
     reason: z.string().trim().max(2000).nullable(),
+    includeBasis: z.enum(['user-reason', 'transferable']).default('user-reason'),
   })
   .superRefine((value, ctx) => {
-    if (value.decision === 'include' && (!value.reason || value.reason.trim() === ''))
+    if (
+      value.decision === 'include' &&
+      value.includeBasis !== 'transferable' &&
+      (!value.reason || value.reason.trim() === '')
+    )
       ctx.addIssue({
         code: 'custom',
         message: 'A reason is required to include this skill.',
@@ -82,6 +87,8 @@ export function findPriorDecision(db: DecisionDb, runId: number, skillId: number
         decision: analysisRunDecisions.decision,
         reason: analysisRunDecisions.reason,
         previousDecisionId: analysisRunDecisions.previousDecisionId,
+        includeBasis: analysisRunDecisions.includeBasis,
+        basisHash: analysisRunDecisions.basisHash,
         createdAt: analysisRunDecisions.createdAt,
         updatedAt: analysisRunDecisions.updatedAt,
       })
@@ -100,9 +107,11 @@ export function findPriorDecision(db: DecisionDb, runId: number, skillId: number
           eq(jobPostings.jobApplicationId, lineage.jobApplicationId),
           eq(analysisRunDecisions.skillId, skillId),
           sql`${analysisRunDecisions.applicationAnalysisRunId} < ${runId}`,
+          sql`${analysisRunDecisions.decision} != 'pending'`,
+          eq(applicationAnalysisRuns.status, 'Completed'),
         ),
       )
-      .orderBy(desc(analysisRunDecisions.id))
+      .orderBy(desc(applicationAnalysisRuns.id), desc(analysisRunDecisions.id))
       .get() ?? null
   )
 }
@@ -133,6 +142,8 @@ export function upsertRunDecision(
     decision: 'pending' | 'skip' | 'include'
     reason: string | null
     previousDecisionId?: number | null
+    includeBasis?: 'user-reason' | 'transferable'
+    basisHash?: string | null
   },
 ) {
   const date = todayISO()
@@ -141,6 +152,8 @@ export function upsertRunDecision(
       ? (findPriorDecision(db, input.runId, input.skillId)?.id ?? null)
       : input.previousDecisionId
   const reason = input.decision === 'include' ? (input.reason ?? null) : null
+  const includeBasis = input.includeBasis ?? 'user-reason'
+  runDecisionSchema.parse({ decision: input.decision, reason, includeBasis })
   db.insert(analysisRunDecisions)
     .values({
       applicationAnalysisRunId: input.runId,
@@ -148,12 +161,21 @@ export function upsertRunDecision(
       decision: input.decision,
       reason,
       previousDecisionId: previous,
+      includeBasis,
+      basisHash: input.basisHash ?? null,
       createdAt: date,
       updatedAt: date,
     })
     .onConflictDoUpdate({
       target: [analysisRunDecisions.applicationAnalysisRunId, analysisRunDecisions.skillId],
-      set: { decision: input.decision, reason, previousDecisionId: previous, updatedAt: date },
+      set: {
+        decision: input.decision,
+        reason,
+        previousDecisionId: previous,
+        includeBasis,
+        basisHash: input.basisHash ?? null,
+        updatedAt: date,
+      },
     })
     .run()
 }

@@ -1,6 +1,8 @@
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { jobAnalysisSchemaVersion } from '../ai/schemas/job-analysis'
 import { canonicalHash } from '../lib/canonical-hash'
 import { nowISO } from '../lib/date'
+import { currentJobAnalysisHash } from '../lib/job-analysis/input'
 import {
   type CaptureItem,
   captureEnvelopeSchema,
@@ -14,7 +16,6 @@ import { listCareerDirections } from './career-directions'
 import { readCareerCandidate } from './career-facts'
 import { db } from './client'
 import {
-  analysisRunDecisions,
   applicationAnalysisRuns,
   companies,
   jobApplications,
@@ -24,6 +25,7 @@ import {
   jobPostings,
   jobSourceIdentities,
 } from './schema'
+import { listRunSkillReviews } from './skill-queries'
 
 export function acceptExtensionBatch(value: unknown, key: string) {
   if (!/^[\w-]{16,120}$/.test(key))
@@ -151,13 +153,51 @@ export function prepareExtensionItem(id: number) {
           .values({ identity, jobApplicationId: ownerId })
           .onConflictDoNothing()
           .run()
+      const latestPosting = tx
+        .select()
+        .from(jobPostings)
+        .where(eq(jobPostings.jobApplicationId, ownerId))
+        .orderBy(desc(jobPostings.version))
+        .get()
+      const contentHash = canonicalHash(item.rawText)
+      const sameContent = latestPosting?.contentHash === contentHash
+      const posting = sameContent
+        ? latestPosting
+        : tx
+            .insert(jobPostings)
+            .values({
+              jobApplicationId: ownerId,
+              version: (latestPosting?.version ?? 0) + 1,
+              rawText: item.rawText,
+              capturedAt: nowISO(),
+              contentHash,
+            })
+            .returning()
+            .get()
+      // Preserve all application metadata, including explicit human edits and pipeline status.
+      const reusableJob = sameContent
+        ? tx
+            .select()
+            .from(jobPostingAnalyses)
+            .where(
+              and(
+                eq(jobPostingAnalyses.jobPostingId, posting.id),
+                inArray(jobPostingAnalyses.status, ['Queued', 'Processing', 'Completed']),
+                eq(jobPostingAnalyses.schemaVersion, jobAnalysisSchemaVersion),
+                eq(jobPostingAnalyses.inputHash, currentJobAnalysisHash(db, posting.id)!),
+              ),
+            )
+            .orderBy(desc(jobPostingAnalyses.id))
+            .get()
+        : undefined
       tx.update(jobIntakeItems)
         .set({
           jobApplicationId: ownerId,
-          pipelineStatus: 'duplicate',
-          stage: 'done',
-          status: 'ready',
-          claimedAt: null,
+          jobPostingId: posting.id,
+          extractedText: item.rawText,
+          jobAnalysisRunId: reusableJob?.id ?? null,
+          pipelineStatus: 'processing',
+          stage: reusableJob?.status === 'Completed' ? 'candidate-analysis' : 'job-analysis',
           updatedAt: nowISO(),
         })
         .where(eq(jobIntakeItems.id, id))
@@ -254,16 +294,9 @@ export function extensionBatchStatus(batchId: number) {
             .get()
         : null
       const decisions = row.candidateAnalysisRunId
-        ? tx
-            .select()
-            .from(analysisRunDecisions)
-            .where(
-              and(
-                eq(analysisRunDecisions.applicationAnalysisRunId, row.candidateAnalysisRunId),
-                eq(analysisRunDecisions.decision, 'pending'),
-              ),
-            )
-            .all().length
+        ? listRunSkillReviews(row.candidateAnalysisRunId, tx).filter(
+            (r) => r.analysisResult !== 'proven-match' && r.decision === 'pending',
+          ).length
         : 0
       return {
         clientItemId: row.clientItemId,
