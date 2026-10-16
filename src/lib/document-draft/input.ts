@@ -1,6 +1,7 @@
 import { listCareerDirections, readCareerDirection } from '../../db/career-directions'
 import { db } from '../../db/client'
 import type { DbExecutor } from '../../db/skill-queries'
+import { type AtsImportance, type AtsTerm, atsImportanceWeight } from '../ats-audit'
 import { canonicalHash } from '../canonical-hash'
 import {
   type FrozenBaseResumeSource,
@@ -64,6 +65,55 @@ export type DocumentDraftSnapshot = {
   excludedSkills: string[]
   documentPolicy: DocumentDraftPolicy
   careerData: ReturnType<typeof safeCareerData>
+}
+
+const auditImportances: Record<string, AtsImportance> = {
+  preferred: 'preferred',
+  mentioned: 'mentioned',
+  required: 'required',
+}
+
+/**
+ * The Job Description terms the ATS keyword audit checks generated text against,
+ * read from the same frozen snapshot the drafts are written from: every
+ * generation-eligible requirement (its raw JD label kept as an alias) and every
+ * excluded skill, reported as a term that must not be added because no evidence
+ * supports it. Duplicate skills are merged, keeping the strongest importance.
+ */
+export function documentDraftAuditTerms(snapshot: DocumentDraftSnapshot): AtsTerm[] {
+  const bySkill = new Map<string, AtsTerm>()
+  const merge = (term: AtsTerm) => {
+    const key = term.canonical.trim().toLowerCase()
+    if (key === '') return
+    const aliases = [...new Set(term.aliases.map((alias) => alias.trim()).filter(Boolean))]
+    const existing = bySkill.get(key)
+    if (!existing) {
+      bySkill.set(key, { ...term, aliases })
+      return
+    }
+    existing.aliases = [...new Set([...existing.aliases, ...aliases])]
+    if (
+      atsImportanceWeight(term.importance ?? 'required') >
+      atsImportanceWeight(existing.importance ?? 'required')
+    )
+      existing.importance = term.importance
+    existing.evidenceEligible = existing.evidenceEligible || term.evidenceEligible
+  }
+
+  for (const requirement of snapshot.requirements)
+    merge({
+      canonical: requirement.skillName,
+      aliases:
+        requirement.rawLabel && requirement.rawLabel !== requirement.skillName
+          ? [requirement.rawLabel]
+          : [],
+      evidenceEligible: true,
+      importance: auditImportances[requirement.importance] ?? 'required',
+    })
+  for (const skill of snapshot.excludedSkills)
+    merge({ canonical: skill, aliases: [], evidenceEligible: false, importance: 'required' })
+
+  return [...bySkill.values()]
 }
 
 export function safeCareerData(

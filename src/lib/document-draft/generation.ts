@@ -20,6 +20,7 @@ import {
   saveGenerationRunResults,
 } from '../../db/generation'
 import { getArtifactsRoot } from '../artifacts/storage'
+import { auditResumeKeywords } from '../ats-audit'
 import { todayISO } from '../date'
 import { renderCoverLetterDocx } from '../docx/cover-letter-renderer'
 import { type DocumentIdentity } from '../docx/render-common'
@@ -33,6 +34,7 @@ import {
   buildBaselineDocumentDraftSnapshot,
   buildDocumentDraftSnapshot,
   type DocumentDraftSnapshot,
+  documentDraftAuditTerms,
 } from './input'
 import { extractMetricClaims, validateDocumentDraft } from './validation'
 
@@ -244,10 +246,22 @@ export async function generateApplicationDrafts(runId: number): Promise<Artifact
     resume: validateResumeDraft(resumeDraft, snapshot),
     coverLetter: validateCoverLetterDraft(coverLetterDraft, snapshot),
   }
+  // Deterministic keyword audit of the generated text against the frozen Job
+  // Description terms. No model is involved: the audit reports what the drafts
+  // matched, what may be added because evidence supports it, what must not be
+  // added, and any keyword stuffing.
+  const auditTerms = documentDraftAuditTerms(snapshot)
+  const atsAuditJson = JSON.stringify({
+    resume: auditResumeKeywords({ requiredTerms: auditTerms, resumeText: resumeMarkdown }),
+    coverLetter: auditResumeKeywords({
+      requiredTerms: auditTerms,
+      resumeText: coverLetterMarkdown,
+    }),
+  })
   saveGenerationRunResults(runId, {
     resumeJson: null,
     coverLetterJson: null,
-    atsAuditJson: null,
+    atsAuditJson,
     resumeMarkdown,
     coverLetterMarkdown,
     draftValidationJson: JSON.stringify(validation),

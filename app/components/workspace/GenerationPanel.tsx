@@ -210,6 +210,7 @@ export function GenerationPanel({
             resumeMarkdown={results?.resumeMarkdown ?? null}
             coverLetterMarkdown={results?.coverLetterMarkdown ?? null}
             draftValidationJson={results?.draftValidationJson ?? null}
+            atsAuditJson={results?.atsAuditJson ?? null}
           />
         </div>
       ) : latest ? (
