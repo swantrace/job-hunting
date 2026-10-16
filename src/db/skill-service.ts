@@ -319,7 +319,13 @@ export function mergeSkills(
           ? `Merge conflict: ${source.name} was ${decision.decision}; ${target.name} was ${targetDecision.decision}.\n${reasons.join('\n\n')}`
           : reasons.join('\n\n') || null
         tx.update(analysisRunDecisions)
-          .set({ decision: conflict ? 'pending' : selected.decision, reason, updatedAt: date })
+          .set({
+            decision: conflict ? 'pending' : selected.decision,
+            reason,
+            includeBasis: selected.includeBasis,
+            basisHash: null,
+            updatedAt: date,
+          })
           .where(eq(analysisRunDecisions.id, targetDecision.id))
           .run()
         tx.update(analysisRunDecisions)
@@ -335,7 +341,7 @@ export function mergeSkills(
         continue
       }
       tx.update(analysisRunDecisions)
-        .set({ skillId: targetId, updatedAt: date })
+        .set({ skillId: targetId, basisHash: null, updatedAt: date })
         .where(eq(analysisRunDecisions.id, decision.id))
         .run()
     }

@@ -41,6 +41,10 @@ export function RequirementEvidenceMatrix({
       {...(oob ? { 'hx-swap-oob': 'outerHTML' } : {})}
     >
       <h3 class="font-semibold">Requirement evidence matrix</h3>
+      <p class="mt-1 text-sm text-base-content/60">
+        AI assessments describe whole requirements, not verified possession of every named skill.
+        Canonical skill review below checks your personal skills and controls Include/Skip.
+      </p>
       {requirements.length === 0 ? (
         <p class="mt-2 text-sm text-base-content/60">
           No structured requirements are available for this application.
@@ -56,7 +60,7 @@ export function RequirementEvidenceMatrix({
                 <th>Importance</th>
                 <th>Source excerpt</th>
                 <th>Evidence</th>
-                <th>Status</th>
+                <th>AI assessment</th>
               </tr>
             </thead>
             <tbody>
@@ -84,7 +88,9 @@ export function RequirementEvidenceMatrix({
                     </td>
                     <td>
                       {assessment ? (
-                        <span class={`badge ${statusBadge[assessment.evidenceStatus]}`}>
+                        <span
+                          class={`badge whitespace-nowrap ${statusBadge[assessment.evidenceStatus]}`}
+                        >
                           {statusLabel[assessment.evidenceStatus]}
                         </span>
                       ) : (

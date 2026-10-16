@@ -1,4 +1,4 @@
-export const candidateFitPromptVersion = '2.0.0'
+export const candidateFitPromptVersion = '2.1.0'
 
 /**
  * Candidate-fit / evidence-matrix boundary. The model receives a frozen
@@ -21,5 +21,8 @@ Assessment rules:
 - evidenceStatus is direct, transferable, or unknown-evidence. Direct or transferable requires at least one evidence reference; unknown-evidence must have none.
 - unknown-evidence means supplied Career Data does not verify the requirement. It never proves the user lacks a skill.
 - relevance is direct or transferable and describes how the referenced source supports the requirement.
+- A standard catalog entry is NOT a personal skill. For every named technology, require its exact personal Career Data skill and usable supporting evidence; absence is unknown-evidence, not proof of transferable capability.
+- Do not infer Vue.js capability from React, or enterprise IAM administration from application authorization. Related technologies can be discussed as learning context, never as verified possession.
+- Direct requires evidence covering the actual requested scope and seniority. Transferable means a recorded personal skill has relevant but limited evidence; the user must explicitly Include or Skip it. Never promote all skills in a compound requirement merely because one part has evidence.
 
 Return only the JSON object required by the schema.`

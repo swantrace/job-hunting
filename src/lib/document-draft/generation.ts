@@ -43,7 +43,11 @@ import {
   type DocumentDraftSnapshot,
   documentDraftAuditTerms,
 } from './input'
-import { extractMetricClaims, validateDocumentDraft } from './validation'
+import {
+  extractMetricClaims,
+  validateDocumentDraft,
+  validateTransferableSkillUsage,
+} from './validation'
 
 type ArtifactOutput = {
   type: GeneratedArtifactType
@@ -253,6 +257,14 @@ export async function generateApplicationDrafts(runId: number): Promise<Artifact
 
   const resumeDraft = parseDocumentDraft(resumeMarkdown, 'resume')
   const coverLetterDraft = parseDocumentDraft(coverLetterMarkdown, 'cover-letter')
+  const transferableSkills = snapshot.requirements
+    .filter((r) => r.usage === 'skills-only-qualified')
+    .flatMap((r) => [r.skillName, ...(r.rawLabel ? [r.rawLabel] : [])])
+  const transferViolations = [
+    ...validateTransferableSkillUsage(resumeDraft, transferableSkills),
+    ...validateTransferableSkillUsage(coverLetterDraft, transferableSkills),
+  ]
+  if (transferViolations.length) throw new Error(transferViolations.map((v) => v.message).join(' '))
   const validation = {
     resume: validateResumeDraft(resumeDraft, snapshot),
     coverLetter: validateCoverLetterDraft(coverLetterDraft, snapshot),

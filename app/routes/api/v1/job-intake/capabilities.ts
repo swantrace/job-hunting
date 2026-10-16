@@ -7,5 +7,6 @@ export default createRoute((c) =>
     authenticated: true,
     limits: intakeLimits,
     pollingIntervalSeconds: 30,
+    repeatImportBehavior: 'refresh-analysis',
   }),
 )

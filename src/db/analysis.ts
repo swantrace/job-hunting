@@ -1,7 +1,7 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
 import { nowISO, todayISO } from '../lib/date'
 import { careerSkillKeys } from '../lib/skills/runtime-career-skills'
-import { seedPendingRunDecisions } from './analysis-decisions'
+import { findPriorDecision, seedPendingRunDecisions, upsertRunDecision } from './analysis-decisions'
 import { db } from './client'
 import {
   type ApplicationAnalysisRun,
@@ -163,7 +163,7 @@ export function completeAnalysisRun(runId: number, resultJson: string) {
       .from(applicationAnalysisRuns)
       .where(eq(applicationAnalysisRuns.id, runId))
       .get()
-    if (!run) return
+    if (!run || run.status === 'Completed') return
     tx.update(applicationAnalysisRuns)
       .set({
         status: 'Completed',
@@ -177,15 +177,44 @@ export function completeAnalysisRun(runId: number, resultJson: string) {
 
     // A new run starts pending for every current missing canonical skill. The
     // missing set derives from the exact Job Analysis run's requirement-skill
-    // mappings where the skill is not in career data; prior decisions remain
-    // suggestions only and must be explicitly reconfirmed. Legacy runs without
-    // explicit lineage seed no decisions.
+    // mappings and frozen personal evidence. Reuse an explicit prior choice
+    // only when its per-skill evidence/requirement fingerprint still matches.
+    // Legacy runs without explicit lineage seed no decisions.
     const jobPostingAnalysisId = run.jobPostingAnalysisId
     if (jobPostingAnalysisId !== null) {
-      const missingSkillIds = listRunSkillReviews(runId, tx)
-        .filter((row) => row.analysisResult === 'not-in-career-data')
-        .map((row) => row.skillId)
-      seedPendingRunDecisions(tx, runId, missingSkillIds)
+      const missingReviews = listRunSkillReviews(runId, tx).filter(
+        (row) => row.analysisResult === 'not-in-career-data',
+      )
+      seedPendingRunDecisions(
+        tx,
+        runId,
+        missingReviews.map((row) => row.skillId),
+      )
+      for (const review of missingReviews) {
+        const prior = findPriorDecision(tx, runId, review.skillId)
+        if (
+          !prior ||
+          prior.decision === 'pending' ||
+          !review.decisionBasisHash ||
+          prior.basisHash !== review.decisionBasisHash
+        )
+          continue
+        if (
+          prior.decision === 'include' &&
+          !prior.reason?.trim() &&
+          review.evidenceKind !== 'transferable'
+        )
+          continue
+        upsertRunDecision(tx, {
+          runId,
+          skillId: review.skillId,
+          decision: prior.decision,
+          reason: prior.reason,
+          includeBasis: prior.includeBasis,
+          basisHash: review.decisionBasisHash,
+          previousDecisionId: prior.id,
+        })
+      }
     }
   })
 }

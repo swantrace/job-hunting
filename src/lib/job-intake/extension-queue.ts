@@ -1,5 +1,5 @@
 import type { Queue, Worker } from 'bunqueue/client'
-import { and, eq, isNotNull, isNull, lt, lte, or } from 'drizzle-orm'
+import { and, desc, eq, isNotNull, isNull, lt, lte, or } from 'drizzle-orm'
 import { failAnalysisRun } from '../../db/analysis'
 import { db } from '../../db/client'
 import {
@@ -9,7 +9,7 @@ import {
   updateExtensionItem,
 } from '../../db/extension-intake'
 import { failJobAnalysisRun } from '../../db/job-analysis-runs'
-import { jobIntakeItems } from '../../db/schema'
+import { jobIntakeItems, jobPostings } from '../../db/schema'
 import { IntakeError, terminalStatuses } from './contracts'
 
 type Work = { itemId: number; legacy?: boolean }
@@ -74,6 +74,17 @@ export async function advanceExtensionItem(
     if (item.pipelineStatus === 'duplicate') return
     if (!item.jobPostingId || !item.jobApplicationId)
       throw new IntakeError('missing-posting', 'The intake source no longer exists.')
+    const newestPosting = db
+      .select({ id: jobPostings.id })
+      .from(jobPostings)
+      .where(eq(jobPostings.jobApplicationId, item.jobApplicationId))
+      .orderBy(desc(jobPostings.version))
+      .get()
+    if (newestPosting?.id !== item.jobPostingId)
+      throw new IntakeError(
+        'posting-superseded',
+        'A newer capture replaced this posting. Follow the newer import; this item will not analyze different text.',
+      )
     if (!item.jobAnalysisRunId) {
       await enqueue.job(item.jobPostingId, (run) =>
         updateExtensionItem(itemId, {

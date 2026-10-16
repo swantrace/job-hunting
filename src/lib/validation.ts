@@ -110,19 +110,21 @@ export const managedSkillSchema = skillSchema.extend({
   ),
   reviewStatus: z.enum(skillReviewStatuses),
 })
-export const skillDecisionSchema = z
-  .object({
-    action: z.enum(['skip', 'include']),
-    reason: z.string().trim().max(2000).default(''),
-  })
-  .superRefine((value, ctx) => {
-    if (value.action === 'include' && value.reason.trim() === '')
-      ctx.addIssue({
-        code: 'custom',
-        message: 'A reason is required to include this skill.',
-        path: ['reason'],
-      })
-  })
+export const skillDecisionSchemaFor = (transferable = false) =>
+  z
+    .object({
+      action: z.enum(['skip', 'include']),
+      reason: z.string().trim().max(2000).default(''),
+    })
+    .superRefine((value, ctx) => {
+      if (value.action === 'include' && !transferable && value.reason.trim() === '')
+        ctx.addIssue({
+          code: 'custom',
+          message: 'A reason is required to include this skill.',
+          path: ['reason'],
+        })
+    })
+export const skillDecisionSchema = skillDecisionSchemaFor()
 export const companySchema = z.object({
   name: z.string().trim().min(1).max(200),
   website: optionalUrl,

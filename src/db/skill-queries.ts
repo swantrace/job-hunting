@@ -9,7 +9,12 @@ import type {
   SkillReviewStatus,
 } from '../lib/skills/constants'
 import { canonicalSkillKey, normalizeSkillAlias } from '../lib/skills/normalize'
-import { careerSkillMatchResult } from '../lib/skills/runtime-career-skills'
+import {
+  readReviewSnapshot,
+  reviewSkillEvidence,
+  type SkillEvidenceKind,
+  skillDecisionBasis,
+} from '../lib/skills/review-evidence'
 import type { SkillCategory } from '../lib/skills/taxonomy'
 import { jobPostingAnalysisIdForCandidateRun } from './analysis-lineage'
 import { db } from './client'
@@ -159,7 +164,7 @@ export type RequirementSkillMapping = {
  */
 export function listRequirementSkillMappings(
   jobPostingAnalysisId: number,
-  executor: DbExecutor = db,
+  executor: Pick<DbExecutor, 'select'> = db,
 ): RequirementSkillMapping[] {
   return executor
     .select({
@@ -218,15 +223,24 @@ export type RunSkillReview = RequirementSkillMapping & {
   decision: SkillDecision
   decisionReason: string | null
   aliases: string[]
+  evidenceKind?: SkillEvidenceKind
+  evidenceExplanation?: string
+  decisionBasisHash?: string | null
+  decisionIncludeBasis?: 'user-reason' | 'transferable'
+  previousDecisionId?: number | null
 }
 
 /**
  * Run-scoped skill review projection for the Review workspace. Combines the
  * exact Job Analysis run's requirement-skill mappings with that run's pending
- * Skip/Include decisions. Validated requirement evidence determines "proven";
- * career-skill links are a fallback for legacy results without assessments.
+ * Skip/Include decisions. Only a personal skill in the frozen career snapshot
+ * plus directly related requirement evidence determines "proven". Transferable
+ * and unknown claims always require explicit confirmation.
  */
-export function listRunSkillReviews(runId: number, executor: DbExecutor = db): RunSkillReview[] {
+export function listRunSkillReviews(
+  runId: number,
+  executor: Pick<DbExecutor, 'select'> = db,
+): RunSkillReview[] {
   const jobPostingAnalysisId = jobPostingAnalysisIdForCandidateRun(runId, executor)
   if (jobPostingAnalysisId === null) return []
   const mappings = listRequirementSkillMappings(jobPostingAnalysisId, executor)
@@ -255,21 +269,31 @@ export function listRunSkillReviews(runId: number, executor: DbExecutor = db): R
     .where(eq(applicationAnalysisRuns.id, runId))
     .get()
   const fit = parseStoredCandidateFit(run?.resultJson ?? null)
+  const snapshot = readReviewSnapshot(run?.inputSnapshotJson ?? null)
   const assessments = new Map(fit?.requirementAssessments.map((a) => [a.jobRequirementId, a]) ?? [])
   const grouped = new Map<number, RunSkillReview>()
   const rank = { required: 3, preferred: 2, mentioned: 1 }
   for (const mapping of mappings) {
     const decision = decisionBySkill.get(mapping.skillId)
     const assessment = assessments.get(mapping.requirementId)
-    const proven = assessment
-      ? assessment.evidenceStatus !== 'unknown-evidence' && assessment.evidenceRefs.length > 0
-      : careerSkillMatchResult(mapping.skillKey, executor) === 'proven-match'
+    const evidenceKind = reviewSkillEvidence(mapping.skillKey, snapshot, assessment)
+    const proven = evidenceKind === 'direct'
     const current: RunSkillReview = {
       ...mapping,
       analysisResult: proven ? 'proven-match' : 'not-in-career-data',
       decision: decision?.decision ?? 'pending',
       decisionReason: decision?.reason ?? null,
       aliases: aliasesBySkill.get(mapping.skillId) ?? [],
+      evidenceKind,
+      evidenceExplanation: assessment?.explanation,
+      decisionBasisHash: skillDecisionBasis(
+        mapping.skillId,
+        mapping.skillKey,
+        snapshot,
+        fit?.requirementAssessments ?? [],
+      ),
+      decisionIncludeBasis: decision?.includeBasis ?? 'user-reason',
+      previousDecisionId: decision?.previousDecisionId ?? null,
     }
     const prior = grouped.get(mapping.skillId)
     if (prior) {
@@ -277,7 +301,23 @@ export function listRunSkillReviews(runId: number, executor: DbExecutor = db): R
         prior.requirementStatement += `\n${mapping.requirementStatement}`
       if (rank[current.importance] > rank[prior.importance]) prior.importance = current.importance
       if (!proven) prior.analysisResult = 'not-in-career-data'
+      if (evidenceKind === 'unknown-evidence' || prior.evidenceKind === 'unknown-evidence') {
+        prior.evidenceKind = 'unknown-evidence'
+        if (evidenceKind === 'unknown-evidence') prior.evidenceExplanation = assessment?.explanation
+      } else if (evidenceKind === 'transferable') {
+        prior.evidenceKind = 'transferable'
+        prior.evidenceExplanation = assessment?.explanation
+      }
     } else grouped.set(mapping.skillId, current)
+  }
+  // Evaluate the final skill-wide kind, not each requirement independently.
+  for (const row of grouped.values()) {
+    if (
+      row.decision === 'include' &&
+      !row.decisionReason?.trim() &&
+      (row.decisionIncludeBasis !== 'transferable' || row.evidenceKind !== 'transferable')
+    )
+      row.decision = 'pending'
   }
   return [...grouped.values()]
 }
