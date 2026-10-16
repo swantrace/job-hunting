@@ -1,5 +1,5 @@
 import { listDirections } from '../lib/career/directions'
-import { jobParserModelId } from './models'
+import { jobParserModelId, stageReasoningEffort } from './models'
 import {
   type CatalogPromptEntry,
   jobAnalysisCatalogBlock,
@@ -108,6 +108,7 @@ export async function parseJobDescription(
       signal: AbortSignal.timeout(timeoutMs),
       body: JSON.stringify({
         model,
+        reasoning: { effort: stageReasoningEffort.jobParser },
         input: [
           {
             role: 'system',

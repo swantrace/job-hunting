@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { candidateFitModelId } from '../../ai/models'
+import { candidateFitModelId, stageReasoningEffort } from '../../ai/models'
 import { candidateFitPromptVersion, candidateFitSystemPrompt } from '../../ai/prompts/candidate-fit'
 import {
   type CandidateFit,
@@ -291,6 +291,7 @@ async function structuredCandidateFit(args: {
     signal: AbortSignal.timeout(180_000),
     body: JSON.stringify({
       model: args.model,
+      reasoning: { effort: stageReasoningEffort.candidateFit },
       input: [
         {
           role: 'system',

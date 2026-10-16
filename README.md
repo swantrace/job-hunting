@@ -275,6 +275,13 @@ near-Astra performance at lower cost — the current default) and `gpt-6-luna`
 | Cover letter drafting | `OPENAI_MODEL_COVER_LETTER` | Quality of the document you send. |
 | Document review | `OPENAI_MODEL_DOCUMENT_REVIEW` | Advisory findings only; it never writes to the database. |
 
+Reasoning effort is hardcoded per stage in `src/ai/models.ts`, not configurable:
+`high` for Job Description parsing and job analysis (the heaviest single call, and
+`xhigh`/`max` would risk the 90s parser timeout), `high` for candidate fit (the
+evidence status every later claim rests on), `medium` for resume and cover-letter
+drafting (writing, not puzzle-solving), and `low` for the advisory document review.
+No stage uses the `none` or `minimal` efforts, which Astra and 6.1 Sol reject.
+
 Switching `OPENAI_MODEL_RESUME` or `OPENAI_MODEL_COVER_LETTER` marks existing
 generated documents stale (`generation-model-changed`). The analysis stages do
 **not** track the model in their input hash: switching their model leaves earlier

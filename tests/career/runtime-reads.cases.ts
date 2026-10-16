@@ -343,6 +343,18 @@ describe('database-owned runtime career reads', () => {
     expect(sent).toContain('Runtime Synthetic Co')
     expect(sent).not.toContain('AFTER ENQUEUE')
 
+    // Every draft request that left the app carries the hardcoded drafting
+    // reasoning effort. The canned response above is not a draft, so generation
+    // stops after the first request; the assertion is about what was sent.
+    const draftRequests = bodies.map(
+      (body) => JSON.parse(body) as { reasoning?: { effort?: string }; model?: string },
+    )
+    expect(draftRequests.length).toBeGreaterThanOrEqual(1)
+    for (const request of draftRequests) {
+      expect(request.reasoning?.effort).toBe('medium')
+      expect(request.model).toBeTruthy()
+    }
+
     updateCareerAchievement(db, achievement.id, achievementInput(achievement, achievement.claim))
   })
 })

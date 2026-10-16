@@ -41,3 +41,29 @@ export function resumeModelId(env: ModelEnv = process.env): string {
 export function coverLetterModelId(env: ModelEnv = process.env): string {
   return stageModel(env, 'OPENAI_MODEL_COVER_LETTER')
 }
+
+/** Reasoning effort accepted by the GPT-6 models this application targets. */
+export type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+
+/**
+ * Reasoning effort per stage, hardcoded rather than configurable: this is a
+ * product decision about where depth pays off, not a deployment knob.
+ *
+ * - Parsing and job analysis runs the heaviest single call: a long catalog block,
+ *   a large strict schema, and source excerpts that must not be invented. `high`
+ *   buys that fidelity without the latency of `xhigh`/`max`, which would risk the
+ *   90s parser timeout (`OPENAI_JOB_PARSER_TIMEOUT_MS`).
+ * - Candidate fit decides the evidence status every later claim rests on, so a
+ *   reasoning mistake there is the expensive kind. `high` as well.
+ * - Drafting is writing, not puzzle-solving: `medium` keeps the documents tight
+ *   and responsive rather than enabling longer deliberation.
+ * - The document review is advisory, writes nothing, and can be re-run, so it
+ *   keeps the cheapest setting.
+ */
+export const stageReasoningEffort = {
+  jobParser: 'medium',
+  candidateFit: 'high',
+  resume: 'medium',
+  coverLetter: 'medium',
+  documentReview: 'medium',
+} as const satisfies Record<string, ReasoningEffort>

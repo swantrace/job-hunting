@@ -1,6 +1,11 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { coverLetterModelId, resumeModelId } from '../../ai/models'
+import {
+  coverLetterModelId,
+  type ReasoningEffort,
+  resumeModelId,
+  stageReasoningEffort,
+} from '../../ai/models'
 import {
   baselineDraftSystemPromptFor,
   coverLetterDraftSystemPromptFor,
@@ -56,6 +61,7 @@ const filenamePart = (value: string) =>
 async function callMarkdown(args: {
   apiKey: string
   model: string
+  effort: ReasoningEffort
   system: string
   input: DocumentDraftSnapshot
 }): Promise<string> {
@@ -65,6 +71,7 @@ async function callMarkdown(args: {
     signal: AbortSignal.timeout(180_000),
     body: JSON.stringify({
       model: args.model,
+      reasoning: { effort: args.effort },
       input: [
         {
           role: 'system',
@@ -231,12 +238,14 @@ export async function generateApplicationDrafts(runId: number): Promise<Artifact
   const resumeMarkdown = await callMarkdown({
     apiKey,
     model: resumeModelId(),
+    effort: stageReasoningEffort.resume,
     system: resumeDraftSystemPromptFor(snapshot.documentPolicy),
     input: snapshot,
   })
   const coverLetterMarkdown = await callMarkdown({
     apiKey,
     model: coverLetterModelId(),
+    effort: stageReasoningEffort.coverLetter,
     system: coverLetterDraftSystemPromptFor(snapshot.documentPolicy),
     input: snapshot,
   })
@@ -317,6 +326,7 @@ export async function generateBaselineDraft(runId: number) {
   const resumeMarkdown = await callMarkdown({
     apiKey,
     model: resumeModelId(),
+    effort: stageReasoningEffort.resume,
     system: baselineDraftSystemPromptFor(snapshot.documentPolicy),
     input: snapshot,
   })

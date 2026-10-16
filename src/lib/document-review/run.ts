@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { documentReviewModelId } from '../../ai/models'
+import { documentReviewModelId, stageReasoningEffort } from '../../ai/models'
 import {
   documentReviewPromptVersion,
   documentReviewSystemPrompt,
@@ -54,6 +54,7 @@ export async function runDocumentReview(reviewId: number): Promise<DocumentRevie
     signal: AbortSignal.timeout(180_000),
     body: JSON.stringify({
       model: documentReviewModelId(),
+      reasoning: { effort: stageReasoningEffort.documentReview },
       input: [
         {
           role: 'system',
