@@ -57,8 +57,15 @@ export function assertSkillLabelAvailable(tx: DbExecutor, label: string, ownerId
     .from(skillAliases)
     .where(eq(skillAliases.normalizedAlias, normalized))
     .get()
-  if (collision || (alias && !ownerIds.includes(alias.skillId)))
-    throw new Error(`"${label}" belongs to another skill. Merge the skills instead.`)
+  const aliasOwner =
+    alias && !ownerIds.includes(alias.skillId)
+      ? tx.select().from(skills).where(eq(skills.id, alias.skillId)).get()
+      : undefined
+  const owner = collision ?? aliasOwner
+  if (owner)
+    throw new Error(
+      `"${label}" belongs to another skill: "${owner.name}" (key: ${owner.key}, ID: ${owner.id}). Merge the skills instead.`,
+    )
 }
 
 export function resolveSkillByKey(tx: DbExecutor, key: string): Skill | undefined {

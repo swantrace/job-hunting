@@ -406,10 +406,12 @@ export function previewImport(payload: ImportPayload): ImportPreview {
     let created = 0
     let updated = 0
     let unchanged = 0
+    let itemConflicts = 0
     for (const item of items) {
       const itemKey = getKey(item)
       if (!itemKey.replaceAll('|', '')) {
         conflicts.push(`${label}: missing matching fields`)
+        itemConflicts++
         continue
       }
       const existing = map.get(itemKey)
@@ -417,7 +419,7 @@ export function previewImport(payload: ImportPayload): ImportPreview {
       else if (compare(item, existing)) unchanged++
       else updated++
     }
-    return { created, updated, unchanged, conflicts: conflicts.length }
+    return { created, updated, unchanged, conflicts: itemConflicts }
   }
   const companiesSummary = count(payload.companies, companyMap, companyKey, 'Company')
   const skillsSummary = { created: 0, updated: 0, unchanged: 0, conflicts: 0 }

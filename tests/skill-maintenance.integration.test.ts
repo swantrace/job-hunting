@@ -90,9 +90,35 @@ test('skill import preview, export and editor share real database contracts', as
       deleteSkills: [protectedSkill.key],
     })
     const current = skillImportState(db)
-    expect(previewImport(blocked).conflicts.join(' ')).toContain('Cannot delete')
+    const blockedPreview = previewImport(blocked)
+    expect(blockedPreview.conflicts.join(' ')).toContain('Cannot delete')
+    expect(blockedPreview.summary.skills.conflicts).toBe(1)
+    for (const type of ['companies', 'contacts', 'applications'])
+      expect(blockedPreview.summary[type].conflicts).toBe(0)
     expect(() => mergeImport(blocked)).toThrow('Cannot delete')
     expect(skillImportState(db)).toEqual(current)
+
+    const aliasCollision = importPayloadSchema.parse({
+      schemaVersion: 6,
+      skills: [{ key: skill.key, name: skill.name, aliases: [protectedSkill.name] }],
+    })
+    const collisionPreview = previewImport(aliasCollision)
+    expect(collisionPreview.conflicts.join(' ')).toContain(
+      `key: ${protectedSkill.key}, ID: ${protectedSkill.id}`,
+    )
+    expect(collisionPreview.conflicts.join(' ')).toContain(protectedSkill.name)
+    expect(collisionPreview.summary.skills.conflicts).toBe(1)
+    expect(collisionPreview.summary.contacts.conflicts).toBe(0)
+    expect(collisionPreview.summary.applications.conflicts).toBe(0)
+    expect(skillImportState(db)).toEqual(current)
+
+    const companyConflict = previewImport(
+      importPayloadSchema.parse({ schemaVersion: 6, companies: [{ name: '' }] }),
+    )
+    expect(companyConflict.summary.companies.conflicts).toBe(1)
+    expect(companyConflict.summary.skills.conflicts).toBe(0)
+    expect(companyConflict.summary.contacts.conflicts).toBe(0)
+    expect(companyConflict.summary.applications.conflicts).toBe(0)
     const deletion = importPayloadSchema.parse({ schemaVersion: 6, deleteSkills: [skill.key] })
     expect(previewImport(deletion).skillChanges[0].action).toBe('deleted')
     expect(skillImportState(db)).toEqual(current)

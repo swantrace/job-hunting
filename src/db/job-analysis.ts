@@ -29,12 +29,12 @@ export type JobRequirementInput = {
 
 /**
  * Persists requirement-owned mentions. Pending terms are stored as they were
- * parsed, and only a term the deterministic resolver verified against the
- * frozen catalog snapshot becomes a `job_requirements_to_skills` mapping (via
- * `mapMention`, which keeps the raw label and parser confidence).
+ * parsed. Frozen keys are reconciled against live aliases before creating a
+ * pending catalog entry: a merge completed while AI was running must not revive
+ * its deleted source. `mapMention` keeps the raw label and parser confidence.
  *
- * This never creates a catalog skill, a catalog alias, a category or personal
- * evidence: an unknown term stays pending until a human decides.
+ * Unknown terms may create pending catalog skills, never aliases, categories or
+ * personal evidence. Catalog identity does not imply personal possession.
  */
 export function persistRequirementMentions(
   tx: CareerDb,
@@ -58,9 +58,14 @@ export function persistRequirementMentions(
       .from(skills)
       .all()
       .find((row) => normalizeSkillAlias(row.name) === normalized)
-    let skill = mention.skillKey
-      ? resolveSkillByKey(tx, mention.skillKey)
-      : (resolveSkillByAlias(tx, normalized) ?? exactName ?? resolveSkillByKey(tx, normalized))
+    let skill =
+      (mention.skillKey
+        ? (resolveSkillByKey(tx, mention.skillKey) ??
+          resolveSkillByAlias(tx, normalizeSkillAlias(mention.skillKey)))
+        : undefined) ??
+      resolveSkillByAlias(tx, normalized) ??
+      exactName ??
+      resolveSkillByKey(tx, normalized)
     if (!skill) {
       let key =
         canonicalSkillKey(mention.rawTerm) || `term-${canonicalHash(normalized).slice(0, 16)}`

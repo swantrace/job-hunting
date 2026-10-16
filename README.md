@@ -241,6 +241,11 @@ Historical snapshots and generated documents are never rewritten. Old names and
 keys remain aliases; ordinary same-skill catalog merges do not trigger paid AI
 analysis. Actual evidence changes can still make an analysis stale.
 
+In-flight Job Analysis completions reconcile missing frozen skill keys through
+live aliases before creating pending entries, so a completed merge does not
+revive its source. Import conflicts identify the occupying skill by name, key,
+and ID; preview conflict counts belong only to the affected collection.
+
 Older database versions may contain soft-merged redirect rows. These remain
 supported internally but are hidden from the catalog. After taking a consistent
 SQLite backup, explicitly consolidate them with:

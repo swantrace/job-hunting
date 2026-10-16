@@ -24,3 +24,6 @@ temp/
 /NIGHT_SHIFT_SUMMARY.md
 ui-template/
 .dsh/
+
+# Ignore untracked JSON files at any directory depth.
+*.json
