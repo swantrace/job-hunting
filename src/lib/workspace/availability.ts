@@ -1,9 +1,8 @@
-import { hasPendingRunDecisions } from '../../db/analysis-decisions'
 import { db } from '../../db/client'
 import { getGenerationState } from '../../db/generation'
 import { getJobAnalysisState } from '../../db/job-analysis-runs'
 import { getApplication } from '../../db/queries'
-import { careerOnboardingRequired } from '../applications/readiness'
+import { careerOnboardingRequired, getApplicationReadiness } from '../applications/readiness'
 import { getCandidateAnalysisState } from '../candidate/analysis'
 import { currentJobAnalysisHash } from '../job-analysis/input'
 import type { WorkspaceAvailability } from './state'
@@ -21,12 +20,12 @@ export function computeWorkspaceAvailability(jobId: number): WorkspaceAvailabili
     : null
   const candidateState = getCandidateAnalysisState(jobId)
   const generationState = getGenerationState(jobId)
-  const current = candidateState.currentCompleted
-  const reviewReady = !!current && !hasPendingRunDecisions(db, current.id)
   return {
     careerDataReady: !careerOnboardingRequired(),
     jobAnalysisCurrent: !!jobState?.currentCompleted,
-    reviewReady,
+    // Navigation and generation must use the same effective decisions. Raw
+    // pending rows can belong to skills that are already proven by career data.
+    reviewReady: getApplicationReadiness(jobId).ready,
     hasHistoricalReview: candidateState.latestCompleted !== null,
     hasHistoricalDocuments: generationState.latestCompleted !== null,
   }
