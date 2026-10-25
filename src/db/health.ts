@@ -4,6 +4,7 @@ import { sqlite } from './client'
 const requiredTables = [
   'companies',
   'batch_analysis_items',
+  'analysis_workflows',
   'job_source_identities',
   'job_requirements_to_skills',
   'job_postings',

@@ -44,7 +44,7 @@ postings, analyses, requirements and skill mentions, career facts, directions,
 the skill catalog, personal skills, and Base Resume versions. JSON is
 **import/export interchange only**; it is never read as live state.
 
-The schema is defined in `src/db/schema.ts`: **38 application tables plus one
+The schema is defined in `src/db/schema.ts`: **39 application tables plus one
 view**. `job_requirements_to_skills` is a read-only view derived from
 `job_requirement_skill_mentions`, so mapping writes only ever touch the mention
 that owns them. There is no `career_state` table: each career table carries its
@@ -65,12 +65,39 @@ flow.
 
 ### Requests and async work
 
-The application persists each requested operation as an append-only run in
-SQLite before queueing it. In production the named queues use embedded Bunqueue
-with durable state in `QUEUE_FILE_NAME` (normally `/data/bunqueue.db`); at
-startup the application recovers queued runs. Development runs the same jobs
-in-process without Bunqueue persistence. The browser never waits for a model
-response: it polls the persisted run state through htmx.
+The application persists each requested operation in SQLite before queueing it.
+Single-job analysis, selected-application batches, and extension imports share
+the embedded `bunqueue/workflow` Engine in development and production:
+
+```mermaid
+flowchart LR
+  Single[Single application] --> Outbox[Analysis workflow outbox]
+  Batch[Selected applications] --> Outbox
+  Extension[Extension intake] --> Outbox
+  Outbox --> Job[Job Analysis, when needed]
+  Job --> Candidate[Freeze candidate input and analyze]
+  Candidate --> Review[User reviews Include / Skip]
+  Review --> Documents[Explicit document generation]
+```
+
+`analysis_workflows` in `jobs.db` is the delivery outbox and links the exact
+business run IDs. The Engine stores step execution and recovery state in
+`QUEUE_FILE_NAME` (normally `/data/bunqueue.db`). Candidate inputs are frozen
+only after the expected Job Analysis completes. Candidate-only requests never
+silently run Job Analysis. Analysis steps share a maximum of three worker slots
+and the existing provider concurrency budget.
+
+The Engine advances steps; a single ten-second outbox sweep repairs delivery and
+terminal-state projection across the two databases. It does not poll child runs
+to schedule the next stage. On upgrade, unfinished legacy analysis runs are
+adopted with their original IDs and snapshots. Known failed model runs require
+an explicit rerun; Engine step retries do not repeat them. A process crash while
+an external request is in flight can still require another provider call; this
+is not an exactly-once billing guarantee.
+
+Manual review, freshness checks, document generation, and Drive uploads remain
+separate business operations. Their existing queues are unchanged. The browser
+polls persisted business state through htmx and never waits for a model response.
 
 At boot, before the server accepts requests, the health check verifies that the
 canonical tables and migration-added columns exist and fails fast with a readable
@@ -107,7 +134,7 @@ Include/Skip decisions automatically.
 - **Candidate Analysis** compares the reviewed requirements against frozen
   canonical Career Data and returns a labelled
   `apply`/`apply-selectively`/`skip` recommendation plus a requirement-to-evidence
-  matrix. After a completed Job Analysis with no unresolved terms it is queued
+  matrix. After a completed Job Analysis it is queued
   automatically; it can also be re-run explicitly.
 - **Skill Review** has two states: Proven match (an exact personal skill in the
   frozen Career Data with usable linked evidence) or Needs confirmation.
@@ -400,6 +427,13 @@ change when you want dependent data re-run, and note that the keyword audit of
 generated drafts is deterministic and costs no model call.
 
 ## Local development
+
+Use **Bun 1.4.0 or newer**. CI and the Docker image pin Bun 1.4.0, matching the
+minimum runtime declared by the installed bunqueue version.
+
+The analysis Engine is process-scoped to avoid duplicate workers during Vite
+hot reloads. Restart `bun run dev` after changing the workflow definition or its
+step handlers; ordinary page/client changes still use HMR.
 
 ```sh
 bun install

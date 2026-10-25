@@ -87,6 +87,7 @@ export async function parseJobDescription(
   env: Record<string, string | undefined>,
   description: string,
   catalog: readonly CatalogPromptEntry[] = [],
+  signal?: AbortSignal,
 ): Promise<ParsedJobResult> {
   const apiKey = env.OPENAI_API_KEY
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured')
@@ -100,6 +101,7 @@ export async function parseJobDescription(
   let response: Response
   try {
     response = await openAIRequest('https://api.openai.com/v1/responses', {
+      signal,
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,

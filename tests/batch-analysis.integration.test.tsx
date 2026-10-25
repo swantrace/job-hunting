@@ -9,7 +9,12 @@ test('batch analysis persists isolated pipelines, validates requests and preserv
     const root = mkdtempSync(join(tmpdir(), 'batch-analysis-'))
     try {
       const child = Bun.spawnSync([process.execPath, 'test', import.meta.path], {
-        env: { ...process.env, BATCH_ANALYSIS_ISOLATED: '1', DB_FILE_NAME: join(root, 'jobs.db') },
+        env: {
+          ...process.env,
+          BATCH_ANALYSIS_ISOLATED: '1',
+          DB_FILE_NAME: join(root, 'jobs.db'),
+          QUEUE_FILE_NAME: join(root, 'bunqueue.db'),
+        },
         stdout: 'pipe',
         stderr: 'pipe',
       })
@@ -31,13 +36,14 @@ test('batch analysis persists isolated pipelines, validates requests and preserv
     jobPostingAnalyses,
     applicationAnalysisRuns,
     generationRuns,
+    analysisWorkflows,
     jobIntakeItems,
     jobIntakeBatches,
   } = await import('../src/db/schema')
-  const { createJobAnalysisRun } = await import('../src/db/job-analysis-runs')
-  const { createAnalysisRun } = await import('../src/db/analysis')
-  const { buildJobAnalysisInput } = await import('../src/lib/job-analysis/input')
-  const { jobAnalysisSchemaVersion } = await import('../src/ai/schemas/job-analysis')
+  const { careerTestDatabase } = await import('./support/career-db')
+  const fixture = careerTestDatabase()
+  const { getAnalysisEngine, closeAnalysisEngine } = await import('../src/lib/analysis/workflow')
+  const { waitFor } = await import('./support/workflow')
   const {
     createAnalysisBatch,
     advanceBatchAnalyses,
@@ -86,56 +92,46 @@ test('batch analysis persists isolated pipelines, validates requests and preserv
       : undefined
     return { app, posting }
   }
-  const jobRun = (postingId: number, completed = false) => {
-    const built = buildJobAnalysisInput(db, postingId)!
-    const run = createJobAnalysisRun(db, {
-      jobPostingId: postingId,
-      inputHash: built.inputHash,
-      frozenInputJson: JSON.stringify(built.snapshot),
-      model: 'test',
-      promptVersion: 'test',
-      schemaVersion: jobAnalysisSchemaVersion,
-    })
-    if (completed)
-      db.update(jobPostingAnalyses)
-        .set({ status: 'Completed', completedAt: date })
-        .where(eq(jobPostingAnalyses.id, run.id))
-        .run()
-    return run
-  }
   const calls: string[] = []
-  const fake = {
-    job: async (id: number, persisted: (run: { id: number }) => void, runId?: number) => {
-      if (runId) return
-      calls.push(`job:${id}`)
-      persisted(jobRun(id))
-    },
-    candidate: async (id: number, persisted: (run: { id: number }) => void, runId?: number) => {
-      if (runId) return
-      calls.push(`candidate:${id}`)
-      const posting = db
-        .select()
-        .from(jobPostings)
-        .where(eq(jobPostings.jobApplicationId, id))
-        .get()!
-      const job = db
+  let releaseCandidate: (() => void) | undefined
+  let blockCandidate = true
+  await getAnalysisEngine({
+    job: async (runId) => {
+      calls.push(`job:${runId}`)
+      const run = db
         .select()
         .from(jobPostingAnalyses)
-        .where(eq(jobPostingAnalyses.jobPostingId, posting.id))
-        .all()
-        .at(-1)!
-      persisted(
-        createAnalysisRun({
-          jobPostingAnalysisId: job.id,
-          inputHash: 'test',
-          inputSnapshotJson: '{}',
-          model: 'test',
-          promptVersion: 'test',
-          schemaVersion: 'test',
-        }),
-      )
+        .where(eq(jobPostingAnalyses.id, runId))
+        .get()!
+      const application = db
+        .select()
+        .from(jobApplications)
+        .where(
+          eq(
+            jobApplications.id,
+            db.select().from(jobPostings).where(eq(jobPostings.id, run.jobPostingId)).get()!
+              .jobApplicationId,
+          ),
+        )
+        .get()!
+      if (application.jobTitle === 'Fails') throw new Error('Bad post')
+      db.update(jobPostingAnalyses)
+        .set({ status: 'Completed', completedAt: date })
+        .where(eq(jobPostingAnalyses.id, runId))
+        .run()
     },
-  }
+    candidate: async (runId) => {
+      calls.push(`candidate:${runId}`)
+      if (blockCandidate)
+        await new Promise<void>((resolve) => {
+          releaseCandidate = resolve
+        })
+      db.update(applicationAnalysisRuns)
+        .set({ status: 'Completed', completedAt: date })
+        .where(eq(applicationAnalysisRuns.id, runId))
+        .run()
+    },
+  })
 
   expect(
     batchAnalysisRequestSchema.safeParse({ mode: 'forged', applicationIds: [1] }).success,
@@ -163,81 +159,49 @@ test('batch analysis persists isolated pipelines, validates requests and preserv
       createAnalysisBatch({ mode: 'job-and-candidate', applicationIds: [first.app.id] }),
     )[0].status,
   ).toBe('skipped')
-  await advanceBatchAnalyses(fake)
-  let row = listBatchAnalysisItems(batch)[0]
-  expect(row.status).toBe('job-analysis')
-  expect(calls).toEqual([`job:${first.posting!.id}`])
-  await advanceBatchAnalyses(fake)
-  expect(calls).toHaveLength(1)
-  // Completion is observed from persisted IDs, including after a worker restart.
-  db.update(jobPostingAnalyses)
-    .set({ status: 'Completed', completedAt: date })
-    .where(eq(jobPostingAnalyses.id, row.jobAnalysisRunId!))
-    .run()
-  await advanceBatchAnalyses(fake)
-  row = listBatchAnalysisItems(batch)[0]
-  expect(row.status).toBe('candidate-analysis')
-  expect(calls).toEqual([`job:${first.posting!.id}`, `candidate:${first.app.id}`])
-  db.update(applicationAnalysisRuns)
-    .set({ status: 'Completed', completedAt: date })
-    .where(eq(applicationAnalysisRuns.id, row.candidateAnalysisRunId!))
-    .run()
-  await advanceBatchAnalyses(fake)
-  expect(listBatchAnalysisItems(batch)[0].status).toBe('completed')
-  await advanceBatchAnalyses(fake)
+  await advanceBatchAnalyses()
+  await waitFor(
+    () => listBatchAnalysisItems(batch)[0].status === 'candidate-analysis' && !!releaseCandidate,
+  )
+  expect(calls.filter((c) => c.startsWith('job:'))).toHaveLength(1)
+  expect(listBatchAnalysisItems(batch)[0].candidateAnalysisRunId).toBeTruthy()
+  blockCandidate = false
+  releaseCandidate!()
+  await waitFor(() => listBatchAnalysisItems(batch)[0].status === 'completed')
+  await advanceBatchAnalyses()
   expect(calls).toHaveLength(2)
   expect(db.select().from(generationRuns).all()).toHaveLength(0)
   expect(
     db.select().from(jobApplications).where(eq(jobApplications.id, first.app.id)).get()?.status,
   ).toBe('Saved')
 
-  // Candidate-only never performs an implicit paid Job Post analysis.
   const noJob = seed('Needs Job Post')
-  const noJobBatch = createAnalysisBatch({ mode: 'candidate-only', applicationIds: [noJob.app.id] })
-  expect(listBatchAnalysisItems(noJobBatch)[0]).toMatchObject({
-    status: 'skipped',
-    jobAnalysisRunId: null,
-  })
+  expect(
+    listBatchAnalysisItems(
+      createAnalysisBatch({ mode: 'candidate-only', applicationIds: [noJob.app.id] }),
+    )[0].status,
+  ).toBe('skipped')
   const candidateBatch = createAnalysisBatch({
     mode: 'candidate-only',
     applicationIds: [first.app.id],
   })
-  await advanceBatchAnalyses(fake)
-  const candidateRow = listBatchAnalysisItems(candidateBatch)[0]
-  expect(candidateRow).toMatchObject({ status: 'candidate-analysis', jobAnalysisRunId: null })
-  expect(calls.filter((call) => call.startsWith('job:'))).toHaveLength(1)
-  db.update(applicationAnalysisRuns)
-    .set({ status: 'Failed', errorMessage: 'Provider unavailable' })
-    .where(eq(applicationAnalysisRuns.id, candidateRow.candidateAnalysisRunId!))
-    .run()
-  await advanceBatchAnalyses(fake)
-  expect(listBatchAnalysisItems(candidateBatch)[0]).toMatchObject({
-    status: 'failed',
-    errorMessage: 'Provider unavailable',
-  })
+  await advanceBatchAnalyses()
+  await waitFor(() => listBatchAnalysisItems(candidateBatch)[0].status === 'completed')
+  expect(listBatchAnalysisItems(candidateBatch)[0].jobAnalysisRunId).toBeNull()
+  expect(calls.filter((c) => c.startsWith('job:'))).toHaveLength(1)
 
-  // One failed child does not halt other applications in the batch.
   const bad = seed('Fails')
   const good = seed('Continues')
   const mixed = createAnalysisBatch({
     mode: 'job-and-candidate',
     applicationIds: [bad.app.id, good.app.id],
   })
-  await advanceBatchAnalyses(fake)
-  const mixedItems = listBatchAnalysisItems(mixed)
-  db.update(jobPostingAnalyses)
-    .set({ status: 'Failed', errorMessage: 'Bad post' })
-    .where(eq(jobPostingAnalyses.id, mixedItems[0].jobAnalysisRunId!))
-    .run()
-  db.update(jobPostingAnalyses)
-    .set({ status: 'Completed', completedAt: date })
-    .where(eq(jobPostingAnalyses.id, mixedItems[1].jobAnalysisRunId!))
-    .run()
-  await advanceBatchAnalyses(fake)
-  expect(listBatchAnalysisItems(mixed).map((item) => item.status)).toEqual([
-    'failed',
-    'candidate-analysis',
-  ])
+  await advanceBatchAnalyses()
+  await waitFor(() =>
+    listBatchAnalysisItems(mixed).every((i) => ['completed', 'failed'].includes(i.status)),
+  )
+  expect(listBatchAnalysisItems(mixed).map((i) => i.status)).toEqual(['failed', 'completed'])
+  expect(listBatchAnalysisItems(mixed)[0].errorMessage).toContain('Bad post')
 
   const replaced = seed('Replaced post')
   const replacedBatch = createAnalysisBatch({
@@ -253,16 +217,14 @@ test('batch analysis persists isolated pipelines, validates requests and preserv
       capturedAt: date,
     })
     .run()
-  await advanceBatchAnalyses(fake)
-  expect(listBatchAnalysisItems(replacedBatch)[0].status).toBe('failed')
-
   const removed = seed('Removed application')
   const removedBatch = createAnalysisBatch({
     mode: 'job-and-candidate',
     applicationIds: [removed.app.id],
   })
   db.delete(jobApplications).where(eq(jobApplications.id, removed.app.id)).run()
-  await advanceBatchAnalyses(fake)
+  await advanceBatchAnalyses()
+  expect(listBatchAnalysisItems(replacedBatch)[0].status).toBe('failed')
   expect(listBatchAnalysisItems(removedBatch)[0].status).toBe('failed')
 
   const imported = seed('Imported')
@@ -326,7 +288,8 @@ test('batch analysis persists isolated pipelines, validates requests and preserv
   expect(html).not.toContain('hx-trigger="every 3s"')
   expect(db.select().from(batchAnalysisItems).all()).toHaveLength(before)
   expect((await app.request('/applications/batch-analysis?batchId=missing')).status).toBe(404)
-  const activeHtml = renderToString(<BatchAnalysisStatus batchId={mixed} />)
+  const activeBatch = createAnalysisBatch({ mode: 'candidate-only', applicationIds: [good.app.id] })
+  const activeHtml = renderToString(<BatchAnalysisStatus batchId={activeBatch} />)
   expect(activeHtml).toContain('every 3s')
   expect(activeHtml).not.toContain('Provider') // Per-item failures are scoped to their batch.
   expect(activeHtml).toContain('hx-include="#filters"')
@@ -341,37 +304,6 @@ test('batch analysis persists isolated pipelines, validates requests and preserv
     expect(boardHtml).toContain('candidate-only')
     expect(boardHtml).toContain('job-and-candidate')
   }
-  // Dispatch failure after persistence must replay the exact child, including on restart.
-  const recovery = seed('Recover dispatch')
-  const recoveryBatch = createAnalysisBatch({
-    mode: 'job-and-candidate',
-    applicationIds: [recovery.app.id],
-  })
-  let replayedId: number | undefined
-  const flaky = {
-    ...fake,
-    job: async (id: number, persisted: (run: { id: number }) => void, runId?: number) => {
-      if (runId) {
-        replayedId = runId
-        return
-      }
-      await fake.job(id, persisted)
-      throw new Error('Queue temporarily unavailable after persistence')
-    },
-  }
-  await advanceBatchAnalyses(flaky)
-  const recoveryRow = listBatchAnalysisItems(recoveryBatch)[0]
-  expect(recoveryRow.status).toBe('job-analysis')
-  await advanceBatchAnalyses(flaky)
-  expect(replayedId).toBe(recoveryRow.jobAnalysisRunId!)
-  expect(
-    db
-      .select()
-      .from(jobPostingAnalyses)
-      .where(eq(jobPostingAnalyses.jobPostingId, recovery.posting!.id))
-      .all(),
-  ).toHaveLength(1)
-
   // No live work is dispatched by the HTTP test; valid skipped requests still return a fragment.
   db.update(batchAnalysisItems).set({ status: 'skipped' }).run()
   const validForm = new FormData()
@@ -387,5 +319,8 @@ test('batch analysis persists isolated pipelines, validates requests and preserv
   expect(validHtml).toContain('id="batch-analysis-status"')
   expect(validHtml).not.toContain('id="board"')
   expect(validHtml).not.toContain('<html')
+  expect(db.select().from(analysisWorkflows).all().length).toBeGreaterThan(0)
   expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
-})
+  await closeAnalysisEngine()
+  fixture.cleanup()
+}, 20000)

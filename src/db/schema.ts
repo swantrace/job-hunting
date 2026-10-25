@@ -684,6 +684,51 @@ export const batchAnalysisItems = sqliteTable(
   ],
 )
 
+// The business outbox owns run IDs; bunqueue owns step scheduling and recovery.
+export const analysisWorkflows = sqliteTable(
+  'analysis_workflows',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    sourceKey: text('source_key').notNull().unique(),
+    executionId: text('execution_id').unique(),
+    mode: text('mode', { enum: batchAnalysisModes }).notNull(),
+    status: text('status', { enum: runStatuses }).notNull().default('Queued'),
+    jobApplicationId: integer('job_application_id').references(() => jobApplications.id, {
+      onDelete: 'set null',
+    }),
+    jobPostingId: integer('job_posting_id').references(() => jobPostings.id, {
+      onDelete: 'set null',
+    }),
+    jobAnalysisRunId: integer('job_analysis_run_id').references(() => jobPostingAnalyses.id, {
+      onDelete: 'set null',
+    }),
+    candidateAnalysisRunId: integer('candidate_analysis_run_id').references(
+      () => applicationAnalysisRuns.id,
+      { onDelete: 'set null' },
+    ),
+    batchItemId: integer('batch_item_id').references(() => batchAnalysisItems.id, {
+      onDelete: 'cascade',
+    }),
+    intakeItemId: integer('intake_item_id').references(() => jobIntakeItems.id, {
+      onDelete: 'cascade',
+    }),
+    errorMessage: text('error_message'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('analysis_workflows_status_idx').on(table.status),
+    check(
+      'analysis_workflows_status_check',
+      sql`${table.status} in ('Queued', 'Processing', 'Completed', 'Failed')`,
+    ),
+    check(
+      'analysis_workflows_mode_check',
+      sql`${table.mode} in ('job-and-candidate', 'candidate-only')`,
+    ),
+  ],
+)
+
 export const jobSourceIdentities = sqliteTable(
   'job_source_identities',
   {

@@ -44,7 +44,7 @@ describe('migration 0030 contract', () => {
       migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
 
       expect(tableNames(sqlite)).not.toContain(orphanTable)
-      expect(tableNames(sqlite)).toHaveLength(38)
+      expect(tableNames(sqlite)).toHaveLength(39)
       expect(sqlite.query('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
       expect(sqlite.query('PRAGMA foreign_key_check').all()).toEqual([])
       sqlite.close()
@@ -57,7 +57,7 @@ describe('migration 0030 contract', () => {
     const sqlite = migratedDatabase()
     const names = tableNames(sqlite)
     expect(names).not.toContain(orphanTable)
-    expect(names).toHaveLength(38)
+    expect(names).toHaveLength(39)
     sqlite.close()
   })
 })

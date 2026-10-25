@@ -298,8 +298,10 @@ async function structuredCandidateFit(args: {
   apiKey: string
   model: string
   input: CandidateAnalysisInput
+  signal?: AbortSignal
 }): Promise<CandidateFit> {
   const response = await openAIRequest('https://api.openai.com/v1/responses', {
+    signal: args.signal,
     method: 'POST',
     headers: {
       Authorization: `Bearer ${args.apiKey}`,
@@ -341,7 +343,7 @@ async function structuredCandidateFit(args: {
   return candidateFitSchema.parse(JSON.parse(output))
 }
 
-export async function runCandidateAnalysis(runId: number) {
+export async function runCandidateAnalysis(runId: number, signal?: AbortSignal) {
   const { getAnalysisRun } = await import('../../db/analysis')
   const run = getAnalysisRun(runId)
   if (!run) throw new Error('Analysis run no longer exists.')
@@ -350,6 +352,7 @@ export async function runCandidateAnalysis(runId: number) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured.')
   const result = await structuredCandidateFit({
+    signal,
     apiKey,
     model: candidateFitModelId(),
     input: snapshot,

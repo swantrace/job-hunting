@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { isAbsolute, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 
@@ -30,6 +30,7 @@ if (!fileName) {
 }
 
 if (!insideRepository(fileName)) {
+  process.env.QUEUE_FILE_NAME ??= resolve(dirname(fileName), 'bunqueue.db')
   const sqlite = new Database(fileName, { create: true })
   try {
     sqlite.exec('PRAGMA foreign_keys = ON;')

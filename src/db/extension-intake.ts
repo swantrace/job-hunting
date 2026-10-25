@@ -358,8 +358,3 @@ export function extensionBatchStatus(batchId: number) {
     }
   })
 }
-
-export function getExtensionRun(stage: 'job-analysis' | 'candidate-analysis', id: number) {
-  const table = stage === 'job-analysis' ? jobPostingAnalyses : applicationAnalysisRuns
-  return db.select().from(table).where(eq(table.id, id)).get()
-}
