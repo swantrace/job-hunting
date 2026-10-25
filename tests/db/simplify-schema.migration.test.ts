@@ -450,8 +450,8 @@ describe('schema simplification migration (0027)', () => {
       const tables = tableNames(sqlite)
       for (const table of droppedTables) expect(tables).not.toContain(table)
 
-      // Current chain: portfolio/state removed; extension and batch analysis added.
-      expect(tables).toHaveLength(38)
+      // Current chain: portfolio/state removed; intake, batch analysis and workflow outbox added.
+      expect(tables).toHaveLength(39)
       expect(tables).not.toContain('career_state')
       expect(
         sqlite

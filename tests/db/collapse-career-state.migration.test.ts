@@ -224,9 +224,9 @@ describe('career_state collapse migration (0029)', () => {
       // Apply the frozen 0029 migration on top of the 0028 database.
       migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
 
-      // The current chain also includes extension intake and batch analysis.
+      // The current chain also includes intake, batch analysis and the workflow outbox.
       const tables = tableNames(sqlite)
-      expect(tables).toHaveLength(38)
+      expect(tables).toHaveLength(39)
       expect(tables).not.toContain('career_state')
 
       // Every career row count and direction link survives.
@@ -358,7 +358,7 @@ describe('career_state collapse migration (0029)', () => {
     try {
       migrate(drizzle({ client: sqlite }), { migrationsFolder: './drizzle' })
       const tables = tableNames(sqlite)
-      expect(tables).toHaveLength(38)
+      expect(tables).toHaveLength(39)
       expect(tables).not.toContain('career_state')
       const columns = (table: string) =>
         sqlite

@@ -1,9 +1,9 @@
-import type { Queue, Worker } from 'bunqueue/client'
 import { eq } from 'drizzle-orm'
 import { parseJobDescription } from '../../ai/client'
 import { jobParserModelId } from '../../ai/models'
 import { jobParserPromptVersion } from '../../ai/prompts/job-parser'
 import { jobAnalysisSchemaVersion } from '../../ai/schemas/job-analysis'
+import { createAnalysisWorkflow } from '../../db/analysis-workflows'
 import { db } from '../../db/client'
 import {
   completeJobAnalysisRun,
@@ -11,184 +11,79 @@ import {
   failJobAnalysisRun,
   findReusableJobAnalysisRun,
   getJobAnalysisRun,
-  listQueuedJobAnalysisRuns,
   markJobAnalysisRunProcessing,
-  resetStaleProcessingJobAnalysisRuns,
 } from '../../db/job-analysis-runs'
-import { batchAnalysisItems, jobIntakeItems, jobPostings } from '../../db/schema'
-import { autoChainCandidateAnalysis } from '../analysis/chain'
+import { jobPostings } from '../../db/schema'
 import { buildJobAnalysisInput, frozenSuppliedCatalog } from './input'
 
-type JobAnalysisQueueJob = { runId: number }
-
-const queueName = 'job-analysis'
-const queueDataPath = () =>
-  process.env.QUEUE_FILE_NAME ??
-  process.env.BUNQUEUE_DATA_PATH ??
-  `${process.cwd().endsWith('/dist') ? '../' : ''}bunqueue.db`
-
-let queue: Queue<JobAnalysisQueueJob> | undefined
-let worker: Worker<JobAnalysisQueueJob, { runId: number }> | undefined
-let bunQueueModule: Promise<typeof import('bunqueue/client')> | undefined
-
-function usePersistentQueue() {
-  return process.env.NODE_ENV === 'production'
+/** Prepare and freeze a run without dispatching it. Called in the owner's transaction. */
+export function prepareJobAnalysisRun(jobPostingId: number) {
+  const built = buildJobAnalysisInput(db, jobPostingId)
+  if (!built) return { run: null, reused: false as const, reason: 'missing-posting' as const }
+  const reusable = findReusableJobAnalysisRun(db, jobPostingId, built.inputHash)
+  if (reusable) return { run: reusable, reused: true }
+  return {
+    run: createJobAnalysisRun(db, {
+      jobPostingId,
+      inputHash: built.inputHash,
+      frozenInputJson: JSON.stringify(built.snapshot),
+      model: jobParserModelId(),
+      promptVersion: jobParserPromptVersion,
+      schemaVersion: jobAnalysisSchemaVersion,
+    }),
+    reused: false,
+  }
 }
 
-async function getBunQueue() {
-  if (!usePersistentQueue()) return null
-  bunQueueModule ??= import('bunqueue/client')
-  return bunQueueModule
-}
-
-async function getQueue() {
-  const bunQueue = await getBunQueue()
-  if (!bunQueue) return null
-  queue ??= new bunQueue.Queue<JobAnalysisQueueJob>(queueName, {
-    embedded: true,
-    dataPath: queueDataPath(),
-    defaultJobOptions: { attempts: 1, backoff: 10_000, timeout: 900_000, durable: true },
-  })
-  return queue
-}
-
-async function processJobAnalysis(
-  runId: number,
-  updateProgress: (progress: number, message: string) => Promise<unknown>,
-) {
+export async function executeJobAnalysis(runId: number, signal?: AbortSignal) {
   const run = getJobAnalysisRun(db, runId)
-  if (!run) return { runId }
-  if (run.status === 'Completed') return { runId: run.id }
-  if (run.status === 'Processing') return { runId: run.id }
-  markJobAnalysisRunProcessing(db, run.id)
-  await updateProgress(10, 'Analyzing job post')
+  if (!run) throw new Error('Job analysis run no longer exists.')
+  if (run.status === 'Completed') return
+  if (run.status === 'Failed')
+    throw new Error(run.errorMessage ?? 'Job analysis failed. Retry explicitly.')
+  if (run.status === 'Processing')
+    throw new Error('Job analysis is already processing; it is not complete.')
+  markJobAnalysisRunProcessing(db, runId)
   try {
     const posting = db.select().from(jobPostings).where(eq(jobPostings.id, run.jobPostingId)).get()
     if (!posting) throw new Error('Job posting no longer exists.')
-    // The bounded catalog was retrieved from this posting when the run was
-    // enqueued; the prompt receives exactly that set and completion resolves
-    // against it, so prompt and resolution cannot disagree.
     const parsed = await parseJobDescription(
-      process.env as Record<string, string | undefined>,
+      process.env,
       posting.rawText,
       frozenSuppliedCatalog(run.frozenInputJson),
+      signal,
     )
-    completeJobAnalysisRun(db, run.id, parsed)
-    // The extension reconciler owns its child IDs; website intake uses the
-    // same automatic chain without waiting for catalog approval.
-    const extensionItem = db
-      .select()
-      .from(jobIntakeItems)
-      .where(eq(jobIntakeItems.jobPostingId, posting.id))
-      .all()
-      .some((item) => item.pipelineStatus !== null)
-    const batchItem = db
-      .select({ id: batchAnalysisItems.id })
-      .from(batchAnalysisItems)
-      .where(eq(batchAnalysisItems.jobAnalysisRunId, run.id))
-      .get()
-    if (!extensionItem && !batchItem) await autoChainCandidateAnalysis(posting.jobApplicationId)
-    await updateProgress(100, 'Complete')
-    return { runId: run.id }
+    signal?.throwIfAborted()
+    completeJobAnalysisRun(db, runId, parsed)
   } catch (error) {
-    failJobAnalysisRun(db, run.id, error)
+    failJobAnalysisRun(db, runId, error)
     throw error
   }
 }
 
-export async function startJobAnalysisWorker() {
-  if (worker || !usePersistentQueue()) return worker
-  const bunQueue = await getBunQueue()
-  if (!bunQueue) return undefined
-  worker = new bunQueue.Worker<JobAnalysisQueueJob, { runId: number }>(
-    queueName,
-    (job) =>
-      processJobAnalysis(job.data.runId, (progress, message) =>
-        job.updateProgress(progress, message),
-      ),
-    {
-      embedded: true,
-      dataPath: queueDataPath(),
-      concurrency: 3,
-      heartbeatInterval: 10_000,
-    },
-  )
-  worker.on('error', (error) => console.error('Job analysis worker error', error))
-  return worker
-}
+export type EnqueueJobAnalysisResult = ReturnType<typeof prepareJobAnalysisRun>
 
-export type EnqueueJobAnalysisResult =
-  | { run: NonNullable<ReturnType<typeof getJobAnalysisRun>>; reused: boolean; reason?: undefined }
-  | { run: null; reused: false; reason: 'missing-posting' }
-
-/**
- * Persists the frozen input before queueing and returns immediately for
- * polling. The identity is built and the run row written in one read
- * transaction, so a concurrent career or catalog write cannot produce a run
- * whose stored snapshot disagrees with its hash. A queued or processing run
- * with the same input hash is reused; an explicit rerun after completion
- * creates a new append-only record.
- */
 export async function enqueueJobAnalysis(
   jobPostingId: number,
   persisted?: (run: { id: number }) => void,
 ): Promise<EnqueueJobAnalysisResult> {
-  const outcome = db.transaction(() => {
-    const built = buildJobAnalysisInput(db, jobPostingId)
-    if (!built) return { kind: 'missing' as const }
-    const reusable = findReusableJobAnalysisRun(db, jobPostingId, built.inputHash)
-    if (reusable) return { kind: 'reused' as const, run: reusable }
-    const model = jobParserModelId()
-    const run = createJobAnalysisRun(db, {
+  const result = db.transaction(() => {
+    const prepared = prepareJobAnalysisRun(jobPostingId)
+    if (!prepared.run) return prepared
+    const posting = db.select().from(jobPostings).where(eq(jobPostings.id, jobPostingId)).get()!
+    createAnalysisWorkflow({
+      sourceKey: `job-run:${prepared.run.id}`,
+      mode: 'job-and-candidate',
+      jobApplicationId: posting.jobApplicationId,
       jobPostingId,
-      inputHash: built.inputHash,
-      frozenInputJson: JSON.stringify(built.snapshot),
-      model,
-      promptVersion: jobParserPromptVersion,
-      schemaVersion: jobAnalysisSchemaVersion,
+      jobAnalysisRunId: prepared.run.id,
     })
-    return { kind: 'created' as const, run }
+    persisted?.(prepared.run)
+    return prepared
   })
-  if (outcome.kind === 'missing') return { run: null, reused: false, reason: 'missing-posting' }
-  const run = outcome.run
-  persisted?.(run)
-  await dispatchJobAnalysisRun(run.id)
-  return { run, reused: outcome.kind === 'reused' }
-}
-
-/** Redispatch the persisted snapshot, never rebuild it from changed live facts. */
-export async function dispatchJobAnalysisRun(runId: number) {
-  const run = getJobAnalysisRun(db, runId)
-  if (!run || run.status !== 'Queued') return
-  const persistentQueue = await getQueue()
-  if (!persistentQueue) {
-    void processJobAnalysis(run.id, async () => undefined).catch((error) =>
-      console.error('Development job analysis failed', error),
-    )
-    return
+  if (result.run) {
+    const { dispatchAnalysisWorkflows } = await import('../analysis/workflow')
+    await dispatchAnalysisWorkflows()
   }
-  await persistentQueue.add(
-    'analyze-job',
-    { runId: run.id },
-    { jobId: run.queueJobId ?? undefined, durable: true },
-  )
-}
-
-export async function recoverQueuedJobAnalysisRuns() {
-  resetStaleProcessingJobAnalysisRuns(db)
-  const queued = listQueuedJobAnalysisRuns(db)
-  const persistentQueue = await getQueue()
-  for (const run of queued) {
-    if (!persistentQueue) {
-      void processJobAnalysis(run.id, async () => undefined).catch((error) =>
-        console.error('Development job analysis recovery failed', error),
-      )
-      continue
-    }
-    await persistentQueue.add(
-      'analyze-job',
-      { runId: run.id },
-      { jobId: run.queueJobId ?? undefined, durable: true },
-    )
-  }
+  return result
 }
